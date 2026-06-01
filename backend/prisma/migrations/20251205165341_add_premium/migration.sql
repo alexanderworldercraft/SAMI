@@ -1,0 +1,8 @@
+-- AlterTable
+ALTER TABLE `Series` ADD COLUMN `Premium` BOOLEAN NULL;
+
+-- AlterTable
+ALTER TABLE `Utilisateur` ADD COLUMN `PremiumEndDate` DATETIME(3) NULL DEFAULT CURRENT_TIMESTAMP(3);
+
+-- AlterTable
+ALTER TABLE `Video` ADD COLUMN `Premium` BOOLEAN NULL;

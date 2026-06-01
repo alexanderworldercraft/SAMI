@@ -1,0 +1,309 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+generator erd {
+  provider = "prisma-erd-generator"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model Etat {
+  EtatID       Int           @id @default(autoincrement())
+  Nom          String        @db.VarChar(100)
+  CreateDate   DateTime?     @default(now())
+  Series       Series[]
+  Utilisateurs Utilisateur[]
+  Videos       Video[]
+}
+
+model Grade {
+  GradeID      Int           @id @default(autoincrement())
+  Nom          String        @unique @db.VarChar(50)
+  CreateDate   DateTime?     @default(now())
+  Utilisateurs Utilisateur[]
+}
+
+model Genre {
+  GenreID          Int                   @id @default(autoincrement())
+  Nom              String                @db.VarChar(50)
+  CreateDate       DateTime?             @default(now())
+  FeaturedContent  GenreFeaturedContent?
+  SeriesGenres     SeriesGenre[]
+  UtilisateurGenre UtilisateurGenre[]
+  VideoGenres      VideoGenre[]
+}
+
+model Series {
+  SeriesID             Int                    @id @default(autoincrement())
+  Titre                String                 @db.VarChar(100)
+  Resumer              String                 @db.Text
+  CheminImage          String                 @db.VarChar(255)
+  EtatID               Int
+  CreateDate           DateTime?              @default(now())
+  UtilisateurID        Int?
+  Premium              Boolean                @default(false)
+  Log                  Log[]
+  Saisons              Saison[]
+  Etat                 Etat                   @relation(fields: [EtatID], references: [EtatID])
+  Utilisateur          Utilisateur?           @relation(fields: [UtilisateurID], references: [UtilisateurID])
+  SeriesGenres         SeriesGenre[]
+  SeriesPersonne       SeriesPersonne[]
+  UserSeriesWatchReset UserSeriesWatchReset[]
+  GenreFeaturedContent GenreFeaturedContent[]
+
+  @@index([EtatID], map: "Series_EtatID_fkey")
+  @@index([UtilisateurID], map: "Series_UtilisateurID_fkey")
+}
+
+model SeriesGenre {
+  SeriesGenreID Int       @id @default(autoincrement())
+  SeriesID      Int
+  GenreID       Int
+  CreateDate    DateTime? @default(now())
+  Genre         Genre     @relation(fields: [GenreID], references: [GenreID])
+  Series        Series    @relation(fields: [SeriesID], references: [SeriesID])
+
+  @@index([GenreID], map: "SeriesGenre_GenreID_fkey")
+  @@index([SeriesID], map: "SeriesGenre_SeriesID_fkey")
+}
+
+model Saison {
+  SaisonID      Int          @id @default(autoincrement())
+  Numero        Int
+  SeriesID      Int
+  CreateDate    DateTime?    @default(now())
+  UtilisateurID Int?
+  Log           Log[]
+  Series        Series       @relation(fields: [SeriesID], references: [SeriesID])
+  Utilisateur   Utilisateur? @relation(fields: [UtilisateurID], references: [UtilisateurID])
+  Episodes      Video[]
+
+  @@index([SeriesID], map: "Saison_SeriesID_fkey")
+  @@index([UtilisateurID], map: "Saison_UtilisateurID_fkey")
+}
+
+model Video {
+  VideoID              Int                    @id @default(autoincrement())
+  Titre                String                 @db.VarChar(100)
+  Resumer              String?                @db.Text
+  CheminAcces          String                 @db.VarChar(255)
+  CheminImage          String?                @db.VarChar(255)
+  EtatID               Int
+  SaisonID             Int?
+  CreateDate           DateTime?              @default(now())
+  UtilisateurID        Int?
+  Premium              Boolean                @default(false)
+  Log                  Log[]
+  Etat                 Etat                   @relation(fields: [EtatID], references: [EtatID])
+  Saison               Saison?                @relation(fields: [SaisonID], references: [SaisonID])
+  Utilisateur          Utilisateur?           @relation(fields: [UtilisateurID], references: [UtilisateurID])
+  VideoGenres          VideoGenre[]
+  VideoPersonne        VideoPersonne[]
+  UserVideoProgress    UserVideoProgress[]
+  VideoSubtitles       VideoSubtitle[]
+  GenreFeaturedContent GenreFeaturedContent[]
+
+  @@index([EtatID], map: "Video_EtatID_fkey")
+  @@index([SaisonID], map: "Video_SaisonID_fkey")
+  @@index([UtilisateurID], map: "Video_UtilisateurID_fkey")
+}
+
+model VideoGenre {
+  VideoGenreID Int       @id @default(autoincrement())
+  VideoID      Int
+  GenreID      Int
+  CreateDate   DateTime? @default(now())
+  Genre        Genre     @relation(fields: [GenreID], references: [GenreID])
+  Video        Video     @relation(fields: [VideoID], references: [VideoID])
+
+  @@index([GenreID], map: "VideoGenre_GenreID_fkey")
+  @@index([VideoID], map: "VideoGenre_VideoID_fkey")
+}
+
+model VideoSubtitle {
+  VideoSubtitleID Int       @id @default(autoincrement())
+  Label           String    @db.VarChar(100)
+  CheminSubtitle  String    @db.VarChar(255)
+  VideoID         Int
+  CreateDate      DateTime? @default(now())
+  Video           Video     @relation(fields: [VideoID], references: [VideoID])
+
+  @@index([VideoID], map: "VideoSubtitle_VideoID_fkey")
+}
+
+model UtilisateurGenre {
+  UtilisateurGenreID Int         @id @default(autoincrement())
+  UtilisateurID      Int
+  GenreID            Int
+  CreateDate         DateTime?   @default(now())
+  Genre              Genre       @relation(fields: [GenreID], references: [GenreID])
+  Utilisateur        Utilisateur @relation(fields: [UtilisateurID], references: [UtilisateurID])
+
+  @@index([GenreID], map: "UtilisateurGenre_GenreID_fkey")
+  @@index([UtilisateurID], map: "UtilisateurGenre_UtilisateurID_fkey")
+}
+
+model Utilisateur {
+  UtilisateurID        Int                    @id @default(autoincrement())
+  Surnom               String                 @unique
+  MotDePasse           String                 @db.VarChar(255)
+  CheminImage          String?                @db.VarChar(255)
+  Email                String                 @db.VarChar(100)
+  Salt                 String                 @db.VarChar(255)
+  GradeID              Int
+  EtatID               Int
+  CreateDate           DateTime?              @default(now())
+  LastLogin            DateTime?
+  PremiumEndDate       DateTime?
+  Log                  Log[]
+  Saisons              Saison[]
+  Seriess              Series[]
+  Etat                 Etat                   @relation(fields: [EtatID], references: [EtatID])
+  Grade                Grade                  @relation(fields: [GradeID], references: [GradeID])
+  UtilisateurGenre     UtilisateurGenre[]
+  Videos               Video[]
+  UserVideoProgress    UserVideoProgress[]
+  UserSeriesWatchReset UserSeriesWatchReset[]
+
+  @@index([GradeID], map: "Utilisateur_GradeID_fkey")
+  @@index([EtatID], map: "Utilisateur_EtatID_fkey")
+}
+
+model UserSeriesWatchReset {
+  UserSeriesWatchResetID BigInt      @id @default(autoincrement())
+  UserID                 Int
+  SeriesID               Int
+  ResetAt                DateTime    @default(now())
+  CreatedAt              DateTime    @default(now())
+  UpdatedAt              DateTime    @default(now()) @updatedAt
+  Utilisateur            Utilisateur @relation(fields: [UserID], references: [UtilisateurID], onDelete: Cascade)
+  Series                 Series      @relation(fields: [SeriesID], references: [SeriesID], onDelete: Cascade)
+
+  @@unique([UserID, SeriesID], map: "uniq_user_series_watch_reset")
+  @@index([UserID], map: "idx_user_series_watch_reset_user")
+  @@index([SeriesID], map: "idx_user_series_watch_reset_series")
+}
+
+model UserVideoProgress {
+  UserVideoProgressID BigInt      @id @default(autoincrement())
+  UserID              Int
+  VideoID             Int
+  Timecode            Int
+  Duration            Int
+  ProgressPercent     Decimal     @default(dbgenerated("((`Timecode` / `Duration`) * 100)")) @db.Decimal(5, 2)
+  UpdatedAt           DateTime    @default(now()) @updatedAt
+  Utilisateur         Utilisateur @relation(fields: [UserID], references: [UtilisateurID], onDelete: Cascade)
+  Video               Video       @relation(fields: [VideoID], references: [VideoID], onDelete: Cascade)
+
+  @@unique([UserID, VideoID], map: "uniq_user_video")
+  @@index([UserID], map: "idx_user_video_progress_user")
+  @@index([VideoID], map: "idx_user_video_progress_video")
+}
+
+model GenreFeaturedContent {
+  GenreFeaturedContentID BigInt    @id @default(autoincrement())
+  GenreID                Int       @unique
+  VideoID                Int?
+  SeriesID               Int?
+  ContentKey             String?   @db.VarChar(40)
+  PreviousContentKey     String?   @db.VarChar(40)
+  CandidateCount         Int       @default(0)
+  ActiveFrom             DateTime  @default(now())
+  UpdatedAt              DateTime  @default(now()) @updatedAt
+  CreateDate             DateTime? @default(now())
+  Genre                  Genre     @relation(fields: [GenreID], references: [GenreID], onDelete: Cascade)
+  Video                  Video?    @relation(fields: [VideoID], references: [VideoID], onDelete: SetNull)
+  Series                 Series?   @relation(fields: [SeriesID], references: [SeriesID], onDelete: SetNull)
+
+  @@index([VideoID], map: "idx_genre_featured_video")
+  @@index([SeriesID], map: "idx_genre_featured_series")
+  @@index([ContentKey], map: "idx_genre_featured_content_key")
+}
+
+model Log {
+  LogID          BigInt      @id @default(autoincrement())
+  UtilisateurID  Int
+  ActionID       Int
+  VideoID        Int?
+  SeriesID       Int?
+  SaisonID       Int?
+  Champ          String?     @db.VarChar(80)
+  AncienneValeur String?     @db.Text
+  NouvelleValeur String?     @db.Text
+  Ip             String?     @db.VarChar(45)
+  UserAgent      String?     @db.VarChar(255)
+  Meta           Json?
+  DateAction     DateTime    @default(now())
+  CreateDate     DateTime?   @default(now())
+  action         Action      @relation(fields: [ActionID], references: [ActionID])
+  utilisateur    Utilisateur @relation(fields: [UtilisateurID], references: [UtilisateurID])
+  Saison         Saison?     @relation(fields: [SaisonID], references: [SaisonID], map: "fk_log_saison")
+  Series         Series?     @relation(fields: [SeriesID], references: [SeriesID], map: "fk_log_series")
+  Video          Video?      @relation(fields: [VideoID], references: [VideoID], map: "fk_log_video")
+
+  @@index([ActionID, DateAction], map: "idx_log_action_date")
+  @@index([SaisonID, DateAction], map: "idx_log_saison_date")
+  @@index([SeriesID, DateAction], map: "idx_log_series_date")
+  @@index([UtilisateurID, DateAction], map: "idx_log_user_date")
+  @@index([VideoID, DateAction], map: "idx_log_video_date")
+}
+
+model Action {
+  ActionID    Int       @id @default(autoincrement())
+  Nom         String    @unique
+  Description String?
+  Criticite   Int?
+  CreateDate  DateTime? @default(now())
+  logs        Log[]
+}
+
+model Personne {
+  PersonneID  Int              @id @default(autoincrement())
+  Nom         String
+  Prenom      String
+  Surnom      String?
+  CheminImage String?
+  ImageStatut StatutImage      @default(DEFAULT)
+  CreateDate  DateTime?        @default(now())
+  Series      SeriesPersonne[]
+  Videos      VideoPersonne[]
+}
+
+model VideoPersonne {
+  VideoPersonneID Int       @id @default(autoincrement())
+  VideoID         Int
+  PersonneID      Int
+  EstActeur       Boolean   @default(false)
+  EstRealisateur  Boolean   @default(false)
+  CreateDate      DateTime? @default(now())
+  Personne        Personne  @relation(fields: [PersonneID], references: [PersonneID])
+  Video           Video     @relation(fields: [VideoID], references: [VideoID])
+
+  @@unique([VideoID, PersonneID])
+  @@index([PersonneID])
+  @@index([VideoID])
+}
+
+model SeriesPersonne {
+  SeriesPersonneID Int       @id @default(autoincrement())
+  SeriesID         Int
+  PersonneID       Int
+  EstActeur        Boolean   @default(false)
+  EstRealisateur   Boolean   @default(false)
+  CreateDate       DateTime? @default(now())
+  Personne         Personne  @relation(fields: [PersonneID], references: [PersonneID])
+  Series           Series    @relation(fields: [SeriesID], references: [SeriesID])
+
+  @@unique([SeriesID, PersonneID])
+  @@index([PersonneID])
+  @@index([SeriesID])
+}
+
+enum StatutImage {
+  DEFAULT
+  CUSTOM
+}

@@ -1,0 +1,216 @@
+import { PrismaClient } from '@prisma/client'; // Import pour Prisma
+import bcrypt from 'bcrypt'; // Import pour bcrypt
+
+const prisma = new PrismaClient();
+
+async function main() {
+  // Générer un mot de passe sécurisé
+  const saltSuperAdmin = await bcrypt.genSalt(10);
+  const saltAdmin = await bcrypt.genSalt(10);
+  const hashedPasswordSuperAdmin = await bcrypt.hash(`${process.env.PASSWORDSUPERADMIN}`, saltSuperAdmin);
+  const hashedPasswordAdmin = await bcrypt.hash(`${process.env.PASSWORDADMIN}`, saltAdmin);
+
+  // Ajouter des grades par défaut
+  await prisma.grade.createMany({
+    data: [
+      { Nom: "SuperAdmin" },
+      { Nom: "Admin" },
+      { Nom: "Utilisateur" },
+    ],
+    skipDuplicates: true, // Évite les erreurs si les grades existent déjà
+  });
+
+  console.log("Grades par défaut ajoutés !");
+
+  // Ajouter des Etat par défaut
+  await prisma.etat.createMany({
+    data: [
+      { Nom: "Actif" },
+      { Nom: "Supprimer" },
+      { Nom: "Bloquer" },
+      { Nom: "Vendu" },
+    ],
+    skipDuplicates: true, // Évite les erreurs si les grades existent déjà
+  });
+
+  console.log("Etat par défaut ajoutés !");
+
+  // Ajouter des Etat par défaut
+  await prisma.action.createMany({
+    data: [
+      {
+        Nom: "connexion",
+        Description: "Connexion d'un utilisateur.",
+        Criticite: 1,
+      },
+      {
+        Nom: "deconnexion",
+        Description: "Déconnexion d'un utilisateur.",
+        Criticite: 1,
+      },
+      {
+        Nom: "reset_mot_de_passe",
+        Description: 'Réinitialisation du mot de passe via la fonctionnalité "Mot de passe oublié".',
+        Criticite: 2,
+      },
+      {
+        Nom: "reset_mot_de_passe_echec",
+        Description: 'Tentative de réinitialisation de mot de passe avec combinaison surnom/email invalide.',
+        Criticite: 3,
+      },
+      {
+        Nom: "connexion_echec",
+        Description: 'Tentative de connexion avec mot de passe incorrect.',
+        Criticite: 2,
+      },
+      {
+        Nom: "login_lock",
+        Description: 'Blocage temporaire des tentatives de connexion après plusieurs échecs.',
+        Criticite: 3,
+      },
+      {
+        Nom: "update_parametres",
+        Description: 'Maj des paramètres.',
+        Criticite: 1,
+      },
+      {
+        Nom: "update_parametres_echec",
+        Description: 'Tentative de MAJ des paramètres avec mot de passe incorrect.',
+        Criticite: 2,
+      },
+      {
+        Nom: "update_parametres_lock",
+        Description: 'Blocage temporaire des tentatives de connexion après plusieurs échecs des MAJ des paramètres.',
+        Criticite: 3,
+      },
+      {
+        Nom: "delete_account",
+        Description: 'Supression du compte.',
+        Criticite: 1,
+      },
+      {
+        Nom: "delete_account_echec",
+        Description: 'Tentative de supression du compte avec mot de passe incorrect.',
+        Criticite: 2,
+      },
+      {
+        Nom: "delete_account_lock",
+        Description: 'Blocage temporaire des tentatives de connexion après plusieurs échecs de supression du compte.',
+        Criticite: 3,
+      },
+      {
+        Nom: "video_update",
+        Description: 'Utilisateur MAJ X vidéo.',
+        Criticite: 1,
+      },
+      {
+        Nom: "serie_update",
+        Description: 'Utilisateur MAJ X série.',
+        Criticite: 1,
+      },
+      {
+        Nom: "video_first_play",
+        Description: 'Utilisateur regarde X vidéo.',
+        Criticite: 0,
+      },
+    ],
+    skipDuplicates: true, // Évite les erreurs si les grades existent déjà
+  });
+
+  console.log("Action par défaut ajoutés !");
+  
+// Ajouter des Genre par défaut
+await prisma.genre.createMany({
+  data: [
+    { Nom: "Action" },
+    { Nom: "Animations" },
+    { Nom: "Aventure" },
+    { Nom: "Biographie" },
+    { Nom: "Buddy cop" },
+    { Nom: "Catastrophe" },
+    { Nom: "Comédie" },
+    { Nom: "Court-métrage" },
+    { Nom: "Cyberpunk" },
+    { Nom: "Documentaire" },
+    { Nom: "Drame" },
+    { Nom: "Dystopique" },
+    { Nom: "Épique" },
+    { Nom: "Épouvante" },
+    { Nom: "Espionnage" },
+    { Nom: "Expérimental" },
+    { Nom: "Fantastique" },
+    { Nom: "Fantasy" },
+    { Nom: "Film culte" },
+    { Nom: "Film noir" },
+    { Nom: "Films" },
+    { Nom: "Guerre" },
+    { Nom: "Historique" },
+    { Nom: "Horreur" },
+    { Nom: "IA" },
+    { Nom: "Isekai" },
+    { Nom: "Mélo (Mélodrame)" },
+    { Nom: "Mockumentaire (faux documentaire)" },
+    { Nom: "Musical" },
+    { Nom: "Mystère" },
+    { Nom: "Parodie" },
+    { Nom: "Policier" },
+    { Nom: "Post-apocalyptique" },
+    { Nom: "Psychologique" },
+    { Nom: "Road movie" },
+    { Nom: "Romance" },
+    { Nom: "Science-fiction" },
+    { Nom: "Séries" },
+    { Nom: "Shōnen" },
+    { Nom: "Slasher" },
+    { Nom: "Space opera" },
+    { Nom: "Steampunk" },
+    { Nom: "Super-héros" },
+    { Nom: "Surnaturel" },
+    { Nom: "Survival" },
+    { Nom: "Suspense" },
+    { Nom: "Thriller" },
+    { Nom: "Tranche de vie" },
+    { Nom: "Uchronie" },
+    { Nom: "Western" },
+    { Nom: "YouTube" },
+  ],
+  skipDuplicates: true,
+});
+
+console.log("Genre par défaut ajoutés !");
+
+  // Créer un utilisateur par défaut
+  await prisma.utilisateur.createMany({
+    data: [
+      {
+        Surnom: `${process.env.USERNAMESUPERADMIN}`, // Remplacez par le surnom souhaité
+        Email: `${process.env.EMAILSUPERADMIN}`, // Remplacez par un email valide
+        Salt: saltSuperAdmin,
+        MotDePasse: hashedPasswordSuperAdmin,
+        GradeID: 1,
+        EtatID: 1,
+        PremiumEndDate: "2026-05-13T18:46:36.166Z",
+      },
+      {
+        Surnom: `${process.env.USERNAMEADMIN}`, // Remplacez par le surnom souhaité
+        Email: `${process.env.EMAILADMIN}`, // Remplacez par un email valide
+        Salt: saltAdmin,
+        MotDePasse: hashedPasswordAdmin,
+        GradeID: 2,
+        EtatID: 1,
+        PremiumEndDate: "2026-05-13T18:46:36.166Z",
+      },
+    ]
+  });
+
+  console.log("Utilisateur par défaut ajouté !");
+}
+
+main()
+  .catch((e) => {
+    console.error(e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });

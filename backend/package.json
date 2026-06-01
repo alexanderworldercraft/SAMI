@@ -1,0 +1,40 @@
+{
+  "name": "backend",
+  "version": "1.0.0",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "seed": "node prisma/seed.js",
+    "start": "node sami.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "@fastify/cors": "^10.0.1",
+    "@fastify/multipart": "^9.0.1",
+    "@fastify/nextjs": "^11.0.0",
+    "@fastify/static": "^8.0.3",
+    "@fastify/swagger": "^9.4.0",
+    "@fastify/swagger-ui": "^5.1.0",
+    "@prisma/client": "^6.11.1",
+    "bcrypt": "^5.1.1",
+    "date-fns": "^4.1.0",
+    "dotenv": "^16.4.5",
+    "fastify": "^5.1.0",
+    "fluent-ffmpeg": "^2.1.3",
+    "jsonwebtoken": "^9.0.2",
+    "mysql2": "^3.11.4",
+    "node-cron": "^3.0.3",
+    "nodemailer": "^7.0.10",
+    "pino-pretty": "^13.0.0",
+    "prisma": "^6.11.1",
+    "promise-mysql": "^5.2.0",
+    "socket.io": "^4.8.1",
+    "vitest": "^2.1.6"
+  },
+  "devDependencies": {
+    "prisma-erd-generator": "^2.3.0"
+  }
+}

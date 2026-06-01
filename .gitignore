@@ -1,0 +1,52 @@
+# Dependencies
+node_modules/
+backend/node_modules/
+frontend/node_modules/
+
+# Environment files
+.env
+.env.*
+!.env.exemple
+backend/.env
+backend/.env.*
+!backend/.env.exemple
+frontend/.env
+frontend/.env.*
+!frontend/.env.exemple
+
+# Build outputs
+build/
+dist/
+frontend/build/
+
+# Local media and generated user data
+backend/uploads/
+backend/uploads/**
+uploads/
+
+# Archives and legacy exports
+archives/
+archive/
+
+# SSL secrets
+backend/ssl/*.key
+backend/ssl/*.crt
+backend/ssl/*.csr
+backend/ssl/*.pem
+
+# Logs and runtime files
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.DS_Store
+
+# Tool caches
+.cache/
+.eslintcache
+coverage/
+.nyc_output/
+
+# Prisma local artifacts
+backend/prisma/dev.db
+backend/prisma/dev.db-journal

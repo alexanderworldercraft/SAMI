@@ -1,0 +1,41 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+#background {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    object-fit: cover;
+    z-index: -9999;
+    background:
+        linear-gradient(to top,
+            rgba(0, 0, 0, 0) 0%,
+            #030303 100%),
+        radial-gradient(circle at 50% 100%,
+            #14171b 0%,
+            black 100%);
+}
+
+/* Barre de scroll page web */
+:root {
+    --color-scrollbar: #0284c7;
+}
+
+/* Pour la barre de défilement de base elle-même */
+::-webkit-scrollbar {
+    width: 14px;
+    background-color: #000;
+}
+
+/* Pour la "poignée" de la barre de défilement verticale */
+::-webkit-scrollbar-thumb {
+    background-color: var(--color-scrollbar);
+    border-radius: 7px;
+}
+
+body.has-maintenance-banner {
+    padding-bottom: 5rem;
+}
