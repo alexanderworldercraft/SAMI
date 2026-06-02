@@ -319,7 +319,7 @@ function AdminDrawer({ open, onClose, admin, activity, watchHistory, loadingWatc
                         <WatchHistoryCards
                           watchLogs={watchHistory}
                           loading={loadingWatchHistory}
-                          title="Contenu regardé (video_first_play)"
+                          title="Contenu regardé"
                           emptyText="Aucun contenu regardé pour cet administrateur."
                         />
                       </div>

@@ -56,7 +56,9 @@ const VideoSeePage = () => {
   const [resumeTime, setResumeTime] = useState(null);
   const [videoElement, setVideoElement] = useState(null);
   const [isResettingSeries, setIsResettingSeries] = useState(false);
+  const [skipFirstPlayLogKey, setSkipFirstPlayLogKey] = useState(0);
   const progressDeletedRef = useRef(false);
+  const resumeProgressRef = useRef(null);
 
 
   useEffect(() => {
@@ -367,6 +369,8 @@ const VideoSeePage = () => {
   useEffect(() => {
     setResumeOpen(false);
     setResumeTime(null);
+    setSkipFirstPlayLogKey(0);
+    resumeProgressRef.current = null;
     progressDeletedRef.current = false;
     if (!currentVideoId) return;
 
@@ -377,9 +381,11 @@ const VideoSeePage = () => {
         const response = await api.get(`/videos/${currentVideoId}/progress`);
         if (cancelled) return;
 
-        const savedTime = Number(response.data?.progress?.Timecode);
+        const progress = response.data?.progress || null;
+        const savedTime = Number(progress?.Timecode);
         if (!Number.isFinite(savedTime) || savedTime <= 0) return;
 
+        resumeProgressRef.current = progress;
         setResumeTime(savedTime);
         setResumeOpen(true);
       } catch (error) {
@@ -457,6 +463,15 @@ const VideoSeePage = () => {
       videoElement.addEventListener("loadedmetadata", onLoadedMetadata);
     }
 
+    api.post("/logs/video-resume-play", {
+      VideoID: currentVideoId,
+      StartTimecode: resumeTime,
+      Duration: resumeProgressRef.current?.Duration || Math.floor(videoElement.duration) || null,
+    }).catch((error) => {
+      console.warn("Log reprise vidéo échoué:", error?.message || error);
+    });
+    setSkipFirstPlayLogKey((prev) => prev + 1);
+
     setResumeOpen(false);
   };
 
@@ -467,6 +482,7 @@ const VideoSeePage = () => {
       });
     }
     setResumeOpen(false);
+    resumeProgressRef.current = null;
   };
 
   const renderRecommendationSection = (title, videos, label = "Propositions") => (
@@ -506,6 +522,7 @@ const VideoSeePage = () => {
                 video={video}
                 backgroundBlur={backgroundBlur}
                 onVideoElement={setVideoElement}
+                skipFirstPlayLogKey={skipFirstPlayLogKey}
               />
             </div>
           </section>

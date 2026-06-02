@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import Hls from "hls.js";
 import api from "../services/api";
 
-const VideoPlayer = ({ video, backgroundBlur, onVideoElement }) => {
+const VideoPlayer = ({ video, backgroundBlur, onVideoElement, skipFirstPlayLogKey = 0 }) => {
   const videoRef = useRef(null);
   const fitContainerRef = useRef(null);
 
@@ -23,6 +23,12 @@ const VideoPlayer = ({ video, backgroundBlur, onVideoElement }) => {
   useEffect(() => {
     hasLoggedFirstPlayRef.current = false;
   }, [video?.VideoID]);
+
+  useEffect(() => {
+    if (skipFirstPlayLogKey) {
+      hasLoggedFirstPlayRef.current = true;
+    }
+  }, [skipFirstPlayLogKey]);
 
   useEffect(() => {
     if (onVideoElement) {

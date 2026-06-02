@@ -373,7 +373,7 @@ function UserDrawer({ open, onClose, user, activity, watchHistory, loadingWatchH
                         <WatchHistoryCards
                           watchLogs={watchHistory}
                           loading={loadingWatchHistory}
-                          title="Contenu regardé (video_first_play)"
+                          title="Contenu regardé"
                           emptyText="Aucun contenu regardé pour cet utilisateur."
                         />
                       </div>

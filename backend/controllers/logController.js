@@ -18,6 +18,7 @@ const actionIdCache = new Map();
  * ⚠️ Protège uniquement dans UNE instance Node (ce qui est ton cas actuel).
  */
 const dedupeLocks = new Map();
+const VIDEO_PLAY_ACTIONS = ["video_first_play", "video_resume_play"];
 
 async function withDedupeLock(lockKey, fn) {
   // Si une exécution est déjà en cours pour cette clé, on attend qu'elle termine.
@@ -92,6 +93,97 @@ async function resolveActionId(ActionNom) {
 
   actionIdCache.set(ActionNom, action.ActionID);
   return action.ActionID;
+}
+
+const normalizeTimecodeMeta = ({ startTimecode = null, endTimecode = null, duration = null }) => {
+  const safeDuration = Number.isFinite(Number(duration)) && Number(duration) > 0
+    ? Math.floor(Number(duration))
+    : null;
+  const safeStart = Number.isFinite(Number(startTimecode)) && Number(startTimecode) >= 0
+    ? Math.floor(Number(startTimecode))
+    : null;
+  const safeEnd = Number.isFinite(Number(endTimecode)) && Number(endTimecode) >= 0
+    ? Math.floor(Number(endTimecode))
+    : null;
+
+  return {
+    startTimecode: safeStart,
+    endTimecode: safeEnd,
+    duration: safeDuration,
+    startPercent: safeDuration && safeStart !== null
+      ? Number(Math.min((safeStart / safeDuration) * 100, 100).toFixed(2))
+      : null,
+    endPercent: safeDuration && safeEnd !== null
+      ? Number(Math.min((safeEnd / safeDuration) * 100, 100).toFixed(2))
+      : null,
+  };
+};
+
+export async function updateLatestVideoPlayLogProgress({
+  UtilisateurID,
+  VideoID,
+  endTimecode,
+  duration,
+  final = false,
+}) {
+  const userId = Number(UtilisateurID);
+  const videoId = Number(VideoID);
+
+  if (!Number.isInteger(userId) || !Number.isInteger(videoId)) {
+    return { ok: false, reason: "INVALID_INPUT" };
+  }
+
+  try {
+    const actions = await prisma.action.findMany({
+      where: { Nom: { in: VIDEO_PLAY_ACTIONS } },
+      select: { ActionID: true, Nom: true },
+    });
+
+    const updates = await Promise.all(actions.map(async (action) => {
+      const latestLog = await prisma.log.findFirst({
+        where: {
+          UtilisateurID: userId,
+          VideoID: videoId,
+          ActionID: action.ActionID,
+        },
+        orderBy: { DateAction: "desc" },
+        select: { LogID: true, Meta: true },
+      });
+
+      if (!latestLog) return null;
+
+      const previousMeta =
+        latestLog.Meta && typeof latestLog.Meta === "object" && !Array.isArray(latestLog.Meta)
+          ? latestLog.Meta
+          : {};
+      const previousStart = previousMeta.startTimecode ?? previousMeta.timecodeStart;
+      const startTimecode = action.Nom === "video_resume_play"
+        ? previousStart ?? null
+        : previousMeta.startTimecode ?? null;
+      const progressMeta = normalizeTimecodeMeta({
+        startTimecode,
+        endTimecode,
+        duration,
+      });
+
+      return prisma.log.update({
+        where: { LogID: latestLog.LogID },
+        data: {
+          Meta: {
+            ...previousMeta,
+            ...progressMeta,
+            progressFinal: Boolean(final),
+            progressUpdatedAt: new Date().toISOString(),
+          },
+        },
+      });
+    }));
+
+    return { ok: true, updated: updates.filter(Boolean).length };
+  } catch (err) {
+    console.error("❌ updateLatestVideoPlayLogProgress:", err);
+    return { ok: false, reason: "EXCEPTION", error: err?.message };
+  }
 }
 
 /**
@@ -261,6 +353,25 @@ export const logVideoFirstPlay = async (request, reply) => {
     });
     if (!exists) return reply.code(404).send({ error: "Vidéo introuvable." });
 
+    const progress = await prisma.userVideoProgress.findUnique({
+      where: {
+        UserID_VideoID: {
+          UserID: Number(userId),
+          VideoID: videoId,
+        },
+      },
+      select: {
+        Timecode: true,
+        Duration: true,
+      },
+    });
+
+    const progressMeta = normalizeTimecodeMeta({
+      startTimecode: null,
+      endTimecode: progress?.Timecode ?? null,
+      duration: progress?.Duration ?? null,
+    });
+
     const res = await createLog({
       request,
       UtilisateurID: Number(userId),
@@ -274,6 +385,7 @@ export const logVideoFirstPlay = async (request, reply) => {
       Meta: {
         // Petit bonus utile: timestamp côté serveur
         serverTime: new Date().toISOString(),
+        ...progressMeta,
       },
       // ✅ Sécurité anti-double-call front (2 requêtes quasi simultanées)
       DedupeMs: 5000,
@@ -286,6 +398,84 @@ export const logVideoFirstPlay = async (request, reply) => {
     return reply.send({ ok: true });
   } catch (err) {
     console.error("❌ logVideoFirstPlay:", err);
+    return reply.code(500).send({ error: "Erreur serveur." });
+  }
+};
+
+export const logVideoResumePlay = async (request, reply) => {
+  try {
+    const { VideoID, StartTimecode, Duration } = request.body || {};
+    const videoId = parseInt(VideoID, 10);
+
+    if (Number.isNaN(videoId)) {
+      return reply.code(400).send({ error: "VideoID invalide." });
+    }
+
+    const userId = request.user?.userId;
+    if (!userId) {
+      return reply.code(401).send({ error: "Non authentifié." });
+    }
+
+    const exists = await prisma.video.findUnique({
+      where: { VideoID: videoId },
+      select: {
+        VideoID: true,
+        SaisonID: true,
+        Saison: { select: { SeriesID: true } },
+      },
+    });
+    if (!exists) return reply.code(404).send({ error: "Vidéo introuvable." });
+
+    const progress = await prisma.userVideoProgress.findUnique({
+      where: {
+        UserID_VideoID: {
+          UserID: Number(userId),
+          VideoID: videoId,
+        },
+      },
+      select: {
+        Timecode: true,
+        Duration: true,
+      },
+    });
+
+    const requestedStart = Number(StartTimecode);
+    const requestedDuration = Number(Duration);
+    const startTimecode = Number.isFinite(requestedStart) && requestedStart > 0
+      ? Math.floor(requestedStart)
+      : progress?.Timecode ?? null;
+    const duration = Number.isFinite(requestedDuration) && requestedDuration > 0
+      ? Math.floor(requestedDuration)
+      : progress?.Duration ?? null;
+
+    const res = await createLog({
+      request,
+      UtilisateurID: Number(userId),
+      ActionNom: "video_resume_play",
+      VideoID: videoId,
+      SaisonID: exists.SaisonID ?? null,
+      SeriesID: exists.Saison?.SeriesID ?? null,
+      Champ: "player",
+      AncienneValeur: null,
+      NouvelleValeur: "resume",
+      Meta: {
+        serverTime: new Date().toISOString(),
+        ...normalizeTimecodeMeta({
+          startTimecode,
+          endTimecode: startTimecode,
+          duration,
+        }),
+      },
+      DedupeMs: 5000,
+    });
+
+    if (!res.ok && res.reason === "ACTION_NOT_FOUND") {
+      return reply.code(500).send({ error: "Action 'video_resume_play' manquante en BDD." });
+    }
+
+    return reply.send({ ok: true });
+  } catch (err) {
+    console.error("❌ logVideoResumePlay:", err);
     return reply.code(500).send({ error: "Erreur serveur." });
   }
 };

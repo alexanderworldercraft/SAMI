@@ -113,6 +113,11 @@ async function main() {
         Description: 'Utilisateur regarde X vidéo.',
         Criticite: 0,
       },
+      {
+        Nom: "video_resume_play",
+        Description: 'Utilisateur reprend X vidéo depuis une progression enregistrée.',
+        Criticite: 0,
+      },
     ],
     skipDuplicates: true, // Évite les erreurs si les grades existent déjà
   });
@@ -179,29 +184,35 @@ await prisma.genre.createMany({
 
 console.log("Genre par défaut ajoutés !");
 
-  // Créer un utilisateur par défaut
-  await prisma.utilisateur.createMany({
-    data: [
-      {
-        Surnom: `${process.env.USERNAMESUPERADMIN}`, // Remplacez par le surnom souhaité
-        Email: `${process.env.EMAILSUPERADMIN}`, // Remplacez par un email valide
-        Salt: saltSuperAdmin,
-        MotDePasse: hashedPasswordSuperAdmin,
-        GradeID: 1,
-        EtatID: 1,
-        PremiumEndDate: "2026-05-13T18:46:36.166Z",
-      },
-      {
-        Surnom: `${process.env.USERNAMEADMIN}`, // Remplacez par le surnom souhaité
-        Email: `${process.env.EMAILADMIN}`, // Remplacez par un email valide
-        Salt: saltAdmin,
-        MotDePasse: hashedPasswordAdmin,
-        GradeID: 2,
-        EtatID: 1,
-        PremiumEndDate: "2026-05-13T18:46:36.166Z",
-      },
-    ]
-  });
+  // Créer les utilisateurs par défaut si absents.
+  const defaultUsers = [
+    {
+      Surnom: `${process.env.USERNAMESUPERADMIN}`,
+      Email: `${process.env.EMAILSUPERADMIN}`,
+      Salt: saltSuperAdmin,
+      MotDePasse: hashedPasswordSuperAdmin,
+      GradeID: 1,
+      EtatID: 1,
+      PremiumEndDate: "2026-05-13T18:46:36.166Z",
+    },
+    {
+      Surnom: `${process.env.USERNAMEADMIN}`,
+      Email: `${process.env.EMAILADMIN}`,
+      Salt: saltAdmin,
+      MotDePasse: hashedPasswordAdmin,
+      GradeID: 2,
+      EtatID: 1,
+      PremiumEndDate: "2026-05-13T18:46:36.166Z",
+    },
+  ].filter((user) => user.Surnom && user.Surnom !== "undefined");
+
+  for (const user of defaultUsers) {
+    await prisma.utilisateur.upsert({
+      where: { Surnom: user.Surnom },
+      update: {},
+      create: user,
+    });
+  }
 
   console.log("Utilisateur par défaut ajouté !");
 }

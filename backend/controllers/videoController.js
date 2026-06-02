@@ -5,7 +5,7 @@ import jwt from 'jsonwebtoken';
 import { prisma } from "../services/db.js";
 import { startOfDay, endOfDay, startOfMonth, endOfMonth, subDays } from "date-fns";
 import { fileURLToPath } from "url";
-import { createLog } from "./logController.js";
+import { createLog, updateLatestVideoPlayLogProgress } from "./logController.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -1452,6 +1452,14 @@ export const upsertVideoProgress = async (request, reply) => {
         },
       });
 
+      await updateLatestVideoPlayLogProgress({
+        UtilisateurID: userId,
+        VideoID: videoId,
+        endTimecode: duration,
+        duration,
+        final: true,
+      });
+
       return reply.send({
         progress: null,
         deleted: true,
@@ -1478,6 +1486,14 @@ export const upsertVideoProgress = async (request, reply) => {
       },
     });
 
+    await updateLatestVideoPlayLogProgress({
+      UtilisateurID: userId,
+      VideoID: videoId,
+      endTimecode: timecode,
+      duration,
+      final: false,
+    });
+
     return reply.send({
       progress: normalizeProgress(progress),
       deleted: false,
@@ -1501,12 +1517,34 @@ export const deleteVideoProgress = async (request, reply) => {
   }
 
   try {
+    const previousProgress = await prisma.userVideoProgress.findUnique({
+      where: {
+        UserID_VideoID: {
+          UserID: userId,
+          VideoID: videoId,
+        },
+      },
+      select: {
+        Duration: true,
+      },
+    });
+
     await prisma.userVideoProgress.deleteMany({
       where: {
         UserID: userId,
         VideoID: videoId,
       },
     });
+
+    if (previousProgress?.Duration) {
+      await updateLatestVideoPlayLogProgress({
+        UtilisateurID: userId,
+        VideoID: videoId,
+        endTimecode: previousProgress.Duration,
+        duration: previousProgress.Duration,
+        final: true,
+      });
+    }
 
     return reply.send({ progress: null, deleted: true });
   } catch (error) {

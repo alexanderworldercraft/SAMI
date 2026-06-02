@@ -25,6 +25,42 @@ function getImageUrl(cheminImage) {
   return `${apiBaseUrl}/uploads/images/videos/default.webp`;
 }
 
+function formatTimecode(seconds) {
+  const value = Number(seconds);
+  if (!Number.isFinite(value) || value < 0) return "--:--";
+  const total = Math.floor(value);
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+  if (h > 0) return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+  return `${m}:${String(s).padStart(2, "0")}`;
+}
+
+function getProgressFromLog(log) {
+  const meta = log?.Meta && typeof log.Meta === "object" ? log.Meta : {};
+  const duration = Number(meta.duration ?? meta.Duration);
+  const endTimecode = Number(meta.endTimecode ?? meta.timecodeEnd ?? meta.Timecode);
+  const startTimecode = log?.ActionNom === "video_resume_play"
+    ? Number(meta.startTimecode ?? meta.timecodeStart ?? 0)
+    : 0;
+
+  if (!Number.isFinite(duration) || duration <= 0) return null;
+  if (!Number.isFinite(endTimecode) || endTimecode < 0) return null;
+
+  const safeStart = Number.isFinite(startTimecode) && startTimecode > 0
+    ? Math.min(startTimecode, duration)
+    : 0;
+  const safeEnd = Math.min(Math.max(endTimecode, safeStart), duration);
+
+  return {
+    startTimecode: safeStart,
+    endTimecode: safeEnd,
+    duration,
+    startPercent: Math.min((safeStart / duration) * 100, 100),
+    watchedPercent: Math.max(Math.min(((safeEnd - safeStart) / duration) * 100, 100), 0),
+  };
+}
+
 function buildWatchGroups(watchLogs) {
   const filmMap = new Map();
   const seriesMap = new Map();
@@ -58,12 +94,16 @@ function buildWatchGroups(watchLogs) {
           videoId: video.VideoID,
           title: video.Titre || `Episode ${video.VideoID}`,
           seasonNumber: video.SaisonNumero ?? null,
-          dates: [],
+          plays: [],
         });
       }
 
       const episodeEntry = seriesEntry.episodes.get(video.VideoID);
-      episodeEntry.dates.push(log.DateAction);
+      episodeEntry.plays.push({
+        date: log.DateAction,
+        actionName: log.ActionNom,
+        progress: getProgressFromLog(log),
+      });
 
       if (dateTs > seriesEntry.latestDate) {
         seriesEntry.latestDate = dateTs;
@@ -76,13 +116,17 @@ function buildWatchGroups(watchLogs) {
           videoId: video.VideoID,
           title: video.Titre || `Video ${video.VideoID}`,
           image: video.CheminImage || null,
-          dates: [],
+          plays: [],
           latestDate: 0,
         });
       }
 
       const filmEntry = filmMap.get(video.VideoID);
-      filmEntry.dates.push(log.DateAction);
+      filmEntry.plays.push({
+        date: log.DateAction,
+        actionName: log.ActionNom,
+        progress: getProgressFromLog(log),
+      });
       if (dateTs > filmEntry.latestDate) {
         filmEntry.latestDate = dateTs;
       }
@@ -91,19 +135,19 @@ function buildWatchGroups(watchLogs) {
 
   const filmCards = Array.from(filmMap.values()).map((entry) => ({
     ...entry,
-    dates: entry.dates
+    plays: entry.plays
       .slice()
-      .sort((a, b) => new Date(b) - new Date(a)),
+      .sort((a, b) => new Date(b.date) - new Date(a.date)),
   }));
 
   const seriesCards = Array.from(seriesMap.values()).map((entry) => {
     const episodes = Array.from(entry.episodes.values()).map((episode) => ({
       ...episode,
-      dates: episode.dates
+      plays: episode.plays
         .slice()
-        .sort((a, b) => new Date(b) - new Date(a)),
-      latestDate: episode.dates.reduce((max, value) => {
-        const ts = new Date(value).getTime();
+        .sort((a, b) => new Date(b.date) - new Date(a.date)),
+      latestDate: episode.plays.reduce((max, value) => {
+        const ts = new Date(value.date).getTime();
         return Number.isFinite(ts) && ts > max ? ts : max;
       }, 0),
     }));
@@ -122,23 +166,47 @@ function buildWatchGroups(watchLogs) {
 const ITEMS_PER_PAGE = 6;
 const DATES_PER_PAGE = 20;
 
-const DateList = ({ dates = [], buttonClassName = "" }) => {
+const ProgressBar = ({ progress }) => {
+  if (!progress) return null;
+
+  return (
+    <div className="mt-1">
+      <div className="flex justify-between text-[11px] text-slate-500">
+        <span>{formatTimecode(progress.startTimecode)}</span>
+        <span>{formatTimecode(progress.endTimecode)} / {formatTimecode(progress.duration)}</span>
+      </div>
+      <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-white/10">
+        <div
+          className="h-full rounded-full bg-transparent"
+          style={{
+            marginLeft: `${progress.startPercent}%`,
+            width: `${progress.watchedPercent}%`,
+          }}
+        >
+          <div className="h-full rounded-full bg-gradient-to-r from-sky-300 to-blue-500" />
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const DateList = ({ plays = [], buttonClassName = "" }) => {
   const [open, setOpen] = useState(false);
   const [page, setPage] = useState(1);
 
   useEffect(() => {
     setPage(1);
-  }, [open, dates.length]);
+  }, [open, plays.length]);
 
-  if (!dates.length) {
+  if (!plays.length) {
     return (
       <p className="text-xs text-slate-500">Aucune date disponible.</p>
     );
   }
 
-  const totalPages = Math.max(1, Math.ceil(dates.length / DATES_PER_PAGE));
+  const totalPages = Math.max(1, Math.ceil(plays.length / DATES_PER_PAGE));
   const start = (page - 1) * DATES_PER_PAGE;
-  const pageItems = dates.slice(start, start + DATES_PER_PAGE);
+  const pageItems = plays.slice(start, start + DATES_PER_PAGE);
 
   return (
     <div className="mt-1">
@@ -155,9 +223,15 @@ const DateList = ({ dates = [], buttonClassName = "" }) => {
 
       {open && (
         <div className="mt-1 space-y-1">
-          {pageItems.map((date, idx) => (
-            <div key={idx} className="text-slate-400 text-xs">
-              {formatDateTime(date)}
+          {pageItems.map((play, idx) => (
+            <div key={idx} className="rounded border border-white/5 bg-white/[0.03] p-2 text-slate-400 text-xs">
+              <div className="flex items-center justify-between gap-2">
+                <span>{formatDateTime(play.date)}</span>
+                {play.actionName === "video_resume_play" && (
+                  <span className="text-[11px] font-semibold text-sky-300">Reprise</span>
+                )}
+              </div>
+              <ProgressBar progress={play.progress} />
             </div>
           ))}
 
@@ -166,7 +240,7 @@ const DateList = ({ dates = [], buttonClassName = "" }) => {
               <PaginationPage
                 currentPage={page}
                 totalPages={totalPages}
-                totalItems={dates.length}
+                totalItems={plays.length}
                 itemsPerPage={DATES_PER_PAGE}
                 onPageChange={setPage}
               />
@@ -260,16 +334,16 @@ const WatchHistoryCards = ({
                                 ? ` (S${episode.seasonNumber})`
                                 : ""}
                             </a>
-                            <DateList dates={episode.dates} />
+                            <DateList plays={episode.plays} />
                           </div>
                         ))}
                       </div>
                     ) : (
                       <>
                         <p className="text-slate-400">
-                          {card.dates.length} lecture{card.dates.length > 1 ? "s" : ""}
+                          {card.plays.length} lecture{card.plays.length > 1 ? "s" : ""}
                         </p>
-                        <DateList dates={card.dates} />
+                        <DateList plays={card.plays} />
                       </>
                     )}
                   </div>

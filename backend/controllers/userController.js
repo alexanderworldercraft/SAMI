@@ -43,28 +43,32 @@ function isUserPremium(user) {
 }
 
 async function buildWatchHistoryPayload(userId, limit) {
-  const action = await prisma.action.findUnique({
-    where: { Nom: "video_first_play" },
-    select: { ActionID: true },
+  const actions = await prisma.action.findMany({
+    where: { Nom: { in: ["video_first_play", "video_resume_play"] } },
+    select: { ActionID: true, Nom: true },
   });
 
-  if (!action?.ActionID) {
+  if (!actions.length) {
     return [];
   }
+
+  const actionById = new Map(actions.map((action) => [action.ActionID, action.Nom]));
 
   const logs = await prisma.log.findMany({
     where: {
       UtilisateurID: userId,
-      ActionID: action.ActionID,
+      ActionID: { in: actions.map((action) => action.ActionID) },
     },
     orderBy: { DateAction: "desc" },
     take: limit,
     select: {
       LogID: true,
+      ActionID: true,
       DateAction: true,
       VideoID: true,
       SeriesID: true,
       SaisonID: true,
+      Meta: true,
     },
   });
 
@@ -135,7 +139,9 @@ async function buildWatchHistoryPayload(userId, limit) {
 
     return {
       LogID: log.LogID ? log.LogID.toString() : null,
+      ActionNom: actionById.get(log.ActionID) || null,
       DateAction: log.DateAction,
+      Meta: log.Meta || null,
       Video: video
         ? {
             VideoID: video.VideoID,
