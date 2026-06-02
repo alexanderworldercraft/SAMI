@@ -1419,6 +1419,9 @@ export const upsertVideoProgress = async (request, reply) => {
   const videoId = parsePositiveInt(request.params?.id);
   const timecode = parsePositiveInt(request.body?.Timecode ?? request.body?.timecode);
   const duration = parsePositiveInt(request.body?.Duration ?? request.body?.duration);
+  const progressLogAction = request.body?.ProgressLogAction === "video_resume_play"
+    ? "video_resume_play"
+    : "video_first_play";
 
   if (!userId) {
     return reply.status(401).send({ error: "Utilisateur non authentifié." });
@@ -1458,6 +1461,7 @@ export const upsertVideoProgress = async (request, reply) => {
         endTimecode: duration,
         duration,
         final: true,
+        ActionNoms: [progressLogAction],
       });
 
       return reply.send({
@@ -1492,6 +1496,7 @@ export const upsertVideoProgress = async (request, reply) => {
       endTimecode: timecode,
       duration,
       final: false,
+      ActionNoms: [progressLogAction],
     });
 
     return reply.send({
@@ -1507,6 +1512,8 @@ export const upsertVideoProgress = async (request, reply) => {
 export const deleteVideoProgress = async (request, reply) => {
   const userId = parsePositiveInt(request.user?.userId);
   const videoId = parsePositiveInt(request.params?.id);
+  const source = request.body?.Source ?? request.body?.source ?? request.query?.source;
+  const skipLogCompletion = source === "resume_modal";
 
   if (!userId) {
     return reply.status(401).send({ error: "Utilisateur non authentifié." });
@@ -1536,13 +1543,14 @@ export const deleteVideoProgress = async (request, reply) => {
       },
     });
 
-    if (previousProgress?.Duration) {
+    if (previousProgress?.Duration && !skipLogCompletion) {
       await updateLatestVideoPlayLogProgress({
         UtilisateurID: userId,
         VideoID: videoId,
         endTimecode: previousProgress.Duration,
         duration: previousProgress.Duration,
         final: true,
+        ActionNoms: ["video_first_play"],
       });
     }
 

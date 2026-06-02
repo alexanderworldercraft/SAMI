@@ -57,8 +57,10 @@ const VideoSeePage = () => {
   const [videoElement, setVideoElement] = useState(null);
   const [isResettingSeries, setIsResettingSeries] = useState(false);
   const [skipFirstPlayLogKey, setSkipFirstPlayLogKey] = useState(0);
+  const [resumeChoicePulse, setResumeChoicePulse] = useState(false);
   const progressDeletedRef = useRef(false);
   const resumeProgressRef = useRef(null);
+  const activeProgressLogActionRef = useRef("video_first_play");
 
 
   useEffect(() => {
@@ -370,7 +372,9 @@ const VideoSeePage = () => {
     setResumeOpen(false);
     setResumeTime(null);
     setSkipFirstPlayLogKey(0);
+    setResumeChoicePulse(false);
     resumeProgressRef.current = null;
+    activeProgressLogActionRef.current = "video_first_play";
     progressDeletedRef.current = false;
     if (!currentVideoId) return;
 
@@ -416,6 +420,7 @@ const VideoSeePage = () => {
         const response = await api.put(`/videos/${currentVideoId}/progress`, {
           Timecode: currentTime,
           Duration: duration,
+          ProgressLogAction: activeProgressLogActionRef.current,
         });
 
         if (response.data?.deleted) {
@@ -470,19 +475,30 @@ const VideoSeePage = () => {
     }).catch((error) => {
       console.warn("Log reprise vidéo échoué:", error?.message || error);
     });
+    activeProgressLogActionRef.current = "video_resume_play";
     setSkipFirstPlayLogKey((prev) => prev + 1);
 
     setResumeOpen(false);
+    setResumeChoicePulse(false);
   };
 
   const handleDismissResume = () => {
     if (currentVideoId) {
-      api.delete(`/videos/${currentVideoId}/progress`).catch((error) => {
+      api.delete(`/videos/${currentVideoId}/progress`, {
+        data: { Source: "resume_modal" },
+      }).catch((error) => {
         console.warn("Suppression de la progression échouée:", error?.message || error);
       });
     }
     setResumeOpen(false);
+    setResumeChoicePulse(false);
+    activeProgressLogActionRef.current = "video_first_play";
     resumeProgressRef.current = null;
+  };
+
+  const handleResumeModalOutsideClick = () => {
+    setResumeChoicePulse(true);
+    window.setTimeout(() => setResumeChoicePulse(false), 900);
   };
 
   const renderRecommendationSection = (title, videos, label = "Propositions") => (
@@ -649,7 +665,7 @@ const VideoSeePage = () => {
       )}
 
       {video && (
-        <Dialog open={resumeOpen} onClose={handleDismissResume} className="relative z-10">
+        <Dialog open={resumeOpen} onClose={handleResumeModalOutsideClick} className="relative z-10">
           <DialogBackdrop
             transition
             className="fixed inset-0 bg-gray-900/50 backdrop-blur-md transition-opacity data-[closed]:opacity-0 data-[enter]:duration-300 data-[leave]:duration-200 data-[enter]:ease-out data-[leave]:ease-in"
@@ -681,7 +697,7 @@ const VideoSeePage = () => {
                   <button
                     type="button"
                     onClick={handleResume}
-                    className="inline-flex w-full justify-center rounded-md bg-blue-500 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-400 sm:w-auto"
+                    className={`inline-flex w-full justify-center rounded-md bg-blue-500 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-400 sm:w-auto ${resumeChoicePulse ? "animate-pulse ring-2 ring-blue-200" : ""}`}
                   >
                     Reprendre
                   </button>
@@ -689,7 +705,7 @@ const VideoSeePage = () => {
                     type="button"
                     data-autofocus
                     onClick={handleDismissResume}
-                    className="mt-3 inline-flex w-full justify-center rounded-md bg-white/10 px-3 py-2 text-sm font-semibold text-white shadow-sm ring-1 ring-inset ring-white/5 hover:bg-white/20 sm:ml-3 sm:mt-0 sm:w-auto"
+                    className={`mt-3 inline-flex w-full justify-center rounded-md bg-white/10 px-3 py-2 text-sm font-semibold text-white shadow-sm ring-1 ring-inset ring-white/5 hover:bg-white/20 sm:ml-3 sm:mt-0 sm:w-auto ${resumeChoicePulse ? "animate-pulse ring-2 ring-blue-200" : ""}`}
                   >
                     Repartir du début
                   </button>

@@ -125,6 +125,7 @@ export async function updateLatestVideoPlayLogProgress({
   endTimecode,
   duration,
   final = false,
+  ActionNoms = ["video_first_play"],
 }) {
   const userId = Number(UtilisateurID);
   const videoId = Number(VideoID);
@@ -134,8 +135,12 @@ export async function updateLatestVideoPlayLogProgress({
   }
 
   try {
+    const requestedActionNames = Array.isArray(ActionNoms) && ActionNoms.length > 0
+      ? ActionNoms.filter((actionName) => VIDEO_PLAY_ACTIONS.includes(actionName))
+      : ["video_first_play"];
+
     const actions = await prisma.action.findMany({
-      where: { Nom: { in: VIDEO_PLAY_ACTIONS } },
+      where: { Nom: { in: requestedActionNames } },
       select: { ActionID: true, Nom: true },
     });
 
