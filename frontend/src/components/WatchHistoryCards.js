@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { PlayIcon } from "@heroicons/react/20/solid";
 import PaginationPage from "./PaginationPage";
 
 const apiBaseUrl = process.env.REACT_APP_URL_LOCAL;
@@ -165,6 +166,7 @@ function buildWatchGroups(watchLogs) {
 
 const ITEMS_PER_PAGE = 6;
 const DATES_PER_PAGE = 20;
+const RAW_ITEMS_PER_PAGE = 8;
 
 const ProgressBar = ({ progress }) => {
   if (!progress) return null;
@@ -252,11 +254,126 @@ const DateList = ({ plays = [], buttonClassName = "" }) => {
   );
 };
 
+function buildRawWatchItems(watchLogs) {
+  return (watchLogs || [])
+    .map((log) => {
+      const video = log?.Video;
+      if (!video?.VideoID) return null;
+
+      const series = log?.Series;
+      const isSeries = Boolean(series?.SeriesID);
+
+      return {
+        logId: log.LogID || `${video.VideoID}-${log.DateAction}`,
+        videoId: video.VideoID,
+        title: isSeries ? series?.Titre || "Série" : video.Titre || `Video ${video.VideoID}`,
+        subtitle: isSeries
+          ? `${video.Titre || `Episode ${video.VideoID}`}${video.SaisonNumero ? ` - Saison ${video.SaisonNumero}` : ""}`
+          : null,
+        image: isSeries ? series?.CheminImage || video.CheminImage : video.CheminImage,
+        date: log.DateAction,
+        actionName: log.ActionNom,
+        progress: getProgressFromLog(log),
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => new Date(b.date) - new Date(a.date));
+}
+
+const actionLabels = {
+  video_first_play: "Lecture",
+  video_resume_play: "Reprise",
+};
+
+const RawWatchHistoryList = ({ watchLogs = [], emptyText }) => {
+  const [page, setPage] = useState(1);
+  const items = useMemo(() => buildRawWatchItems(watchLogs), [watchLogs]);
+  const totalPages = Math.max(1, Math.ceil(items.length / RAW_ITEMS_PER_PAGE));
+
+  useEffect(() => {
+    setPage(1);
+  }, [items.length]);
+
+  const pageItems = items.slice(
+    (page - 1) * RAW_ITEMS_PER_PAGE,
+    page * RAW_ITEMS_PER_PAGE
+  );
+
+  if (!items.length) {
+    return <p className="mt-2 text-sm text-slate-500">{emptyText}</p>;
+  }
+
+  return (
+    <>
+      <ul className="mt-3 space-y-3">
+        {pageItems.map((item) => (
+          <li
+            key={item.logId}
+            className="rounded-2xl border border-white/10 bg-slate-950/55 p-4 text-white shadow-xl shadow-black/20 backdrop-blur-xl"
+          >
+            <div className="flex items-center gap-4">
+              <a href={`/lecture/${item.videoId}`} className="shrink-0">
+                <img
+                  src={getImageUrl(item.image)}
+                  alt={item.title}
+                  className="h-24 w-20 rounded-lg object-cover ring-1 ring-white/10"
+                />
+              </a>
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <a
+                    href={`/lecture/${item.videoId}`}
+                    className="line-clamp-2 text-sm font-bold text-white hover:text-sky-100"
+                  >
+                    {item.title}
+                  </a>
+                  <span className="rounded-full border border-sky-300/25 bg-sky-500/10 px-2 py-0.5 text-[11px] font-bold text-sky-200">
+                    {actionLabels[item.actionName] || item.actionName || "Lecture"}
+                  </span>
+                </div>
+                {item.subtitle && (
+                  <p className="mt-1 line-clamp-1 text-xs text-slate-300">
+                    {item.subtitle}
+                  </p>
+                )}
+                <p className="mt-2 text-xs font-semibold text-slate-300">
+                  {formatDateTime(item.date)}
+                </p>
+                <ProgressBar progress={item.progress} />
+              </div>
+              <a
+                href={`/lecture/${item.videoId}`}
+                className="grid size-12 shrink-0 place-items-center rounded-full border border-white/10 bg-white/10 text-white transition duration-200 hover:bg-sky-500/30"
+                aria-label="Lire"
+              >
+                <PlayIcon className="size-5" />
+              </a>
+            </div>
+          </li>
+        ))}
+      </ul>
+
+      {totalPages > 1 && (
+        <div className="mt-4">
+          <PaginationPage
+            currentPage={page}
+            totalPages={totalPages}
+            totalItems={items.length}
+            itemsPerPage={RAW_ITEMS_PER_PAGE}
+            onPageChange={setPage}
+          />
+        </div>
+      )}
+    </>
+  );
+};
+
 const WatchHistoryCards = ({
   watchLogs = [],
   title = "Contenu regardé",
   emptyText = "Aucun contenu regardé pour le moment.",
   loading = false,
+  rawMode = false,
 }) => {
   const [page, setPage] = useState(1);
   const cards = useMemo(() => buildWatchGroups(watchLogs), [watchLogs]);
@@ -276,6 +393,8 @@ const WatchHistoryCards = ({
       <h2 className="text-sm font-medium text-slate-400">{title}</h2>
       {loading ? (
         <p className="mt-2 text-sm text-slate-500">Chargement de l'historique...</p>
+      ) : rawMode ? (
+        <RawWatchHistoryList watchLogs={watchLogs} emptyText={emptyText} />
       ) : cards.length === 0 ? (
         <p className="mt-2 text-sm text-slate-500">{emptyText}</p>
       ) : (

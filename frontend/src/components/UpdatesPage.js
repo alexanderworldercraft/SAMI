@@ -2,6 +2,51 @@ import React from "react";
 
 const updates = [
   {
+    version: "6.4.0",
+    title: "Historique de lecture et reprises detaillees",
+    date: "2 juin 2026",
+    sections: [
+      {
+        title: "Lecture video",
+        items: [
+          "Ajout de la nouvelle action video_resume_play lorsqu'un utilisateur reprend une video depuis une progression enregistree.",
+          "Le clic Reprendre du modal log maintenant une reprise distincte du premier lancement de la page.",
+          "Quand une reprise est acceptee, video_first_play n'est plus logue pour ce lancement.",
+          "Le modal Reprendre la lecture est maintenant obligatoire quand une progression existe.",
+          "Un clic en dehors du modal ne le ferme plus et fait pulser les boutons Reprendre et Repartir du debut.",
+        ],
+      },
+      {
+        title: "Logs et progressions",
+        items: [
+          "Ajout des timecodes dans les logs de lecture via Meta.",
+          "video_first_play conserve son timecode de lecture initial et ne reprend plus les timecodes des reprises.",
+          "video_resume_play stocke le timecode de depart et le dernier timecode de progression.",
+          "La suppression de progression depuis le modal ne complete plus l'ancien log video_first_play.",
+          "Quand la progression est terminee normalement, le log actif est complete avec la duree max de la video.",
+        ],
+      },
+      {
+        title: "Contenu regarde",
+        items: [
+          "Ajout de video_resume_play dans les sections Contenu regarde.",
+          "Ajout de barres de progression sur les lectures et reprises affichees dans l'historique.",
+          "Les reprises affichent une barre segmentee avec une partie vide avant le timecode de depart.",
+          "Ajout d'un mode Historique brut dans les parametres pour afficher les logs stricts, sans regroupement.",
+          "Le mode brut conserve la recherche, la pagination, la date, l'heure et les informations du contenu.",
+        ],
+      },
+      {
+        title: "Backend et donnees de base",
+        items: [
+          "Ajout de l'action video_resume_play dans seed.js pour les prochains deploiements.",
+          "Correction du seed pour ne plus recreer les utilisateurs par defaut s'ils existent deja.",
+          "Le seed utilise maintenant une creation idempotente des utilisateurs par Surnom.",
+        ],
+      },
+    ],
+  },
+  {
     version: "6.3.1",
     title: "Reprise d'accueil plus intelligente",
     date: "22 mai 2026",
