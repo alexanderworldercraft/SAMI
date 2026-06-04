@@ -118,6 +118,16 @@ async function main() {
         Description: 'Utilisateur reprend X vidéo depuis une progression enregistrée.',
         Criticite: 0,
       },
+      {
+        Nom: "admin_message_update",
+        Description: 'Maj du message général administrateur.',
+        Criticite: 1,
+      },
+      {
+        Nom: "admin_message_toggle",
+        Description: "Changement d'état du toggle du message général administrateur.",
+        Criticite: 1,
+      },
     ],
     skipDuplicates: true, // Évite les erreurs si les grades existent déjà
   });

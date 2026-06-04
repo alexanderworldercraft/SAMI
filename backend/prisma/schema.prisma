@@ -224,6 +224,15 @@ model GenreFeaturedContent {
   @@index([ContentKey], map: "idx_genre_featured_content_key")
 }
 
+model AdminMessage {
+  AdminMessageID BigInt    @id @default(autoincrement())
+  Titre          String    @db.VarChar(150)
+  Description    String    @db.Text
+  Actif          Boolean   @default(false)
+  UpdatedAt      DateTime  @default(now()) @updatedAt
+  CreateDate     DateTime? @default(now())
+}
+
 model Log {
   LogID          BigInt      @id @default(autoincrement())
   UtilisateurID  Int

@@ -22,6 +22,7 @@ import PeopleListPage from "./components/PeopleListPage";
 import PersonDetailsPage from "./components/PersonDetailsPage";
 import MaintenanceBanner from "./components/MaintenanceBanner";
 import UpdatesPage from "./components/UpdatesPage";
+import GeneralMessageBanner from "./components/GeneralMessageBanner";
 
 const NameApp = process.env.REACT_APP_NAME + " " + process.env.REACT_APP_VER;
 
@@ -37,6 +38,7 @@ function AppShell({ children, withFooter = true, contentClassName = "" }) {
       <WallPaper />
       <Navbar />
       <div className={paddingClass}>
+        <GeneralMessageBanner />
         <main className={contentClassName || "px-4 sm:px-6 lg:px-8"}>
           {children}
         </main>

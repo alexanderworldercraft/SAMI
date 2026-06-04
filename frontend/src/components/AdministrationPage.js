@@ -4,6 +4,7 @@ import AdminList from "./AdminList";
 import UserManagerCard from "./UserManagerCard";
 import api from "../services/api";
 import { ArrowPathIcon } from "@heroicons/react/24/outline";
+import AdminMessageSettings from "./AdminMessageSettings";
 
 const AdministrationPage = () => {
     const [, setReload] = useState(false);
@@ -62,6 +63,7 @@ const AdministrationPage = () => {
                 {featuredError && <p className="mt-4 text-sm font-semibold text-red-600 dark:text-red-300">{featuredError}</p>}
                 </div>
             </section>
+            <AdminMessageSettings />
             <FormNewAdmin />
 
             <AdminList />

@@ -2,6 +2,49 @@ import React from "react";
 
 const updates = [
   {
+    version: "6.5.0",
+    title: "Message general administrable",
+    date: "4 juin 2026",
+    sections: [
+      {
+        title: "Administration",
+        items: [
+          "Ajout d'une nouvelle section Message general dans la page Administration.",
+          "Ajout d'un formulaire avec titre, description et bouton de validation.",
+          "Ajout d'un toggle on/off pour activer ou desactiver l'affichage du message.",
+          "Le formulaire reprend le style des cards administrateur existantes.",
+        ],
+      },
+      {
+        title: "Banniere generale",
+        items: [
+          "Ajout d'une banniere generale visible dans l'application quand le message est actif.",
+          "La banniere affiche le titre et la description configures par les administrateurs.",
+          "La banniere ne s'affiche pas si le toggle est desactive ou si le message est vide.",
+          "Ajout d'un bouton pour masquer la banniere cote utilisateur pendant la session.",
+        ],
+      },
+      {
+        title: "Backend et base de donnees",
+        items: [
+          "Ajout de la table AdminMessage avec Titre, Description, Actif, CreateDate et UpdatedAt.",
+          "Ajout de l'endpoint GET /api/admin-message pour recuperer la configuration cote admin.",
+          "Ajout de l'endpoint PUT /api/admin-message pour mettre a jour le formulaire.",
+          "Ajout de l'endpoint PUT /api/admin-message/toggle pour changer l'etat du toggle.",
+          "Ajout de l'endpoint GET /api/admin-message/active pour recuperer le message actif cote public.",
+        ],
+      },
+      {
+        title: "Logs et actions",
+        items: [
+          "Ajout de l'action admin_message_update pour tracer les maj du formulaire.",
+          "Ajout de l'action admin_message_toggle pour tracer les changements d'etat du toggle.",
+          "Ajout des actions dans la migration et dans seed.js pour les prochains deploiements.",
+        ],
+      },
+    ],
+  },
+  {
     version: "6.4.0",
     title: "Historique de lecture et reprises detaillees",
     date: "2 juin 2026",
