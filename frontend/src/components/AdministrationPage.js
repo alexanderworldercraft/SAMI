@@ -6,6 +6,7 @@ import api from "../services/api";
 import { ArrowPathIcon } from "@heroicons/react/24/outline";
 import AdminMessageSettings from "./AdminMessageSettings";
 import AdminGenreManager from "./AdminGenreManager";
+import AdminSeriesManager from "./AdminSeriesManager";
 
 const AdministrationPage = () => {
     const [, setReload] = useState(false);
@@ -66,6 +67,7 @@ const AdministrationPage = () => {
             </section>
             <AdminMessageSettings />
             <AdminGenreManager />
+            <AdminSeriesManager />
             <FormNewAdmin />
 
             <AdminList />

@@ -4,7 +4,7 @@ import { ChevronUpDownIcon } from '@heroicons/react/16/solid';
 import { CheckIcon } from '@heroicons/react/20/solid';
 
 const listboxButtonClass = "w-full cursor-default rounded-xl border border-sky-500/20 bg-white/85 py-3 pl-4 pr-10 text-left text-sm font-semibold text-slate-900 shadow-sm transition duration-200 hover:border-sky-400/60 focus:outline-none focus:ring-2 focus:ring-sky-400 dark:bg-slate-950/65 dark:text-white";
-const listboxOptionsClass = "absolute z-[9999] mt-2 max-h-72 w-full overflow-auto rounded-xl border border-sky-500/20 bg-white py-2 text-sm shadow-2xl shadow-sky-950/20 focus:outline-none dark:bg-slate-950 dark:text-slate-100";
+const listboxOptionsClass = "z-[9999] max-h-72 w-[var(--button-width)] overflow-auto rounded-xl border border-sky-500/20 bg-white py-2 text-sm shadow-2xl shadow-sky-950/20 focus:outline-none dark:bg-slate-950 dark:text-slate-100";
 const labelClass = "mb-2 block text-sm/6 font-bold text-slate-700 dark:text-slate-200";
 
 const SeriesAndSeasonSelector = ({ selectedSeries, setSelectedSeries, selectedSeason, setSelectedSeason }) => {
@@ -75,7 +75,7 @@ const SeriesAndSeasonSelector = ({ selectedSeries, setSelectedSeries, selectedSe
                 <ChevronUpDownIcon className="h-5 w-5 text-sky-500 dark:text-sky-300" aria-hidden="true" />
               </span>
             </ListboxButton>
-            <ListboxOptions className={listboxOptionsClass}>
+            <ListboxOptions anchor={{ to: "bottom start", gap: 8 }} className={listboxOptionsClass}>
               <div className="sticky top-0 z-10 bg-white px-3 pb-2 dark:bg-slate-950">
                 <input
                   type="text"
@@ -135,7 +135,7 @@ const SeriesAndSeasonSelector = ({ selectedSeries, setSelectedSeries, selectedSe
                   <ChevronUpDownIcon className="h-5 w-5 text-sky-500 dark:text-sky-300" aria-hidden="true" />
                 </span>
               </ListboxButton>
-              <ListboxOptions className={listboxOptionsClass}>
+              <ListboxOptions anchor={{ to: "bottom start", gap: 8 }} className={listboxOptionsClass}>
                 <ListboxOption value={""} className="cursor-default select-none py-2.5 pl-10 pr-4 text-slate-700 dark:text-slate-200">
                   Aucune
                 </ListboxOption>

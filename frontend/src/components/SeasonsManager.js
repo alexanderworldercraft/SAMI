@@ -9,6 +9,7 @@ const apiUrl = process.env.REACT_APP_URL_LOCAL || "https://192.168.0.17:1234";
 const fieldClass = "block w-full rounded-xl border border-sky-500/20 bg-white/85 px-4 py-3 text-sm font-semibold text-slate-900 shadow-sm transition duration-200 hover:border-sky-400/60 focus:outline-none focus:ring-2 focus:ring-sky-400 dark:bg-slate-950/65 dark:text-white";
 const labelClass = "mb-2 block text-sm/6 font-bold text-slate-700 dark:text-slate-200";
 const submitClass = "inline-flex items-center justify-center rounded-lg border border-sky-300/40 bg-sky-500/15 px-5 py-3 text-sm font-bold text-slate-900 transition duration-200 hover:border-sky-300/80 hover:bg-sky-500/25 dark:text-white";
+const listboxOptionsClass = "z-[9999] max-h-72 w-[var(--button-width)] overflow-auto rounded-xl border border-sky-500/20 bg-white py-2 text-sm shadow-2xl shadow-sky-950/20 focus:outline-none dark:bg-slate-950 dark:text-slate-100";
 
 const SeasonsManager = () => {
     const [series, setSeries] = useState([]);
@@ -112,7 +113,7 @@ const SeasonsManager = () => {
                                         <ChevronUpDownIcon className="h-5 w-5 text-sky-500 dark:text-sky-300" aria-hidden="true" />
                                     </span>
                                 </ListboxButton>
-                                <ListboxOptions className="absolute z-[9999] mt-2 max-h-72 w-full overflow-auto rounded-xl border border-sky-500/20 bg-white py-2 text-sm shadow-2xl shadow-sky-950/20 focus:outline-none dark:bg-slate-950 dark:text-slate-100">
+                                <ListboxOptions anchor={{ to: "bottom start", gap: 8 }} className={listboxOptionsClass}>
                                     <div className="sticky top-0 z-10 bg-white px-3 pb-2 dark:bg-slate-950">
                                         <input
                                             type="text"

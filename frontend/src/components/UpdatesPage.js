@@ -2,6 +2,53 @@ import React from "react";
 
 const updates = [
   {
+    version: "6.7.0",
+    title: "Gestion administrateur des series",
+    date: "8 juin 2026",
+    sections: [
+      {
+        title: "Administration",
+        items: [
+          "Ajout d'une nouvelle section Series dans la page Administration.",
+          "Ajout d'un select avec recherche pour retrouver rapidement la serie a gerer.",
+          "Ajout d'un formulaire de modification pour le titre, le resume, l'affiche, les genres et le statut premium.",
+          "Ajout de la modification des numeros de saisons directement depuis la fiche administrateur.",
+          "Aucune creation de serie n'a ete ajoutee dans cette section, pour garder la creation dans la page Nouvelle video.",
+        ],
+      },
+      {
+        title: "Suppression des series et saisons",
+        items: [
+          "Ajout d'une confirmation avant chaque suppression de saison.",
+          "Ajout d'une confirmation avant chaque suppression de serie.",
+          "La suppression d'une saison est bloquee si elle est reliee a des videos.",
+          "La suppression d'une serie supprime aussi ses saisons uniquement si aucune saison n'est reliee a des videos.",
+          "Le feedback affiche les saisons et videos qui bloquent la suppression quand l'action est refusee.",
+        ],
+      },
+      {
+        title: "Backend",
+        items: [
+          "Ajout de l'endpoint GET /api/series/:id pour recuperer les details complets d'une serie.",
+          "Ajout des endpoints PUT /api/series/saisons/:saisonId et DELETE /api/series/saisons/:saisonId.",
+          "Ajout de l'endpoint DELETE /api/series/:id pour supprimer une serie et ses saisons eligibles.",
+          "Les endpoints de modification et suppression des saisons verifient le role administrateur.",
+          "Les logs existants sont detaches avant suppression pour eviter les contraintes de relation.",
+        ],
+      },
+      {
+        title: "Dropdowns",
+        items: [
+          "Correction des dropdowns qui passaient sous les autres cards.",
+          "Les select Headless UI de series, saisons et contenus lies utilisent maintenant un rendu portalise.",
+          "Les dropdowns Genres et Tri sont maintenant rendus hors des cards avec une position fixe.",
+          "La correction couvre les pages Nouvelle video, Administration, Details video, Details serie, Personnes et Videos.",
+          "Les menus gardent leur largeur alignee avec le bouton tout en restant au-dessus des autres elements.",
+        ],
+      },
+    ],
+  },
+  {
     version: "6.6.1",
     title: "Ameliorations des formulaires et historiques",
     date: "8 juin 2026",

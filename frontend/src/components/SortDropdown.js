@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { ChevronUpDownIcon } from "@heroicons/react/16/solid";
 
 /**
@@ -31,13 +32,79 @@ const OPTIONS = [
 
 const SortDropdown = ({ sort, setSort }) => {
   const [open, setOpen] = useState(false);
+  const [menuPosition, setMenuPosition] = useState(null);
+  const buttonRef = useRef(null);
+  const menuRef = useRef(null);
 
   const current = OPTIONS.find(o => o.value === sort) || OPTIONS[0];
+
+  useEffect(() => {
+    if (!open) return;
+
+    const updatePosition = () => {
+      if (!buttonRef.current) return;
+      const rect = buttonRef.current.getBoundingClientRect();
+      setMenuPosition({
+        left: rect.left,
+        top: rect.bottom + 8,
+        width: rect.width,
+      });
+    };
+
+    const handleClickOutside = (event) => {
+      if (
+        buttonRef.current?.contains(event.target) ||
+        menuRef.current?.contains(event.target)
+      ) {
+        return;
+      }
+      setOpen(false);
+    };
+
+    updatePosition();
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", updatePosition, true);
+    document.addEventListener("mousedown", handleClickOutside);
+
+    return () => {
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", updatePosition, true);
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [open]);
 
   const handlePick = (value) => {
     setSort(value);     // on propage la valeur au parent
     setOpen(false);     // on ferme le menu
   };
+
+  const dropdown = open && menuPosition
+    ? createPortal(
+        <div
+          ref={menuRef}
+          style={{
+            left: menuPosition.left,
+            top: menuPosition.top,
+            width: menuPosition.width,
+          }}
+          className="fixed z-[9999] overflow-hidden rounded-xl border border-sky-500/20 bg-white text-sm shadow-2xl shadow-sky-950/20 dark:bg-slate-950 dark:text-slate-100"
+        >
+          {OPTIONS.map(opt => (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => handlePick(opt.value)}
+              className={`w-full px-4 py-2.5 text-left transition duration-150 hover:bg-sky-500/10 ${
+                sort === opt.value ? "bg-sky-500/15 font-black text-sky-700 dark:text-sky-300" : "font-semibold"
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>,
+        document.body
+      )
+    : null;
 
   return (
     <div className="w-full">
@@ -45,8 +112,9 @@ const SortDropdown = ({ sort, setSort }) => {
         Tri
       </label>
 
-      <div className={open ? "relative z-[100]" : "relative z-0"}>
+      <div className={open ? "relative z-[200]" : "relative z-0"}>
         <button
+          ref={buttonRef}
           type="button"
           onClick={() => setOpen(!open)}
           className="flex w-full items-center justify-between rounded-xl border border-sky-500/20 bg-white/85 px-4 py-3 text-sm font-semibold text-slate-900 shadow-sm transition duration-200 hover:border-sky-400/60 hover:bg-sky-500/10 focus:outline-none focus:ring-2 focus:ring-sky-400 dark:bg-slate-950/65 dark:text-white dark:shadow-sky-950/20"
@@ -54,22 +122,7 @@ const SortDropdown = ({ sort, setSort }) => {
           <span className="truncate">{current.label}</span>
           <ChevronUpDownIcon className="size-5 text-sky-500 dark:text-sky-300" />
         </button>
-
-        {open && (
-          <div className="absolute z-[9999] mt-2 w-full overflow-hidden rounded-xl border border-sky-500/20 bg-white text-sm shadow-2xl shadow-sky-950/20 dark:bg-slate-950 dark:text-slate-100">
-            {OPTIONS.map(opt => (
-              <button
-                key={opt.value}
-                onClick={() => handlePick(opt.value)}
-                className={`w-full px-4 py-2.5 text-left transition duration-150 hover:bg-sky-500/10 ${
-                  sort === opt.value ? "bg-sky-500/15 font-black text-sky-700 dark:text-sky-300" : "font-semibold"
-                }`}
-              >
-                {opt.label}
-              </button>
-            ))}
-          </div>
-        )}
+        {dropdown}
       </div>
     </div>
   );

@@ -13,6 +13,26 @@ const UPLOADS_ROOT = path.join(BACKEND_ROOT, "uploads");
 const SERIE_ROOT = path.join(UPLOADS_ROOT, "serie");
 const TEMP_ROOT = path.join(UPLOADS_ROOT, "tmp");
 
+const ensureSeriesAdmin = async (request, reply) => {
+  const userId = Number(request.user?.userId);
+  if (!Number.isInteger(userId)) {
+    reply.code(401).send({ error: "Non autorisé." });
+    return null;
+  }
+
+  const user = await prisma.utilisateur.findUnique({
+    where: { UtilisateurID: userId },
+    select: { GradeID: true },
+  });
+
+  if (!user || (user.GradeID !== 1 && user.GradeID !== 2)) {
+    reply.status(403).send({ error: "Accès réservé aux administrateurs." });
+    return null;
+  }
+
+  return userId;
+};
+
 // Ajouter une nouvelle série
 export const createSeries = async (request, reply) => {
   try {
@@ -209,6 +229,68 @@ export const getAllSeries = async (request, reply) => {
   }
 };
 
+export const getSeriesById = async (request, reply) => {
+  const seriesId = parseInt(request.params.id, 10);
+
+  if (!Number.isInteger(seriesId)) {
+    return reply.status(400).send({ error: "SeriesID invalide." });
+  }
+
+  try {
+    const series = await prisma.series.findUnique({
+      where: { SeriesID: seriesId },
+      select: {
+        SeriesID: true,
+        Titre: true,
+        Resumer: true,
+        CheminImage: true,
+        Premium: true,
+        EtatID: true,
+        SeriesGenres: {
+          select: {
+            GenreID: true,
+            Genre: {
+              select: {
+                GenreID: true,
+                Nom: true,
+              },
+            },
+          },
+          orderBy: { SeriesGenreID: "asc" },
+        },
+        Saisons: {
+          select: {
+            SaisonID: true,
+            Numero: true,
+            _count: {
+              select: { Episodes: true },
+            },
+          },
+          orderBy: { Numero: "asc" },
+        },
+      },
+    });
+
+    if (!series) {
+      return reply.status(404).send({ error: "Série introuvable." });
+    }
+
+    return reply.send({
+      ...series,
+      Genres: series.SeriesGenres.map((link) => link.Genre),
+      Saisons: series.Saisons.map((saison) => ({
+        SaisonID: saison.SaisonID,
+        Numero: saison.Numero,
+        episodeCount: saison._count.Episodes,
+      })),
+      SeriesGenres: undefined,
+    });
+  } catch (error) {
+    console.error("Erreur lors de la récupération de la série :", error);
+    return reply.status(500).send({ error: "Erreur lors de la récupération de la série." });
+  }
+};
+
 // Récupérer toutes les saisons d'une série par SeriesID
 export const getSeasonsBySeriesId = async (request, reply) => {
   const { id } = request.params;
@@ -231,6 +313,132 @@ export const getSeasonsBySeriesId = async (request, reply) => {
   } catch (error) {
     console.error("Erreur lors de la récupération des saisons :", error);
     reply.status(500).send({ error: "Erreur lors de la récupération des saisons." });
+  }
+};
+
+export const updateSaison = async (request, reply) => {
+  const saisonId = parseInt(request.params.saisonId, 10);
+  const numero = parseInt(request.body?.Numero, 10);
+  const userId = await ensureSeriesAdmin(request, reply);
+  if (!userId) return;
+
+  if (!Number.isInteger(saisonId)) {
+    return reply.status(400).send({ error: "SaisonID invalide." });
+  }
+
+  if (!Number.isInteger(numero) || numero < 1) {
+    return reply.status(400).send({ error: "Le numéro de saison doit être un entier positif." });
+  }
+
+  try {
+    const before = await prisma.saison.findUnique({
+      where: { SaisonID: saisonId },
+      select: { SaisonID: true, Numero: true, SeriesID: true },
+    });
+
+    if (!before) {
+      return reply.status(404).send({ error: "Saison introuvable." });
+    }
+
+    if (before.Numero === numero) {
+      return reply.send({ ok: true, unchanged: true, SaisonID: saisonId, Numero: numero });
+    }
+
+    const updated = await prisma.saison.update({
+      where: { SaisonID: saisonId },
+      data: { Numero: numero },
+      select: {
+        SaisonID: true,
+        Numero: true,
+        SeriesID: true,
+        _count: {
+          select: { Episodes: true },
+        },
+      },
+    });
+
+    await createLog({
+      request,
+      UtilisateurID: userId,
+      ActionNom: "saison_update",
+      SeriesID: before.SeriesID,
+      SaisonID: saisonId,
+      Champ: "Numero",
+      AncienneValeur: String(before.Numero),
+      NouvelleValeur: String(numero),
+      DedupeMs: 2000,
+    });
+
+    return reply.send({
+      SaisonID: updated.SaisonID,
+      Numero: updated.Numero,
+      SeriesID: updated.SeriesID,
+      episodeCount: updated._count.Episodes,
+    });
+  } catch (error) {
+    console.error("Erreur lors de la mise à jour de la saison :", error);
+    return reply.status(500).send({ error: "Erreur lors de la mise à jour de la saison." });
+  }
+};
+
+export const deleteSaison = async (request, reply) => {
+  const saisonId = parseInt(request.params.saisonId, 10);
+  const userId = await ensureSeriesAdmin(request, reply);
+  if (!userId) return;
+
+  if (!Number.isInteger(saisonId)) {
+    return reply.status(400).send({ error: "SaisonID invalide." });
+  }
+
+  try {
+    const saison = await prisma.saison.findUnique({
+      where: { SaisonID: saisonId },
+      select: {
+        SaisonID: true,
+        Numero: true,
+        SeriesID: true,
+        _count: {
+          select: { Episodes: true },
+        },
+      },
+    });
+
+    if (!saison) {
+      return reply.status(404).send({ error: "Saison introuvable." });
+    }
+
+    if (saison._count.Episodes > 0) {
+      return reply.status(409).send({
+        error: "Impossible de supprimer cette saison car elle est liée à des vidéos.",
+        links: {
+          videos: saison._count.Episodes,
+          blockingTotal: saison._count.Episodes,
+        },
+      });
+    }
+
+    await prisma.$transaction([
+      prisma.log.updateMany({
+        where: { SaisonID: saisonId },
+        data: { SaisonID: null },
+      }),
+      prisma.saison.delete({ where: { SaisonID: saisonId } }),
+    ]);
+
+    await createLog({
+      request,
+      UtilisateurID: userId,
+      ActionNom: "saison_delete",
+      SeriesID: saison.SeriesID,
+      Champ: "Saison",
+      AncienneValeur: `Saison ${saison.Numero}`,
+      NouvelleValeur: null,
+    });
+
+    return reply.send({ ok: true, saison });
+  } catch (error) {
+    console.error("Erreur lors de la suppression de la saison :", error);
+    return reply.status(500).send({ error: "Erreur lors de la suppression de la saison." });
   }
 };
 
@@ -288,10 +496,10 @@ export const updateSerieTitle = async (request, reply) => {
 // Mise à jour du résumer d'une série
 export const updateSerieResumer = async (request, reply) => {
   const { id } = request.params;
-  const { Resumer } = request.body;
+  const Resumer = typeof request.body?.Resumer === "string" ? request.body.Resumer : "";
 
-  if (!Resumer || Resumer.trim() === "") {
-    return reply.status(400).send({ error: "Le Resumer ne peut pas être vide." });
+  if (Resumer.length > 65535) {
+    return reply.status(400).send({ error: "Le Resumer est trop long." });
   }
 
   try {
@@ -605,5 +813,118 @@ export const updateSeriePremium = async (request, reply) => {
   } catch (e) {
     console.error("updateSeriePremium error:", e);
     return reply.code(500).send({ error: "Erreur lors de la mise à jour du statut premium de la série." });
+  }
+};
+
+export const deleteSeries = async (request, reply) => {
+  const seriesId = parseInt(request.params.id, 10);
+  const userId = await ensureSeriesAdmin(request, reply);
+  if (!userId) return;
+
+  if (!Number.isInteger(seriesId)) {
+    return reply.status(400).send({ error: "SeriesID invalide." });
+  }
+
+  try {
+    const series = await prisma.series.findUnique({
+      where: { SeriesID: seriesId },
+      select: {
+        SeriesID: true,
+        Titre: true,
+        CheminImage: true,
+        Saisons: {
+          select: {
+            SaisonID: true,
+            Numero: true,
+            _count: {
+              select: { Episodes: true },
+            },
+          },
+        },
+      },
+    });
+
+    if (!series) {
+      return reply.status(404).send({ error: "Série introuvable." });
+    }
+
+    const linkedVideoCount = series.Saisons.reduce(
+      (total, saison) => total + saison._count.Episodes,
+      0
+    );
+
+    if (linkedVideoCount > 0) {
+      return reply.status(409).send({
+        error: "Impossible de supprimer cette série car au moins une saison est liée à des vidéos.",
+        links: {
+          videos: linkedVideoCount,
+          saisons: series.Saisons.filter((saison) => saison._count.Episodes > 0).map((saison) => ({
+            SaisonID: saison.SaisonID,
+            Numero: saison.Numero,
+            videos: saison._count.Episodes,
+          })),
+          blockingTotal: linkedVideoCount,
+        },
+      });
+    }
+
+    const saisonIds = series.Saisons.map((saison) => saison.SaisonID);
+
+    await prisma.$transaction([
+      prisma.log.updateMany({
+        where: { SaisonID: { in: saisonIds } },
+        data: { SaisonID: null },
+      }),
+      prisma.log.updateMany({
+        where: { SeriesID: seriesId },
+        data: { SeriesID: null },
+      }),
+      prisma.seriesGenre.deleteMany({ where: { SeriesID: seriesId } }),
+      prisma.seriesPersonne.deleteMany({ where: { SeriesID: seriesId } }),
+      prisma.userSeriesWatchReset.deleteMany({ where: { SeriesID: seriesId } }),
+      prisma.genreFeaturedContent.updateMany({
+        where: { SeriesID: seriesId },
+        data: { SeriesID: null },
+      }),
+      prisma.saison.deleteMany({ where: { SeriesID: seriesId } }),
+      prisma.series.delete({ where: { SeriesID: seriesId } }),
+    ]);
+
+    if (series.CheminImage && !series.CheminImage.includes("default")) {
+      const cleanedRel = series.CheminImage.replace(/^[/\\]+/, "");
+      const imagePath = path.join(BACKEND_ROOT, cleanedRel);
+      if (fs.existsSync(imagePath)) {
+        try {
+          fs.unlinkSync(imagePath);
+        } catch (error) {
+          console.warn("Suppression de l'image de série échouée :", error.message);
+        }
+      }
+    }
+
+    await createLog({
+      request,
+      UtilisateurID: userId,
+      ActionNom: "serie_delete",
+      Champ: "Series",
+      AncienneValeur: JSON.stringify({
+        SeriesID: series.SeriesID,
+        Titre: series.Titre,
+        saisons: series.Saisons.map((saison) => saison.Numero),
+      }),
+      NouvelleValeur: null,
+    });
+
+    return reply.send({
+      ok: true,
+      series: {
+        SeriesID: series.SeriesID,
+        Titre: series.Titre,
+      },
+      deletedSeasons: saisonIds.length,
+    });
+  } catch (error) {
+    console.error("Erreur lors de la suppression de la série :", error);
+    return reply.status(500).send({ error: "Erreur lors de la suppression de la série." });
   }
 };
