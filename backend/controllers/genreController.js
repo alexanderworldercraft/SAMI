@@ -77,15 +77,30 @@ export const getFeaturedGenres = async (request, reply) => {
 
 // Ajouter un nouveau genre
 export const addGenre = async (request, reply) => {
-  const { Nom } = request.body;
+  const Nom = request.body?.Nom?.trim();
+
+  if (!Nom) {
+    return reply.status(400).send({ error: "Le nom du genre est obligatoire." });
+  }
 
   try {
     const genre = await prisma.genre.create({ data: { Nom } });
     console.log("Ajout d'un nouveau genre : ", Nom);
     reply.status(201).send(genre);
   } catch (err) {
+    if (err.code === "P2002") {
+      return reply.status(409).send({ error: "Ce genre existe déjà." });
+    }
+
     reply.status(500).send({ error: "Erreur lors de l'ajout du genre." });
   }
+};
+
+export const addAdminGenre = async (request, reply) => {
+  const isAdmin = await ensureAdmin(request, reply);
+  if (!isAdmin) return;
+
+  return addGenre(request, reply);
 };
 // Ajoute un nouveau genre à l'utilisateur
 export const addGenreUtilisateur = async (request, reply) => {
@@ -119,6 +134,96 @@ export const refreshFeaturedGenres = async (request, reply) => {
   } catch (err) {
     console.error("Erreur lors de l'actualisation des contenus à la une :", err);
     return reply.status(500).send({ error: "Erreur lors de l'actualisation des contenus à la une." });
+  }
+};
+
+export const updateGenre = async (request, reply) => {
+  try {
+    const isAdmin = await ensureAdmin(request, reply);
+    if (!isAdmin) return;
+
+    const GenreID = Number.parseInt(request.params.id, 10);
+    const Nom = request.body?.Nom?.trim();
+
+    if (!Number.isInteger(GenreID)) {
+      return reply.status(400).send({ error: "GenreID invalide." });
+    }
+
+    if (!Nom) {
+      return reply.status(400).send({ error: "Le nom du genre est obligatoire." });
+    }
+
+    const genre = await prisma.genre.update({
+      where: { GenreID },
+      data: { Nom },
+    });
+
+    return reply.send(genre);
+  } catch (err) {
+    if (err.code === "P2002") {
+      return reply.status(409).send({ error: "Ce genre existe déjà." });
+    }
+
+    if (err.code === "P2025") {
+      return reply.status(404).send({ error: "Genre introuvable." });
+    }
+
+    return reply.status(500).send({ error: "Erreur lors de la mise à jour du genre." });
+  }
+};
+
+export const deleteGenre = async (request, reply) => {
+  try {
+    const isAdmin = await ensureAdmin(request, reply);
+    if (!isAdmin) return;
+
+    const GenreID = Number.parseInt(request.params.id, 10);
+    if (!Number.isInteger(GenreID)) {
+      return reply.status(400).send({ error: "GenreID invalide." });
+    }
+
+    const genre = await prisma.genre.findUnique({
+      where: { GenreID },
+      select: { GenreID: true, Nom: true },
+    });
+
+    if (!genre) {
+      return reply.status(404).send({ error: "Genre introuvable." });
+    }
+
+    const [videos, series, utilisateurs, contenusALaUne] = await Promise.all([
+      prisma.videoGenre.count({ where: { GenreID } }),
+      prisma.seriesGenre.count({ where: { GenreID } }),
+      prisma.utilisateurGenre.count({ where: { GenreID } }),
+      prisma.genreFeaturedContent.count({ where: { GenreID } }),
+    ]);
+
+    const blockingTotal = videos + series + utilisateurs;
+    const links = {
+      videos,
+      series,
+      utilisateurs,
+      contenusALaUne,
+      total: blockingTotal + contenusALaUne,
+      blockingTotal,
+    };
+
+    if (blockingTotal > 0) {
+      return reply.status(409).send({
+        error: "Ce genre est déjà relié à du contenu ou à des préférences utilisateur.",
+        links,
+      });
+    }
+
+    await prisma.genre.delete({ where: { GenreID } });
+
+    return reply.send({
+      ok: true,
+      genre,
+      deletedFeaturedContent: contenusALaUne,
+    });
+  } catch (err) {
+    return reply.status(500).send({ error: "Erreur lors de la suppression du genre." });
   }
 };
 

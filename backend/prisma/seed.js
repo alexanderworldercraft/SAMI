@@ -3,6 +3,22 @@ import bcrypt from 'bcrypt'; // Import pour bcrypt
 
 const prisma = new PrismaClient();
 
+const uniqueByNom = (items) => {
+  const seen = new Set();
+
+  return items.filter((item) => {
+    const nom = item.Nom?.trim();
+    if (!nom) return false;
+
+    const key = nom.toLocaleLowerCase("fr-FR");
+    if (seen.has(key)) return false;
+
+    seen.add(key);
+    item.Nom = nom;
+    return true;
+  });
+};
+
 async function main() {
   // Générer un mot de passe sécurisé
   const saltSuperAdmin = await bcrypt.genSalt(10);
@@ -12,11 +28,11 @@ async function main() {
 
   // Ajouter des grades par défaut
   await prisma.grade.createMany({
-    data: [
+    data: uniqueByNom([
       { Nom: "SuperAdmin" },
       { Nom: "Admin" },
       { Nom: "Utilisateur" },
-    ],
+    ]),
     skipDuplicates: true, // Évite les erreurs si les grades existent déjà
   });
 
@@ -24,12 +40,12 @@ async function main() {
 
   // Ajouter des Etat par défaut
   await prisma.etat.createMany({
-    data: [
+    data: uniqueByNom([
       { Nom: "Actif" },
       { Nom: "Supprimer" },
       { Nom: "Bloquer" },
       { Nom: "Vendu" },
-    ],
+    ]),
     skipDuplicates: true, // Évite les erreurs si les grades existent déjà
   });
 
@@ -37,7 +53,7 @@ async function main() {
 
   // Ajouter des Etat par défaut
   await prisma.action.createMany({
-    data: [
+    data: uniqueByNom([
       {
         Nom: "connexion",
         Description: "Connexion d'un utilisateur.",
@@ -128,7 +144,7 @@ async function main() {
         Description: "Changement d'état du toggle du message général administrateur.",
         Criticite: 1,
       },
-    ],
+    ]),
     skipDuplicates: true, // Évite les erreurs si les grades existent déjà
   });
 
@@ -136,7 +152,7 @@ async function main() {
   
 // Ajouter des Genre par défaut
 await prisma.genre.createMany({
-  data: [
+  data: uniqueByNom([
     { Nom: "Action" },
     { Nom: "Animations" },
     { Nom: "Aventure" },
@@ -188,7 +204,7 @@ await prisma.genre.createMany({
     { Nom: "Uchronie" },
     { Nom: "Western" },
     { Nom: "YouTube" },
-  ],
+  ]),
   skipDuplicates: true,
 });
 

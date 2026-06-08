@@ -13,6 +13,15 @@ const fieldClass = "block w-full rounded-xl border border-sky-500/20 bg-white/85
 const labelClass = "block text-sm/6 font-bold text-slate-700 dark:text-slate-200";
 const submitClass = "inline-flex items-center justify-center rounded-lg border border-sky-300/40 bg-sky-500/15 px-5 py-3 text-sm font-bold text-slate-900 transition duration-200 hover:border-sky-300/80 hover:bg-sky-500/25 dark:text-white";
 
+const videoEncodingSpecs = [
+    { resolution: "240p", minWidth: "426", bitrate: "500" },
+    { resolution: "360p", minWidth: "640", bitrate: "1000" },
+    { resolution: "480p", minWidth: "854", bitrate: "1500" },
+    { resolution: "720p", minWidth: "1280", bitrate: "4500" },
+    { resolution: "1080p", minWidth: "1920", bitrate: "12000" },
+    { resolution: "4K", minWidth: "3840", bitrate: "25000" },
+];
+
 const NewVideoForm = () => {
     const [title, setTitle] = useState("");
     const [summary, setSummary] = useState("");
@@ -24,6 +33,7 @@ const NewVideoForm = () => {
     const [selectedSeason, setSelectedSeason] = useState(null);
     const [notification, setNotification] = useState(null);
     const [user, setUser] = useState(null);
+    const [showVideoSpecs, setShowVideoSpecs] = useState(false);
 
     useEffect(() => {
         const fetchUser = async () => {
@@ -208,7 +218,7 @@ const NewVideoForm = () => {
 
 
                     {/* Fichier vidéo */}
-                    <div className="group relative grid min-h-24 gap-4">
+                    <div className="relative grid min-h-24 gap-4">
                         <div className="rounded-xl border border-sky-500/20 bg-white/85 p-4 shadow-sm transition duration-200 hover:border-sky-400/60 dark:bg-slate-950/65">
                             <div className="flex justify-between">
                                 <label className={labelClass}>
@@ -219,49 +229,47 @@ const NewVideoForm = () => {
                                 </span>
                             </div>
                             <input type="file" onChange={(e) => setVideoFile(e.target.files[0])} required className="mt-3 w-full text-sm font-semibold text-slate-600 file:mr-4 file:rounded-lg file:border-0 file:bg-sky-500/15 file:px-4 file:py-2 file:text-sm file:font-bold file:text-slate-900 hover:file:bg-sky-500/25 dark:text-slate-300 dark:file:text-white" />
-                        </div>
-                        <div className='fixed bottom-4 right-4 -z-10 w-fit overflow-auto rounded-xl border border-sky-500/10 bg-white/95 text-slate-700 opacity-0 shadow-2xl shadow-sky-950/20 backdrop-blur transition duration-300 ease-in-out group-hover:z-[80] group-hover:opacity-100 dark:bg-slate-950/95 dark:text-neutral-100'>
-                            <table className='table-auto'>
-                                <thead>
-                                    <tr>
-                                        <th className='border border-slate-600 px-4 py-2 bg-slate-200 dark:bg-slate-900'>Résolution</th>
-                                        <th className='border border-slate-600 px-4 py-2 bg-slate-200 dark:bg-slate-900'>Largeur minimum</th>
-                                        <th className='border border-slate-600 px-4 py-2 bg-slate-200 dark:bg-slate-900'>Bitrate (CPU)</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr>
-                                        <td className='border border-slate-600 px-4 py-2 bg-blue-50 dark:bg-slate-950'>240p</td>
-                                        <td className='border border-slate-600 px-4 py-2 bg-blue-50 dark:bg-slate-950'>426</td>
-                                        <td className='border border-slate-600 px-4 py-2 bg-blue-50 dark:bg-slate-950'>500</td>
-                                    </tr>
-                                    <tr>
-                                        <td className='border border-slate-600 px-4 py-2 bg-blue-50 dark:bg-slate-950'>360p</td>
-                                        <td className='border border-slate-600 px-4 py-2 bg-blue-50 dark:bg-slate-950'>640</td>
-                                        <td className='border border-slate-600 px-4 py-2 bg-blue-50 dark:bg-slate-950'>1000</td>
-                                    </tr>
-                                    <tr>
-                                        <td className='border border-slate-600 px-4 py-2 bg-blue-50 dark:bg-slate-950'>480p</td>
-                                        <td className='border border-slate-600 px-4 py-2 bg-blue-50 dark:bg-slate-950'>854</td>
-                                        <td className='border border-slate-600 px-4 py-2 bg-blue-50 dark:bg-slate-950'>1500</td>
-                                    </tr>
-                                    <tr>
-                                        <td className='border border-slate-600 px-4 py-2 bg-blue-50 dark:bg-slate-950'>720p</td>
-                                        <td className='border border-slate-600 px-4 py-2 bg-blue-50 dark:bg-slate-950'>1280</td>
-                                        <td className='border border-slate-600 px-4 py-2 bg-blue-50 dark:bg-slate-950'>4500</td>
-                                    </tr>
-                                    <tr>
-                                        <td className='border border-slate-600 px-4 py-2 bg-blue-50 dark:bg-slate-950'>1080p</td>
-                                        <td className='border border-slate-600 px-4 py-2 bg-blue-50 dark:bg-slate-950'>1920</td>
-                                        <td className='border border-slate-600 px-4 py-2 bg-blue-50 dark:bg-slate-950'>12000</td>
-                                    </tr>
-                                    <tr>
-                                        <td className='border border-slate-600 px-4 py-2 bg-blue-50 dark:bg-slate-950'>4K</td>
-                                        <td className='border border-slate-600 px-4 py-2 bg-blue-50 dark:bg-slate-950'>3840</td>
-                                        <td className='border border-slate-600 px-4 py-2 bg-blue-50 dark:bg-slate-950'>25000</td>
-                                    </tr>
-                                </tbody>
-                            </table>
+                            <div className="mt-4">
+                                <button
+                                    type="button"
+                                    onClick={() => setShowVideoSpecs((current) => !current)}
+                                    aria-expanded={showVideoSpecs}
+                                    className="inline-flex w-full items-center justify-between rounded-lg border border-sky-300/30 bg-sky-500/10 px-4 py-2.5 text-sm font-bold text-slate-800 transition duration-200 hover:border-sky-300/70 hover:bg-sky-500/20 dark:text-slate-100"
+                                >
+                                    <span>Voir les paramètres d'encodage</span>
+                                    <span
+                                        aria-hidden="true"
+                                        className={`text-sky-500 transition duration-200 dark:text-sky-300 ${showVideoSpecs ? "rotate-180" : ""}`}
+                                    >
+                                        ▼
+                                    </span>
+                                </button>
+
+                                {showVideoSpecs && (
+                                    <div className="mt-3 overflow-hidden rounded-xl border border-sky-500/10 bg-white/80 shadow-sm dark:bg-slate-950/50">
+                                        <div className="overflow-x-auto">
+                                            <table className="min-w-full text-left text-sm">
+                                                <thead className="bg-sky-500/10 text-xs uppercase tracking-wide text-slate-600 dark:text-slate-300">
+                                                    <tr>
+                                                        <th className="px-4 py-3 font-bold">Résolution</th>
+                                                        <th className="px-4 py-3 font-bold">Largeur min.</th>
+                                                        <th className="px-4 py-3 font-bold">Bitrate CPU</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-sky-500/10 text-slate-700 dark:text-slate-200">
+                                                    {videoEncodingSpecs.map((spec) => (
+                                                        <tr key={spec.resolution} className="transition duration-200 hover:bg-sky-500/10">
+                                                            <td className="px-4 py-3 font-bold text-sky-700 dark:text-sky-300">{spec.resolution}</td>
+                                                            <td className="px-4 py-3 font-semibold">{spec.minWidth}</td>
+                                                            <td className="px-4 py-3 font-semibold">{spec.bitrate}</td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     </div>
 

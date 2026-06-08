@@ -136,6 +136,8 @@ function UserTabs({ currentTab, onChange }) {
 
 // Drawer pour afficher tous les détails d'un utilisateur
 function UserDrawer({ open, onClose, user, activity, watchHistory, loadingWatchHistory }) {
+  const [watchRawMode, setWatchRawMode] = useState(false);
+
   if (!user) return null;
 
   const risk = computeRiskLevel(activity);
@@ -368,13 +370,36 @@ function UserDrawer({ open, onClose, user, activity, watchHistory, loadingWatchH
       </ul>
     )}
   </dd>
-</div>
+                      </div>
                       <div>
+                        <div className="mb-4 flex justify-end">
+                          <label className="inline-flex items-center gap-3 rounded-xl border border-sky-500/20 bg-white/70 px-4 py-3 text-sm font-bold text-slate-700 shadow-sm dark:bg-slate-950/55 dark:text-slate-200">
+                            <span>Historique brut</span>
+                            <button
+                              type="button"
+                              role="switch"
+                              aria-checked={watchRawMode}
+                              onClick={() => setWatchRawMode((prev) => !prev)}
+                              className={classNames(
+                                watchRawMode ? "bg-sky-500" : "bg-slate-500/40",
+                                "relative inline-flex h-6 w-11 shrink-0 rounded-full transition duration-200 focus:outline-none focus:ring-2 focus:ring-sky-400"
+                              )}
+                            >
+                              <span
+                                className={classNames(
+                                  watchRawMode ? "translate-x-6" : "translate-x-1",
+                                  "mt-1 inline-block size-4 rounded-full bg-white shadow transition duration-200"
+                                )}
+                              />
+                            </button>
+                          </label>
+                        </div>
                         <WatchHistoryCards
                           watchLogs={watchHistory}
                           loading={loadingWatchHistory}
                           title="Contenu regardé"
                           emptyText="Aucun contenu regardé pour cet utilisateur."
+                          rawMode={watchRawMode}
                         />
                       </div>
                     </dl>

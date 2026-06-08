@@ -2,6 +2,77 @@ import React from "react";
 
 const updates = [
   {
+    version: "6.6.1",
+    title: "Ameliorations des formulaires et historiques",
+    date: "8 juin 2026",
+    sections: [
+      {
+        title: "Nouvelle video",
+        items: [
+          "Remplacement du tooltip de la section Fichier Video par un bouton dropdown.",
+          "Le tableau des parametres d'encodage s'affiche maintenant dans la carte du fichier video.",
+          "Suppression du positionnement fixe qui pouvait placer le tableau trop a droite de l'ecran.",
+          "Restylage du tableau avec le design SAMI actuel, en clair et en sombre.",
+          "Ajout d'un scroll horizontal pour garder le tableau lisible sur les petits ecrans.",
+        ],
+      },
+      {
+        title: "Administration",
+        items: [
+          "Ajout du toggle Historique brut dans les drawers administrateur.",
+          "Ajout du toggle Historique brut dans les drawers utilisateur de la page Administration.",
+          "Le toggle reprend le style de celui des Parametres dans la section Contenu regarde.",
+          "Les drawers peuvent maintenant alterner entre l'historique regroupe et les logs stricts.",
+        ],
+      },
+      {
+        title: "Contenu regarde",
+        items: [
+          "Ajout du mode brut dans le composant d'historique utilise par le panel administrateur.",
+          "Le mode brut affiche les lectures non regroupees, triees de la plus recente a la plus ancienne.",
+          "Chaque entree brute conserve le contenu, l'episode si present, la date, l'action, la progression et le lien de lecture.",
+          "Ajout d'une pagination dediee au mode brut dans les drawers.",
+        ],
+      },
+    ],
+  },
+  {
+    version: "6.6.0",
+    title: "Gestion administrateur des genres",
+    date: "8 juin 2026",
+    sections: [
+      {
+        title: "Administration",
+        items: [
+          "Ajout d'une nouvelle section Genres dans la page Administration.",
+          "Ajout du CRUD administrateur pour creer, renommer et supprimer les genres.",
+          "Ajout d'une pagination de 10 genres par page pour garder une liste lisible.",
+          "Ajout d'une confirmation avant chaque suppression de genre.",
+          "La section reprend le style des cards administrateur existantes.",
+        ],
+      },
+      {
+        title: "Suppression des genres",
+        items: [
+          "La suppression est bloquee quand le genre est relie a des videos, series ou preferences utilisateur.",
+          "Le feedback de suppression affiche les types de liens qui empechent la suppression.",
+          "Un genre relie uniquement au contenu a la une peut maintenant etre supprime.",
+          "Quand ce cas arrive, le contenu a la une associe est supprime avec le genre.",
+        ],
+      },
+      {
+        title: "Backend et base de donnees",
+        items: [
+          "Ajout des endpoints POST /api/genres/admin, PUT /api/genres/admin/:id et DELETE /api/genres/admin/:id.",
+          "Les endpoints administrateur verifient le role admin avant modification.",
+          "Ajout de contraintes uniques sur Etat.Nom et Genre.Nom dans le schema Prisma.",
+          "Ajout d'une migration pour consolider les doublons existants avant l'ajout des index uniques.",
+          "Mise a jour de seed.js pour dedupliquer les entrees par Nom avant les createMany.",
+        ],
+      },
+    ],
+  },
+  {
     version: "6.5.0",
     title: "Message general administrable",
     date: "4 juin 2026",
