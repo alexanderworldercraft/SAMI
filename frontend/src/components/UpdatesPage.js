@@ -2,6 +2,71 @@ import React from "react";
 
 const updates = [
   {
+    version: "6.8.0",
+    title: "Gestion administrateur des videos",
+    date: "13 juin 2026",
+    sections: [
+      {
+        title: "Administration",
+        items: [
+          "Ajout d'une nouvelle section Videos dans la page Administration.",
+          "Ajout d'un select avec recherche pour retrouver rapidement un film ou un episode a gerer.",
+          "Ajout d'un formulaire de modification pour le titre, le resume, l'affiche, les genres et le statut premium.",
+          "Les episodes affichent leur contexte de serie et de saison directement dans la fiche administrateur.",
+          "La section reprend le style des cards administrateur deja presentes pour les series et les genres.",
+        ],
+      },
+      {
+        title: "Corbeille videos",
+        items: [
+          "Le bouton de suppression administrateur ne supprime plus physiquement la video.",
+          "Une suppression administrateur place maintenant la video en corbeille avec l'etat Supprimer.",
+          "Les videos en corbeille sont masquees des listes publiques, recherches, recommandations, aleatoires, tendances, calendrier et historiques actifs.",
+          "Ajout d'une nouvelle section Corbeille videos reservee au super administrateur.",
+          "Le super administrateur peut restaurer une video en corbeille ou la supprimer definitivement.",
+        ],
+      },
+      {
+        title: "Suppression definitive",
+        items: [
+          "La suppression definitive supprime les liens genres, personnes, progressions, sous-titres, contenu a la une et fichiers video.",
+          "Les logs de modification et d'administration lies a la video sont supprimes lors de la suppression definitive.",
+          "Les logs de lecture video_first_play et video_resume_play sont conserves pour garder l'historique utilisateur.",
+          "Avant suppression de la video en base, son titre est copie dans AncienneValeur sur les logs de lecture conserves.",
+          "Les metadonnees des logs conserves gardent les timecodes existants et ajoutent les informations du contenu supprime.",
+        ],
+      },
+      {
+        title: "Historique de lecture",
+        items: [
+          "Les historiques affichent maintenant les videos supprimees definitivement quand un log de lecture existe encore.",
+          "Le titre des videos supprimees est recupere depuis les logs conserves.",
+          "Ajout d'un badge Contenu supprime dans les historiques regroupes et bruts.",
+          "Les liens de lecture sont desactives pour les contenus qui n'existent plus.",
+          "Les videos en corbeille ou supprimees restent visibles uniquement dans les historiques de lecture.",
+        ],
+      },
+      {
+        title: "Backend",
+        items: [
+          "Ajout de l'endpoint GET /api/videos/admin pour lister les videos administrables.",
+          "Ajout de l'endpoint DELETE /api/videos/:id pour placer une video en corbeille.",
+          "Ajout de l'endpoint GET /api/videos/admin/deleted pour lister les videos en corbeille.",
+          "Ajout de l'endpoint PUT /api/videos/:id/restore pour restaurer une video.",
+          "Ajout de l'endpoint DELETE /api/videos/:id/permanent pour supprimer definitivement une video.",
+        ],
+      },
+      {
+        title: "Logs et actions",
+        items: [
+          "Ajout des actions video_delete, video_soft_delete et video_restore dans seed.js.",
+          "Ajout des actions serie_delete, saison_update et saison_delete dans seed.js pour aligner les logs des sections administrateur.",
+          "Les actions sensibles de restauration et suppression definitive verifient le role super administrateur.",
+        ],
+      },
+    ],
+  },
+  {
     version: "6.7.0",
     title: "Gestion administrateur des series",
     date: "8 juin 2026",

@@ -7,6 +7,8 @@ import { ArrowPathIcon } from "@heroicons/react/24/outline";
 import AdminMessageSettings from "./AdminMessageSettings";
 import AdminGenreManager from "./AdminGenreManager";
 import AdminSeriesManager from "./AdminSeriesManager";
+import AdminVideoManager from "./AdminVideoManager";
+import SuperAdminVideoTrashManager from "./SuperAdminVideoTrashManager";
 
 const AdministrationPage = () => {
     const [, setReload] = useState(false);
@@ -68,6 +70,8 @@ const AdministrationPage = () => {
             <AdminMessageSettings />
             <AdminGenreManager />
             <AdminSeriesManager />
+            <AdminVideoManager />
+            <SuperAdminVideoTrashManager />
             <FormNewAdmin />
 
             <AdminList />

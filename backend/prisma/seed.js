@@ -125,6 +125,36 @@ async function main() {
         Criticite: 1,
       },
       {
+        Nom: "video_delete",
+        Description: 'Utilisateur supprime X vidéo.',
+        Criticite: 2,
+      },
+      {
+        Nom: "video_soft_delete",
+        Description: "Utilisateur place X vidéo dans la corbeille.",
+        Criticite: 2,
+      },
+      {
+        Nom: "video_restore",
+        Description: "Super administrateur restaure X vidéo.",
+        Criticite: 2,
+      },
+      {
+        Nom: "serie_delete",
+        Description: 'Utilisateur supprime X série.',
+        Criticite: 2,
+      },
+      {
+        Nom: "saison_update",
+        Description: 'Utilisateur MAJ X saison.',
+        Criticite: 1,
+      },
+      {
+        Nom: "saison_delete",
+        Description: 'Utilisateur supprime X saison.',
+        Criticite: 2,
+      },
+      {
         Nom: "video_first_play",
         Description: 'Utilisateur regarde X vidéo.',
         Criticite: 0,

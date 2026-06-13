@@ -68,11 +68,22 @@ async function buildWatchHistoryPayload(userId, limit) {
       VideoID: true,
       SeriesID: true,
       SaisonID: true,
+      AncienneValeur: true,
       Meta: true,
     },
   });
 
-  const videoIds = logs.map((log) => log.VideoID).filter(Boolean);
+  const deletedVideoIdFromLog = (log) => {
+    const meta = log.Meta && typeof log.Meta === "object" && !Array.isArray(log.Meta)
+      ? log.Meta
+      : {};
+    const id = Number(meta.deletedVideoId ?? meta.VideoID ?? meta.videoId);
+    return Number.isInteger(id) ? id : null;
+  };
+
+  const videoIds = logs
+    .map((log) => log.VideoID || deletedVideoIdFromLog(log))
+    .filter(Boolean);
   const videos = videoIds.length > 0
     ? await prisma.video.findMany({
         where: { VideoID: { in: videoIds } },
@@ -80,6 +91,7 @@ async function buildWatchHistoryPayload(userId, limit) {
           VideoID: true,
           Titre: true,
           CheminImage: true,
+          EtatID: true,
           SaisonID: true,
           Saison: {
             select: {
@@ -116,6 +128,7 @@ async function buildWatchHistoryPayload(userId, limit) {
             take: 1,
             select: {
               Episodes: {
+                where: { EtatID: 1 },
                 orderBy: { Titre: "asc" },
                 take: 1,
                 select: { VideoID: true },
@@ -134,21 +147,38 @@ async function buildWatchHistoryPayload(userId, limit) {
   );
 
   return logs.map((log) => {
-    const video = log.VideoID ? videoById.get(log.VideoID) : null;
+    const deletedVideoId = deletedVideoIdFromLog(log);
+    const meta = log.Meta && typeof log.Meta === "object" && !Array.isArray(log.Meta)
+      ? log.Meta
+      : {};
+    const videoId = log.VideoID || deletedVideoId;
+    const video = videoId ? videoById.get(videoId) : null;
     const series = video?.Saison?.Series || null;
+    const isDeletedVideo = !video || video.EtatID === 2;
+    const deletedSeriesId = Number(meta.deletedSeriesId ?? log.SeriesID);
+    const fallbackSeries = Number.isInteger(deletedSeriesId) && deletedSeriesId > 0
+      ? {
+          SeriesID: deletedSeriesId,
+          Titre: meta.deletedSeriesTitre || "Série supprimée",
+          CheminImage: null,
+          FirstEpisodeID: null,
+          Deleted: true,
+        }
+      : null;
 
     return {
       LogID: log.LogID ? log.LogID.toString() : null,
       ActionNom: actionById.get(log.ActionID) || null,
       DateAction: log.DateAction,
       Meta: log.Meta || null,
-      Video: video
+      Video: videoId
         ? {
-            VideoID: video.VideoID,
-            Titre: video.Titre,
-            CheminImage: video.CheminImage,
-            SaisonID: video.SaisonID,
-            SaisonNumero: video.Saison?.Numero ?? null,
+            VideoID: videoId,
+            Titre: video?.Titre || log.AncienneValeur || `Video ${videoId}`,
+            CheminImage: video?.CheminImage || null,
+            SaisonID: video?.SaisonID ?? log.SaisonID ?? null,
+            SaisonNumero: video?.Saison?.Numero ?? null,
+            Deleted: isDeletedVideo,
           }
         : null,
       Series: series
@@ -158,9 +188,7 @@ async function buildWatchHistoryPayload(userId, limit) {
             CheminImage: series.CheminImage,
             FirstEpisodeID: firstEpisodeBySeriesId.get(series.SeriesID) || null,
           }
-        : log.SeriesID
-          ? { SeriesID: log.SeriesID }
-          : null,
+        : fallbackSeries,
     };
   });
 }

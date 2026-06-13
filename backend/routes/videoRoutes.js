@@ -26,7 +26,12 @@ import {
   getVideoProgress,
   upsertVideoProgress,
   deleteVideoProgress,
-  getResumeProgressOverview
+  getResumeProgressOverview,
+  getAdminVideos,
+  getDeletedVideos,
+  restoreVideo,
+  softDeleteVideo,
+  deleteVideo
 } from "../controllers/videoController.js";
 
 import { authMiddleware } from "../middlewares/authMiddleware.js";
@@ -37,6 +42,8 @@ export default async function (fastify) {
   fastify.post("/", { preHandler: authMiddleware }, async (req, reply) => addVideo(req, reply, fastify));
 
   fastify.get("/", getVideosAndSeries);
+  fastify.get("/admin", { preHandler: authMiddleware }, getAdminVideos);
+  fastify.get("/admin/deleted", { preHandler: authMiddleware }, getDeletedVideos);
   fastify.get("/:id/genres", getVideoGenres);
   fastify.get("/:id", { preHandler: authMiddleware }, getVideoDetails);
   fastify.get("/random-film", getRandomFilm);
@@ -66,6 +73,9 @@ export default async function (fastify) {
   fastify.put("/:id/image", { preHandler: authMiddleware }, updateVideoImage); // ⬅️ nouveau (multipart)
   fastify.put("/:id/genres", { preHandler: authMiddleware }, updateVideoGenres);
   fastify.put("/:id/premium", { preHandler: authMiddleware }, updateVideoPremium);
+  fastify.put("/:id/restore", { preHandler: authMiddleware }, restoreVideo);
   fastify.put("/:id/progress", { preHandler: authMiddleware }, upsertVideoProgress);
   fastify.delete("/:id/progress", { preHandler: authMiddleware }, deleteVideoProgress);
+  fastify.delete("/:id/permanent", { preHandler: authMiddleware }, deleteVideo);
+  fastify.delete("/:id", { preHandler: authMiddleware }, softDeleteVideo);
 }

@@ -69,6 +69,7 @@ function buildWatchGroups(watchLogs) {
   (watchLogs || []).forEach((log) => {
     const video = log?.Video;
     if (!video?.VideoID) return;
+    const deleted = Boolean(video.Deleted);
 
     const series = log?.Series;
     const seriesId = series?.SeriesID || null;
@@ -95,6 +96,7 @@ function buildWatchGroups(watchLogs) {
           videoId: video.VideoID,
           title: video.Titre || `Episode ${video.VideoID}`,
           seasonNumber: video.SaisonNumero ?? null,
+          deleted,
           plays: [],
         });
       }
@@ -117,6 +119,7 @@ function buildWatchGroups(watchLogs) {
           videoId: video.VideoID,
           title: video.Titre || `Video ${video.VideoID}`,
           image: video.CheminImage || null,
+          deleted,
           plays: [],
           latestDate: 0,
         });
@@ -266,6 +269,7 @@ function buildRawWatchItems(watchLogs) {
       return {
         logId: log.LogID || `${video.VideoID}-${log.DateAction}`,
         videoId: video.VideoID,
+        deleted: Boolean(video.Deleted),
         title: isSeries ? series?.Titre || "Série" : video.Titre || `Video ${video.VideoID}`,
         subtitle: isSeries
           ? `${video.Titre || `Episode ${video.VideoID}`}${video.SaisonNumero ? ` - Saison ${video.SaisonNumero}` : ""}`
@@ -312,6 +316,15 @@ const RawWatchHistoryList = ({ watchLogs = [], emptyText }) => {
             className="rounded-2xl border border-white/10 bg-slate-950/55 p-4 text-white shadow-xl shadow-black/20 backdrop-blur-xl"
           >
             <div className="flex items-center gap-4">
+              {item.deleted ? (
+                <div className="shrink-0">
+                  <img
+                    src={getImageUrl(item.image)}
+                    alt={item.title}
+                    className="h-24 w-20 rounded-lg object-cover opacity-60 grayscale ring-1 ring-white/10"
+                  />
+                </div>
+              ) : (
               <a href={`/lecture/${item.videoId}`} className="shrink-0">
                 <img
                   src={getImageUrl(item.image)}
@@ -319,17 +332,27 @@ const RawWatchHistoryList = ({ watchLogs = [], emptyText }) => {
                   className="h-24 w-20 rounded-lg object-cover ring-1 ring-white/10"
                 />
               </a>
+              )}
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
-                  <a
-                    href={`/lecture/${item.videoId}`}
-                    className="line-clamp-2 text-sm font-bold text-white hover:text-sky-100"
-                  >
-                    {item.title}
-                  </a>
+                  {item.deleted ? (
+                    <span className="line-clamp-2 text-sm font-bold text-white">{item.title}</span>
+                  ) : (
+                    <a
+                      href={`/lecture/${item.videoId}`}
+                      className="line-clamp-2 text-sm font-bold text-white hover:text-sky-100"
+                    >
+                      {item.title}
+                    </a>
+                  )}
                   <span className="rounded-full border border-sky-300/25 bg-sky-500/10 px-2 py-0.5 text-[11px] font-bold text-sky-200">
                     {actionLabels[item.actionName] || item.actionName || "Lecture"}
                   </span>
+                  {item.deleted && (
+                    <span className="rounded-full border border-red-300/25 bg-red-500/10 px-2 py-0.5 text-[11px] font-bold text-red-200">
+                      Contenu supprimé
+                    </span>
+                  )}
                 </div>
                 {item.subtitle && (
                   <p className="mt-1 line-clamp-1 text-xs text-slate-300">
@@ -341,13 +364,15 @@ const RawWatchHistoryList = ({ watchLogs = [], emptyText }) => {
                 </p>
                 <ProgressBar progress={item.progress} />
               </div>
-              <a
-                href={`/lecture/${item.videoId}`}
-                className="grid size-12 shrink-0 place-items-center rounded-full border border-white/10 bg-white/10 text-white transition duration-200 hover:bg-sky-500/30"
-                aria-label="Lire"
-              >
-                <PlayIcon className="size-5" />
-              </a>
+              {!item.deleted && (
+                <a
+                  href={`/lecture/${item.videoId}`}
+                  className="grid size-12 shrink-0 place-items-center rounded-full border border-white/10 bg-white/10 text-white transition duration-200 hover:bg-sky-500/30"
+                  aria-label="Lire"
+                >
+                  <PlayIcon className="size-5" />
+                </a>
+              )}
             </div>
           </li>
         ))}
@@ -408,30 +433,48 @@ const WatchHistoryCards = ({
                 : card.latestEpisodeId
                   ? `/lecture/${card.latestEpisodeId}`
                   : "#"
-              : `/lecture/${card.videoId}`;
+              : card.deleted ? "#" : `/lecture/${card.videoId}`;
+            const imageIsLink = imageHref !== "#" && !card.deleted;
 
             return (
               <li
                 key={isSeries ? `series-${card.seriesId}` : `video-${card.videoId}`}
                 className="col-span-1 flex max-h-60 rounded-md"
               >
-                <a
-                  href={imageHref}
-                  className={classNames(
-                    "flex max-h-60 shrink-0 items-center justify-center rounded-l-md text-sm font-medium text-white",
-                    "bg-slate-800"
-                  )}
-                >
+                {imageIsLink ? (
+                  <a
+                    href={imageHref}
+                    className={classNames(
+                      "flex max-h-60 shrink-0 items-center justify-center rounded-l-md text-sm font-medium text-white",
+                      "bg-slate-800"
+                    )}
+                  >
+                    <img
+                      src={getImageUrl(card.image)}
+                      alt={card.title}
+                      className="object-cover w-full h-full aspect-2/3 rounded-l-md"
+                    />
+                  </a>
+                ) : (
+                  <div className="flex max-h-60 shrink-0 items-center justify-center rounded-l-md bg-slate-800 text-sm font-medium text-white">
                   <img
                     src={getImageUrl(card.image)}
                     alt={card.title}
-                    className="object-cover w-full h-full aspect-2/3 rounded-l-md"
+                    className="object-cover w-full h-full aspect-2/3 rounded-l-md opacity-60 grayscale"
                   />
-                </a>
+                  </div>
+                )}
                 <div className="flex flex-1 items-stretch justify-between rounded-r-md border-b border-r border-t border-white/10 bg-slate-900/50 overflow-hidden">
                   <div className="flex-1 px-4 py-3 text-sm overflow-y-auto max-h-60">
                     {isSeries ? (
                       <div className="font-medium text-white truncate">{card.title}</div>
+                    ) : card.deleted ? (
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-medium text-white truncate">{card.title}</span>
+                        <span className="rounded-full border border-red-300/25 bg-red-500/10 px-2 py-0.5 text-[11px] font-bold text-red-200">
+                          Contenu supprimé
+                        </span>
+                      </div>
                     ) : (
                       <a
                         href={`/lecture/${card.videoId}`}
@@ -444,15 +487,31 @@ const WatchHistoryCards = ({
                       <div className="mt-1 space-y-2 text-xs text-slate-300">
                         {card.episodes.map((episode) => (
                           <div key={episode.videoId}>
-                            <a
-                              href={`/lecture/${episode.videoId}`}
-                              className="font-semibold text-slate-200 truncate hover:text-white"
-                            >
-                              {episode.title}
-                              {episode.seasonNumber
-                                ? ` (S${episode.seasonNumber})`
-                                : ""}
-                            </a>
+                            <div className="flex flex-wrap items-center gap-2">
+                              {episode.deleted ? (
+                                <span className="font-semibold text-slate-200 truncate">
+                                  {episode.title}
+                                  {episode.seasonNumber
+                                    ? ` (S${episode.seasonNumber})`
+                                    : ""}
+                                </span>
+                              ) : (
+                                <a
+                                  href={`/lecture/${episode.videoId}`}
+                                  className="font-semibold text-slate-200 truncate hover:text-white"
+                                >
+                                  {episode.title}
+                                  {episode.seasonNumber
+                                    ? ` (S${episode.seasonNumber})`
+                                    : ""}
+                                </a>
+                              )}
+                              {episode.deleted && (
+                                <span className="rounded-full border border-red-300/25 bg-red-500/10 px-2 py-0.5 text-[10px] font-bold text-red-200">
+                                  Supprimé
+                                </span>
+                              )}
+                            </div>
                             <DateList plays={episode.plays} />
                           </div>
                         ))}
