@@ -30,10 +30,11 @@ const updates = [
         title: "Suppression definitive",
         items: [
           "La suppression definitive supprime les liens genres, personnes, progressions, sous-titres, contenu a la une et fichiers video.",
-          "Les logs de modification et d'administration lies a la video sont supprimes lors de la suppression definitive.",
-          "Les logs de lecture video_first_play et video_resume_play sont conserves pour garder l'historique utilisateur.",
-          "Avant suppression de la video en base, son titre est copie dans AncienneValeur sur les logs de lecture conserves.",
-          "Les metadonnees des logs conserves gardent les timecodes existants et ajoutent les informations du contenu supprime.",
+          "Tous les logs lies a la video sont conserves lors de la suppression definitive.",
+          "Les logs conserves sont detaches de la video avant la suppression en base pour eviter les contraintes de relation.",
+          "Avant suppression de la video en base, son titre est copie dans AncienneValeur quand cette colonne est disponible.",
+          "Les metadonnees des logs conserves gardent les donnees existantes et ajoutent les informations du contenu supprime.",
+          "Les anciens champs d'audit restent disponibles dans les metadonnees quand AncienneValeur contenait deja une valeur utile.",
         ],
       },
       {

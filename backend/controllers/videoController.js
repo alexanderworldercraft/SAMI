@@ -3620,25 +3620,18 @@ export const deleteVideo = async (request, reply) => {
       return reply.status(404).send({ error: "Vidéo introuvable." });
     }
 
-    const playActions = await prisma.action.findMany({
-      where: { Nom: { in: ["video_first_play", "video_resume_play"] } },
-      select: { ActionID: true },
-    });
-    const playActionIds = playActions.map((action) => action.ActionID);
-
     await prisma.$transaction(async (tx) => {
-      const playLogs = playActionIds.length
-        ? await tx.log.findMany({
-            where: {
-              VideoID: videoId,
-              ActionID: { in: playActionIds },
-            },
-            select: { LogID: true, Meta: true },
-          })
-        : [];
+      const linkedLogs = await tx.log.findMany({
+        where: { VideoID: videoId },
+        select: {
+          LogID: true,
+          AncienneValeur: true,
+          Meta: true,
+        },
+      });
 
       await Promise.all(
-        playLogs.map((log) => {
+        linkedLogs.map((log) => {
           const previousMeta =
             log.Meta && typeof log.Meta === "object" && !Array.isArray(log.Meta)
               ? log.Meta
@@ -3648,11 +3641,12 @@ export const deleteVideo = async (request, reply) => {
             where: { LogID: log.LogID },
             data: {
               VideoID: null,
-              AncienneValeur: video.Titre,
+              AncienneValeur: log.AncienneValeur ?? video.Titre,
               Meta: {
                 ...previousMeta,
                 deletedVideoId: video.VideoID,
                 deletedVideoTitle: video.Titre,
+                previousAncienneValeur: log.AncienneValeur ?? null,
                 deletedSaisonId: video.SaisonID ?? null,
                 deletedSaisonNumero: video.Saison?.Numero ?? null,
                 deletedSeriesId: video.Saison?.SeriesID ?? null,
@@ -3664,12 +3658,6 @@ export const deleteVideo = async (request, reply) => {
         })
       );
 
-      await tx.log.deleteMany({
-        where: {
-          VideoID: videoId,
-          ...(playActionIds.length ? { ActionID: { notIn: playActionIds } } : {}),
-        },
-      });
       await tx.genreFeaturedContent.updateMany({
         where: { VideoID: videoId },
         data: { VideoID: null },
