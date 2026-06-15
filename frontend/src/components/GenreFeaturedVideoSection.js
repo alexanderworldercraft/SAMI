@@ -13,7 +13,7 @@ const GenreFeaturedVideoSection = ({
   const navigate = useNavigate();
 
   const getImageUrl = (cheminImage) => {
-    if (!cheminImage) return `${apiUrl}/uploads/images/videos/default.webp`;
+    if (!cheminImage) return `./imageDefault.png`;
     if (/^https?:\/\//i.test(cheminImage)) return cheminImage;
     return `${apiUrl}/${cheminImage.replace(/^\/+/, "")}`;
   };

@@ -23,7 +23,7 @@ function formatDateTime(value) {
 
 function getImageUrl(cheminImage) {
   if (cheminImage) return `${apiBaseUrl}/${cheminImage}`;
-  return `${apiBaseUrl}/uploads/images/videos/default.webp`;
+  return `./imageDefault.png`;
 }
 
 function formatTimecode(seconds) {

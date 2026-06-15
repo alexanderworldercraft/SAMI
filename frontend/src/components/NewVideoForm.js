@@ -91,13 +91,13 @@ const NewVideoForm = () => {
         const formData = new FormData();
 
         // Chemin de l'image par défaut (accessible depuis le frontend)
-        const defaultImagePath = "./imageDefault.webp";
+        const defaultImagePath = "./imageDefault.png";
 
         // Fonction pour charger une image par défaut
         const fetchDefaultImage = async () => {
             const response = await fetch(defaultImagePath);
             const blob = await response.blob();
-            return new File([blob], "imageDefault.webp", { type: "image/png" });
+            return new File([blob], "./imageDefault.png", { type: "image/png" });
         };
 
         // Champs obligatoires

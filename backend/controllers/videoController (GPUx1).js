@@ -731,7 +731,7 @@ export const addVideo = async (req, reply, fastify) => {
         Titre: data.titre,
         Resumer: data.resumer || null, // Inclure le résumé
         CheminAcces: relativeMasterPlaylistPath, // Chemin relatif correct : `uploads/videos/...`
-        CheminImage: data.imagePath || 'uploads/images/default.png',
+        CheminImage: data.imagePath || '',
         EtatID: 1,
         SaisonID: data.SaisonID || null, // Inclure la saison
       },

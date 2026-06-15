@@ -51,7 +51,7 @@ const HomePage = () => {
     };
 
     const getImageUrl = (path) => {
-        if (!path) return `${apiUrl}/uploads/images/videos/default.webp`;
+        if (!path) return `./imageDefault.png`;
         if (/^https?:\/\//i.test(path)) return path;
         return `${apiUrl}/${path.replace(/^\/+/, "")}`;
     };

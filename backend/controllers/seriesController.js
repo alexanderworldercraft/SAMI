@@ -93,7 +93,7 @@ export const createSeries = async (request, reply) => {
       data: {
         Titre,
         Resumer,
-        CheminImage: CheminImage || "uploads/images/default.png",
+        CheminImage: CheminImage || "",
         EtatID,
         UtilisateurID,
       },

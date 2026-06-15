@@ -2912,7 +2912,7 @@ export const addVideo = async (req, reply, fastify) => {
         Titre: data.titre,
         Resumer: data.resumer || null, // Inclure le résumé
         CheminAcces: path.join("uploads", "video", "pending", "master.m3u8"),
-        CheminImage: "uploads/images/default.png",
+        CheminImage: "",
         EtatID: 1,
         SaisonID: data.SaisonID || null, // Inclure la saison
 
@@ -2956,7 +2956,7 @@ export const addVideo = async (req, reply, fastify) => {
       }
     }
 
-    let finalImagePath = "uploads/images/default.png";
+    let finalImagePath = "";
     if (data.imageTempPath) {
       fs.mkdirSync(finalAfficheDir, { recursive: true });
       const afficheExt = data.imageTempExt || path.extname(data.imageTempPath) || ".png";

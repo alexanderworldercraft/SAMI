@@ -8,7 +8,7 @@ const VideoList = ({ videos = [], overlayActions }) => {
     if (cheminImage) return `${apiUrl}/${cheminImage}`;
     if (type === "person") return `${apiUrl}/uploads/images/people/default.webp`;
     // à ajuster si tu as un default pour vidéos/séries
-    return `${apiUrl}/uploads/images/videos/default.webp`;
+    return `./imageDefault.png`;
   };
 
   const renderBadges = (item) => {
