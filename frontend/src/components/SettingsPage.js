@@ -4,6 +4,7 @@ import UpdateSettings from "./UpdateSettings";
 import DeleteAccount from "./DeleteAccount";
 import SubscriptionPlans from "./SubscriptionPlans";
 import WatchHistoryCards from "./WatchHistoryCards";
+import GenreSelect from "./GenreSelect";
 
 import { ChevronDownIcon } from "@heroicons/react/16/solid";
 import {
@@ -45,6 +46,7 @@ const SettingsPage = () => {
   const [genreError, setGenreError] = useState("");
   const [genreSuccess, setGenreSuccess] = useState("");
   const [allGenres, setAllGenres] = useState([]);
+  const [defaultGenreIds, setDefaultGenreIds] = useState(["", "", "", "", ""]);
   const [selectedGenres, setSelectedGenres] = useState(["", "", "", "", ""]);
   const [userId, setUserId] = useState(null);
 
@@ -80,24 +82,34 @@ const SettingsPage = () => {
     fetchWatchHistory();
   }, [currentTabId, watchLoaded]);
 
-  const resolveDefaultIds = (genres) =>
-    DEFAULT_GENRE_NAMES.map((name) => {
+  const resolveDefaultIds = (genres, configuredDefaults = []) => {
+    const configuredIds = (configuredDefaults || [])
+      .map((entry) => entry?.GenreID || entry?.Genre?.GenreID)
+      .filter(Boolean)
+      .slice(0, 5)
+      .map(String);
+
+    if (configuredIds.length === 5) return configuredIds;
+
+    return DEFAULT_GENRE_NAMES.map((name) => {
       const match = genres.find(
         (genre) => genre?.Nom?.toLowerCase() === name.toLowerCase()
       );
       return match?.GenreID ? String(match.GenreID) : "";
     });
+  };
 
   const fetchGenreGroups = async () => {
     try {
       setGenreError("");
       setGenreSuccess("");
 
-      const [userResponse, genresResponse] = await Promise.all([
+      const [userResponse, genresResponse, defaultsResponse] = await Promise.all([
         axios.get("/api/users/me", {
           headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
         }),
         axios.get("/api/genres"),
+        axios.get("/api/genres/homepage-defaults"),
       ]);
 
       const fetchedUserId = userResponse.data?.UtilisateurID;
@@ -120,7 +132,11 @@ const SettingsPage = () => {
         }
       }
 
-      const defaultIds = resolveDefaultIds(genres);
+      const defaultIds = resolveDefaultIds(
+        genres,
+        Array.isArray(defaultsResponse.data) ? defaultsResponse.data : []
+      );
+      setDefaultGenreIds(defaultIds);
       const selectedFromUser = userGenres
         .slice(0, 5)
         .map((entry) => (entry?.Genre?.GenreID ? String(entry.Genre.GenreID) : ""))
@@ -159,7 +175,9 @@ const SettingsPage = () => {
       return;
     }
 
-    const defaultIds = resolveDefaultIds(allGenres);
+    const defaultIds = defaultGenreIds.some(Boolean)
+      ? defaultGenreIds
+      : resolveDefaultIds(allGenres);
     const filled = selectedGenres.map((value, idx) => value || defaultIds[idx] || "");
     const finalIds = filled.filter(Boolean).slice(0, 5);
 
@@ -177,6 +195,36 @@ const SettingsPage = () => {
     } catch (err) {
       console.error("Erreur lors de la sauvegarde des genres:", err);
       setGenreError("Impossible d'enregistrer les genres.");
+    } finally {
+      setGenreSaving(false);
+    }
+  };
+
+  const handleResetGenresToDefault = async () => {
+    if (!userId) {
+      setGenreError("Utilisateur introuvable.");
+      return;
+    }
+
+    const fallbackIds = defaultGenreIds.some(Boolean)
+      ? defaultGenreIds
+      : resolveDefaultIds(allGenres);
+
+    setGenreSaving(true);
+    setGenreError("");
+    setGenreSuccess("");
+
+    try {
+      await axios.put(
+        `/api/genres/${userId}`,
+        { GenreIDs: [] },
+        { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
+      );
+      setSelectedGenres(fallbackIds);
+      setGenreSuccess("Choix réinitialisés sur les genres par défaut.");
+    } catch (err) {
+      console.error("Erreur lors de la réinitialisation des genres:", err);
+      setGenreError("Impossible de remettre les genres par défaut.");
     } finally {
       setGenreSaving(false);
     }
@@ -260,27 +308,18 @@ const SettingsPage = () => {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {selectedGenres.map((value, index) => (
-                <div key={`genre-slot-${index}`}>
-                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-200 mb-1">
-                    Groupe {index + 1}
-                  </label>
-                  <select
-                    className="w-full rounded-xl border border-sky-500/20 bg-white/85 px-4 py-3 text-sm font-semibold text-slate-900 shadow-sm focus:outline-none focus:ring-2 focus:ring-sky-400 dark:bg-slate-950/65 dark:text-slate-100"
-                    value={value}
-                    onChange={(e) => handleGenreChange(index, e.target.value)}
-                  >
-                    <option value="">Par défaut</option>
-                    {allGenres.map((genre) => (
-                      <option key={genre.GenreID} value={genre.GenreID}>
-                        {genre.Nom}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                <GenreSelect
+                  key={`genre-slot-${index}`}
+                  label={`Groupe ${index + 1}`}
+                  genres={allGenres}
+                  value={value}
+                  onChange={(nextValue) => handleGenreChange(index, nextValue)}
+                  placeholder="Par défaut"
+                />
               ))}
             </div>
 
-            <div className="mt-6 flex items-center gap-3">
+            <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center">
               <button
                 type="button"
                 onClick={handleSaveGenres}
@@ -288,6 +327,14 @@ const SettingsPage = () => {
                 disabled={genreSaving}
               >
                 {genreSaving ? "Enregistrement..." : "Enregistrer"}
+              </button>
+              <button
+                type="button"
+                onClick={handleResetGenresToDefault}
+                className="inline-flex items-center justify-center rounded-lg border border-slate-300/60 bg-white px-5 py-2.5 text-sm font-bold text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
+                disabled={genreSaving}
+              >
+                Remettre par défaut
               </button>
             </div>
           </div>

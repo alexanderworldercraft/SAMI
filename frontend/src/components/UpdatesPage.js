@@ -2,6 +2,63 @@ import React from "react";
 
 const updates = [
   {
+    version: "6.9.0",
+    title: "Images de contenu et genres par defaut homepage",
+    date: "15 juin 2026",
+    sections: [
+      {
+        title: "Administration",
+        items: [
+          "Ajout d'une nouvelle section Genres par defaut dans la page Administration.",
+          "Les administrateurs peuvent personnaliser les 5 genres utilises par defaut sur la homepage.",
+          "Les selects de genres de cette section reprennent le visuel des dropdowns de genres existants.",
+          "Ajout d'un composant GenreSelect reutilisable avec recherche, rendu portalise et style SAMI.",
+          "Les listes empechent de choisir deux fois le meme genre dans la configuration homepage.",
+        ],
+      },
+      {
+        title: "Images films et series",
+        items: [
+          "Ajout d'un bouton Retirer l'image dans la section administrateur Videos.",
+          "Ajout d'un bouton Retirer l'image dans la section administrateur Series.",
+          "La suppression retire le chemin de l'image en base de donnees.",
+          "La suppression retire aussi physiquement le fichier image stocke dans les uploads.",
+          "Les anciens comportements de remplacement d'image restent conserves.",
+        ],
+      },
+      {
+        title: "Homepage",
+        items: [
+          "Les 5 genres de homepage ne sont plus uniquement codes en dur cote frontend.",
+          "La homepage recupere maintenant les genres par defaut depuis l'API.",
+          "Si aucun utilisateur n'est connecte, les genres par defaut configures sont utilises.",
+          "Si un utilisateur n'a pas choisi ses genres, les genres par defaut configures sont utilises.",
+          "Si aucune configuration n'existe encore, l'ancien fallback Epique, Romance, Anime, Aventure et Horreur reste utilise.",
+        ],
+      },
+      {
+        title: "Parametres utilisateur",
+        items: [
+          "L'onglet Groupes par genre utilise maintenant les genres par defaut configures comme fallback.",
+          "Ajout du bouton Remettre par defaut pour supprimer les preferences personnalisees de l'utilisateur.",
+          "Une remise par defaut laisse l'utilisateur suivre automatiquement les futures modifications administrateur.",
+          "Les selects de genres utilisateur utilisent le nouveau visuel harmonise avec recherche.",
+        ],
+      },
+      {
+        title: "Backend et base de donnees",
+        items: [
+          "Ajout de la table HomepageDefaultGenre pour stocker les 5 genres de homepage par position.",
+          "Ajout de l'endpoint GET /api/genres/homepage-defaults pour recuperer les genres par defaut.",
+          "Ajout de l'endpoint PUT /api/genres/homepage-defaults pour mettre a jour les genres par defaut.",
+          "Ajout de l'endpoint DELETE /api/videos/:id/image pour retirer l'image d'une video.",
+          "Ajout de l'endpoint DELETE /api/series/:id/image pour retirer l'image d'une serie.",
+          "Les suppressions d'image sont limitees aux fichiers geres dans le dossier uploads.",
+        ],
+      },
+    ],
+  },
+  {
     version: "6.8.0",
     title: "Gestion administrateur des videos",
     date: "13 juin 2026",

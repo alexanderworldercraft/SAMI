@@ -144,6 +144,43 @@ const AdminSeriesManager = () => {
     setImagePreview(URL.createObjectURL(file));
   };
 
+  const handleRemoveImage = async () => {
+    if (!selectedSeries?.SeriesID) return;
+
+    if (imageFile && !initialForm.CheminImage) {
+      setImageFile(null);
+      setImagePreview("");
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
+
+    if (!initialForm.CheminImage) {
+      setMessage("Aucune image à retirer.");
+      return;
+    }
+
+    if (!window.confirm("Retirer définitivement l'image de cette série ?")) return;
+
+    setSaving(true);
+    resetFeedback();
+
+    try {
+      const seriesId = selectedSeries.SeriesID;
+      await api.delete(`/series/${seriesId}/image`);
+      setImageFile(null);
+      setImagePreview("");
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      await loadSeries();
+      await loadSeriesDetails({ SeriesID: seriesId });
+      setMessage("Image de la série retirée.");
+    } catch (error) {
+      console.error("Erreur lors de la suppression de l'image de la série :", error);
+      setErrorMessage(error.response?.data?.error || "Impossible de retirer l'image de cette série.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const sameGenres = () => {
     const a = [...selectedGenres].sort((left, right) => left - right);
     const b = [...initialGenres].sort((left, right) => left - right);
@@ -419,6 +456,14 @@ const AdminSeriesManager = () => {
                         className="hidden"
                         onChange={handleImageChange}
                       />
+                      <button
+                        type="button"
+                        onClick={handleRemoveImage}
+                        disabled={saving || (!imageSrc && !imageFile)}
+                        className="mt-3 w-full rounded-lg border border-red-300/50 bg-red-500/10 px-4 py-2 text-sm font-bold text-red-700 transition hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-60 dark:text-red-200"
+                      >
+                        Retirer l'image
+                      </button>
                     </div>
                   </div>
 

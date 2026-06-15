@@ -25,6 +25,7 @@ const HomePage = () => {
     const [genre5, setGenre5] = useState('');
     const [genreIds, setGenreIds] = useState([]);
     const [allGenres, setAllGenres] = useState([]);
+    const [homepageDefaultGenres, setHomepageDefaultGenres] = useState([]);
     const [featuredByGenreId, setFeaturedByGenreId] = useState({});
     const [resumeOverview, setResumeOverview] = useState(emptyResumeOverview);
 
@@ -111,9 +112,19 @@ const HomePage = () => {
     useEffect(() => {
         const fetchGenres = async () => {
             try {
-                const response = await fetch(`${apiUrl}/api/genres`);
-                const data = await response.json();
+                const [genresResponse, defaultsResponse] = await Promise.all([
+                    fetch(`${apiUrl}/api/genres`),
+                    fetch(`${apiUrl}/api/genres/homepage-defaults`),
+                ]);
+                const data = await genresResponse.json();
+                const defaults = await defaultsResponse.json();
                 setAllGenres(Array.isArray(data) ? data : []);
+                setHomepageDefaultGenres(
+                    (Array.isArray(defaults) ? defaults : [])
+                        .map((row) => row.Genre || row)
+                        .filter((genre) => genre?.GenreID && genre?.Nom)
+                        .slice(0, 5)
+                );
             } catch (error) {
                 console.error("Erreur lors de la récupération des genres :", error);
             }
@@ -159,11 +170,28 @@ const HomePage = () => {
     }, []);
 
     useEffect(() => {
-        const fallbackNames = ["Épique", "Romance", "Animé", "Aventure", "Horreur"];
+        const historicalFallbackNames = ["Épique", "Romance", "Animé", "Aventure", "Horreur"];
+        const configuredFallbackNames = homepageDefaultGenres.length === 5
+            ? homepageDefaultGenres.map((genre) => genre.Nom)
+            : historicalFallbackNames;
+        const configuredFallbackIds = homepageDefaultGenres.length === 5
+            ? homepageDefaultGenres.map((genre) => genre.GenreID).filter(Boolean)
+            : [];
+        const fallbackNames = configuredFallbackNames;
         const resolveFallbackIds = () =>
-            fallbackNames
+            configuredFallbackIds.length === 5
+                ? configuredFallbackIds
+                : historicalFallbackNames
                 .map((name) => allGenres.find((genre) => genre.Nom === name)?.GenreID)
                 .filter(Boolean);
+        const applyFallbackGenres = () => {
+            setGenre1(fallbackNames[0] || "Épique");
+            setGenre2(fallbackNames[1] || "Romance");
+            setGenre3(fallbackNames[2] || "Animé");
+            setGenre4(fallbackNames[3] || "Aventure");
+            setGenre5(fallbackNames[4] || "Horreur");
+            setGenreIds(resolveFallbackIds());
+        };
 
         if (user) {
             console.log(user.UtilisateurID);
@@ -173,33 +201,28 @@ const HomePage = () => {
                 .then(response => response.json())
                 .then(data => {
                     // Mettre à jour les genres avec les valeurs de l'API
-                    setGenre1(data[0]?.Genre?.Nom || "Épique");
-                    setGenre2(data[1]?.Genre?.Nom || "Romance");
-                    setGenre3(data[2]?.Genre?.Nom || "Animé");
-                    setGenre4(data[3]?.Genre?.Nom || "Aventure");
-                    setGenre5(data[4]?.Genre?.Nom || "Horreur");
-                    setGenreIds(data.map((item) => item?.Genre?.GenreID).filter(Boolean).slice(0, 5));
+                    const userGenres = Array.isArray(data) ? data.map((item) => item?.Genre).filter(Boolean) : [];
+                    const mergedGenres = Array.from({ length: 5 }, (_, index) => ({
+                        Nom: userGenres[index]?.Nom || fallbackNames[index],
+                        GenreID: userGenres[index]?.GenreID || resolveFallbackIds()[index],
+                    }));
+                    setGenre1(mergedGenres[0]?.Nom || "Épique");
+                    setGenre2(mergedGenres[1]?.Nom || "Romance");
+                    setGenre3(mergedGenres[2]?.Nom || "Animé");
+                    setGenre4(mergedGenres[3]?.Nom || "Aventure");
+                    setGenre5(mergedGenres[4]?.Nom || "Horreur");
+                    setGenreIds(mergedGenres.map((genre) => genre.GenreID).filter(Boolean).slice(0, 5));
                 })
                 .catch(error => {
                     console.error('Error fetching genres:', error);
-                    setGenre1("Épique");
-                    setGenre2("Romance");
-                    setGenre3("Animé");
-                    setGenre4("Aventure");
-                    setGenre5("Horreur");
-                    setGenreIds(resolveFallbackIds());
+                    applyFallbackGenres();
                 });
         } else {
             console.log("pas de user connecter");
 
-            setGenre1("Épique");
-            setGenre2("Romance");
-            setGenre3("Animé");
-            setGenre4("Aventure");
-            setGenre5("Horreur");
-            setGenreIds(resolveFallbackIds());
+            applyFallbackGenres();
         }
-    }, [user, allGenres]);
+    }, [user, allGenres, homepageDefaultGenres]);
 
     useEffect(() => {
         const fetchFeatured = async () => {

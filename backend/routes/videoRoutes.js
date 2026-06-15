@@ -17,6 +17,7 @@ import {
   moveVideoToSeason,
   getAdditionsByDate,
   updateVideoImage,
+  deleteVideoImage,
   getAdditionsForDate,
   quickSearchVideos,
   getVideoGenres,
@@ -76,6 +77,7 @@ export default async function (fastify) {
   fastify.put("/:id/restore", { preHandler: authMiddleware }, restoreVideo);
   fastify.put("/:id/progress", { preHandler: authMiddleware }, upsertVideoProgress);
   fastify.delete("/:id/progress", { preHandler: authMiddleware }, deleteVideoProgress);
+  fastify.delete("/:id/image", { preHandler: authMiddleware }, deleteVideoImage);
   fastify.delete("/:id/permanent", { preHandler: authMiddleware }, deleteVideo);
   fastify.delete("/:id", { preHandler: authMiddleware }, softDeleteVideo);
 }

@@ -6,6 +6,7 @@ import api from "../services/api";
 import { ArrowPathIcon } from "@heroicons/react/24/outline";
 import AdminMessageSettings from "./AdminMessageSettings";
 import AdminGenreManager from "./AdminGenreManager";
+import AdminHomepageGenreManager from "./AdminHomepageGenreManager";
 import AdminSeriesManager from "./AdminSeriesManager";
 import AdminVideoManager from "./AdminVideoManager";
 import SuperAdminVideoTrashManager from "./SuperAdminVideoTrashManager";
@@ -68,6 +69,7 @@ const AdministrationPage = () => {
                 </div>
             </section>
             <AdminMessageSettings />
+            <AdminHomepageGenreManager />
             <AdminGenreManager />
             <AdminSeriesManager />
             <AdminVideoManager />

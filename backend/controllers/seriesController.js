@@ -13,6 +13,25 @@ const UPLOADS_ROOT = path.join(BACKEND_ROOT, "uploads");
 const SERIE_ROOT = path.join(UPLOADS_ROOT, "serie");
 const TEMP_ROOT = path.join(UPLOADS_ROOT, "tmp");
 
+const removeStoredSeriesImage = (relativePath) => {
+  if (!relativePath || relativePath.includes("default")) return false;
+
+  const cleanedRel = relativePath.replace(/^[/\\]+/, "");
+  const absolutePath = path.join(BACKEND_ROOT, cleanedRel);
+  const normalizedRoot = path.resolve(UPLOADS_ROOT);
+  const normalizedTarget = path.resolve(absolutePath);
+
+  if (!normalizedTarget.startsWith(normalizedRoot) || !fs.existsSync(normalizedTarget)) return false;
+
+  try {
+    fs.rmSync(normalizedTarget, { force: true });
+    return true;
+  } catch (error) {
+    console.warn("Suppression de l'image série échouée :", error.message);
+    return false;
+  }
+};
+
 const ensureSeriesAdmin = async (request, reply) => {
   const userId = Number(request.user?.userId);
   if (!Number.isInteger(userId)) {
@@ -629,19 +648,7 @@ export const updateSerieImage = async (request, reply) => {
       select: { CheminImage: true },
     });
 
-    // Supprimer l’ancien fichier si présent et non 'default'
-    if (old?.CheminImage) {
-      const cleanedRel = old.CheminImage.replace(/^[/\\]+/, "");
-      const oldAbs = path.join(BACKEND_ROOT, cleanedRel);
-      if (fs.existsSync(oldAbs) && !old.CheminImage.includes("default")) {
-        try {
-          fs.unlinkSync(oldAbs);
-          console.log("🗑️ Ancien visuel série supprimé :", old.CheminImage);
-        } catch (err) {
-          console.warn("⚠️ Suppression ancienne image (serie) échouée :", err.message);
-        }
-      }
-    }
+    removeStoredSeriesImage(old?.CheminImage);
 
     // Écrire le nouveau chemin en BDD
     const updated = await prisma.series.update({
@@ -667,6 +674,52 @@ export const updateSerieImage = async (request, reply) => {
   } catch (error) {
     console.error("❌ updateSerieImage:", error);
     return reply.code(500).send({ error: "Erreur lors de la mise à jour de l'image de la série." });
+  }
+};
+
+// DELETE /api/series/:id/image
+export const deleteSerieImage = async (request, reply) => {
+  const seriesId = parseInt(request.params.id, 10);
+  const userId = await ensureSeriesAdmin(request, reply);
+  if (!userId) return;
+
+  if (!Number.isInteger(seriesId)) {
+    return reply.status(400).send({ error: "SeriesID invalide." });
+  }
+
+  try {
+    const old = await prisma.series.findUnique({
+      where: { SeriesID: seriesId },
+      select: { CheminImage: true },
+    });
+
+    if (!old) {
+      return reply.status(404).send({ error: "Série introuvable." });
+    }
+
+    removeStoredSeriesImage(old.CheminImage);
+
+    const updated = await prisma.series.update({
+      where: { SeriesID: seriesId },
+      data: { CheminImage: "" },
+      select: { CheminImage: true },
+    });
+
+    await createLog({
+      request,
+      UtilisateurID: userId,
+      ActionNom: "serie_update",
+      SeriesID: seriesId,
+      Champ: "CheminImage",
+      AncienneValeur: old.CheminImage ?? null,
+      NouvelleValeur: "",
+      DedupeMs: 2000,
+    });
+
+    return reply.send({ ok: true, ...updated });
+  } catch (error) {
+    console.error("Erreur lors de la suppression de l'image de la série :", error);
+    return reply.status(500).send({ error: "Erreur lors de la suppression de l'image de la série." });
   }
 };
 

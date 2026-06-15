@@ -3,6 +3,7 @@ import {
   getAllGenres, 
   getGenres, 
   getFeaturedGenres,
+  getHomepageDefaultGenres,
 
   // POST
   addAdminGenre,
@@ -12,6 +13,7 @@ import {
 
   // PUT
   updateGenre,
+  updateHomepageDefaultGenres,
   updateGenreUtilisateur,
 
   // DELETE
@@ -23,6 +25,7 @@ export default async function (fastify) {
   // GET
   fastify.get("/", getAllGenres); // Récupère la liste des genres
   fastify.get("/featured", getFeaturedGenres);
+  fastify.get("/homepage-defaults", getHomepageDefaultGenres);
   fastify.get("/:id", getGenres); // Récupère la liste des genres préfèrer de l'utilisateur
 
   //POST
@@ -32,6 +35,7 @@ export default async function (fastify) {
   fastify.post("/:id", addGenreUtilisateur); // Ajoute un nouveau genre à l'utilisateur
 
   // PUT
+  fastify.put("/homepage-defaults", { preHandler: authMiddleware }, updateHomepageDefaultGenres);
   fastify.put("/admin/:id", { preHandler: authMiddleware }, updateGenre);
   fastify.put("/:id", updateGenreUtilisateur); // Mettre à jour les genre de l'utilisateur
 

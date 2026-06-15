@@ -9,6 +9,7 @@ import {
     getAllSeries,
     getSeasonsBySeriesId,
     updateSerieImage,
+    deleteSerieImage,
     getSerieGenres,
     updateSerieGenres,
     updateSeriePremium,
@@ -28,6 +29,7 @@ export default async function (fastify) {
     fastify.post("/:id/saisons", addSaison); // Ajouter une saison à une série
 
     fastify.delete("/saisons/:saisonId", { preHandler: authMiddleware }, deleteSaison);
+    fastify.delete("/:id/image", { preHandler: authMiddleware }, deleteSerieImage);
     fastify.delete("/:id", { preHandler: authMiddleware }, deleteSeries);
 
     fastify.put("/saisons/:saisonId", { preHandler: authMiddleware }, updateSaison);

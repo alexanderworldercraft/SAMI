@@ -165,6 +165,43 @@ const AdminVideoManager = () => {
     setImagePreview(URL.createObjectURL(file));
   };
 
+  const handleRemoveImage = async () => {
+    if (!selectedVideo?.VideoID) return;
+
+    if (imageFile && !initialForm.CheminImage) {
+      setImageFile(null);
+      setImagePreview("");
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
+
+    if (!initialForm.CheminImage) {
+      setMessage("Aucune image à retirer.");
+      return;
+    }
+
+    if (!window.confirm("Retirer définitivement l'image de cette vidéo ?")) return;
+
+    setSaving(true);
+    resetFeedback();
+
+    try {
+      const videoId = selectedVideo.VideoID;
+      await api.delete(`/videos/${videoId}/image`);
+      setImageFile(null);
+      setImagePreview("");
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      await loadVideos();
+      await loadVideoDetails({ VideoID: videoId });
+      setMessage("Image de la vidéo retirée.");
+    } catch (error) {
+      console.error("Erreur lors de la suppression de l'image de la vidéo :", error);
+      setErrorMessage(error.response?.data?.error || "Impossible de retirer l'image de cette vidéo.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleSave = async (event) => {
     event.preventDefault();
     if (!selectedVideo?.VideoID) return;
@@ -403,6 +440,14 @@ const AdminVideoManager = () => {
                         className="hidden"
                         onChange={handleImageChange}
                       />
+                      <button
+                        type="button"
+                        onClick={handleRemoveImage}
+                        disabled={saving || (!imageSrc && !imageFile)}
+                        className="mt-3 w-full rounded-lg border border-red-300/50 bg-red-500/10 px-4 py-2 text-sm font-bold text-red-700 transition hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-60 dark:text-red-200"
+                      >
+                        Retirer l'image
+                      </button>
                     </div>
                   </div>
 

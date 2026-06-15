@@ -28,10 +28,11 @@ model Grade {
 }
 
 model Genre {
-  GenreID          Int                   @id @default(autoincrement())
-  Nom              String                @unique @db.VarChar(50)
-  CreateDate       DateTime?             @default(now())
+  GenreID          Int                    @id @default(autoincrement())
+  Nom              String                 @unique @db.VarChar(50)
+  CreateDate       DateTime?              @default(now())
   FeaturedContent  GenreFeaturedContent?
+  HomepageDefaults HomepageDefaultGenre[]
   SeriesGenres     SeriesGenre[]
   UtilisateurGenre UtilisateurGenre[]
   VideoGenres      VideoGenre[]
@@ -222,6 +223,17 @@ model GenreFeaturedContent {
   @@index([VideoID], map: "idx_genre_featured_video")
   @@index([SeriesID], map: "idx_genre_featured_series")
   @@index([ContentKey], map: "idx_genre_featured_content_key")
+}
+
+model HomepageDefaultGenre {
+  HomepageDefaultGenreID BigInt    @id @default(autoincrement())
+  Position               Int       @unique
+  GenreID                Int
+  UpdatedAt              DateTime  @default(now()) @updatedAt
+  CreateDate             DateTime? @default(now())
+  Genre                  Genre     @relation(fields: [GenreID], references: [GenreID], onDelete: Cascade)
+
+  @@index([GenreID], map: "idx_homepage_default_genre")
 }
 
 model AdminMessage {

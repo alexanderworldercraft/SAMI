@@ -24,6 +24,29 @@ const ensureAdmin = async (request, reply) => {
   return true;
 };
 
+const FALLBACK_HOMEPAGE_GENRES = ["Épique", "Romance", "Animé", "Aventure", "Horreur"];
+
+const getFallbackHomepageGenres = async () => {
+  const genres = await prisma.genre.findMany({
+    where: { Nom: { in: FALLBACK_HOMEPAGE_GENRES } },
+    select: { GenreID: true, Nom: true },
+  });
+  const byName = new Map(genres.map((genre) => [genre.Nom, genre]));
+
+  return FALLBACK_HOMEPAGE_GENRES
+    .map((name, index) => {
+      const genre = byName.get(name);
+      return genre ? { Position: index + 1, GenreID: genre.GenreID, Genre: genre } : null;
+    })
+    .filter(Boolean);
+};
+
+const toHomepageDefaultGenrePayload = (row) => ({
+  Position: row.Position,
+  GenreID: row.GenreID,
+  Genre: row.Genre,
+});
+
 // GET
 
 // Récupérer tous les genres
@@ -70,6 +93,24 @@ export const getFeaturedGenres = async (request, reply) => {
   } catch (err) {
     console.error("Erreur lors de la récupération des contenus à la une :", err);
     return reply.status(500).send({ error: "Erreur lors de la récupération des contenus à la une." });
+  }
+};
+
+export const getHomepageDefaultGenres = async (request, reply) => {
+  try {
+    const rows = await prisma.homepageDefaultGenre.findMany({
+      include: { Genre: true },
+      orderBy: { Position: "asc" },
+    });
+
+    if (rows.length === 0) {
+      return reply.send(await getFallbackHomepageGenres());
+    }
+
+    return reply.send(rows.map(toHomepageDefaultGenrePayload));
+  } catch (err) {
+    console.error("Erreur lors de la récupération des genres homepage :", err);
+    return reply.status(500).send({ error: "Erreur lors de la récupération des genres homepage." });
   }
 };
 
@@ -134,6 +175,58 @@ export const refreshFeaturedGenres = async (request, reply) => {
   } catch (err) {
     console.error("Erreur lors de l'actualisation des contenus à la une :", err);
     return reply.status(500).send({ error: "Erreur lors de l'actualisation des contenus à la une." });
+  }
+};
+
+export const updateHomepageDefaultGenres = async (request, reply) => {
+  try {
+    const isAdmin = await ensureAdmin(request, reply);
+    if (!isAdmin) return;
+
+    const { GenreIDs } = request.body || {};
+    if (!Array.isArray(GenreIDs)) {
+      return reply.status(400).send({ error: "GenreIDs doit être un tableau." });
+    }
+
+    const sanitized = [
+      ...new Set(
+        GenreIDs
+          .map((value) => Number.parseInt(value, 10))
+          .filter((value) => Number.isInteger(value))
+      ),
+    ];
+
+    if (sanitized.length !== 5) {
+      return reply.status(400).send({ error: "Exactement 5 genres sont requis." });
+    }
+
+    const existingCount = await prisma.genre.count({
+      where: { GenreID: { in: sanitized } },
+    });
+
+    if (existingCount !== sanitized.length) {
+      return reply.status(400).send({ error: "Un ou plusieurs genres sont introuvables." });
+    }
+
+    await prisma.$transaction(
+      sanitized.map((GenreID, index) =>
+        prisma.homepageDefaultGenre.upsert({
+          where: { Position: index + 1 },
+          create: { Position: index + 1, GenreID },
+          update: { GenreID },
+        })
+      )
+    );
+
+    const rows = await prisma.homepageDefaultGenre.findMany({
+      include: { Genre: true },
+      orderBy: { Position: "asc" },
+    });
+
+    return reply.send({ ok: true, genres: rows.map(toHomepageDefaultGenrePayload) });
+  } catch (err) {
+    console.error("Erreur lors de la mise à jour des genres homepage :", err);
+    return reply.status(500).send({ error: "Erreur lors de la mise à jour des genres homepage." });
   }
 };
 

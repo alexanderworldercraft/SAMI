@@ -2275,6 +2275,58 @@ export const updateVideoImage = async (request, reply) => {
   }
 };
 
+// DELETE /api/videos/:id/image
+export const deleteVideoImage = async (request, reply) => {
+  const videoId = parseInt(request.params.id, 10);
+  const userId = await ensureVideoAdmin(request, reply);
+  if (!userId) return;
+
+  if (!Number.isInteger(videoId)) {
+    return reply.status(400).send({ error: "VideoID invalide." });
+  }
+
+  try {
+    const oldVideo = await prisma.video.findUnique({
+      where: { VideoID: videoId },
+      select: {
+        CheminImage: true,
+        SaisonID: true,
+        Saison: { select: { SeriesID: true } },
+      },
+    });
+
+    if (!oldVideo) {
+      return reply.status(404).send({ error: "Vidéo introuvable." });
+    }
+
+    removeStoredPath(oldVideo.CheminImage);
+
+    const updated = await prisma.video.update({
+      where: { VideoID: videoId },
+      data: { CheminImage: null },
+      select: { CheminImage: true },
+    });
+
+    await createLog({
+      request,
+      UtilisateurID: userId,
+      ActionNom: "video_update",
+      VideoID: videoId,
+      SaisonID: oldVideo.SaisonID ?? null,
+      SeriesID: oldVideo.Saison?.SeriesID ?? null,
+      Champ: "CheminImage",
+      AncienneValeur: oldVideo.CheminImage ?? null,
+      NouvelleValeur: null,
+      DedupeMs: 2000,
+    });
+
+    return reply.send({ ok: true, ...updated });
+  } catch (error) {
+    console.error("Erreur lors de la suppression de l'image de la vidéo :", error);
+    return reply.status(500).send({ error: "Erreur lors de la suppression de l'image de la vidéo." });
+  }
+};
+
 // Récupérer les informations de navigation (précédent/suivant)
 export const getNavigationInfo = async (request, reply) => {
   const { id } = request.params;
