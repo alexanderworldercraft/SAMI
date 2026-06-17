@@ -28,6 +28,7 @@ const VideoListPage = () => {
   const [videos, setVideos] = useState([]);
   const [genres, setGenres] = useState([]);
   const [selectedGenres, setSelectedGenres] = useState(genresFromQuery);
+  const [appliedGenres, setAppliedGenres] = useState(genresFromQuery);
   // ⬇️ tri par défaut "A-Z"
   const [sort, setSort] = useState(sortFromQuery);
   const [onlyOngoingSeries, setOnlyOngoingSeries] = useState(false);
@@ -35,8 +36,15 @@ const VideoListPage = () => {
   const [totalPages, setTotalPages] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
 
-  const [isLoading, setIsLoading] = useState(false); // Indicateur de chargement
+  const [isGenresLoading, setIsGenresLoading] = useState(false);
+  const [isVideosLoading, setIsVideosLoading] = useState(false);
   const [error, setError] = useState(null); // Gestion des erreurs
+  const currentPageRef = useRef(currentPage);
+
+  useEffect(() => {
+    currentPageRef.current = currentPage;
+  }, [currentPage]);
+
   // Fonction pour extraire le paramètre `search` de l'URL
   const getSearchQuery = () => {
     const params = new URLSearchParams(location.search);
@@ -45,7 +53,7 @@ const VideoListPage = () => {
 
   const fetchGenres = async () => {
     try {
-      setIsLoading(true);
+      setIsGenresLoading(true);
       const response = await fetch(`${apiUrl}/api/genres`);
       if (!response.ok) throw new Error("Erreur lors de la récupération des genres.");
       const data = await response.json();
@@ -53,18 +61,18 @@ const VideoListPage = () => {
     } catch (error) {
       setError(error.message);
     } finally {
-      setIsLoading(false);
+      setIsGenresLoading(false);
     }
   };
 
   const fetchVideos = async (page = 1) => {
     try {
-      setIsLoading(true);
+      setIsVideosLoading(true);
       setError(null);
 
       const search = getSearchQuery();
-      const genresQuery = selectedGenres.length > 0
-        ? `&genres=${selectedGenres.join(",")}`
+      const genresQuery = appliedGenres.length > 0
+        ? `&genres=${appliedGenres.join(",")}`
         : "";
 
       // ⬇️ on bascule vers ?sort= (az|za|recent|ancien). 'order' reste géré en back pour rétro-compat.
@@ -101,7 +109,7 @@ const VideoListPage = () => {
     } catch (error) {
       setError(error.message);
     } finally {
-      setIsLoading(false);
+      setIsVideosLoading(false);
     }
   };
 
@@ -126,33 +134,37 @@ const VideoListPage = () => {
       const nextKey = genresFromQuery.join(",");
       return currentKey === nextKey ? currentGenres : genresFromQuery;
     });
+    setAppliedGenres((currentGenres) => {
+      const currentKey = currentGenres.join(",");
+      const nextKey = genresFromQuery.join(",");
+      return currentKey === nextKey ? currentGenres : genresFromQuery;
+    });
   }, [genresFromQuery]);
 
   const didMountRef = useRef(false);
 
   useEffect(() => {
     if (didMountRef.current) {
-      fetchVideos(1);
+      if (currentPageRef.current === 1) {
+        fetchVideos(1);
+      } else {
+        setCurrentPage(1);
+      }
     } else {
       didMountRef.current = true;
     }
-  }, [selectedGenres, sort, location.search, onlyOngoingSeries]);
+  }, [appliedGenres, sort, location.search, onlyOngoingSeries]);
 
 
   return (
     <div className="container mx-auto px-4 py-10 dark:text-white sm:px-6 lg:px-8">
 
-      {isLoading && (
-        <div className="text-center dark:text-white">
-          <p>Chargement en cours...</p>
-        </div>
-      )}
       {error && (
         <div className="text-center text-red-500">
           <p>{error}</p>
         </div>
       )}
-      {!isLoading && !error && (
+      {!error && (
         <>
           <div className="relative z-30 mb-8 overflow-visible rounded-2xl border border-sky-500/10 bg-white/80 p-5 shadow-xl shadow-slate-950/5 backdrop-blur dark:bg-slate-950/70 dark:shadow-sky-950/20">
             <div className="pointer-events-none absolute inset-0 rounded-2xl bg-[radial-gradient(circle_at_12%_20%,rgba(14,165,233,0.12),transparent_26%),radial-gradient(circle_at_88%_0%,rgba(139,92,246,0.10),transparent_22%)]" />
@@ -163,6 +175,8 @@ const VideoListPage = () => {
               genres={genres}
               selectedGenres={selectedGenres}
               setSelectedGenres={setSelectedGenres}
+              onSelectionCommit={setAppliedGenres}
+              allowNegation
             />
             <div className="rounded-xl border border-sky-500/20 bg-white/85 px-4 py-3 shadow-sm transition duration-200 dark:bg-slate-950/65 dark:shadow-sky-950/20">
               <div className="flex items-center justify-between gap-4">
@@ -193,7 +207,13 @@ const VideoListPage = () => {
           </div>
           <div className="relative z-0 grid grid-cols-1 gap-4">
 
-            <VideoList videos={videos} />
+            {isVideosLoading || isGenresLoading ? (
+              <div className="text-center dark:text-white">
+                <p>Chargement en cours...</p>
+              </div>
+            ) : (
+              <VideoList videos={videos} />
+            )}
              
             <PaginationPage
               currentPage={currentPage}

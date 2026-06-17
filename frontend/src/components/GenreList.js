@@ -1,17 +1,63 @@
-import React, { useEffect, useId, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { ChevronUpDownIcon } from "@heroicons/react/16/solid";
 
-const GenreList = ({ genres = [], selectedGenres, setSelectedGenres }) => {
+const TriStateCheckbox = ({ checked, indeterminate, ...props }) => {
+  const ref = useRef(null);
+
+  useEffect(() => {
+    if (ref.current) {
+      ref.current.indeterminate = indeterminate;
+    }
+  }, [indeterminate]);
+
+  return (
+    <input
+      ref={ref}
+      type="checkbox"
+      checked={checked}
+      aria-checked={indeterminate ? "mixed" : checked}
+      {...props}
+    />
+  );
+};
+
+const getSelectionKey = (values) => values.join(",");
+
+const GenreList = ({
+  genres = [],
+  selectedGenres,
+  setSelectedGenres,
+  allowNegation = false,
+  onSelectionCommit,
+}) => {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [menuPosition, setMenuPosition] = useState(null);
   const buttonRef = useRef(null);
   const menuRef = useRef(null);
+  const selectionAtOpenRef = useRef("");
   const inputIdPrefix = useId();
 
+  const closeDropdown = useCallback(() => {
+    setDropdownOpen(false);
+
+    if (
+      onSelectionCommit &&
+      selectionAtOpenRef.current !== getSelectionKey(selectedGenres)
+    ) {
+      onSelectionCommit(selectedGenres);
+    }
+  }, [onSelectionCommit, selectedGenres]);
+
   const toggleDropdown = () => {
-    setDropdownOpen(!dropdownOpen);
+    if (dropdownOpen) {
+      closeDropdown();
+      return;
+    }
+
+    selectionAtOpenRef.current = getSelectionKey(selectedGenres);
+    setDropdownOpen(true);
   };
 
   useEffect(() => {
@@ -35,7 +81,7 @@ const GenreList = ({ genres = [], selectedGenres, setSelectedGenres }) => {
       ) {
         return;
       }
-      setDropdownOpen(false);
+      closeDropdown();
     };
 
     updatePosition();
@@ -48,14 +94,31 @@ const GenreList = ({ genres = [], selectedGenres, setSelectedGenres }) => {
       window.removeEventListener("scroll", updatePosition, true);
       document.removeEventListener("mousedown", handleClickOutside);
     };
-  }, [dropdownOpen]);
+  }, [closeDropdown, dropdownOpen]);
 
   const handleGenreChange = (genreId) => {
-    if (selectedGenres.includes(genreId)) {
-      setSelectedGenres(selectedGenres.filter((id) => id !== genreId));
-    } else {
-      setSelectedGenres([...selectedGenres, genreId]);
+    if (!allowNegation) {
+      if (selectedGenres.includes(genreId)) {
+        setSelectedGenres(selectedGenres.filter((id) => id !== genreId));
+      } else {
+        setSelectedGenres([...selectedGenres, genreId]);
+      }
+      return;
     }
+
+    setSelectedGenres((currentGenres) => {
+      const withoutGenre = currentGenres.filter((id) => Math.abs(id) !== genreId);
+
+      if (currentGenres.includes(genreId)) {
+        return [...withoutGenre, -genreId];
+      }
+
+      if (currentGenres.includes(-genreId)) {
+        return withoutGenre;
+      }
+
+      return [...withoutGenre, genreId];
+    });
   };
 
   const filteredGenres = useMemo(() => {
@@ -65,8 +128,8 @@ const GenreList = ({ genres = [], selectedGenres, setSelectedGenres }) => {
   }, [genres, searchTerm]);
 
   const selectedLabels = genres
-    .filter((g) => selectedGenres.includes(g.GenreID))
-    .map((g) => g.Nom)
+    .filter((g) => selectedGenres.some((id) => Math.abs(id) === g.GenreID))
+    .map((g) => (selectedGenres.includes(-g.GenreID) ? `Sans ${g.Nom}` : g.Nom))
     .join(", ");
 
   const dropdown = dropdownOpen && menuPosition
@@ -93,21 +156,25 @@ const GenreList = ({ genres = [], selectedGenres, setSelectedGenres }) => {
           {filteredGenres.length > 0 ? (
             filteredGenres.map((genre) => {
               const optionId = `${inputIdPrefix}-${genre.GenreID}`;
+              const isPositive = selectedGenres.includes(genre.GenreID);
+              const isNegative = selectedGenres.includes(-genre.GenreID);
               return (
                 <label
                   key={genre.GenreID}
                   htmlFor={optionId}
                   className="flex cursor-pointer items-center gap-3 px-4 py-2.5 font-semibold transition duration-150 hover:bg-sky-500/10"
                 >
-                  <input
-                    type="checkbox"
+                  <TriStateCheckbox
                     id={optionId}
                     value={genre.GenreID}
-                    checked={selectedGenres.includes(genre.GenreID)}
+                    checked={isPositive}
+                    indeterminate={allowNegation && isNegative}
                     onChange={() => handleGenreChange(genre.GenreID)}
                     className="size-4 rounded border-slate-300 accent-sky-500"
                   />
-                  <span className="capitalize">{genre.Nom}</span>
+                  <span className="capitalize">
+                    {allowNegation && isNegative ? `Sans ${genre.Nom}` : genre.Nom}
+                  </span>
                 </label>
               );
             })

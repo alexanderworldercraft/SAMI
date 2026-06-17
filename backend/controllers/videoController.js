@@ -940,7 +940,14 @@ export const getVideosAndSeries = async (request, reply) => {
     }
   };
 
-  const genreIds = genres.split(",").map(Number).filter(Boolean);
+  const rawGenreIds = genres
+    .split(",")
+    .map((value) => Number.parseInt(value, 10))
+    .filter((value) => Number.isInteger(value) && value !== 0);
+  const genreIds = [...new Set(rawGenreIds.filter((id) => id > 0))];
+  const excludedGenreIds = [
+    ...new Set(rawGenreIds.filter((id) => id < 0).map((id) => Math.abs(id))),
+  ].filter((id) => !genreIds.includes(id));
 
   const searchCondition = search
     ? {
@@ -951,14 +958,24 @@ export const getVideosAndSeries = async (request, reply) => {
     }
     : {};
 
-  const genreCondition =
-    genreIds.length > 0
-      ? {
-        AND: genreIds.map((id) => ({
-          VideoGenres: { some: { GenreID: id } },
-        })),
-      }
-      : {};
+  const videoGenreFilters = [
+    ...genreIds.map((id) => ({
+      VideoGenres: { some: { GenreID: id } },
+    })),
+    ...excludedGenreIds.map((id) => ({
+      VideoGenres: { none: { GenreID: id } },
+    })),
+  ];
+  const seriesGenreFilters = [
+    ...genreIds.map((id) => ({
+      SeriesGenres: { some: { GenreID: id } },
+    })),
+    ...excludedGenreIds.map((id) => ({
+      SeriesGenres: { none: { GenreID: id } },
+    })),
+  ];
+
+  const genreCondition = videoGenreFilters.length > 0 ? { AND: videoGenreFilters } : {};
 
   try {
     // ⚠️ On ne fait PAS d'orderBy DB sur le Titre si on doit trier par date ensuite.
@@ -988,8 +1005,8 @@ export const getVideosAndSeries = async (request, reply) => {
     const series = await prisma.series.findMany({
       where: {
         AND: [
-          genreIds.length > 0
-            ? { AND: genreIds.map((id) => ({ SeriesGenres: { some: { GenreID: id } } })) }
+          seriesGenreFilters.length > 0
+            ? { AND: seriesGenreFilters }
             : {},
           searchCondition,
         ],
