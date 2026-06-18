@@ -11,15 +11,16 @@ import importRoutes from "./routes/importRoutes.js";
 import personneRoutes from "./routes/personneRoutes.js";
 import logRoutes from "./routes/logRoutes.js";
 import adminMessageRoutes from "./routes/adminMessageRoutes.js";
+import adminBackupRoutes from "./routes/adminBackupRoutes.js";
 import fastifyCors from '@fastify/cors';
 import fastifyMultipart from '@fastify/multipart';
 import { prisma as db } from "./services/db.js";
 import fastifySwagger from "@fastify/swagger";
 import fastifySwaggerUI from "@fastify/swagger-ui";
 import { Server as SocketIOServer } from "socket.io"; 
-import { exec } from 'child_process';
 import cron from 'node-cron';
 import { rotateGenreFeaturedContent } from './services/genreFeaturedContentService.js';
+import { createDatabaseBackup } from './services/databaseBackupService.js';
 
 // URL publique
 const PUBLIC_URL = process.env.PUBLIC_URL;
@@ -89,6 +90,7 @@ fastify.register(fastifyCors, {
     origin: PUBLIC_URL, // Autoriser les requêtes depuis cette origine
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
     credentials: true,
+    exposedHeaders: ['Content-Disposition', 'X-Backup-Filename'],
 });
 
 // Enregistrement du plugin multipart
@@ -105,6 +107,7 @@ fastify.register(importRoutes, { prefix: "/api/import" });
 fastify.register(personneRoutes, { prefix: "/api/people" });
 fastify.register(logRoutes, { prefix: "/api/logs" });
 fastify.register(adminMessageRoutes, { prefix: "/api/admin-message" });
+fastify.register(adminBackupRoutes, { prefix: "/api/admin-backup" });
 
 // Enregistrer les fichiers statiques pour le frontend
 fastify.register(fastifyStatic, {
@@ -139,39 +142,14 @@ function keepDatabaseAlive() {
 // Configurer l'intervalle de ping (toutes les 7 heures)
 setInterval(keepDatabaseAlive, 25200000);
 
-// Configuration de la base de données pour la sauvegarde
-const DB_HOST = process.env.DB_HOST;
-const DB_USER = process.env.DB_USER;
-const DB_PASSWORD = process.env.DB_PASSWORD;
-const DB_NAME = process.env.DB_NAME;
-const BACKUP_DIR = path.join(__dirname, 'uploads/BDD');
-
-// Assurez-vous que le dossier de sauvegarde existe
-if (!fs.existsSync(BACKUP_DIR)) {
-    fs.mkdirSync(BACKUP_DIR);
-}
-
 // Fonction pour créer une sauvegarde de la base de données
-function backupDatabase() {
-    const timestamp = new Date();
-    const year = timestamp.getFullYear();
-    const month = String(timestamp.getMonth() + 1).padStart(2, '0');
-    const day = String(timestamp.getDate()).padStart(2, '0');
-    const backupFile = path.join(BACKUP_DIR, `BDD_${DB_NAME}_${year}-${month}-${day}.sql`);
-
-    const command = `mysqldump -h ${DB_HOST} -u ${DB_USER} -p${DB_PASSWORD} ${DB_NAME} > ${backupFile}`;
-
-    exec(command, (error, stdout, stderr) => {
-        if (error) {
-            fastify.log.error(`Erreur lors de la sauvegarde : ${error.message}`);
-            return;
-        }
-        if (stderr) {
-            fastify.log.error(`Erreur stderr : ${stderr}`);
-            return;
-        }
-        fastify.log.info(`Sauvegarde créée avec succès : ${backupFile}`);
-    });
+async function backupDatabase() {
+    try {
+        const backup = await createDatabaseBackup({ kind: "auto" });
+        fastify.log.info(`Sauvegarde créée avec succès : ${backup.filePath}`);
+    } catch (error) {
+        fastify.log.error(`Erreur lors de la sauvegarde : ${error.message}`);
+    }
 }
 
 // Planifier la tâche hebdomadaire

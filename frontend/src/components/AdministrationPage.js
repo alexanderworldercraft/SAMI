@@ -10,6 +10,7 @@ import AdminHomepageGenreManager from "./AdminHomepageGenreManager";
 import AdminSeriesManager from "./AdminSeriesManager";
 import AdminVideoManager from "./AdminVideoManager";
 import SuperAdminVideoTrashManager from "./SuperAdminVideoTrashManager";
+import AdminBackupManager from "./AdminBackupManager";
 
 const AdministrationPage = () => {
     const [, setReload] = useState(false);
@@ -74,6 +75,7 @@ const AdministrationPage = () => {
             <AdminSeriesManager />
             <AdminVideoManager />
             <SuperAdminVideoTrashManager />
+            <AdminBackupManager />
             <FormNewAdmin />
 
             <AdminList />

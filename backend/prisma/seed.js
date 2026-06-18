@@ -174,6 +174,11 @@ async function main() {
         Description: "Changement d'état du toggle du message général administrateur.",
         Criticite: 1,
       },
+      {
+        Nom: "manual_database_backup",
+        Description: "Super administrateur lance une sauvegarde manuelle de la base de données.",
+        Criticite: 3,
+      },
     ]),
     skipDuplicates: true, // Évite les erreurs si les grades existent déjà
   });

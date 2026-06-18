@@ -2,6 +2,51 @@ import React from "react";
 
 const updates = [
   {
+    version: "6.10.0",
+    title: "Sauvegarde manuelle super administrateur",
+    date: "18 juin 2026",
+    sections: [
+      {
+        title: "Administration",
+        items: [
+          "Ajout d'une nouvelle section Sauvegarde base de donnees dans la page Administration.",
+          "La section est reservee au super administrateur.",
+          "Le lancement d'une sauvegarde demande le mot de passe du compte connecte.",
+          "Une sauvegarde manuelle cree une copie SQL dans uploads/BDD.",
+          "Une seconde copie est automatiquement telechargee sur l'appareil du super administrateur.",
+        ],
+      },
+      {
+        title: "Backend et sauvegardes",
+        items: [
+          "Ajout d'un service backend reutilisable pour centraliser la creation des sauvegardes SQL.",
+          "La sauvegarde hebdomadaire utilise maintenant le meme service que la sauvegarde manuelle.",
+          "Les sauvegardes automatiques conservent le format de nom existant.",
+          "Les sauvegardes manuelles ajoutent l'heure et le suffixe manual dans le nom du fichier.",
+          "Le dossier uploads/BDD est cree automatiquement si necessaire.",
+        ],
+      },
+      {
+        title: "Securite",
+        items: [
+          "Ajout de l'endpoint POST /api/admin-backup/manual pour lancer une sauvegarde manuelle.",
+          "L'endpoint verifie le token JWT, le role super administrateur et le mot de passe utilisateur.",
+          "Le mot de passe de la base de donnees est transmis a mysqldump via l'environnement plutot que dans la commande shell.",
+          "La reponse renvoie le fichier SQL en telechargement apres la creation de la copie serveur.",
+        ],
+      },
+      {
+        title: "Logs et actions",
+        items: [
+          "Ajout de l'action manual_database_backup dans seed.js.",
+          "Ajout d'une migration pour creer l'action manual_database_backup lors des prochains deploiements.",
+          "Chaque sauvegarde manuelle reussie est journalisee avec le chemin du fichier cree.",
+          "Les headers de telechargement exposent le nom du fichier au frontend.",
+        ],
+      },
+    ],
+  },
+  {
     version: "6.9.0",
     title: "Images de contenu et genres par defaut homepage",
     date: "15 juin 2026",
