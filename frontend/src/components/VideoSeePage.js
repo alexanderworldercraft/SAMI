@@ -5,7 +5,7 @@ import {
   DialogPanel,
   DialogTitle,
 } from "@headlessui/react";
-import { ExclamationTriangleIcon } from "@heroicons/react/24/outline";
+import { ExclamationTriangleIcon, XMarkIcon } from "@heroicons/react/24/outline";
 import api from '../services/api';
 import { useParams } from "react-router-dom";
 import VideoPlayer from "./VideoPlayer";
@@ -17,6 +17,7 @@ import Notification from "./Notification";
 import VideoList from "./VideoList";
 import SeriesAndSeasonSelector from "./SeriesAndSeasonSelector"
 import { buildCookieValue } from "../utils/cookieValue";
+import PaginationPage from "./PaginationPage";
 
 
 const apiUrl = process.env.REACT_APP_URL_LOCAL;
@@ -58,6 +59,13 @@ const VideoSeePage = () => {
   const [isResettingSeries, setIsResettingSeries] = useState(false);
   const [skipFirstPlayLogKey, setSkipFirstPlayLogKey] = useState(0);
   const [resumeChoicePulse, setResumeChoicePulse] = useState(false);
+  const [contentSagas, setContentSagas] = useState([]);
+  const [sagaPage, setSagaPage] = useState(1);
+  const [sagaTotalPages, setSagaTotalPages] = useState(1);
+  const [sagaTotalItems, setSagaTotalItems] = useState(0);
+  const [selectedSaga, setSelectedSaga] = useState(null);
+  const [selectedSagaDetails, setSelectedSagaDetails] = useState(null);
+  const [selectedSagaLoading, setSelectedSagaLoading] = useState(false);
   const progressDeletedRef = useRef(false);
   const resumeProgressRef = useRef(null);
   const activeProgressLogActionRef = useRef("video_first_play");
@@ -327,6 +335,31 @@ const VideoSeePage = () => {
 
   const NameApp = process.env.REACT_APP_NAME;
   const currentVideoId = video?.VideoID || null;
+  const sagaItemsPerPage = 8;
+
+  const fetchContentSagas = async (page = 1) => {
+    if (!currentVideoId) return;
+
+    try {
+      const response = await api.get(`/sagas/content/video/${currentVideoId}`, {
+        params: { page, limit: sagaItemsPerPage },
+      });
+      setContentSagas(response.data?.items || []);
+      setSagaTotalItems(response.data?.totalItems || 0);
+      setSagaTotalPages(response.data?.totalPages || 1);
+      setSagaPage(page);
+    } catch (error) {
+      console.error("Erreur lors de la récupération des sagas du contenu :", error);
+      setContentSagas([]);
+      setSagaTotalItems(0);
+      setSagaTotalPages(1);
+      setSagaPage(1);
+    }
+  };
+
+  useEffect(() => {
+    fetchContentSagas(1);
+  }, [currentVideoId]);
 
   const formatTimecode = (seconds) => {
     if (!Number.isFinite(seconds)) return "0:00";
@@ -518,6 +551,78 @@ const VideoSeePage = () => {
     </section>
   );
 
+  const openSaga = async (saga) => {
+    setSelectedSaga(saga);
+    setSelectedSagaDetails(null);
+    setSelectedSagaLoading(true);
+
+    try {
+      const response = await api.get(`/sagas/${saga.SagaID}`);
+      setSelectedSagaDetails(response.data);
+    } catch (error) {
+      console.error("Erreur lors du chargement de la saga :", error);
+      showNotification("Impossible de charger cette saga.", "⚠️", "error");
+      setSelectedSaga(null);
+    } finally {
+      setSelectedSagaLoading(false);
+    }
+  };
+
+  const renderSagaSection = () => {
+    if (!contentSagas.length) return null;
+
+    return (
+      <section className="container mx-auto overflow-hidden rounded-2xl border border-sky-500/10 bg-white/80 shadow-xl shadow-slate-950/5 backdrop-blur dark:bg-slate-950/70 dark:shadow-sky-950/20">
+        <div className="border-b border-sky-500/10 bg-gradient-to-r from-sky-500/15 via-blue-500/10 to-transparent px-6 py-5">
+          <p className="text-sm font-bold uppercase text-sky-500 dark:text-sky-400">Sagas</p>
+          <h2 className="mt-1 text-2xl font-black text-slate-950 dark:text-white">
+            Ce contenu fait partie de
+          </h2>
+        </div>
+        <div className="relative p-6">
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_12%_20%,rgba(14,165,233,0.10),transparent_26%),radial-gradient(circle_at_88%_0%,rgba(139,92,246,0.08),transparent_22%)]" />
+          <div className="relative">
+            <div className="container mx-auto grid grid-cols-2 gap-4 sm:grid-cols-4 xl:grid-cols-8">
+              {contentSagas.map((saga) => (
+                <button
+                  key={saga.SagaID}
+                  type="button"
+                  onClick={() => openSaga(saga)}
+                  className="group text-left transition duration-300 hover:-translate-y-2"
+                >
+                  <div className="relative mb-2 overflow-hidden rounded-xl border border-neutral-400 bg-gradient-to-br from-slate-950 to-slate-900 transition duration-300 ease-in-out group-hover:border-blue-500">
+                    <img
+                      src={saga.CheminImage ? `${apiUrl}/${saga.CheminImage}` : "/imageDefault.png"}
+                      alt={saga.Titre}
+                      className="aspect-2/3 h-full w-full object-cover duration-300 group-hover:scale-110"
+                    />
+                    {saga.Premium && (
+                      <span className="absolute left-2 top-2 z-10 inline-flex rounded-full border border-amber-200/40 bg-gradient-to-br from-amber-300/95 via-yellow-400/95 to-orange-400/95 px-2.5 py-1 text-[10px] font-black uppercase text-slate-950">
+                        Premium
+                      </span>
+                    )}
+                  </div>
+                  <p className="px-2 py-1 text-center text-sm font-bold capitalize text-slate-900 line-clamp-2 dark:text-neutral-300">
+                    {saga.Titre}
+                  </p>
+                </button>
+              ))}
+            </div>
+            {sagaTotalItems > sagaItemsPerPage && (
+              <PaginationPage
+                currentPage={sagaPage}
+                totalPages={sagaTotalPages}
+                totalItems={sagaTotalItems}
+                itemsPerPage={sagaItemsPerPage}
+                onPageChange={fetchContentSagas}
+              />
+            )}
+          </div>
+        </div>
+      </section>
+    );
+  };
+
   return (
     <div className="relative">
       <div ref={backgroundBlur} className="fixed w-full h-full inset-0 -z-10 blur-3xl opacity-70"></div>
@@ -651,6 +756,8 @@ const VideoSeePage = () => {
               </section>
             )}
 
+            {renderSagaSection()}
+
             {/* recommandations personnalisées */}
             {renderRecommendationSection("Recommandations proches de vos goûts", similarPanel)}
 
@@ -714,6 +821,37 @@ const VideoSeePage = () => {
             </div>
           </div>
         </Dialog>
+      )}
+
+      {selectedSaga && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 px-4 py-8 backdrop-blur">
+          <div className="max-h-full w-full max-w-6xl overflow-y-auto rounded-2xl border border-sky-500/10 bg-white shadow-2xl dark:bg-slate-950 dark:text-white">
+            <div className="sticky top-0 z-10 flex items-start justify-between gap-4 border-b border-sky-500/10 bg-white/95 px-6 py-5 backdrop-blur dark:bg-slate-950/95">
+              <div>
+                <p className="text-sm font-bold uppercase text-sky-500 dark:text-sky-400">Saga</p>
+                <h2 className="mt-1 text-2xl font-black text-slate-950 dark:text-white">{selectedSaga.Titre}</h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedSaga(null)}
+                className="rounded-lg border border-slate-300/60 p-2 text-slate-700 transition hover:bg-slate-100 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-900"
+              >
+                <XMarkIcon className="size-5" />
+              </button>
+            </div>
+            <div className="p-6">
+              {selectedSagaLoading ? (
+                <p className="text-sm font-semibold text-slate-500 dark:text-slate-300">Chargement...</p>
+              ) : selectedSagaDetails?.Contents?.length ? (
+                <VideoList videos={selectedSagaDetails.Contents} />
+              ) : (
+                <p className="rounded-xl border border-sky-500/10 bg-slate-50 px-4 py-5 text-sm font-semibold text-slate-600 dark:bg-slate-900 dark:text-slate-300">
+                  Aucun contenu dans cette saga.
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Si pas de vidéo mais un message d'accès (premium ou autre) */}

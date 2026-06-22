@@ -106,18 +106,18 @@ const VideoListTendance = ({
                       className="aspect-2/3 w-full object-cover transition duration-500 group-hover:scale-105"
                     />
 
-                    <span className="absolute left-2 top-2 z-20 grid size-9 place-items-center rounded-lg border border-white/15 bg-slate-950/80 text-base font-black text-white shadow-xl backdrop-blur">
+                    <span className="absolute left-2 top-2 z-20 grid size-9 place-items-center rounded-lg border border-white/15 bg-slate-950/80 text-base font-black text-white shadow-inner backdrop-blur">
                       {index + 1}
                     </span>
 
                     {item.Premium && (
-                      <span className="absolute right-2 top-2 z-20 rounded-md bg-yellow-400 px-2 py-1 text-[10px] font-black text-slate-950 shadow-xl">
+                      <span className="inline-flex w-fit max-w-full items-center justify-center border text-center uppercase leading-tight tracking-wide backdrop-blur-md whitespace-normal border-yellow-200/35 bg-gradient-to-br from-yellow-300/95 via-yellow-400/95 to-orange-400/95 shadow-yellow-950/45 ring-1 ring-yellow-100/25              absolute right-2 top-2 z-20 rounded-md px-2 py-1 text-[10px] font-black text-slate-950 shadow-inner">
                         Premium
                       </span>
                     )}
 
                     {watchBadge && (
-                      <span className="absolute bottom-2 right-2 z-20 rounded-md bg-emerald-400 px-2 py-1 text-[10px] font-black text-slate-950 shadow-xl">
+                      <span className="inline-flex w-fit max-w-full items-center justify-center border text-center uppercase leading-tight tracking-wide backdrop-blur-md shadow-inner whitespace-normal border-emerald-200/35 bg-gradient-to-br from-emerald-300/95 via-emerald-400/95 to-teal-400/95 shadow-emerald-950/45 ring-1 ring-emerald-100/25              absolute bottom-2 right-2 z-20 rounded-md px-2 py-1 text-[10px] font-black text-slate-950">
                         {watchBadge}
                       </span>
                     )}

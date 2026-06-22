@@ -10,6 +10,7 @@ import SettingsPage from './components/SettingsPage';
 import Administration from './components/AdministrationPage';
 import ProtectedAdminRoute from './components/ProtectedAdminRoute';
 import VideoListPage from './components/VideoListPage';
+import SagaListPage from './components/SagaListPage';
 import VideoSeePage from './components/VideoSeePage';
 import FormNewVideoPage from './components/FormNewVideoPage';
 import FooterPage from './components/FooterPage';
@@ -65,6 +66,7 @@ const routesMeta = {
     description: `Gérez les utilisateurs et les paramètres administratifs de ${NameApp}.`,
   },
   "/videos": { title: `liste des vidéos - ${NameApp}`, description: `La liste des vidéos disponible sur ${NameApp}.` },
+  "/sagas": { title: `liste des sagas - ${NameApp}`, description: `La liste des sagas disponible sur ${NameApp}.` },
   "/nouvelle-video": {
     title: `Formulaire pour ajout de vidéos - ${NameApp}`,
     description: `Formulaire d'ajout de vidéos sur ${NameApp}.`,
@@ -128,6 +130,16 @@ export default function App() {
             <ProtectedRoute>
               <AppShell>
                 <VideoListPage />
+              </AppShell>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/sagas"
+          element={
+            <ProtectedRoute>
+              <AppShell>
+                <SagaListPage />
               </AppShell>
             </ProtectedRoute>
           }

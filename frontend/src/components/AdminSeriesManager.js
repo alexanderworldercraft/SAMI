@@ -312,7 +312,7 @@ const AdminSeriesManager = () => {
   };
 
   return (
-    <section className="mx-auto my-8 max-w-4xl overflow-visible rounded-2xl border border-sky-500/10 bg-white/80 shadow-xl shadow-slate-950/5 backdrop-blur dark:bg-slate-950/70 dark:shadow-sky-950/20">
+    <section className="mx-auto my-8 max-w-4xl overflow-hidden rounded-2xl border border-sky-500/10 bg-white/80 shadow-xl shadow-slate-950/5 backdrop-blur dark:bg-slate-950/70 dark:shadow-sky-950/20">
       <div className="border-b border-sky-500/10 bg-gradient-to-r from-sky-500/15 via-blue-500/10 to-transparent px-6 py-5">
         <p className="text-sm font-bold uppercase text-sky-500 dark:text-sky-400">Administration</p>
         <h2 className="mt-1 text-2xl font-black text-slate-950 dark:text-white">Séries</h2>

@@ -81,6 +81,9 @@ const countWatchedEpisodesAfterReset = (logs, resetBySeriesId = new Map()) => {
   return counts;
 };
 
+const isTruthyQueryValue = (value) =>
+  ["1", "true", "yes", "on"].includes(String(value || "").toLowerCase());
+
 const attachWatchStatus = async (items, userId) => {
   if (!userId || !Array.isArray(items) || items.length === 0) return items;
 
@@ -917,6 +920,9 @@ export const getVideosAndSeries = async (request, reply) => {
     search = "",
     sort: rawSort, // <-- nouveau
     ongoing: rawOngoing,
+    hideWatched: rawHideWatched,
+    hidePremium: rawHidePremium,
+    newOnly: rawNewOnly,
   } = request.query;
 
   const take = 40; // Nombre d'éléments par page
@@ -926,9 +932,11 @@ export const getVideosAndSeries = async (request, reply) => {
   const sort = (rawSort || "").toLowerCase();
   const isSortProvided = ["az", "za", "recent", "ancien", "most", "least"].includes(sort);
   const isWatchSort = sort === "most" || sort === "least";
-  const isOngoingRequested = ["1", "true", "yes", "on"].includes(
-    String(rawOngoing || "").toLowerCase()
-  );
+  const isOngoingRequested = isTruthyQueryValue(rawOngoing);
+  const shouldHideWatched = isTruthyQueryValue(rawHideWatched);
+  const shouldHidePremium = isTruthyQueryValue(rawHidePremium);
+  const shouldListNewOnly = isTruthyQueryValue(rawNewOnly);
+  const newEpisodeThreshold = subDays(new Date(), 30);
 
   // Fonction utilitaire: date sûre => number (epoch). Null/undefined => 0 (considéré comme "très ancien")
   const safeEpoch = (d) => {
@@ -1016,7 +1024,15 @@ export const getVideosAndSeries = async (request, reply) => {
         SeriesGenres: { include: { Genre: true } },
         Saisons: {
           include: {
-            Episodes: { where: { EtatID: ACTIVE_ETAT_ID }, take: 1, orderBy: { Titre: "asc" } },
+            Episodes: {
+              where: { EtatID: ACTIVE_ETAT_ID },
+              select: {
+                VideoID: true,
+                Titre: true,
+                CreateDate: true,
+              },
+              orderBy: { Titre: "asc" },
+            },
           },
           orderBy: { Numero: "asc" },
         },
@@ -1027,6 +1043,19 @@ export const getVideosAndSeries = async (request, reply) => {
     const seriesWithFirstVideo = series.map((serie) => {
       const firstSeason = serie.Saisons[0];
       const firstVideo = firstSeason?.Episodes[0];
+      const latestEpisodeDate = serie.Saisons.reduce((latest, saison) => {
+        saison.Episodes.forEach((episode) => {
+          if (safeEpoch(episode.CreateDate) > safeEpoch(latest)) {
+            latest = episode.CreateDate;
+          }
+        });
+        return latest;
+      }, null);
+      const recentSortDate =
+        safeEpoch(latestEpisodeDate) > safeEpoch(serie.CreateDate)
+          ? latestEpisodeDate
+          : serie.CreateDate;
+
       return {
         id: serie.SeriesID,
         type: "series",
@@ -1038,6 +1067,11 @@ export const getVideosAndSeries = async (request, reply) => {
         Saisons: serie.Saisons.length,
         Genres: serie.SeriesGenres.map((sg) => sg.Genre.Nom),
         CreateDate: serie.CreateDate ?? null, // ⬅️ important pour les tris par date (null => très ancien)
+        LatestEpisodeDate: latestEpisodeDate ?? null,
+        RecentSortDate: recentSortDate ?? null,
+        HasNewEpisode:
+          latestEpisodeDate != null &&
+          safeEpoch(latestEpisodeDate) >= safeEpoch(newEpisodeThreshold),
       };
     });
 
@@ -1125,9 +1159,9 @@ export const getVideosAndSeries = async (request, reply) => {
 
     // Fusion
     let allItems = [...seriesWithFirstVideo, ...filmItems];
+    const userId = getUserIdFromRequest(request);
 
     // ---- ONGOING SERIES (filtre global) ----
-    const userId = getUserIdFromRequest(request);
     if (isOngoingRequested) {
       if (!userId) {
         return reply.send({ items: [], totalItems: 0, totalPages: 0 });
@@ -1200,6 +1234,26 @@ export const getVideosAndSeries = async (request, reply) => {
         );
     }
 
+    // ---- OPTIONS SUPPLEMENTAIRES (filtres globaux avant pagination) ----
+    if (shouldHidePremium) {
+      allItems = allItems.filter((item) => !item.Premium);
+    }
+
+    if (shouldListNewOnly) {
+      allItems = allItems.filter(
+        (item) => safeEpoch(item.RecentSortDate || item.LatestEpisodeDate || item.CreateDate) >= safeEpoch(newEpisodeThreshold)
+      );
+    }
+
+    if (shouldHideWatched && userId) {
+      allItems = await attachWatchStatus(allItems, userId);
+      allItems = allItems.filter((item) => {
+        if (item.type === "video") return !item.Watched;
+        if (item.type === "series") return !item.WatchedAll;
+        return true;
+      });
+    }
+
     // ---- TRI ----
     // sort a priorité si fourni, sinon on retombe sur order asc/desc (titre)
     let sorted;
@@ -1208,8 +1262,13 @@ export const getVideosAndSeries = async (request, reply) => {
     } else if (sort === "za") {
       sorted = allItems.sort((a, b) => b.Titre.localeCompare(a.Titre));
     } else if (sort === "recent") {
-      // Récent → Ancien (dates nulles = très anciennes => en bas)
-      sorted = allItems.sort((a, b) => safeEpoch(b.CreateDate) - safeEpoch(a.CreateDate));
+      // Récent → Ancien. Pour les séries, un épisode ajouté récemment remonte la série.
+      sorted = allItems.sort(
+        (a, b) =>
+          safeEpoch(b.RecentSortDate || b.CreateDate) -
+            safeEpoch(a.RecentSortDate || a.CreateDate) ||
+          a.Titre.localeCompare(b.Titre)
+      );
     } else if (sort === "ancien") {
       // Ancien → Récent (dates nulles = très anciennes => en haut)
       sorted = allItems.sort((a, b) => safeEpoch(a.CreateDate) - safeEpoch(b.CreateDate));
@@ -1233,86 +1292,9 @@ export const getVideosAndSeries = async (request, reply) => {
     const paginatedItems = sorted.slice(skip, skip + take);
 
     // ---- WATCH STATUS (optionnel, par utilisateur) ----
-    let itemsWithWatch = paginatedItems;
-    if (userId) {
-      const action = await prisma.action.findUnique({
-        where: { Nom: "video_first_play" },
-        select: { ActionID: true },
-      });
-
-      if (action?.ActionID) {
-        const filmIds = paginatedItems.filter((item) => item.type === "video").map((item) => item.id);
-        const seriesIds = paginatedItems.filter((item) => item.type === "series").map((item) => item.id);
-        const resetBySeriesId = await getSeriesResetMap(userId, seriesIds);
-
-        const [filmLogCounts, seriesEpisodeTotalsRaw, seriesWatchedRaw] = await Promise.all([
-          filmIds.length > 0
-            ? prisma.log.groupBy({
-                by: ["VideoID"],
-                where: {
-                  ActionID: action.ActionID,
-                  UtilisateurID: userId,
-                  VideoID: { in: filmIds },
-                },
-                _count: { _all: true },
-              })
-            : [],
-          seriesIds.length > 0
-            ? prisma.saison.findMany({
-                where: { SeriesID: { in: seriesIds } },
-                select: {
-                  SeriesID: true,
-                  _count: { select: { Episodes: true } },
-                },
-              })
-            : [],
-          seriesIds.length > 0
-            ? prisma.log.findMany({
-                where: {
-                  ActionID: action.ActionID,
-                  UtilisateurID: userId,
-                  SeriesID: { in: seriesIds },
-                  VideoID: { not: null },
-                },
-                select: {
-                  SeriesID: true,
-                  VideoID: true,
-                  DateAction: true,
-                },
-              })
-            : [],
-        ]);
-
-        const watchedFilmIds = new Set(filmLogCounts.map((row) => row.VideoID));
-
-        const seriesEpisodeTotals = new Map();
-        seriesEpisodeTotalsRaw.forEach((row) => {
-          const prev = seriesEpisodeTotals.get(row.SeriesID) || 0;
-          seriesEpisodeTotals.set(row.SeriesID, prev + row._count.Episodes);
-        });
-
-        const seriesWatchedCounts = countWatchedEpisodesAfterReset(seriesWatchedRaw, resetBySeriesId);
-
-        itemsWithWatch = paginatedItems.map((item) => {
-          if (item.type === "video") {
-            return { ...item, Watched: watchedFilmIds.has(item.id) };
-          }
-
-          if (item.type === "series") {
-            const total = seriesEpisodeTotals.get(item.id) || 0;
-            const watched = seriesWatchedCounts.get(item.id) || 0;
-            return {
-              ...item,
-              WatchedCount: watched,
-              TotalEpisodes: total,
-              WatchedAll: total > 0 && watched >= total,
-            };
-          }
-
-          return item;
-        });
-      }
-    }
+    const itemsWithWatch = userId
+      ? await attachWatchStatus(paginatedItems, userId)
+      : paginatedItems;
 
     reply.send({
       items: itemsWithWatch,

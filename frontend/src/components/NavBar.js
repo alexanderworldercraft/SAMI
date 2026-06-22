@@ -17,6 +17,7 @@ import {
   HomeIcon,
   UserIcon,
   FilmIcon,
+  RectangleStackIcon,
   PlusCircleIcon,
   Cog6ToothIcon,
 } from '@heroicons/react/24/outline'
@@ -85,6 +86,7 @@ export default function NavBar() {
   const navigation = [
     { name: 'Accueil', href: '/', icon: HomeIcon },
     { name: 'Vidéos', href: '/videos', icon: FilmIcon },
+    { name: 'Sagas', href: '/sagas', icon: RectangleStackIcon },
     { name: 'Acteur/réalisateur', href: '/personnes', icon: UserIcon },
     ...(user?.GradeID === 1 || user?.GradeID === 2
       ? [{ name: 'Nouveau contenu', href: '/nouvelle-video', icon: PlusCircleIcon }]

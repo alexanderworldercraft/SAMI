@@ -4,6 +4,7 @@ import PaginationPage from "./PaginationPage";
 import VideoList from "./VideoList";
 import GenreList from "./GenreList";
 import SortDropdown from "./SortDropdown"; // ⬅️ nouveau
+import VideoOptionsDropdown from "./VideoOptionsDropdown";
 
 const apiUrl = process.env.REACT_APP_URL_LOCAL;
 const VALID_SORTS = ["az", "za", "recent", "ancien", "most", "least"];
@@ -31,7 +32,12 @@ const VideoListPage = () => {
   const [appliedGenres, setAppliedGenres] = useState(genresFromQuery);
   // ⬇️ tri par défaut "A-Z"
   const [sort, setSort] = useState(sortFromQuery);
-  const [onlyOngoingSeries, setOnlyOngoingSeries] = useState(false);
+  const [videoOptions, setVideoOptions] = useState({
+    onlyOngoingSeries: false,
+    hideWatched: false,
+    hidePremium: false,
+    onlyNew: false,
+  });
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalItems, setTotalItems] = useState(0);
@@ -79,10 +85,15 @@ const VideoListPage = () => {
       const token = localStorage.getItem("token");
       const headers = token ? { Authorization: `Bearer ${token}` } : undefined;
 
-      const ongoingQuery = onlyOngoingSeries ? "&ongoing=1" : "";
+      const optionsQuery = [
+        videoOptions.onlyOngoingSeries ? "ongoing=1" : "",
+        videoOptions.hideWatched ? "hideWatched=1" : "",
+        videoOptions.hidePremium ? "hidePremium=1" : "",
+        videoOptions.onlyNew ? "newOnly=1" : "",
+      ].filter(Boolean).map((value) => `&${value}`).join("");
 
       const response = await fetch(
-        `${apiUrl}/api/videos?page=${page}&sort=${sort}&search=${encodeURIComponent(search)}${genresQuery}${ongoingQuery}`,
+        `${apiUrl}/api/videos?page=${page}&sort=${sort}&search=${encodeURIComponent(search)}${genresQuery}${optionsQuery}`,
         headers ? { headers } : undefined
       );
 
@@ -153,7 +164,7 @@ const VideoListPage = () => {
     } else {
       didMountRef.current = true;
     }
-  }, [appliedGenres, sort, location.search, onlyOngoingSeries]);
+  }, [appliedGenres, sort, location.search, videoOptions]);
 
 
   return (
@@ -178,31 +189,7 @@ const VideoListPage = () => {
               onSelectionCommit={setAppliedGenres}
               allowNegation
             />
-            <div className="rounded-xl border border-sky-500/20 bg-white/85 px-4 py-3 shadow-sm transition duration-200 dark:bg-slate-950/65 dark:shadow-sky-950/20">
-              <div className="flex items-center justify-between gap-4">
-              <span className="flex grow flex-col">
-                <label id="ongoing-series-label" className="text-sm/6 font-bold text-slate-700 dark:text-slate-200">
-                  Séries en cours
-                </label>
-                <span id="ongoing-series-description" className="text-xs leading-5 text-slate-500 dark:text-slate-400">
-                  Cela permet de lister vos séries en cours de visionnage.
-                </span>
-              </span>
-              <div className="group relative inline-flex w-12 shrink-0 rounded-full border border-sky-500/20 bg-slate-200 p-0.5 outline-offset-2 outline-sky-400 transition-colors duration-200 ease-in-out has-[:checked]:bg-gradient-to-r has-[:checked]:from-sky-400 has-[:checked]:to-violet-500 has-[:focus-visible]:outline has-[:focus-visible]:outline-2 dark:bg-white/10">
-                <span className="size-5 rounded-full bg-white shadow-sm ring-1 ring-gray-900/5 transition-transform duration-200 ease-in-out group-has-[:checked]:translate-x-6" />
-                <input
-                  id="ongoing-series"
-                  name="ongoing-series"
-                  type="checkbox"
-                  aria-labelledby="ongoing-series-label"
-                  aria-describedby="ongoing-series-description"
-                  className="absolute inset-0 size-full appearance-none focus:outline-none"
-                  checked={onlyOngoingSeries}
-                  onChange={(e) => setOnlyOngoingSeries(e.target.checked)}
-                />
-              </div>
-              </div>
-            </div>
+            <VideoOptionsDropdown options={videoOptions} setOptions={setVideoOptions} />
             </div>
           </div>
           <div className="relative z-0 grid grid-cols-1 gap-4">

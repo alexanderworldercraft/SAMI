@@ -2,6 +2,139 @@ import React from "react";
 
 const updates = [
   {
+    version: "6.12.0",
+    title: "Sagas de films et series",
+    date: "22 juin 2026",
+    sections: [
+      {
+        title: "Sagas",
+        items: [
+          "Ajout d'une nouvelle page Sagas accessible depuis la navigation.",
+          "Une saga regroupe des films et des series entieres dans un ensemble commun.",
+          "Les cards de sagas reprennent le style des contenus avec affiche, resume au survol et badge Premium.",
+          "L'ouverture d'une saga affiche un modal avec la liste ordonnee de ses contenus.",
+          "Un clic sur un film ouvre directement sa page de lecture, et un clic sur une serie ouvre son premier episode disponible.",
+        ],
+      },
+      {
+        title: "Page Lecture",
+        items: [
+          "Ajout d'une section Sagas sur la page de lecture quand le contenu appartient a au moins une saga.",
+          "La section reprend le style des sections de propositions existantes.",
+          "La liste des sagas liees est paginee quand un contenu appartient a beaucoup de sagas.",
+          "La section reste masquee automatiquement pour les contenus qui ne sont lies a aucune saga.",
+          "Les episodes recuperent aussi les sagas liees a leur serie parente.",
+        ],
+      },
+      {
+        title: "Nouvelle video",
+        items: [
+          "Ajout d'un onglet Sagas pour creer une nouvelle saga.",
+          "La creation d'une saga permet de saisir le titre, le resume, le statut Premium et l'affiche.",
+          "L'affiche des sagas utilise le meme composant de depot et previsualisation que les series.",
+          "Ajout d'un onglet Contenus saga pour lier un film ou une serie entiere a une saga.",
+          "Le select Contenu integre une barre de recherche dans le dropdown pour rester utilisable avec beaucoup de contenus.",
+        ],
+      },
+      {
+        title: "Administration",
+        items: [
+          "Ajout d'une section Sagas dans la page Administration pour modifier les sagas existantes.",
+          "Les administrateurs peuvent modifier le titre, le resume, l'affiche et le statut Premium d'une saga.",
+          "Les contenus d'une saga peuvent etre retires sans supprimer les films ou series associes.",
+          "L'ordre des contenus dans une saga peut etre gere par champ numerique ou par drag and drop.",
+          "Les sections Series, Sagas et Videos sont harmonisees avec le style des autres cards administrateur.",
+        ],
+      },
+      {
+        title: "Corbeille sagas",
+        items: [
+          "La suppression administrateur place maintenant une saga en corbeille.",
+          "Ajout d'une section Corbeille sagas reservee au super administrateur.",
+          "Le super administrateur peut restaurer une saga placee en corbeille.",
+          "La suppression definitive retire les liaisons, la saga et son dossier d'affiche.",
+          "Les films et series lies a une saga ne sont jamais supprimes lors de la suppression de la saga.",
+        ],
+      },
+      {
+        title: "Backend et base de donnees",
+        items: [
+          "Ajout des tables Saga et SagaContent pour stocker les sagas et leurs contenus.",
+          "Chaque relation de contenu porte son propre ordre, independant pour chaque saga.",
+          "Ajout des endpoints /api/sagas pour lister, creer, modifier, lier, reordonner, restaurer et supprimer les sagas.",
+          "Les images de saga sont stockees dans uploads/saga/SagaID/NomDeImage.extension.",
+          "L'API limite l'ajout direct aux films sans saison et aux series entieres.",
+        ],
+      },
+    ],
+  },
+  {
+    version: "6.11.0",
+    title: "Options supplementaires sur la page Videos",
+    date: "21 juin 2026",
+    sections: [
+      {
+        title: "Page Videos",
+        items: [
+          "Remplacement du reglage direct Series en cours par un dropdown Options.",
+          "Le dropdown regroupe maintenant les options Series en cours, Masquer le contenu deja vu, Masquer le contenu premium et Lister les nouveautes.",
+          "Les interrupteurs du dropdown reprennent le style du toggle Series en cours existant.",
+          "Le bouton Options affiche le nombre d'options actives pour garder la barre de reglages lisible.",
+        ],
+      },
+      {
+        title: "Filtres",
+        items: [
+          "Les options supplementaires peuvent etre combinees avec le tri, la recherche et les genres.",
+          "Masquer le contenu deja vu retire les films vus et les series terminees de la liste.",
+          "Masquer le contenu premium retire les films et series marques comme premium.",
+          "Lister les nouveautes affiche les contenus ajoutes recemment et les series avec nouvel episode recent.",
+        ],
+      },
+      {
+        title: "Backend",
+        items: [
+          "Ajout des parametres hideWatched, hidePremium et newOnly sur l'endpoint GET /api/videos.",
+          "Les nouveaux filtres sont appliques avant pagination pour conserver un total et un nombre de pages coherents.",
+          "Le calcul du statut vu est reutilise pour filtrer les contenus deja vus et pour conserver les badges existants.",
+          "Le filtre Series en cours continue d'utiliser le parametre ongoing deja existant.",
+        ],
+      },
+    ],
+  },
+  {
+    version: "6.10.1",
+    title: "Tri recent des series et badge nouvel episode",
+    date: "19 juin 2026",
+    sections: [
+      {
+        title: "Page Videos",
+        items: [
+          "Le tri Ajout - plus recent prend maintenant en compte le dernier episode ajoute dans une serie.",
+          "Une serie remonte dans la liste quand un nouvel episode est plus recent que les films et series autour d'elle.",
+          "Le comportement reste limite au tri Ajout - plus recent pour conserver les autres tris existants.",
+          "Les films continuent d'utiliser leur propre date d'ajout pour ce tri.",
+        ],
+      },
+      {
+        title: "Badges",
+        items: [
+          "Ajout du badge Nouveau episode sur les cards de series.",
+          "Le badge s'affiche quand une serie possede un episode actif ajoute il y a moins de 30 jours.",
+          "Le badge est affiche avec les badges Premium et Vu deja presents.",
+        ],
+      },
+      {
+        title: "Backend",
+        items: [
+          "L'endpoint GET /api/videos renvoie maintenant la date du dernier episode actif pour les series.",
+          "Ajout d'une date de tri dediee aux series pour faire remonter les series avec episode recent.",
+          "Ajout d'un indicateur HasNewEpisode pour piloter l'affichage du badge cote frontend.",
+        ],
+      },
+    ],
+  },
+  {
     version: "6.10.0",
     title: "Sauvegarde manuelle super administrateur",
     date: "18 juin 2026",

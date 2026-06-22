@@ -15,6 +15,7 @@ model Etat {
   EtatID       Int           @id @default(autoincrement())
   Nom          String        @unique @db.VarChar(100)
   CreateDate   DateTime?     @default(now())
+  Sagas        Saga[]
   Series       Series[]
   Utilisateurs Utilisateur[]
   Videos       Video[]
@@ -53,6 +54,7 @@ model Series {
   Utilisateur          Utilisateur?           @relation(fields: [UtilisateurID], references: [UtilisateurID])
   SeriesGenres         SeriesGenre[]
   SeriesPersonne       SeriesPersonne[]
+  SagaContents         SagaContent[]
   UserSeriesWatchReset UserSeriesWatchReset[]
   GenreFeaturedContent GenreFeaturedContent[]
 
@@ -104,6 +106,7 @@ model Video {
   Utilisateur          Utilisateur?           @relation(fields: [UtilisateurID], references: [UtilisateurID])
   VideoGenres          VideoGenre[]
   VideoPersonne        VideoPersonne[]
+  SagaContents         SagaContent[]
   UserVideoProgress    UserVideoProgress[]
   VideoSubtitles       VideoSubtitle[]
   GenreFeaturedContent GenreFeaturedContent[]
@@ -134,6 +137,38 @@ model VideoSubtitle {
   Video           Video     @relation(fields: [VideoID], references: [VideoID])
 
   @@index([VideoID], map: "VideoSubtitle_VideoID_fkey")
+}
+
+model Saga {
+  SagaID       Int           @id @default(autoincrement())
+  Titre        String        @db.VarChar(100)
+  Resumer      String?       @db.Text
+  CheminImage  String?       @db.VarChar(255)
+  EtatID       Int
+  Premium      Boolean       @default(false)
+  CreateDate   DateTime?     @default(now())
+  Etat         Etat          @relation(fields: [EtatID], references: [EtatID])
+  SagaContents SagaContent[]
+
+  @@index([EtatID], map: "Saga_EtatID_fkey")
+}
+
+model SagaContent {
+  SagaContentID Int       @id @default(autoincrement())
+  SagaID        Int
+  VideoID       Int?
+  SeriesID      Int?
+  Ordre         Int       @default(0)
+  CreateDate    DateTime? @default(now())
+  Saga          Saga      @relation(fields: [SagaID], references: [SagaID], onDelete: Cascade)
+  Video         Video?    @relation(fields: [VideoID], references: [VideoID], onDelete: Cascade)
+  Series        Series?   @relation(fields: [SeriesID], references: [SeriesID], onDelete: Cascade)
+
+  @@unique([SagaID, VideoID], map: "uniq_saga_video")
+  @@unique([SagaID, SeriesID], map: "uniq_saga_series")
+  @@index([SagaID, Ordre], map: "idx_saga_content_order")
+  @@index([VideoID], map: "SagaContent_VideoID_fkey")
+  @@index([SeriesID], map: "SagaContent_SeriesID_fkey")
 }
 
 model UtilisateurGenre {

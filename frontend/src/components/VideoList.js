@@ -13,20 +13,34 @@ const VideoList = ({ videos = [], overlayActions }) => {
 
   const renderBadges = (item) => {
     const badges = [];
+    const badgeBaseClass =
+      "inline-flex w-fit max-w-full items-center justify-center rounded-full border px-2.5 py-1 text-center text-[10px] font-black uppercase leading-tight tracking-wide backdrop-blur-md shadow-inner whitespace-normal";
 
     if (item.Premium) {
       badges.push(
         <span
           key="premium"
-          className="inline-flex items-center rounded-full bg-yellow-500 text-black text-[10px] font-bold px-2 py-0.5 shadow-xl tracking-wide"
+          className={`${badgeBaseClass} border-amber-200/40 bg-gradient-to-br from-amber-300/95 via-yellow-400/95 to-orange-400/95 text-slate-950 shadow-amber-950/45 ring-1 ring-amber-100/30`}
         >
           Premium
         </span>
       );
     }
 
+    if (item.type === "series" && item.HasNewEpisode) {
+      badges.push(
+        <span
+          key="new-episode"
+          className={`${badgeBaseClass} border-sky-200/35 bg-gradient-to-br from-sky-400/95 via-blue-500/95 to-cyan-400/95 text-white shadow-sky-950/55 ring-1 ring-sky-100/25`}
+        >
+          Nouveau épisode
+        </span>
+      );
+    }
+
     let watchLabel = null;
-    let watchClass = "bg-emerald-500 text-black";
+    let watchClass =
+      "border-emerald-200/35 bg-gradient-to-br from-emerald-300/95 via-emerald-400/95 to-teal-400/95 text-slate-950 shadow-emerald-950/45 ring-1 ring-emerald-100/25";
 
     if (item.type === "video" && item.Watched) {
       watchLabel = "Vu";
@@ -38,7 +52,8 @@ const VideoList = ({ videos = [], overlayActions }) => {
           watchLabel = "Vu";
         } else {
           watchLabel = `${watched}/${total}`;
-          watchClass = "bg-slate-200 text-slate-900";
+          watchClass =
+            "border-white/25 bg-gradient-to-br from-slate-100/95 via-slate-200/95 to-sky-100/95 text-slate-950 shadow-slate-950/50 ring-1 ring-white/30";
         }
       }
     }
@@ -47,7 +62,7 @@ const VideoList = ({ videos = [], overlayActions }) => {
       badges.push(
         <span
           key="watched"
-          className={`inline-flex items-center rounded-full ${watchClass} text-[10px] font-bold px-2 py-0.5 shadow-xl tracking-wide`}
+          className={`${badgeBaseClass} ${watchClass}`}
         >
           {watchLabel}
         </span>
@@ -57,7 +72,7 @@ const VideoList = ({ videos = [], overlayActions }) => {
     if (!badges.length) return null;
 
     return (
-      <div className="absolute top-2 left-2 z-10 flex flex-col gap-1 group-hover:opacity-0 duration-300">
+      <div className="absolute top-2 left-2 z-10 flex max-w-[calc(100%-1rem)] flex-col items-start gap-1 group-hover:opacity-0 duration-300">
         {badges}
       </div>
     );

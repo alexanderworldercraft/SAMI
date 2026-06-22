@@ -12,6 +12,7 @@ import personneRoutes from "./routes/personneRoutes.js";
 import logRoutes from "./routes/logRoutes.js";
 import adminMessageRoutes from "./routes/adminMessageRoutes.js";
 import adminBackupRoutes from "./routes/adminBackupRoutes.js";
+import sagaRoutes from "./routes/sagaRoutes.js";
 import fastifyCors from '@fastify/cors';
 import fastifyMultipart from '@fastify/multipart';
 import { prisma as db } from "./services/db.js";
@@ -136,6 +137,7 @@ fastify.register(personneRoutes, { prefix: "/api/people" });
 fastify.register(logRoutes, { prefix: "/api/logs" });
 fastify.register(adminMessageRoutes, { prefix: "/api/admin-message" });
 fastify.register(adminBackupRoutes, { prefix: "/api/admin-backup" });
+fastify.register(sagaRoutes, { prefix: "/api/sagas" });
 
 // Enregistrer les fichiers statiques pour le frontend
 fastify.register(fastifyStatic, {
