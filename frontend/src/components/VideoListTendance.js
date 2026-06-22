@@ -88,7 +88,7 @@ const VideoListTendance = ({
               <a
                 key={`${item.type || "video"}-${item.id || item.VideoID || index}`}
                 href={getTargetUrl(item)}
-                className={`group min-w-0 transition duration-300 hover:-translate-y-1 ${
+                className={`min-h-full h-max max-h-max min-h-full h-max max-h-max min-h-full h-max max-h-max group min-w-0 transition duration-300 hover:-translate-y-1 ${
                   isLead ? "col-span-2 sm:col-span-2 xl:col-span-1" : ""
                 }`}
               >

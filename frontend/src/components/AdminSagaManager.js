@@ -315,11 +315,7 @@ const AdminSagaManager = () => {
           {message && <div className="mb-5 rounded-xl border border-emerald-400/30 bg-emerald-500/10 px-4 py-3 text-sm font-semibold text-emerald-700 dark:text-emerald-200">{message}</div>}
           {errorMessage && <div className="mb-5 rounded-xl border border-red-400/30 bg-red-500/10 px-4 py-3 text-sm font-semibold text-red-700 dark:text-red-200">{errorMessage}</div>}
 
-          <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-[1fr_1fr_auto]">
-            <div>
-              <label className={labelClass}>Filtrer</label>
-              <input value={searchTerm} onChange={(event) => setSearchTerm(event.target.value)} className={fieldClass} placeholder="Titre ou ID..." />
-            </div>
+          <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-[1fr_auto]">
             <div>
               <label className={labelClass}>Saga à gérer</label>
               <Listbox value={selectedSaga} onChange={setSelectedSaga}>
@@ -333,6 +329,16 @@ const AdminSagaManager = () => {
                     </span>
                   </ListboxButton>
                   <ListboxOptions anchor={{ to: "bottom start", gap: 8 }} className={listboxOptionsClass}>
+                    <div className="sticky top-0 z-10 bg-white px-3 py-3 dark:bg-slate-950">
+                      <input
+                        type="text"
+                        value={searchTerm}
+                        onChange={(event) => setSearchTerm(event.target.value)}
+                        onKeyDown={(event) => event.stopPropagation()}
+                        placeholder="Rechercher une saga..."
+                        className="w-full rounded-lg border border-sky-500/20 bg-slate-50 px-3 py-2 text-slate-900 placeholder:text-slate-400 focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-400/40 dark:bg-slate-900 dark:text-slate-100"
+                      />
+                    </div>
                     {filteredSagas.length > 0 ? (
                       filteredSagas.map((saga) => (
                         <ListboxOption

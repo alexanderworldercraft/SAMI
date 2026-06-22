@@ -5,6 +5,8 @@ import SeasonsManager from "./SeasonsManager";
 import SeriesManager from "./SeriesManager";
 import SagaManager from "./SagaManager";
 import SagaContentManager from "./SagaContentManager";
+import UniverseManager from "./UniverseManager";
+import UniverseSagaManager from "./UniverseSagaManager";
 import AddGenre from "./AddGenre";
 import ImportDrawer from "./ImportDrawer";
 import PeopleQuickAdd from "./PeopleQuickAdd";
@@ -34,6 +36,8 @@ const tabs = [
   { id: "series", name: "Séries", icon: UsersIcon }, // tu pourras changer l'icône si tu veux
   { id: "sagas", name: "Sagas", icon: UsersIcon },
   { id: "saga-content", name: "Contenus saga", icon: BuildingOfficeIcon },
+  { id: "universes", name: "Univers", icon: UsersIcon },
+  { id: "universe-sagas", name: "Sagas univers", icon: BuildingOfficeIcon },
 ];
 
 const FormNewVideoPage = () => {
@@ -112,6 +116,10 @@ const FormNewVideoPage = () => {
         return <SagaManager />;
       case "saga-content":
         return <SagaContentManager />;
+      case "universes":
+        return <UniverseManager />;
+      case "universe-sagas":
+        return <UniverseSagaManager />;
       default:
         return null;
     }

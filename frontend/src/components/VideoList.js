@@ -2,7 +2,7 @@ import React from "react";
 
 const apiUrl = process.env.REACT_APP_URL_LOCAL;
 
-const VideoList = ({ videos = [], overlayActions }) => {
+const VideoList = ({ videos = [], overlayActions, onItemClick, gridClassName = "" }) => {
   const getImageUrl = (cheminImage, type) => {
     // Fallbacks locaux (évite via.placeholder.*)
     if (cheminImage) return `${apiUrl}/${cheminImage}`;
@@ -83,7 +83,7 @@ const VideoList = ({ videos = [], overlayActions }) => {
   }
 
   return (
-    <div className="container grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-8 gap-4 mx-auto">
+    <div className={`container grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-8 gap-4 mx-auto ${gridClassName}`}>
       {videos.map((item) =>
         // --- NOUVEAU: cartes "personne"
         item.type === "person" ? (
@@ -92,7 +92,7 @@ const VideoList = ({ videos = [], overlayActions }) => {
             href={`/personnes/${item.id}`} // pour le moment: /personne/:ID
             className="group hover:-translate-y-2 duration-300"
           >
-            <div className="min-h-max h-max max-h-max">
+            <div className="min-h-full h-max max-h-max">
               <div className="rounded-xl overflow-hidden border border-neutral-400 bg-gradient-to-br from-slate-950 to-slate-900 mb-2 relative transition duration-300 ease-in-out group-hover:border-blue-500">
                 <img
                   src={getImageUrl(item.CheminImage)}
@@ -121,13 +121,50 @@ const VideoList = ({ videos = [], overlayActions }) => {
           </a>
         )
           :
+          item.type === "saga" ? (
+            <button
+              key={`saga-${item.id}`}
+              type="button"
+              onClick={() => typeof onItemClick === "function" && onItemClick(item)}
+              className="group text-left hover:-translate-y-2 duration-300"
+            >
+              <div className="min-h-full h-max max-h-max">
+                <div className="rounded-xl overflow-hidden border border-neutral-400 bg-gradient-to-br from-slate-950 to-slate-900 mb-2 relative transition duration-300 ease-in-out group-hover:border-blue-500">
+                  <img
+                    src={getImageUrl(item.CheminImage)}
+                    alt={item.Titre}
+                    className="object-cover w-full h-full aspect-2/3 dark:text-white group-hover:scale-110 duration-300"
+                  />
+
+                  {renderBadges(item)}
+
+                  {typeof overlayActions === "function" && (
+                    <div
+                      className="absolute top-2 right-2 z-10"
+                      onClick={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                    >
+                      {overlayActions(item)}
+                    </div>
+                  )}
+
+                  <div className="px-4 py-2 h-full absolute top-0 left-0 opacity-0 group-hover:opacity-100 group-hover:bg-neutral-950/50 group-hover:backdrop-blur-2xl duration-300">
+                    <p className="line-clamp-15 text-xs text-neutral-50 text-justify">{item.Resumer}</p>
+                  </div>
+                </div>
+                <div className="relative capitalize text-center px-2 py-1 font-bold dark:text-neutral-300">
+                  <p className="text-sm line-clamp-2">{item.Titre}</p>
+                </div>
+              </div>
+            </button>
+          )
+            :
           item.type === "series" ? (
             <a
               key={`series-${item.id}`}
               href={item.FirstVideoID ? `/lecture/${item.FirstVideoID}` : "#"} // Lien vers la première vidéo
               className="group hover:-translate-y-2 duration-300"
             >
-              <div className="min-h-max h-max max-h-max">
+              <div className="min-h-full h-max max-h-max">
                 <div className="rounded-xl overflow-hidden border border-neutral-400 bg-gradient-to-br from-slate-950 to-slate-900 mb-2 relative transition duration-300 ease-in-out group-hover:border-blue-500">
                   <img
                     src={getImageUrl(item.CheminImage)}
@@ -156,7 +193,7 @@ const VideoList = ({ videos = [], overlayActions }) => {
                   <p className="group-hover:opacity-0 opacity-100 duration-300 text-sm line-clamp-2">{item.Titre} ({item.Saisons} Saisons)</p>
                   <div className="absolute top-0 left-0 opacity-0 group-hover:opacity-100 duration-300">
                     <p className="text-xs text-neutral-400 text-center line-clamp-2">
-                      {item.Genres.map((genre, index) => {
+                      {(item.Genres || []).map((genre, index) => {
                         const colorClasses = [
                           "bg-red-400/10 text-red-400 ring-red-600/10 dark:bg-red-400/10 dark:text-red-400 dark:ring-red-400/20",
                           "bg-yellow-400/10 text-yellow-900 ring-yellow-600/20 dark:bg-yellow-400/10 dark:text-yellow-300 dark:ring-yellow-400/20",
@@ -188,7 +225,7 @@ const VideoList = ({ videos = [], overlayActions }) => {
             :
             (
               <a key={`video-${item.id}`} href={`/lecture/${item.id}`} className="group hover:-translate-y-2 duration-300">
-                <div className="min-h-max h-max max-h-max">
+                <div className="min-h-full h-max max-h-max">
                   <div className="rounded-xl overflow-hidden border border-neutral-400 bg-gradient-to-br from-slate-950 to-slate-900 mb-2 relative transition duration-300 ease-in-out group-hover:border-blue-500">
                     <img
                       src={getImageUrl(item.CheminImage)}
@@ -216,7 +253,7 @@ const VideoList = ({ videos = [], overlayActions }) => {
                     <p className="group-hover:opacity-0 opacity-100 duration-300 text-sm line-clamp-2">{item.Titre}</p>
                     <div className="absolute top-0 left-0 opacity-0 group-hover:opacity-100 duration-300">
                       <p className="text-xs text-neutral-400 text-center line-clamp-2">
-                        {item.Genres.map((genre, index) => {
+                        {(item.Genres || []).map((genre, index) => {
                           const colorClasses = [
                             "bg-red-400/10 text-red-400 ring-red-600/10 dark:bg-red-400/10 dark:text-red-400 dark:ring-red-400/20",
                             "bg-yellow-400/10 text-yellow-900 ring-yellow-600/20 dark:bg-yellow-400/10 dark:text-yellow-300 dark:ring-yellow-400/20",

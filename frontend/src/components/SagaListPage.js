@@ -6,8 +6,7 @@ import api from "../services/api";
 import PaginationPage from "./PaginationPage";
 import VideoList from "./VideoList";
 
-const apiUrl = process.env.REACT_APP_URL_LOCAL;
-const ITEMS_PER_PAGE = 40;
+const ITEMS_PER_PAGE = 8;
 const sortOptions = [
   { id: "az", label: "A-Z" },
   { id: "za", label: "Z-A" },
@@ -17,21 +16,13 @@ const sortOptions = [
 const fieldClass = "block w-full rounded-xl border border-sky-500/20 bg-white/85 px-4 py-3 text-sm font-semibold text-slate-900 shadow-sm transition duration-200 hover:border-sky-400/60 focus:outline-none focus:ring-2 focus:ring-sky-400 dark:bg-slate-950/65 dark:text-white";
 const listboxOptionsClass = "z-[9999] max-h-72 w-[var(--button-width)] overflow-auto rounded-xl border border-sky-500/20 bg-white py-2 text-sm shadow-2xl shadow-sky-950/20 focus:outline-none dark:bg-slate-950 dark:text-slate-100";
 
-const getImageUrl = (cheminImage) => {
-  if (cheminImage) return `${apiUrl}/${cheminImage}`;
-  return "./imageDefault.png";
-};
-
 const SagaListPage = () => {
-  const [sagas, setSagas] = useState([]);
+  const [universes, setUniverses] = useState([]);
   const [selectedSaga, setSelectedSaga] = useState(null);
   const [sagaDetails, setSagaDetails] = useState(null);
   const [search, setSearch] = useState("");
-  const [appliedSearch, setAppliedSearch] = useState("");
   const [sort, setSort] = useState("az");
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [totalItems, setTotalItems] = useState(0);
+  const [universePages, setUniversePages] = useState({});
   const [loading, setLoading] = useState(false);
   const [detailsLoading, setDetailsLoading] = useState(false);
   const [error, setError] = useState("");
@@ -42,34 +33,33 @@ const SagaListPage = () => {
   );
   const selectedSort = sortOptions.find((option) => option.id === sort) || sortOptions[0];
 
-  const fetchSagas = async (page = 1) => {
-    setLoading(true);
-    setError("");
-
-    try {
-      const response = await api.get("/sagas", {
-        params: {
-          page,
-          limit: ITEMS_PER_PAGE,
-          search: appliedSearch,
-          sort,
-        },
-      });
-      setSagas(response.data?.items || []);
-      setTotalItems(response.data?.totalItems || 0);
-      setTotalPages(response.data?.totalPages || 1);
-      setCurrentPage(page);
-    } catch (err) {
-      console.error("Erreur lors de la récupération des sagas :", err);
-      setError(err.response?.data?.error || "Impossible de récupérer les sagas.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
-    fetchSagas(1);
-  }, [appliedSearch, sort]);
+    const timer = window.setTimeout(() => {
+      const fetchUniverses = async () => {
+        setLoading(true);
+        setError("");
+
+        try {
+          const response = await api.get("/universes", {
+            params: {
+              search: search.trim(),
+              sort,
+            },
+          });
+          setUniverses(response.data?.items || []);
+        } catch (err) {
+          console.error("Erreur lors de la récupération des univers :", err);
+          setError(err.response?.data?.error || "Impossible de récupérer les univers.");
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      fetchUniverses();
+    }, 250);
+
+    return () => window.clearTimeout(timer);
+  }, [search, sort]);
 
   const openSaga = async (saga) => {
     setSelectedSaga(saga);
@@ -88,24 +78,28 @@ const SagaListPage = () => {
     }
   };
 
-  const handleSearchSubmit = (event) => {
-    event.preventDefault();
-    setAppliedSearch(search.trim());
-  };
-
   return (
-    <div className="container mx-auto px-4 py-10 dark:text-white sm:px-6 lg:px-8">
+    <div className="container mx-auto py-10 dark:text-white">
       <div className="relative z-30 mb-8 overflow-hidden rounded-2xl border border-sky-500/10 bg-white/80 p-5 shadow-xl shadow-slate-950/5 backdrop-blur dark:bg-slate-950/70 dark:shadow-sky-950/20">
         <div className="pointer-events-none absolute inset-0 rounded-2xl bg-[radial-gradient(circle_at_12%_20%,rgba(14,165,233,0.12),transparent_26%),radial-gradient(circle_at_88%_0%,rgba(139,92,246,0.10),transparent_22%)]" />
-        <form onSubmit={handleSearchSubmit} className="relative grid grid-cols-1 gap-4 md:grid-cols-[1fr_auto_auto]">
+        <div className="relative grid grid-cols-1 gap-4 md:grid-cols-[1fr_auto]">
           <input
             type="text"
             value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder="Rechercher une saga..."
+            onChange={(event) => {
+              setSearch(event.target.value);
+              setUniversePages({});
+            }}
+            placeholder="Rechercher une saga ou un univers..."
             className={fieldClass}
           />
-          <Listbox value={selectedSort} onChange={(option) => setSort(option.id)}>
+          <Listbox
+            value={selectedSort}
+            onChange={(option) => {
+              setSort(option.id);
+              setUniversePages({});
+            }}
+          >
             <div className="relative z-[60] min-w-44">
               <ListboxButton className={`${fieldClass} text-left`}>
                 <span className="block truncate">{selectedSort.label}</span>
@@ -133,62 +127,63 @@ const SagaListPage = () => {
               </ListboxOptions>
             </div>
           </Listbox>
-          <button
-            type="submit"
-            className="inline-flex items-center justify-center rounded-lg border border-sky-300/40 bg-sky-500/15 px-5 py-3 text-sm font-bold text-slate-900 transition duration-200 hover:border-sky-300/80 hover:bg-sky-500/25 dark:text-white"
-          >
-            Rechercher
-          </button>
-        </form>
+        </div>
       </div>
 
       {error && <p className="mb-6 rounded-xl border border-red-400/30 bg-red-500/10 px-4 py-3 text-sm font-semibold text-red-700 dark:text-red-200">{error}</p>}
 
       {loading ? (
         <p className="text-center text-neutral-400">Chargement en cours...</p>
-      ) : sagas.length === 0 ? (
-        <p className="text-center text-neutral-400">Aucune saga.</p>
+      ) : universes.length === 0 ? (
+        <p className="text-center text-neutral-400">Aucun univers avec saga.</p>
       ) : (
-        <div className="container mx-auto grid grid-cols-2 gap-4 sm:grid-cols-4 xl:grid-cols-8">
-          {sagas.map((saga) => (
-            <button
-              key={saga.SagaID}
-              type="button"
-              onClick={() => openSaga(saga)}
-              className="group text-left transition duration-300 hover:-translate-y-2"
-            >
-              <div className="min-h-max h-max max-h-max">
-                <div className="relative mb-2 overflow-hidden rounded-xl border border-neutral-400 bg-gradient-to-br from-slate-950 to-slate-900 transition duration-300 ease-in-out group-hover:border-blue-500">
-                  <img
-                    src={getImageUrl(saga.CheminImage)}
-                    alt={saga.Titre}
-                    className="aspect-2/3 h-full w-full object-cover duration-300 group-hover:scale-110"
-                  />
-                  {saga.Premium && (
-                    <span className="absolute left-2 top-2 z-10 inline-flex max-w-[calc(100%-1rem)] items-center rounded-full border border-amber-200/40 bg-gradient-to-br from-amber-300/95 via-yellow-400/95 to-orange-400/95 px-2.5 py-1 text-[10px] font-black uppercase leading-tight text-slate-950 shadow-inner shadow-amber-950/45 ring-1 ring-amber-100/30">
-                      Premium
-                    </span>
+        <div className="grid gap-6">
+          {universes.map((universe) => {
+            const universeSagas = Array.isArray(universe.Sagas) ? universe.Sagas : [];
+            const universeKey = String(universe.UniverseID);
+            const currentUniversePage = universePages[universeKey] || 1;
+            const universeTotalPages = Math.max(1, Math.ceil(universeSagas.length / ITEMS_PER_PAGE));
+            const paginatedSagas = universeSagas.slice(
+              (currentUniversePage - 1) * ITEMS_PER_PAGE,
+              currentUniversePage * ITEMS_PER_PAGE
+            );
+
+            return (
+              <section
+                key={universe.UniverseID}
+                className="overflow-hidden rounded-2xl border border-sky-500/10 bg-white/80 p-5 shadow-xl shadow-slate-950/5 backdrop-blur dark:bg-slate-950/70 dark:shadow-sky-950/20"
+              >
+                <div className="mb-4">
+                  <p className="text-sm font-bold uppercase text-sky-500 dark:text-sky-400">Univers</p>
+                  <h2 className="mt-1 text-2xl font-black text-slate-950 dark:text-white">{universe.Titre}</h2>
+                  {universe.Resume && (
+                    <p className="mt-2 line-clamp-3 text-sm leading-6 text-slate-600 dark:text-slate-300">{universe.Resume}</p>
                   )}
-                  <div className="absolute inset-0 px-4 py-2 opacity-0 duration-300 group-hover:bg-neutral-950/50 group-hover:opacity-100 group-hover:backdrop-blur-2xl">
-                    <p className="line-clamp-15 text-xs text-neutral-50">{saga.Resumer}</p>
-                  </div>
                 </div>
-                <p className="px-2 py-1 text-center text-sm font-bold capitalize text-slate-900 line-clamp-2 dark:text-neutral-300">
-                  {saga.Titre}
-                </p>
-              </div>
-            </button>
-          ))}
+                <div className="[&_.container]:w-full">
+                  <VideoList videos={paginatedSagas} onItemClick={openSaga} />
+                </div>
+                {universeSagas.length > ITEMS_PER_PAGE && (
+                  <div className="mt-6">
+                    <PaginationPage
+                      currentPage={currentUniversePage}
+                      totalPages={universeTotalPages}
+                      totalItems={universeSagas.length}
+                      itemsPerPage={ITEMS_PER_PAGE}
+                      onPageChange={(page) =>
+                        setUniversePages((current) => ({
+                          ...current,
+                          [universeKey]: page,
+                        }))
+                      }
+                    />
+                  </div>
+                )}
+              </section>
+            );
+          })}
         </div>
       )}
-
-      <PaginationPage
-        currentPage={currentPage}
-        totalPages={totalPages}
-        totalItems={totalItems}
-        itemsPerPage={ITEMS_PER_PAGE}
-        onPageChange={fetchSagas}
-      />
 
       {selectedSaga && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 px-4 py-8 backdrop-blur">

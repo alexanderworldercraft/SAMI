@@ -196,6 +196,63 @@ const cleanupAddVideoTemp = (paths = []) => {
   }
 };
 
+const FRENCH_LANG_CODES = new Set(["fr", "fra", "fre", "frf", "vff", "vfq"]);
+const JAPANESE_LANG_CODES = new Set(["ja", "jp", "jpn", "jap"]);
+const getStreamLanguage = (stream) => normalizeLangTag(stream?.tags?.language);
+
+const getAudioLanguageGenre = (stream) => {
+  const language = getStreamLanguage(stream);
+  if (!language || language === "und") return null;
+  if (FRENCH_LANG_CODES.has(language)) return "FR";
+  if (JAPANESE_LANG_CODES.has(language)) return "JP";
+  return "VO";
+};
+
+const hasFrenchSubtitle = (subtitleStreams = []) =>
+  subtitleStreams.some((stream) => FRENCH_LANG_CODES.has(getStreamLanguage(stream)));
+
+const getAutoLanguageGenreNames = ({ audioStream, subtitleStreams }) => {
+  const names = new Set();
+  const audioGenre = getAudioLanguageGenre(audioStream);
+  if (audioGenre) names.add(audioGenre);
+  if (audioGenre && audioGenre !== "FR" && hasFrenchSubtitle(subtitleStreams)) {
+    names.add("VOSTFR");
+  }
+  return Array.from(names);
+};
+
+const ensureGenreIdsByNames = async (genreNames = []) => {
+  const names = Array.from(new Set(
+    genreNames
+      .map((name) => String(name || "").trim())
+      .filter(Boolean)
+  ));
+
+  if (names.length === 0) return [];
+
+  const existingGenres = await prisma.genre.findMany({
+    where: { Nom: { in: names } },
+    select: { GenreID: true, Nom: true },
+  });
+
+  const existingByName = new Map(
+    existingGenres.map((genre) => [genre.Nom.toLowerCase(), genre])
+  );
+
+  const createdGenres = [];
+  for (const name of names) {
+    const key = name.toLowerCase();
+    if (existingByName.has(key)) continue;
+
+    const genre = await prisma.genre.create({ data: { Nom: name } });
+    existingByName.set(key, genre);
+    createdGenres.push(genre);
+    console.log("[addVideo] Genre auto créé :", name);
+  }
+
+  return [...existingGenres, ...createdGenres].map((genre) => genre.GenreID);
+};
+
 // Helper : contenu premium ?
 function isVideoPremium(video) {
   const videoPremium = !!video.Premium;
@@ -2590,6 +2647,7 @@ export const addVideo = async (req, reply, fastify) => {
     }
 
     data.genres = data.genres ? JSON.parse(data.genres) : [];
+    if (!Array.isArray(data.genres)) data.genres = [];
     const rawSaisonId =
       data.SaisonID ??
       data.saisonID ??
@@ -2789,6 +2847,13 @@ export const addVideo = async (req, reply, fastify) => {
     if (audioTrackIndex === null) {
       throw new Error("Aucune piste audio disponible");
     }
+
+    const selectedAudioStream = metadata.streams.find((stream) => stream.index === audioTrackIndex);
+    const autoLanguageGenreNames = getAutoLanguageGenreNames({
+      audioStream: selectedAudioStream,
+      subtitleStreams,
+    });
+    console.log("[addVideo] Genres de langue détectés :", autoLanguageGenreNames);
 
     // Ajoute l'option pour sélectionner la piste audio
     const audioStreamOption = `-map 0:${audioTrackIndex}`;
@@ -3031,10 +3096,16 @@ export const addVideo = async (req, reply, fastify) => {
       },
     });
 
-    if (data.genres) {
-      await Promise.all(data.genres.map(async (genreId) => {
+    const requestedGenreIds = data.genres
+      .map((genreId) => parseInt(genreId, 10))
+      .filter((genreId) => Number.isInteger(genreId) && genreId > 0);
+    const autoGenreIds = await ensureGenreIdsByNames(autoLanguageGenreNames);
+    const genreIds = Array.from(new Set([...requestedGenreIds, ...autoGenreIds]));
+
+    if (genreIds.length > 0) {
+      await Promise.all(genreIds.map(async (genreId) => {
         await prisma.videoGenre.create({
-          data: { VideoID: video.VideoID, GenreID: parseInt(genreId, 10) },
+          data: { VideoID: video.VideoID, GenreID: genreId },
         });
       }));
     }

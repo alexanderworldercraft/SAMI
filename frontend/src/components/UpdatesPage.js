@@ -2,6 +2,73 @@ import React from "react";
 
 const updates = [
   {
+    version: "6.13.0",
+    title: "Univers et regroupement des sagas",
+    date: "22 juin 2026",
+    sections: [
+      {
+        title: "Page Sagas",
+        items: [
+          "La page Sagas est maintenant organisee par Univers.",
+          "Chaque univers affiche ses sagas dans une section dediee, avec une ligne par univers.",
+          "Les sagas qui ne sont rattachees a aucun univers actif sont regroupees dans un Univers par defaut affiche en dernier.",
+          "Un univers sans saga visible est masque automatiquement.",
+          "La recherche peut maintenant retrouver une saga ou un univers par titre et resume.",
+        ],
+      },
+      {
+        title: "Recherche et pagination",
+        items: [
+          "La recherche de la page Sagas fonctionne directement pendant la saisie, sans bouton de validation.",
+          "La recherche est appliquee cote backend avant affichage pour retrouver aussi les sagas qui ne sont pas visibles a l'ecran.",
+          "Chaque univers possede sa propre pagination quand il contient plus de 8 sagas.",
+          "Les univers avec 8 sagas ou moins restent affiches sans pagination.",
+          "Changer la recherche ou le tri remet les paginations des univers a leur premiere page.",
+        ],
+      },
+      {
+        title: "Nouvelle video",
+        items: [
+          "Ajout d'un onglet Univers pour creer un nouvel univers.",
+          "Ajout d'un onglet Sagas univers pour lier une saga a un univers avec un ordre personnalisable.",
+          "Les selects Univers et Saga integrent une barre de recherche dans leur dropdown.",
+          "Le select Saga de l'onglet Contenus saga integre aussi une barre de recherche.",
+          "Les formulaires reprennent les styles existants de SAMI.",
+        ],
+      },
+      {
+        title: "Administration",
+        items: [
+          "Ajout d'une section Univers dans la page Administration.",
+          "Les administrateurs peuvent modifier le titre et le resume d'un univers.",
+          "Les sagas d'un univers peuvent etre retirees sans supprimer les sagas elles-memes.",
+          "L'ordre des sagas dans un univers peut etre gere par champ numerique ou par drag and drop.",
+          "Les selects administrateur Sagas et Univers utilisent maintenant une recherche integree au dropdown.",
+        ],
+      },
+      {
+        title: "Corbeille univers",
+        items: [
+          "La suppression administrateur place maintenant un univers en corbeille.",
+          "Ajout d'une section Corbeille univers reservee au super administrateur.",
+          "Le super administrateur peut restaurer un univers place en corbeille.",
+          "La suppression definitive retire les liaisons avec les sagas et supprime l'univers.",
+          "Les sagas liees a un univers ne sont jamais supprimees lors de la suppression de l'univers.",
+        ],
+      },
+      {
+        title: "Backend et base de donnees",
+        items: [
+          "Ajout des tables Universe et UniverseSaga pour stocker les univers et leurs sagas.",
+          "Chaque relation UniverseSaga porte son propre ordre, independant pour chaque univers.",
+          "Ajout des endpoints /api/universes pour lister, creer, modifier, lier, reordonner, restaurer et supprimer les univers.",
+          "La liste publique des univers renvoie uniquement les univers actifs avec au moins une saga active visible.",
+          "Les sagas sans univers actif sont ajoutees a un groupe par defaut genere par l'API sans etre stocke en base.",
+        ],
+      },
+    ],
+  },
+  {
     version: "6.12.0",
     title: "Sagas de films et series",
     date: "22 juin 2026",

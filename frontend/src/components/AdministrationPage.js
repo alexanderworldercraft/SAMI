@@ -9,9 +9,11 @@ import AdminGenreManager from "./AdminGenreManager";
 import AdminHomepageGenreManager from "./AdminHomepageGenreManager";
 import AdminSeriesManager from "./AdminSeriesManager";
 import AdminSagaManager from "./AdminSagaManager";
+import AdminUniverseManager from "./AdminUniverseManager";
 import AdminVideoManager from "./AdminVideoManager";
 import SuperAdminVideoTrashManager from "./SuperAdminVideoTrashManager";
 import SuperAdminSagaTrashManager from "./SuperAdminSagaTrashManager";
+import SuperAdminUniverseTrashManager from "./SuperAdminUniverseTrashManager";
 import AdminBackupManager from "./AdminBackupManager";
 
 const AdministrationPage = () => {
@@ -76,8 +78,10 @@ const AdministrationPage = () => {
             <AdminGenreManager />
             <AdminSeriesManager />
             <AdminSagaManager />
+            <AdminUniverseManager />
             <AdminVideoManager />
             <SuperAdminSagaTrashManager />
+            <SuperAdminUniverseTrashManager />
             <SuperAdminVideoTrashManager />
             <AdminBackupManager />
             <FormNewAdmin />

@@ -16,6 +16,7 @@ model Etat {
   Nom          String        @unique @db.VarChar(100)
   CreateDate   DateTime?     @default(now())
   Sagas        Saga[]
+  Universes    Universe[]
   Series       Series[]
   Utilisateurs Utilisateur[]
   Videos       Video[]
@@ -149,8 +150,35 @@ model Saga {
   CreateDate   DateTime?     @default(now())
   Etat         Etat          @relation(fields: [EtatID], references: [EtatID])
   SagaContents SagaContent[]
+  UniverseSagas UniverseSaga[]
 
   @@index([EtatID], map: "Saga_EtatID_fkey")
+}
+
+model Universe {
+  UniverseID    Int            @id @default(autoincrement())
+  Titre         String         @db.VarChar(100)
+  Resume        String?        @db.Text
+  EtatID        Int
+  CreateDate    DateTime?      @default(now())
+  Etat          Etat           @relation(fields: [EtatID], references: [EtatID])
+  UniverseSagas UniverseSaga[]
+
+  @@index([EtatID], map: "Universe_EtatID_fkey")
+}
+
+model UniverseSaga {
+  UniverseSagaID Int       @id @default(autoincrement())
+  UniverseID     Int
+  SagaID         Int
+  Ordre          Int       @default(0)
+  CreateDate     DateTime? @default(now())
+  Universe       Universe  @relation(fields: [UniverseID], references: [UniverseID], onDelete: Cascade)
+  Saga           Saga      @relation(fields: [SagaID], references: [SagaID], onDelete: Cascade)
+
+  @@unique([UniverseID, SagaID], map: "uniq_universe_saga")
+  @@index([UniverseID, Ordre], map: "idx_universe_saga_order")
+  @@index([SagaID], map: "UniverseSaga_SagaID_fkey")
 }
 
 model SagaContent {
