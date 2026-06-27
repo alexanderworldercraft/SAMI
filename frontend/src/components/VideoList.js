@@ -16,6 +16,17 @@ const VideoList = ({ videos = [], overlayActions, onItemClick, gridClassName = "
     const badgeBaseClass =
       "inline-flex w-fit max-w-full items-center justify-center bg-gradient-to-br rounded-md border px-2.5 py-1 text-center text-[10px] font-black uppercase leading-tight tracking-wide backdrop-blur-md shadow-inner whitespace-normal";
 
+    if (item.type === "series" && item.HasNewEpisode) {
+      badges.push(
+        <span
+          key="new-episode"
+          className={`${badgeBaseClass} border-sky-200/35 from-sky-400/95 via-blue-500/95 to-cyan-400/95 text-white shadow-sky-950/55 ring-1 ring-sky-100/25`}
+        >
+          Nouvel épisode
+        </span>
+      );
+    }
+
     if (item.Premium) {
       badges.push(
         <span
@@ -23,17 +34,6 @@ const VideoList = ({ videos = [], overlayActions, onItemClick, gridClassName = "
           className={`${badgeBaseClass} border-amber-200/40 from-amber-300/95 via-yellow-400/95 to-orange-400/95 text-slate-950 shadow-amber-950/45 ring-1 ring-amber-100/30`}
         >
           Premium
-        </span>
-      );
-    }
-
-    if (item.type === "series" && item.HasNewEpisode) {
-      badges.push(
-        <span
-          key="new-episode"
-          className={`${badgeBaseClass} border-sky-200/35 from-sky-400/95 via-blue-500/95 to-cyan-400/95 text-white shadow-sky-950/55 ring-1 ring-sky-100/25`}
-        >
-          Nouveau épisode
         </span>
       );
     }

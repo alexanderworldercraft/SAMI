@@ -959,13 +959,6 @@
     overflow: hidden;
   }
 
-  .line-clamp-10 {
-    -webkit-line-clamp: 10;
-    -webkit-box-orient: vertical;
-    display: -webkit-box;
-    overflow: hidden;
-  }
-
   .block {
     display: block;
   }
@@ -1962,16 +1955,6 @@
     }
   }
 
-  .border-emerald-300\/40 {
-    border-color: #5ee9b566;
-  }
-
-  @supports (color: color-mix(in lab, red, red)) {
-    .border-emerald-300\/40 {
-      border-color: color-mix(in oklab, var(--color-emerald-300) 40%, transparent);
-    }
-  }
-
   .border-emerald-300\/70 {
     border-color: #5ee9b5b3;
   }
@@ -2230,16 +2213,6 @@
     border-color: var(--color-slate-300);
   }
 
-  .border-slate-300\/40 {
-    border-color: #cad5e266;
-  }
-
-  @supports (color: color-mix(in lab, red, red)) {
-    .border-slate-300\/40 {
-      border-color: color-mix(in oklab, var(--color-slate-300) 40%, transparent);
-    }
-  }
-
   .border-slate-300\/60 {
     border-color: #cad5e299;
   }
@@ -2453,16 +2426,6 @@
   @supports (color: color-mix(in lab, red, red)) {
     .bg-emerald-500\/10 {
       background-color: color-mix(in oklab, var(--color-emerald-500) 10%, transparent);
-    }
-  }
-
-  .bg-emerald-500\/15 {
-    background-color: #00bb7f26;
-  }
-
-  @supports (color: color-mix(in lab, red, red)) {
-    .bg-emerald-500\/15 {
-      background-color: color-mix(in oklab, var(--color-emerald-500) 15%, transparent);
     }
   }
 
@@ -2730,6 +2693,16 @@
     }
   }
 
+  .bg-sky-500\/20 {
+    background-color: #00a5ef33;
+  }
+
+  @supports (color: color-mix(in lab, red, red)) {
+    .bg-sky-500\/20 {
+      background-color: color-mix(in oklab, var(--color-sky-500) 20%, transparent);
+    }
+  }
+
   .bg-sky-600 {
     background-color: var(--color-sky-600);
   }
@@ -2744,6 +2717,16 @@
 
   .bg-slate-50 {
     background-color: var(--color-slate-50);
+  }
+
+  .bg-slate-50\/40 {
+    background-color: #f8fafc66;
+  }
+
+  @supports (color: color-mix(in lab, red, red)) {
+    .bg-slate-50\/40 {
+      background-color: color-mix(in oklab, var(--color-slate-50) 40%, transparent);
+    }
   }
 
   .bg-slate-100 {
@@ -2771,16 +2754,6 @@
   @supports (color: color-mix(in lab, red, red)) {
     .bg-slate-300\/70 {
       background-color: color-mix(in oklab, var(--color-slate-300) 70%, transparent);
-    }
-  }
-
-  .bg-slate-500\/10 {
-    background-color: #62748e1a;
-  }
-
-  @supports (color: color-mix(in lab, red, red)) {
-    .bg-slate-500\/10 {
-      background-color: color-mix(in oklab, var(--color-slate-500) 10%, transparent);
     }
   }
 
@@ -4658,6 +4631,16 @@
     }
   }
 
+  .ring-sky-300\/40 {
+    --tw-ring-color: #77d4ff66;
+  }
+
+  @supports (color: color-mix(in lab, red, red)) {
+    .ring-sky-300\/40 {
+      --tw-ring-color: color-mix(in oklab, var(--color-sky-300) 40%, transparent);
+    }
+  }
+
   .ring-sky-300\/60 {
     --tw-ring-color: #77d4ff99;
   }
@@ -5290,16 +5273,6 @@
       background-color: var(--color-blue-700);
     }
 
-    .hover\:bg-emerald-500\/25:hover {
-      background-color: #00bb7f40;
-    }
-
-    @supports (color: color-mix(in lab, red, red)) {
-      .hover\:bg-emerald-500\/25:hover {
-        background-color: color-mix(in oklab, var(--color-emerald-500) 25%, transparent);
-      }
-    }
-
     .hover\:bg-gray-50:hover {
       background-color: var(--color-gray-50);
     }
@@ -5432,16 +5405,6 @@
       background-color: var(--color-slate-100);
     }
 
-    .hover\:bg-slate-500\/20:hover {
-      background-color: #62748e33;
-    }
-
-    @supports (color: color-mix(in lab, red, red)) {
-      .hover\:bg-slate-500\/20:hover {
-        background-color: color-mix(in oklab, var(--color-slate-500) 20%, transparent);
-      }
-    }
-
     .hover\:bg-slate-700:hover {
       background-color: var(--color-slate-700);
     }
@@ -5511,6 +5474,10 @@
 
     .hover\:text-sky-700:hover {
       color: var(--color-sky-700);
+    }
+
+    .hover\:text-slate-950:hover {
+      color: var(--color-slate-950);
     }
 
     .hover\:text-white:hover {
@@ -6648,6 +6615,16 @@
     background-color: var(--color-slate-950);
   }
 
+  .dark\:bg-slate-950\/20:is(.dark *) {
+    background-color: #02061833;
+  }
+
+  @supports (color: color-mix(in lab, red, red)) {
+    .dark\:bg-slate-950\/20:is(.dark *) {
+      background-color: color-mix(in oklab, var(--color-slate-950) 20%, transparent);
+    }
+  }
+
   .dark\:bg-slate-950\/40:is(.dark *) {
     background-color: #02061866;
   }
@@ -7215,6 +7192,14 @@
 
   .\[\&_\.container\]\:w-full .container {
     width: 100%;
+  }
+
+  .\[\&\>section\]\:my-0 > section {
+    margin-block: 0;
+  }
+
+  .\[\&\>section\]\:max-w-none > section {
+    max-width: none;
   }
 }
 
