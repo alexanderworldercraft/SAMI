@@ -1,5 +1,5 @@
 // AdminList.js
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import axios from "axios";
 import { Dialog, DialogPanel, DialogTitle } from "@headlessui/react";
 import {
@@ -379,6 +379,7 @@ const AdminList = () => {
   // Pagination
   const itemsPerPage = 20; // 20 admins par page (grille 4x4)
   const [currentPage, setCurrentPage] = useState(1);
+  const sectionRef = useRef(null);
 
   const fetchAdmins = async () => {
     try {
@@ -506,7 +507,7 @@ const AdminList = () => {
 
   return (
     <div className="w-full mb-12">
-      <section className={panelClass}>
+      <section ref={sectionRef} className={panelClass}>
         <div className={panelHeaderClass}>
         <div className="flex items-center justify-between">
           <div>
@@ -670,6 +671,8 @@ const AdminList = () => {
               totalItems={totalItems}
               itemsPerPage={itemsPerPage}
               onPageChange={setCurrentPage}
+              scrollTarget={sectionRef}
+              scrollOffset={16}
             />
           </div>
         )}

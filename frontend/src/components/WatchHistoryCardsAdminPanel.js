@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { PlayIcon } from "@heroicons/react/20/solid";
 import PaginationPage from "./PaginationPage";
 
@@ -198,6 +198,7 @@ const ProgressBar = ({ progress }) => {
 const DateList = ({ plays = [], buttonClassName = "" }) => {
   const [open, setOpen] = useState(false);
   const [page, setPage] = useState(1);
+  const dateListRef = useRef(null);
 
   useEffect(() => {
     setPage(1);
@@ -214,7 +215,7 @@ const DateList = ({ plays = [], buttonClassName = "" }) => {
   const pageItems = plays.slice(start, start + DATES_PER_PAGE);
 
   return (
-    <div className="mt-1">
+    <div ref={dateListRef} className="mt-1">
       <button
         type="button"
         onClick={() => setOpen((prev) => !prev)}
@@ -248,6 +249,7 @@ const DateList = ({ plays = [], buttonClassName = "" }) => {
                 totalItems={plays.length}
                 itemsPerPage={DATES_PER_PAGE}
                 onPageChange={setPage}
+                scrollTarget={dateListRef}
               />
             </div>
           )}
@@ -291,6 +293,7 @@ const actionLabels = {
 
 const RawWatchHistoryList = ({ watchLogs = [], emptyText }) => {
   const [page, setPage] = useState(1);
+  const listRef = useRef(null);
   const items = useMemo(() => buildRawWatchItems(watchLogs), [watchLogs]);
   const totalPages = Math.max(1, Math.ceil(items.length / RAW_ITEMS_PER_PAGE));
 
@@ -308,7 +311,7 @@ const RawWatchHistoryList = ({ watchLogs = [], emptyText }) => {
   }
 
   return (
-    <>
+    <div ref={listRef}>
       <ul className="mt-3 space-y-3">
         {pageItems.map((item) => (
           <li
@@ -386,10 +389,11 @@ const RawWatchHistoryList = ({ watchLogs = [], emptyText }) => {
             totalItems={items.length}
             itemsPerPage={RAW_ITEMS_PER_PAGE}
             onPageChange={setPage}
+            scrollTarget={listRef}
           />
         </div>
       )}
-    </>
+    </div>
   );
 };
 
@@ -401,6 +405,7 @@ const WatchHistoryCards = ({
   rawMode = false,
 }) => {
   const [page, setPage] = useState(1);
+  const sectionRef = useRef(null);
   const cards = useMemo(() => buildWatchGroups(watchLogs), [watchLogs]);
   const totalPages = Math.max(1, Math.ceil(cards.length / ITEMS_PER_PAGE));
 
@@ -414,7 +419,7 @@ const WatchHistoryCards = ({
   );
 
   return (
-    <div>
+    <div ref={sectionRef}>
       <h2 className="text-sm font-medium text-slate-400">{title}</h2>
       {loading ? (
         <p className="mt-2 text-sm text-slate-500">Chargement de l'historique...</p>
@@ -539,6 +544,7 @@ const WatchHistoryCards = ({
                 totalItems={cards.length}
                 itemsPerPage={ITEMS_PER_PAGE}
                 onPageChange={setPage}
+                scrollTarget={sectionRef}
               />
             </div>
           )}

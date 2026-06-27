@@ -1,7 +1,27 @@
 import { ChevronLeftIcon, ChevronRightIcon } from "@heroicons/react/20/solid";
 
 // Petite fonction utilitaire pour remonter en haut
-const scrollToTop = () => {
+const scrollToTop = (target, offset = 0) => {
+  const element = typeof target === "function" ? target() : target?.current || target;
+
+  if (element) {
+    if (offset === 0) {
+      element.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+      return;
+    }
+
+    const top = element.getBoundingClientRect().top + window.scrollY - offset;
+
+    window.scrollTo({
+      top,
+      behavior: "smooth",
+    });
+    return;
+  }
+
   window.scrollTo({
     top: 0,
     behavior: "smooth", // Smooth = UX plus douce
@@ -14,6 +34,8 @@ const PaginationPage = ({
   totalItems,
   onPageChange,
   itemsPerPage,
+  scrollTarget,
+  scrollOffset = 0,
 }) => {
   // Calcul des éléments affichés
   const startItem = (currentPage - 1) * itemsPerPage + 1;
@@ -39,7 +61,7 @@ const PaginationPage = ({
     if (page < 1 || page > totalPages) return;
 
     onPageChange(page);
-    scrollToTop(); // Remonte la page automatiquement
+    scrollToTop(scrollTarget, scrollOffset); // Remonte la page automatiquement
   };
 
   const pageNumbers = getPageNumbers();

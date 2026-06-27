@@ -1,5 +1,5 @@
 // UserManagerCard.js
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import axios from "axios";
 import { Dialog, DialogPanel, DialogTitle } from "@headlessui/react";
 import {
@@ -433,6 +433,7 @@ const UserManagerCard = ({ onStateChange }) => {
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 20; // 20 cartes par page (grille 4x4)
+  const sectionRef = useRef(null);
 
   // Drawer
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -631,7 +632,7 @@ const UserManagerCard = ({ onStateChange }) => {
   };
 
   return (
-    <section className={panelClass}>
+    <section ref={sectionRef} className={panelClass}>
       <div className={panelHeaderClass}>
       <div className="flex items-center justify-between">
         <div>
@@ -830,6 +831,8 @@ const UserManagerCard = ({ onStateChange }) => {
             totalItems={totalItems}
             itemsPerPage={itemsPerPage}
             onPageChange={handlePageChange}
+            scrollTarget={sectionRef}
+            scrollOffset={16}
           />
         </div>
       )}

@@ -14,13 +14,13 @@ const VideoList = ({ videos = [], overlayActions, onItemClick, gridClassName = "
   const renderBadges = (item) => {
     const badges = [];
     const badgeBaseClass =
-      "inline-flex w-fit max-w-full items-center justify-center rounded-full border px-2.5 py-1 text-center text-[10px] font-black uppercase leading-tight tracking-wide backdrop-blur-md shadow-inner whitespace-normal";
+      "inline-flex w-fit max-w-full items-center justify-center bg-gradient-to-br rounded-md border px-2.5 py-1 text-center text-[10px] font-black uppercase leading-tight tracking-wide backdrop-blur-md shadow-inner whitespace-normal";
 
     if (item.Premium) {
       badges.push(
         <span
           key="premium"
-          className={`${badgeBaseClass} border-amber-200/40 bg-gradient-to-br from-amber-300/95 via-yellow-400/95 to-orange-400/95 text-slate-950 shadow-amber-950/45 ring-1 ring-amber-100/30`}
+          className={`${badgeBaseClass} border-amber-200/40 from-amber-300/95 via-yellow-400/95 to-orange-400/95 text-slate-950 shadow-amber-950/45 ring-1 ring-amber-100/30`}
         >
           Premium
         </span>
@@ -31,7 +31,7 @@ const VideoList = ({ videos = [], overlayActions, onItemClick, gridClassName = "
       badges.push(
         <span
           key="new-episode"
-          className={`${badgeBaseClass} border-sky-200/35 bg-gradient-to-br from-sky-400/95 via-blue-500/95 to-cyan-400/95 text-white shadow-sky-950/55 ring-1 ring-sky-100/25`}
+          className={`${badgeBaseClass} border-sky-200/35 from-sky-400/95 via-blue-500/95 to-cyan-400/95 text-white shadow-sky-950/55 ring-1 ring-sky-100/25`}
         >
           Nouveau épisode
         </span>

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import api from "../services/api";
 import {
   CheckIcon,
@@ -24,6 +24,7 @@ const AdminGenreManager = () => {
   const [deleteFeedback, setDeleteFeedback] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [pendingDelete, setPendingDelete] = useState(null);
+  const sectionRef = useRef(null);
 
   const sortedGenres = useMemo(
     () => [...genres].sort((a, b) => a.Nom.localeCompare(b.Nom, "fr")),
@@ -169,8 +170,20 @@ const AdminGenreManager = () => {
     return parts.map(([label, count]) => `${count} ${label}`).join(", ");
   };
 
+  const changePage = (nextPage) => {
+    setCurrentPage(nextPage);
+
+    if (sectionRef.current) {
+      const top = sectionRef.current.getBoundingClientRect().top + window.scrollY - 16;
+      window.scrollTo({
+        top,
+        behavior: "smooth",
+      });
+    }
+  };
+
   return (
-    <section className="mx-auto my-8 max-w-4xl overflow-hidden rounded-2xl border border-sky-500/10 bg-white/80 shadow-xl shadow-slate-950/5 backdrop-blur dark:bg-slate-950/70 dark:shadow-sky-950/20">
+    <section ref={sectionRef} className="mx-auto my-8 max-w-4xl overflow-hidden rounded-2xl border border-sky-500/10 bg-white/80 shadow-xl shadow-slate-950/5 backdrop-blur dark:bg-slate-950/70 dark:shadow-sky-950/20">
       <div className="border-b border-sky-500/10 bg-gradient-to-r from-sky-500/15 via-blue-500/10 to-transparent px-6 py-5">
         <p className="text-sm font-bold uppercase text-sky-500 dark:text-sky-400">Administration</p>
         <h2 className="mt-1 text-2xl font-black text-slate-950 dark:text-white">Genres</h2>
@@ -312,7 +325,7 @@ const AdminGenreManager = () => {
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+                  onClick={() => changePage(Math.max(1, currentPage - 1))}
                   disabled={currentPage === 1 || saving}
                   className="inline-flex size-10 items-center justify-center rounded-lg border border-sky-300/40 bg-sky-500/15 text-sky-700 transition hover:bg-sky-500/25 disabled:cursor-not-allowed disabled:opacity-60 dark:text-sky-200"
                   title="Page précédente"
@@ -321,7 +334,7 @@ const AdminGenreManager = () => {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))}
+                  onClick={() => changePage(Math.min(totalPages, currentPage + 1))}
                   disabled={currentPage === totalPages || saving}
                   className="inline-flex size-10 items-center justify-center rounded-lg border border-sky-300/40 bg-sky-500/15 text-sky-700 transition hover:bg-sky-500/25 disabled:cursor-not-allowed disabled:opacity-60 dark:text-sky-200"
                   title="Page suivante"

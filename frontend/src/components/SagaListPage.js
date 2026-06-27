@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Listbox, ListboxButton, ListboxOption, ListboxOptions } from "@headlessui/react";
 import { CheckIcon, ChevronUpDownIcon } from "@heroicons/react/16/solid";
 import { XMarkIcon } from "@heroicons/react/24/outline";
@@ -26,6 +26,7 @@ const SagaListPage = () => {
   const [loading, setLoading] = useState(false);
   const [detailsLoading, setDetailsLoading] = useState(false);
   const [error, setError] = useState("");
+  const sectionRefs = useRef({});
 
   const modalContents = useMemo(
     () => (Array.isArray(sagaDetails?.Contents) ? sagaDetails.Contents : []),
@@ -151,6 +152,13 @@ const SagaListPage = () => {
             return (
               <section
                 key={universe.UniverseID}
+                ref={(element) => {
+                  if (element) {
+                    sectionRefs.current[universeKey] = element;
+                  } else {
+                    delete sectionRefs.current[universeKey];
+                  }
+                }}
                 className="overflow-hidden rounded-2xl border border-sky-500/10 bg-white/80 p-5 shadow-xl shadow-slate-950/5 backdrop-blur dark:bg-slate-950/70 dark:shadow-sky-950/20"
               >
                 <div className="mb-4">
@@ -176,6 +184,8 @@ const SagaListPage = () => {
                           [universeKey]: page,
                         }))
                       }
+                      scrollTarget={() => sectionRefs.current[universeKey]}
+                      scrollOffset={16}
                     />
                   </div>
                 )}
