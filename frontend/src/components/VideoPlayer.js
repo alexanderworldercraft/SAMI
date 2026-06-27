@@ -239,7 +239,7 @@ const VideoPlayer = ({ video, backgroundBlur, onVideoElement, skipFirstPlayLogKe
   return (
     <div ref={fitContainerRef} className="relative w-full h-full flex items-center justify-center">
       <div
-        className="relative group bg-neutral-900/50 rounded-xl lg:rounded-2xl xl:rounded-3xl shadow-xl overflow-hidden"
+        className="relative border-0 ring-0 group rounded-xl xl:rounded-2xl shadow-xl/30 overflow-hidden"
         style={{
           width: playerSize.width ? `${playerSize.width}px` : "100%",
           height: playerSize.height ? `${playerSize.height}px` : "100%",

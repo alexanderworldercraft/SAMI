@@ -590,21 +590,23 @@ const VideoSeePage = () => {
                   onClick={() => openSaga(saga)}
                   className="group text-left transition duration-300 hover:-translate-y-2"
                 >
-                  <div className="relative mb-2 overflow-hidden rounded-xl border border-neutral-400 bg-gradient-to-br from-slate-950 to-slate-900 transition duration-300 ease-in-out group-hover:border-blue-500">
-                    <img
-                      src={saga.CheminImage ? `${apiUrl}/${saga.CheminImage}` : "/imageDefault.png"}
-                      alt={saga.Titre}
-                      className="aspect-2/3 h-full w-full object-cover duration-300 group-hover:scale-110"
-                    />
-                    {saga.Premium && (
-                      <span className="absolute left-2 top-2 z-10 inline-flex rounded-full border border-amber-200/40 bg-gradient-to-br from-amber-300/95 via-yellow-400/95 to-orange-400/95 px-2.5 py-1 text-[10px] font-black uppercase text-slate-950">
-                        Premium
-                      </span>
-                    )}
+                  <div className="min-h-full h-max max-h-max">
+                    <div className="rounded-xl overflow-hidden border border-neutral-400 bg-gradient-to-br from-slate-950 to-slate-900 mb-2 relative transition duration-300 ease-in-out group-hover:border-blue-500">
+                      <img
+                        src={saga.CheminImage ? `${apiUrl}/${saga.CheminImage}` : "/imageDefault.png"}
+                        alt={saga.Titre}
+                        className="aspect-2/3 h-full w-full object-cover duration-300 group-hover:scale-110"
+                      />
+                      {saga.Premium && (
+                        <span className="absolute left-2 top-2 z-10 inline-flex rounded-full border border-amber-200/40 bg-gradient-to-br from-amber-300/95 via-yellow-400/95 to-orange-400/95 px-2.5 py-1 text-[10px] font-black uppercase text-slate-950">
+                          Premium
+                        </span>
+                      )}
+                    </div>
+                    <p className="px-2 py-1 text-center text-sm font-bold capitalize text-slate-900 line-clamp-2 dark:text-neutral-300">
+                      {saga.Titre}
+                    </p>
                   </div>
-                  <p className="px-2 py-1 text-center text-sm font-bold capitalize text-slate-900 line-clamp-2 dark:text-neutral-300">
-                    {saga.Titre}
-                  </p>
                 </button>
               ))}
             </div>
@@ -685,29 +687,29 @@ const VideoSeePage = () => {
                             Saisons et épisodes
                           </h2>
                         </div>
-                      <button
-                        type="button"
-                        onClick={handleResetSeriesWatchStatus}
-                        disabled={isResettingSeries}
-                        className="inline-flex items-center justify-center rounded-lg border border-rose-300/40 bg-rose-500/15 px-5 py-2.5 text-sm font-bold text-rose-700 transition duration-200 hover:border-rose-300/80 hover:bg-rose-500/25 disabled:cursor-not-allowed disabled:opacity-60 dark:text-rose-200"
-                      >
-                        {isResettingSeries ? "Remise à zéro..." : "Recommencer la série"}
-                      </button>
+                        <button
+                          type="button"
+                          onClick={handleResetSeriesWatchStatus}
+                          disabled={isResettingSeries}
+                          className="inline-flex items-center justify-center rounded-lg border border-rose-300/40 bg-rose-500/15 px-5 py-2.5 text-sm font-bold text-rose-700 transition duration-200 hover:border-rose-300/80 hover:bg-rose-500/25 disabled:cursor-not-allowed disabled:opacity-60 dark:text-rose-200"
+                        >
+                          {isResettingSeries ? "Remise à zéro..." : "Recommencer la série"}
+                        </button>
                       </div>
                     </div>
                     <div className="relative p-6">
                       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_12%_20%,rgba(14,165,233,0.10),transparent_26%),radial-gradient(circle_at_88%_0%,rgba(139,92,246,0.08),transparent_22%)]" />
                       <div className="relative">
-                    <SeasonList
-                      seasons={series.Saisons}
-                      currentSeason={currentSeason}
-                      onSeasonChange={handleSeasonChange}
-                    />
-                    <EpisodeList
-                      episodes={episodes}
-                      currentEpisode={currentEpisode}
-                      canAccessPremium={isPremiumUser}
-                    />
+                        <SeasonList
+                          seasons={series.Saisons}
+                          currentSeason={currentSeason}
+                          onSeasonChange={handleSeasonChange}
+                        />
+                        <EpisodeList
+                          episodes={episodes}
+                          currentEpisode={currentEpisode}
+                          canAccessPremium={isPremiumUser}
+                        />
                       </div>
                     </div>
                   </section>
@@ -736,21 +738,21 @@ const VideoSeePage = () => {
                 <div className="relative p-6">
                   <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_12%_20%,rgba(14,165,233,0.10),transparent_26%),radial-gradient(circle_at_88%_0%,rgba(139,92,246,0.08),transparent_22%)]" />
                   <div className="relative z-[80] grid grid-cols-1 md:grid-cols-2">
-                <div>
-                  <SeriesAndSeasonSelector
-                    selectedSeries={selectedSeries}
-                    setSelectedSeries={setSelectedSeries}
-                    selectedSeason={selectedSeason}
-                    setSelectedSeason={setSelectedSeason}
-                  />
-                  <button
-                    onClick={handleConvertToEpisode}
-                    className="mt-4 inline-flex items-center justify-center rounded-lg border border-sky-300/40 bg-sky-500/15 px-5 py-2.5 text-sm font-bold text-slate-900 transition duration-200 hover:border-sky-300/80 hover:bg-sky-500/25 dark:text-white"
-                  >
-                    {selectedSeason ? "Convertir en épisode" : "Retirer de la série"}
-                  </button>
+                    <div>
+                      <SeriesAndSeasonSelector
+                        selectedSeries={selectedSeries}
+                        setSelectedSeries={setSelectedSeries}
+                        selectedSeason={selectedSeason}
+                        setSelectedSeason={setSelectedSeason}
+                      />
+                      <button
+                        onClick={handleConvertToEpisode}
+                        className="mt-4 inline-flex items-center justify-center rounded-lg border border-sky-300/40 bg-sky-500/15 px-5 py-2.5 text-sm font-bold text-slate-900 transition duration-200 hover:border-sky-300/80 hover:bg-sky-500/25 dark:text-white"
+                      >
+                        {selectedSeason ? "Convertir en épisode" : "Retirer de la série"}
+                      </button>
 
-                </div>
+                    </div>
                   </div>
                 </div>
               </section>

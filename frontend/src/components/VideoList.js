@@ -146,9 +146,8 @@ const VideoList = ({ videos = [], overlayActions, onItemClick, gridClassName = "
                       {overlayActions(item)}
                     </div>
                   )}
-
-                  <div className="px-4 py-2 h-full absolute top-0 left-0 opacity-0 group-hover:opacity-100 group-hover:bg-neutral-950/50 group-hover:backdrop-blur-2xl duration-300">
-                    <p className="line-clamp-15 text-xs text-neutral-50 text-justify">{item.Resumer}</p>
+                  <div className="px-4 py-2 rounded-xl h-full w-full absolute top-0 left-0 opacity-0 group-hover:opacity-100 group-hover:bg-neutral-950/50 group-hover:backdrop-blur-2xl duration-300">
+                    <p className="line-clamp-5 text-xs text-neutral-50 text-justify">{item.Resumer}</p>
                   </div>
                 </div>
                 <div className="relative capitalize text-center px-2 py-1 font-bold dark:text-neutral-300">
@@ -185,8 +184,8 @@ const VideoList = ({ videos = [], overlayActions, onItemClick, gridClassName = "
                     </div>
                   )}
 
-                  <div className="px-4 py-2 h-full absolute top-0 left-0 opacity-0 group-hover:opacity-100 group-hover:bg-neutral-950/50 group-hover:backdrop-blur-2xl duration-300">
-                    <p className="line-clamp-15 text-xs text-neutral-50 text-justify">{item.Resumer} {/* Affichage résumer */}</p>
+                  <div className="px-4 py-2 rounded-xl h-full w-full absolute top-0 left-0 opacity-0 group-hover:opacity-100 group-hover:bg-neutral-950/50 group-hover:backdrop-blur-2xl duration-300">
+                    <p className="line-clamp-5 text-xs text-neutral-50 text-justify">{item.Resumer} {/* Affichage résumer */}</p>
                   </div>
                 </div>
                 <div className="relative capitalize text-center px-2 py-1 font-bold dark:text-neutral-300">
@@ -245,8 +244,8 @@ const VideoList = ({ videos = [], overlayActions, onItemClick, gridClassName = "
                       </div>
                     )}
 
-                    <div className="px-4 py-2 h-full absolute top-0 left-0 opacity-0 group-hover:opacity-100 group-hover:bg-neutral-950/50 group-hover:backdrop-blur-2xl duration-300">
-                      <p className="line-clamp-15 text-xs text-neutral-50 text-justify">{item.Resumer} {/* Affichage résumer */}</p>
+                    <div className="px-4 py-2 rounded-xl h-full w-full absolute top-0 left-0 opacity-0 group-hover:opacity-100 group-hover:bg-neutral-950/50 group-hover:backdrop-blur-2xl duration-300">
+                      <p className="line-clamp-5 text-xs text-neutral-50 text-justify">{item.Resumer} {/* Affichage résumer */}</p>
                     </div>
                   </div>
                   <div className="relative capitalize text-center px-2 py-1 font-bold dark:text-neutral-300">
