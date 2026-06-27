@@ -2,6 +2,33 @@ import React from "react";
 
 const updates = [
   {
+    version: "6.13.1",
+    title: "Controle des lumieres d'ambiance en lecture",
+    date: "27 juin 2026",
+    sections: [
+      {
+        title: "Page Lecture",
+        items: [
+          "Ajout d'un toggle Ambiance en haut a droite du lecteur video.",
+          "Le toggle reprend le style du select de resolution avec affichage au survol du lecteur.",
+          "Les lumieres d'ambiance sont activees par defaut pour conserver le comportement existant.",
+          "Le choix actif ou inactif est conserve dans le localStorage de l'utilisateur.",
+          "Quand l'utilisateur desactive l'ambiance, le fond repasse sur une couleur par defaut et ne se met plus a jour.",
+        ],
+      },
+      {
+        title: "Performance video",
+        items: [
+          "Le rafraichissement de la couleur d'ambiance est augmente pour suivre plus rapidement la video.",
+          "Le calcul de couleur s'arrete automatiquement quand la video passe en plein ecran.",
+          "Le calcul de couleur s'arrete aussi quand la video passe en picture in picture.",
+          "Quand l'utilisateur revient au mode de lecture normal, l'ambiance reprend si le toggle est actif.",
+          "Les intervalles de calcul sont nettoyes a la pause, a la fin de la video et au demontage du lecteur.",
+        ],
+      },
+    ],
+  },
+  {
     version: "6.13.0",
     title: "Univers et regroupement des sagas",
     date: "22 juin 2026",

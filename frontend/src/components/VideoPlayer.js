@@ -2,6 +2,10 @@ import React, { useEffect, useRef, useState } from "react";
 import Hls from "hls.js";
 import api from "../services/api";
 
+const AMBIENT_LIGHT_STORAGE_KEY = "sami-ambient-light-enabled";
+const AMBIENT_LIGHT_DEFAULT_COLOR = "rgb(3, 3, 3)";
+const AMBIENT_LIGHT_REFRESH_MS = 200;
+
 const VideoPlayer = ({ video, backgroundBlur, onVideoElement, skipFirstPlayLogKey = 0 }) => {
   const videoRef = useRef(null);
   const fitContainerRef = useRef(null);
@@ -11,10 +15,20 @@ const VideoPlayer = ({ video, backgroundBlur, onVideoElement, skipFirstPlayLogKe
   const [selectedLevel, setSelectedLevel] = useState(-1);
   const [aspectRatio, setAspectRatio] = useState(16 / 9);
   const [playerSize, setPlayerSize] = useState({ width: 0, height: 0 });
+  const [ambientLightEnabled, setAmbientLightEnabled] = useState(() => {
+    try {
+      return localStorage.getItem(AMBIENT_LIGHT_STORAGE_KEY) !== "false";
+    } catch (e) {
+      return true;
+    }
+  });
 
   // Réfs internes
   const hlsRef = useRef(null);
   const blurIntervalRef = useRef(null);
+  const ambientLightEnabledRef = useRef(ambientLightEnabled);
+  const isFullscreenRef = useRef(false);
+  const isPictureInPictureRef = useRef(false);
 
   // ✅ 1 seule fois par chargement de page (par vidéo affichée)
   const hasLoggedFirstPlayRef = useRef(false);
@@ -29,6 +43,27 @@ const VideoPlayer = ({ video, backgroundBlur, onVideoElement, skipFirstPlayLogKe
       hasLoggedFirstPlayRef.current = true;
     }
   }, [skipFirstPlayLogKey]);
+
+  useEffect(() => {
+    ambientLightEnabledRef.current = ambientLightEnabled;
+    try {
+      localStorage.setItem(AMBIENT_LIGHT_STORAGE_KEY, ambientLightEnabled ? "true" : "false");
+    } catch (e) {
+      // ignore
+    }
+
+    const videoElement = videoRef.current;
+    if (!ambientLightEnabled) {
+      stopBackgroundUpdate();
+      resetBackgroundColor();
+      return;
+    }
+
+    if (videoElement && !videoElement.paused && !isFullscreenRef.current && !isPictureInPictureRef.current) {
+      startBackgroundUpdate();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ambientLightEnabled]);
 
   useEffect(() => {
     if (onVideoElement) {
@@ -79,17 +114,6 @@ const VideoPlayer = ({ video, backgroundBlur, onVideoElement, skipFirstPlayLogKe
     // -------------------------
     // 3) Events player
     // -------------------------
-    const startBackgroundUpdate = () => {
-      blurIntervalRef.current = setInterval(updateBackgroundColor, 500);
-    };
-
-    const stopBackgroundUpdate = () => {
-      if (blurIntervalRef.current) {
-        clearInterval(blurIntervalRef.current);
-        blurIntervalRef.current = null;
-      }
-    };
-
     const handleLoadedMetadata = () => {
       if (!videoElement.videoWidth || !videoElement.videoHeight) return;
       setAspectRatio(videoElement.videoWidth / videoElement.videoHeight);
@@ -114,10 +138,47 @@ const VideoPlayer = ({ video, backgroundBlur, onVideoElement, skipFirstPlayLogKe
       startBackgroundUpdate();
     };
 
+    const handleFullscreenChange = () => {
+      isFullscreenRef.current = Boolean(document.fullscreenElement);
+      if (isFullscreenRef.current) {
+        stopBackgroundUpdate();
+        resetBackgroundColor();
+      } else {
+        startBackgroundUpdate();
+      }
+    };
+
+    const handleEnterPictureInPicture = () => {
+      isPictureInPictureRef.current = true;
+      stopBackgroundUpdate();
+      resetBackgroundColor();
+    };
+
+    const handleLeavePictureInPicture = () => {
+      isPictureInPictureRef.current = false;
+      startBackgroundUpdate();
+    };
+
+    const handleWebkitBeginFullscreen = () => {
+      isFullscreenRef.current = true;
+      stopBackgroundUpdate();
+      resetBackgroundColor();
+    };
+
+    const handleWebkitEndFullscreen = () => {
+      isFullscreenRef.current = false;
+      startBackgroundUpdate();
+    };
+
     videoElement.addEventListener("loadedmetadata", handleLoadedMetadata);
     videoElement.addEventListener("play", handlePlay);
     videoElement.addEventListener("pause", stopBackgroundUpdate);
     videoElement.addEventListener("ended", stopBackgroundUpdate);
+    videoElement.addEventListener("enterpictureinpicture", handleEnterPictureInPicture);
+    videoElement.addEventListener("leavepictureinpicture", handleLeavePictureInPicture);
+    videoElement.addEventListener("webkitbeginfullscreen", handleWebkitBeginFullscreen);
+    videoElement.addEventListener("webkitendfullscreen", handleWebkitEndFullscreen);
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
 
     // -------------------------
     // Cleanup
@@ -136,8 +197,14 @@ const VideoPlayer = ({ video, backgroundBlur, onVideoElement, skipFirstPlayLogKe
       videoElement.removeEventListener("play", handlePlay);
       videoElement.removeEventListener("pause", stopBackgroundUpdate);
       videoElement.removeEventListener("ended", stopBackgroundUpdate);
+      videoElement.removeEventListener("enterpictureinpicture", handleEnterPictureInPicture);
+      videoElement.removeEventListener("leavepictureinpicture", handleLeavePictureInPicture);
+      videoElement.removeEventListener("webkitbeginfullscreen", handleWebkitBeginFullscreen);
+      videoElement.removeEventListener("webkitendfullscreen", handleWebkitEndFullscreen);
+      document.removeEventListener("fullscreenchange", handleFullscreenChange);
 
       stopBackgroundUpdate();
+      resetBackgroundColor();
 
       // Nettoyage des tracks ajoutés dynamiquement
       try {
@@ -194,12 +261,52 @@ const VideoPlayer = ({ video, backgroundBlur, onVideoElement, skipFirstPlayLogKe
   // -------------------------
   // Fond dynamique (moyenne couleur)
   // -------------------------
+  const resetBackgroundColor = () => {
+    if (!backgroundBlur?.current) return;
+    backgroundBlur.current.style.backgroundColor = AMBIENT_LIGHT_DEFAULT_COLOR;
+  };
+
+  const stopBackgroundUpdate = () => {
+    if (blurIntervalRef.current) {
+      clearInterval(blurIntervalRef.current);
+      blurIntervalRef.current = null;
+    }
+  };
+
+  const startBackgroundUpdate = () => {
+    const videoElement = videoRef.current;
+    if (
+      !ambientLightEnabledRef.current ||
+      isFullscreenRef.current ||
+      isPictureInPictureRef.current ||
+      !videoElement ||
+      videoElement.paused ||
+      videoElement.ended
+    ) {
+      return;
+    }
+
+    updateBackgroundColor();
+    if (!blurIntervalRef.current) {
+      blurIntervalRef.current = setInterval(updateBackgroundColor, AMBIENT_LIGHT_REFRESH_MS);
+    }
+  };
+
   const updateBackgroundColor = () => {
     const videoElement = videoRef.current;
     const canvas = document.createElement("canvas");
     const ctx = canvas.getContext("2d");
 
-    if (!videoElement || !backgroundBlur?.current || !videoElement.videoWidth) return;
+    if (
+      !ambientLightEnabledRef.current ||
+      isFullscreenRef.current ||
+      isPictureInPictureRef.current ||
+      !videoElement ||
+      !backgroundBlur?.current ||
+      !videoElement.videoWidth
+    ) {
+      return;
+    }
 
     canvas.width = videoElement.videoWidth / 10;
     canvas.height = videoElement.videoHeight / 10;
@@ -224,6 +331,10 @@ const VideoPlayer = ({ video, backgroundBlur, onVideoElement, skipFirstPlayLogKe
     b = Math.floor(b / count);
 
     backgroundBlur.current.style.backgroundColor = `rgb(${r}, ${g}, ${b})`;
+  };
+
+  const toggleAmbientLight = () => {
+    setAmbientLightEnabled((enabled) => !enabled);
   };
 
   // -------------------------
@@ -268,6 +379,30 @@ const VideoPlayer = ({ video, backgroundBlur, onVideoElement, skipFirstPlayLogKe
             </select>
           </div>
         )}
+
+        <div className="ambient-light-selector absolute top-0 right-0 z-50">
+          <button
+            type="button"
+            onClick={toggleAmbientLight}
+            aria-pressed={ambientLightEnabled}
+            title={ambientLightEnabled ? "Désactiver les lumières d'ambiance" : "Activer les lumières d'ambiance"}
+            className="flex items-center gap-2 p-2 opacity-0 duration-700 group-hover:opacity-100 shadow-md backdrop-blur bg-black/40 text-neutral-200 font-semibold border-b border-l border-neutral-500"
+            style={{ borderBottomLeftRadius: "0.5rem" }}
+          >
+            <span
+              className={`relative inline-flex h-5 w-10 shrink-0 items-center rounded-full transition-colors duration-200 ${
+                ambientLightEnabled ? "bg-sky-500" : "bg-neutral-700"
+              }`}
+              aria-hidden="true"
+            >
+              <span
+                className="inline-block h-4 w-4 rounded-full bg-white shadow transition-transform duration-200"
+                style={{ transform: ambientLightEnabled ? "translateX(1.25rem)" : "translateX(0.25rem)" }}
+              ></span>
+            </span>
+            <span className="text-sm">Ambiance</span>
+          </button>
+        </div>
       </div>
     </div>
   );
