@@ -16,8 +16,52 @@ import SuperAdminSagaTrashManager from "./SuperAdminSagaTrashManager";
 import SuperAdminUniverseTrashManager from "./SuperAdminUniverseTrashManager";
 import AdminBackupManager from "./AdminBackupManager";
 
+const tabButtonClass = (active) =>
+    `rounded-lg px-4 py-2 text-sm font-bold transition duration-200 ${
+        active
+            ? "bg-sky-500/20 text-sky-700 ring-1 ring-sky-300/40 dark:text-sky-200"
+            : "text-slate-600 hover:bg-sky-500/10 hover:text-slate-950 dark:text-slate-300 dark:hover:text-white"
+    }`;
+
+const TabbedAdminSection = ({ title, description, tabs, activeTab, onTabChange }) => {
+    const activeItem = tabs.find((tab) => tab.id === activeTab) || tabs[0];
+
+    return (
+        <section className="mx-auto my-8 max-w-4xl overflow-hidden rounded-2xl border border-sky-500/10 bg-white/80 shadow-xl shadow-slate-950/5 backdrop-blur dark:bg-slate-950/70 dark:shadow-sky-950/20">
+            <div className="border-b border-sky-500/10 bg-gradient-to-r from-sky-500/15 via-blue-500/10 to-transparent px-6 py-5">
+                <p className="text-sm font-bold uppercase text-sky-500 dark:text-sky-400">Administration</p>
+                <h2 className="mt-1 text-2xl font-black text-slate-950 dark:text-white">{title}</h2>
+                {description && (
+                    <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-300">
+                        {description}
+                    </p>
+                )}
+                <div className="mt-5 flex flex-wrap gap-2">
+                    {tabs.map((tab) => (
+                        <button
+                            key={tab.id}
+                            type="button"
+                            onClick={() => onTabChange(tab.id)}
+                            className={tabButtonClass(activeItem.id === tab.id)}
+                        >
+                            {tab.label}
+                        </button>
+                    ))}
+                </div>
+            </div>
+            <div className="bg-slate-50/40 px-4 py-5 dark:bg-slate-950/20 sm:px-6">
+                <div className="[&>section]:my-0 [&>section]:max-w-none">
+                    {activeItem.content}
+                </div>
+            </div>
+        </section>
+    );
+};
+
 const AdministrationPage = () => {
     const [, setReload] = useState(false);
+    const [activeContentTab, setActiveContentTab] = useState("genres");
+    const [activeTrashTab, setActiveTrashTab] = useState("sagas");
     const [featuredLoading, setFeaturedLoading] = useState(false);
     const [featuredMessage, setFeaturedMessage] = useState("");
     const [featuredError, setFeaturedError] = useState("");
@@ -42,6 +86,20 @@ const AdministrationPage = () => {
             setFeaturedLoading(false);
         }
     };
+
+    const contentTabs = [
+        { id: "genres", label: "Genres", content: <AdminGenreManager /> },
+        { id: "series", label: "Séries", content: <AdminSeriesManager /> },
+        { id: "videos", label: "Vidéos", content: <AdminVideoManager /> },
+        { id: "sagas", label: "Sagas", content: <AdminSagaManager /> },
+        { id: "universes", label: "Univers", content: <AdminUniverseManager /> },
+    ];
+
+    const trashTabs = [
+        { id: "sagas", label: "Sagas", content: <SuperAdminSagaTrashManager /> },
+        { id: "universes", label: "Univers", content: <SuperAdminUniverseTrashManager /> },
+        { id: "videos", label: "Vidéos", content: <SuperAdminVideoTrashManager /> },
+    ];
 
     return (
         <div className="container mx-auto px-4 py-10 sm:px-6 lg:px-8">
@@ -75,14 +133,20 @@ const AdministrationPage = () => {
             </section>
             <AdminMessageSettings />
             <AdminHomepageGenreManager />
-            <AdminGenreManager />
-            <AdminSeriesManager />
-            <AdminSagaManager />
-            <AdminUniverseManager />
-            <AdminVideoManager />
-            <SuperAdminSagaTrashManager />
-            <SuperAdminUniverseTrashManager />
-            <SuperAdminVideoTrashManager />
+            <TabbedAdminSection
+                title="Gestion des contenus"
+                description="Modifie les genres, séries, vidéos, sagas et univers depuis une seule zone."
+                tabs={contentTabs}
+                activeTab={activeContentTab}
+                onTabChange={setActiveContentTab}
+            />
+            <TabbedAdminSection
+                title="Corbeilles"
+                description="Restaure ou supprime définitivement les contenus supprimés."
+                tabs={trashTabs}
+                activeTab={activeTrashTab}
+                onTabChange={setActiveTrashTab}
+            />
             <AdminBackupManager />
             <FormNewAdmin />
 

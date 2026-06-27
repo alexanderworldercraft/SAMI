@@ -140,7 +140,7 @@ const VideoListTendance = ({
 
                     <div className="absolute inset-0 z-10 flex items-start rounded-xl bg-transparent px-4 py-12 opacity-0 transition duration-300 group-hover:bg-slate-950/55 group-hover:opacity-100 group-hover:backdrop-blur-2xl">
                       <div className="h-full w-full">
-                        <p className="line-clamp-10 text-xs leading-5 text-slate-50">
+                        <p className="line-clamp-5 text-xs leading-5 text-slate-50">
                           {item.Resumer || "Aucun résumé disponible."}
                         </p>
                       </div>
