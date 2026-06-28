@@ -2,6 +2,63 @@ import React from "react";
 
 const updates = [
   {
+    version: "6.14.0",
+    title: "Tooltip experimental de previsualisation video",
+    date: "28 juin 2026",
+    sections: [
+      {
+        title: "Administration",
+        items: [
+          "Ajout d'une section Fonctionnalites experimentales dans la page Administration.",
+          "Ajout d'un toggle Tooltip de previsualisation video actif ou inactif pour toute l'application.",
+          "Le toggle reprend le style des autres interrupteurs administrateur de SAMI.",
+          "Le reglage est stocke en base pour rester commun a tous les utilisateurs.",
+          "Le changement d'etat du toggle est journalise avec une nouvelle action dediee.",
+        ],
+      },
+      {
+        title: "Cards de contenus",
+        items: [
+          "Ajout d'un tooltip au survol des cards films et series pour afficher une previsualisation video.",
+          "Le tooltip est rendu hors des sections avec une position fixe pour passer au-dessus des cards et des blocs Tendance.",
+          "La position du tooltip s'adapte automatiquement au viewport pour s'afficher au-dessus ou au-dessous de la card.",
+          "Le diaporama affiche les images de preview disponibles avec un compteur base sur la liste reelle renvoyee par l'API.",
+          "Les cards personnes et sagas ne declenchent pas de preview video quand aucun contenu video cible n'est disponible.",
+        ],
+      },
+      {
+        title: "Generation des previews",
+        items: [
+          "Ajout de l'endpoint GET /api/videos/:id/preview-frames pour recuperer ou generer les images de previsualisation.",
+          "Les images sont generees depuis les segments HLS 240p de la video.",
+          "Quand l'option est active et qu'aucune preview n'existe, l'API tente de creer les images au premier survol.",
+          "Lors de l'encodage d'une nouvelle video, les images de preview sont aussi generees automatiquement si l'option est active.",
+          "Une erreur sur un segment n'interrompt pas toute la generation : les autres frames continuent d'etre creees.",
+        ],
+      },
+      {
+        title: "Stockage des fichiers",
+        items: [
+          "Le stockage canonique des previews est maintenant uploads/video/VideoID/preview/frame-01.jpg.",
+          "Les dossiers preview sont crees automatiquement pour les videos qui n'ont pas encore cette structure.",
+          "Les anciennes previews dans uploads/previews/VideoID restent lues en fallback pour ne pas casser l'existant.",
+          "La suppression definitive d'une video nettoie aussi l'ancien dossier legacy de previews quand il existe.",
+          "Le frontend utilise les URLs renvoyees par l'API pour eviter les compteurs incoherents et les chemins absents.",
+        ],
+      },
+      {
+        title: "Backend et base de donnees",
+        items: [
+          "Ajout de la table AppSetting pour stocker les reglages applicatifs experimentaux.",
+          "Ajout des endpoints /api/app-settings/content-preview pour lire et modifier l'etat de la feature.",
+          "Ajout de l'action content_preview_tooltip_toggle dans seed.js.",
+          "Ajout d'une migration pour creer AppSetting et initialiser le reglage content_preview_tooltip.",
+          "Ajout d'une migration pour creer l'action content_preview_tooltip_toggle sur les bases existantes.",
+        ],
+      },
+    ],
+  },
+  {
     version: "6.13.1",
     title: "Controle des lumieres d'ambiance en lecture",
     date: "27 juin 2026",

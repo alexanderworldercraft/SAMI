@@ -12,6 +12,7 @@ import personneRoutes from "./routes/personneRoutes.js";
 import logRoutes from "./routes/logRoutes.js";
 import adminMessageRoutes from "./routes/adminMessageRoutes.js";
 import adminBackupRoutes from "./routes/adminBackupRoutes.js";
+import appSettingRoutes from "./routes/appSettingRoutes.js";
 import sagaRoutes from "./routes/sagaRoutes.js";
 import universeRoutes from "./routes/universeRoutes.js";
 import fastifyCors from '@fastify/cors';
@@ -138,6 +139,7 @@ fastify.register(personneRoutes, { prefix: "/api/people" });
 fastify.register(logRoutes, { prefix: "/api/logs" });
 fastify.register(adminMessageRoutes, { prefix: "/api/admin-message" });
 fastify.register(adminBackupRoutes, { prefix: "/api/admin-backup" });
+fastify.register(appSettingRoutes, { prefix: "/api/app-settings" });
 fastify.register(sagaRoutes, { prefix: "/api/sagas" });
 fastify.register(universeRoutes, { prefix: "/api/universes" });
 

@@ -1,4 +1,5 @@
 import React from "react";
+import ContentPreviewTooltip from "./ContentPreviewTooltip";
 
 const apiUrl = process.env.REACT_APP_URL_LOCAL;
 
@@ -163,6 +164,7 @@ const VideoList = ({ videos = [], overlayActions, onItemClick, gridClassName = "
               href={item.FirstVideoID ? `/lecture/${item.FirstVideoID}` : "#"} // Lien vers la première vidéo
               className="group hover:-translate-y-2 duration-300"
             >
+              <ContentPreviewTooltip item={item} title={item.Titre}>
               <div className="min-h-full h-max max-h-max">
                 <div className="rounded-xl overflow-hidden border border-neutral-400 bg-gradient-to-br from-slate-950 to-slate-900 mb-2 relative transition duration-300 ease-in-out group-hover:border-blue-500">
                   <img
@@ -219,11 +221,13 @@ const VideoList = ({ videos = [], overlayActions, onItemClick, gridClassName = "
                   </div>
                 </div>
               </div>
+              </ContentPreviewTooltip>
             </a>
           )
             :
             (
               <a key={`video-${item.id}`} href={`/lecture/${item.id}`} className="group hover:-translate-y-2 duration-300">
+                <ContentPreviewTooltip item={item} title={item.Titre}>
                 <div className="min-h-full h-max max-h-max">
                   <div className="rounded-xl overflow-hidden border border-neutral-400 bg-gradient-to-br from-slate-950 to-slate-900 mb-2 relative transition duration-300 ease-in-out group-hover:border-blue-500">
                     <img
@@ -278,6 +282,7 @@ const VideoList = ({ videos = [], overlayActions, onItemClick, gridClassName = "
                     </div>
                   </div>
                 </div>
+                </ContentPreviewTooltip>
               </a>
             )
       )}

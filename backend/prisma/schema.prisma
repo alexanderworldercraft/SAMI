@@ -308,6 +308,16 @@ model AdminMessage {
   CreateDate     DateTime? @default(now())
 }
 
+model AppSetting {
+  AppSettingID BigInt    @id @default(autoincrement())
+  Cle          String    @unique @db.VarChar(120)
+  Valeur       Json
+  UpdatedAt    DateTime  @default(now()) @updatedAt
+  CreateDate   DateTime? @default(now())
+
+  @@index([Cle], map: "idx_app_setting_key")
+}
+
 model Log {
   LogID          BigInt      @id @default(autoincrement())
   UtilisateurID  Int

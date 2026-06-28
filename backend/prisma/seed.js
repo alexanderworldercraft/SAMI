@@ -175,6 +175,11 @@ async function main() {
         Criticite: 1,
       },
       {
+        Nom: "content_preview_tooltip_toggle",
+        Description: "Changement d'état du tooltip de prévisualisation vidéo.",
+        Criticite: 1,
+      },
+      {
         Nom: "manual_database_backup",
         Description: "Super administrateur lance une sauvegarde manuelle de la base de données.",
         Criticite: 3,
