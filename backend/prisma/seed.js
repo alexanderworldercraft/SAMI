@@ -160,6 +160,71 @@ async function main() {
         Criticite: 0,
       },
       {
+        Nom: "musique_create",
+        Description: "Utilisateur ajoute X musique.",
+        Criticite: 1,
+      },
+      {
+        Nom: "musique_update",
+        Description: "Utilisateur MAJ X musique.",
+        Criticite: 1,
+      },
+      {
+        Nom: "musique_soft_delete",
+        Description: "Utilisateur place X musique dans la corbeille.",
+        Criticite: 2,
+      },
+      {
+        Nom: "musique_restore",
+        Description: "Super administrateur restaure X musique.",
+        Criticite: 2,
+      },
+      {
+        Nom: "musique_delete",
+        Description: "Super administrateur supprime définitivement X musique.",
+        Criticite: 3,
+      },
+      {
+        Nom: "album_create",
+        Description: "Utilisateur ajoute X album musical.",
+        Criticite: 1,
+      },
+      {
+        Nom: "album_update",
+        Description: "Utilisateur MAJ X album musical.",
+        Criticite: 1,
+      },
+      {
+        Nom: "album_soft_delete",
+        Description: "Utilisateur place X album musical dans la corbeille.",
+        Criticite: 2,
+      },
+      {
+        Nom: "album_restore",
+        Description: "Super administrateur restaure X album musical.",
+        Criticite: 2,
+      },
+      {
+        Nom: "album_delete",
+        Description: "Super administrateur supprime définitivement X album musical.",
+        Criticite: 3,
+      },
+      {
+        Nom: "musique_genre_create",
+        Description: "Utilisateur ajoute X genre musical.",
+        Criticite: 1,
+      },
+      {
+        Nom: "musique_genre_update",
+        Description: "Utilisateur MAJ X genre musical.",
+        Criticite: 1,
+      },
+      {
+        Nom: "musique_genre_delete",
+        Description: "Utilisateur supprime X genre musical.",
+        Criticite: 2,
+      },
+      {
         Nom: "video_resume_play",
         Description: 'Utilisateur reprend X vidéo depuis une progression enregistrée.',
         Criticite: 0,

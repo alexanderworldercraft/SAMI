@@ -14,6 +14,7 @@ import adminBackupRoutes from "./routes/adminBackupRoutes.js";
 import appSettingRoutes from "./routes/appSettingRoutes.js";
 import sagaRoutes from "./routes/sagaRoutes.js";
 import universeRoutes from "./routes/universeRoutes.js";
+import musicRoutes from "./routes/musicRoutes.js";
 import fastifyCors from '@fastify/cors';
 import fastifyMultipart from '@fastify/multipart';
 import { prisma as db } from "./services/db.js";
@@ -113,6 +114,7 @@ fastify.register(adminBackupRoutes, { prefix: "/api/admin-backup" });
 fastify.register(appSettingRoutes, { prefix: "/api/app-settings" });
 fastify.register(sagaRoutes, { prefix: "/api/sagas" });
 fastify.register(universeRoutes, { prefix: "/api/universes" });
+fastify.register(musicRoutes, { prefix: "/api/music" });
 
 // Enregistrer les fichiers statiques pour le frontend
 fastify.register(fastifyStatic, {

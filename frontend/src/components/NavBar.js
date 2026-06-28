@@ -17,6 +17,7 @@ import {
   HomeIcon,
   UserIcon,
   FilmIcon,
+  MusicalNoteIcon,
   RectangleStackIcon,
   PlusCircleIcon,
   Cog6ToothIcon,
@@ -86,10 +87,14 @@ export default function NavBar() {
   const navigation = [
     { name: 'Accueil', href: '/', icon: HomeIcon },
     { name: 'Vidéos', href: '/videos', icon: FilmIcon },
+    { name: 'Musique', href: '/musique', icon: MusicalNoteIcon },
     { name: 'Sagas', href: '/sagas', icon: RectangleStackIcon },
     { name: 'Acteur/réalisateur', href: '/personnes', icon: UserIcon },
     ...(user?.GradeID === 1 || user?.GradeID === 2
-      ? [{ name: 'Nouveau contenu', href: '/nouvelle-video', icon: PlusCircleIcon }]
+      ? [
+          { name: 'Nouveau contenu', href: '/nouvelle-video', icon: PlusCircleIcon },
+          { name: 'Nouvelle musique', href: '/nouvelle-musique', icon: MusicalNoteIcon },
+        ]
       : []),
   ]
 

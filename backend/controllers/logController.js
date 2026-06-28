@@ -196,7 +196,7 @@ export async function updateLatestVideoPlayLogProgress({
  * Elle:
  * - résout ActionID via ActionNom
  * - ajoute IP + UserAgent
- * - rattache le log à une entité (VideoID/SeriesID/SaisonID)
+ * - rattache le log à une entité (VideoID/SeriesID/SaisonID/MusiqueID/AlbumID)
  * - stocke ancien/nouveau (audit)
  */
 export async function createLog({
@@ -206,6 +206,8 @@ export async function createLog({
   VideoID = null,
   SeriesID = null,
   SaisonID = null,
+  MusiqueID = null,
+  AlbumID = null,
   Champ = null,
   AncienneValeur = null,
   NouvelleValeur = null,
@@ -237,6 +239,8 @@ export async function createLog({
       VideoID ?? "null",
       SeriesID ?? "null",
       SaisonID ?? "null",
+      MusiqueID ?? "null",
+      AlbumID ?? "null",
       Champ ?? "null",
       AncienneValeur ?? "null",
       NouvelleValeur ?? "null",
@@ -255,6 +259,8 @@ export async function createLog({
             VideoID: VideoID ?? null,
             SeriesID: SeriesID ?? null,
             SaisonID: SaisonID ?? null,
+            MusiqueID: MusiqueID ?? null,
+            AlbumID: AlbumID ?? null,
             Champ: Champ ?? null,
             AncienneValeur: AncienneValeur ?? null,
             NouvelleValeur: NouvelleValeur ?? null,
@@ -282,6 +288,8 @@ export async function createLog({
         VideoID: VideoID ?? undefined,
         SeriesID: SeriesID ?? undefined,
         SaisonID: SaisonID ?? undefined,
+        MusiqueID: MusiqueID ?? undefined,
+        AlbumID: AlbumID ?? undefined,
 
         // Audit
         Champ: Champ ?? undefined,

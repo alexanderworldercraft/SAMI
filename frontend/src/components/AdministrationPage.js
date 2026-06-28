@@ -11,9 +11,11 @@ import AdminSeriesManager from "./AdminSeriesManager";
 import AdminSagaManager from "./AdminSagaManager";
 import AdminUniverseManager from "./AdminUniverseManager";
 import AdminVideoManager from "./AdminVideoManager";
+import AdminMusicContentManager from "./AdminMusicContentManager";
 import SuperAdminVideoTrashManager from "./SuperAdminVideoTrashManager";
 import SuperAdminSagaTrashManager from "./SuperAdminSagaTrashManager";
 import SuperAdminUniverseTrashManager from "./SuperAdminUniverseTrashManager";
+import SuperAdminMusicTrashManager from "./SuperAdminMusicTrashManager";
 import AdminBackupManager from "./AdminBackupManager";
 import AdminExperimentalFeatures from "./AdminExperimentalFeatures";
 
@@ -62,6 +64,7 @@ const TabbedAdminSection = ({ title, description, tabs, activeTab, onTabChange }
 const AdministrationPage = () => {
     const [, setReload] = useState(false);
     const [activeContentTab, setActiveContentTab] = useState("genres");
+    const [activeMusicContentTab, setActiveMusicContentTab] = useState("musiques");
     const [activeTrashTab, setActiveTrashTab] = useState("sagas");
     const [featuredLoading, setFeaturedLoading] = useState(false);
     const [featuredMessage, setFeaturedMessage] = useState("");
@@ -100,6 +103,12 @@ const AdministrationPage = () => {
         { id: "sagas", label: "Sagas", content: <SuperAdminSagaTrashManager /> },
         { id: "universes", label: "Univers", content: <SuperAdminUniverseTrashManager /> },
         { id: "videos", label: "Vidéos", content: <SuperAdminVideoTrashManager /> },
+    ];
+
+    const musicContentTabs = [
+        { id: "musiques", label: "Musiques", content: <AdminMusicContentManager activeTab="musiques" /> },
+        { id: "albums", label: "Albums", content: <AdminMusicContentManager activeTab="albums" /> },
+        { id: "music-genres", label: "Genres", content: <AdminMusicContentManager activeTab="genres" /> },
     ];
 
     return (
@@ -143,9 +152,20 @@ const AdministrationPage = () => {
                 onTabChange={setActiveContentTab}
             />
             <TabbedAdminSection
+                title="Gestion des contenus musicaux"
+                description="Modifie les musiques, albums et genres dédiés à la musique."
+                tabs={musicContentTabs}
+                activeTab={activeMusicContentTab}
+                onTabChange={setActiveMusicContentTab}
+            />
+            <TabbedAdminSection
                 title="Corbeilles"
                 description="Restaure ou supprime définitivement les contenus supprimés."
-                tabs={trashTabs}
+                tabs={[
+                    ...trashTabs,
+                    { id: "musiques", label: "Musiques", content: <SuperAdminMusicTrashManager type="musiques" /> },
+                    { id: "albums", label: "Albums", content: <SuperAdminMusicTrashManager type="albums" /> },
+                ]}
                 activeTab={activeTrashTab}
                 onTabChange={setActiveTrashTab}
             />

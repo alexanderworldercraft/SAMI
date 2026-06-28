@@ -15,8 +15,10 @@ model Etat {
   EtatID       Int           @id @default(autoincrement())
   Nom          String        @unique @db.VarChar(100)
   CreateDate   DateTime?     @default(now())
+  Albums       Album[]
   Sagas        Saga[]
   Universes    Universe[]
+  Musiques     Musique[]
   Series       Series[]
   Utilisateurs Utilisateur[]
   Videos       Video[]
@@ -224,6 +226,12 @@ model Utilisateur {
   LastLogin            DateTime?
   PremiumEndDate       DateTime?
   Log                  Log[]
+  Albums               Album[]
+  AlbumMusiques        AlbumMusique[]
+  Musiques             Musique[]
+  MusiqueGenres        MusiqueGenre[]
+  MusiqueGenreAlbums   MusiqueGenreAlbum[]
+  MusiqueGenreMusiques MusiqueGenreMusique[]
   Saisons              Saison[]
   Seriess              Series[]
   Etat                 Etat                   @relation(fields: [EtatID], references: [EtatID])
@@ -235,6 +243,102 @@ model Utilisateur {
 
   @@index([GradeID], map: "Utilisateur_GradeID_fkey")
   @@index([EtatID], map: "Utilisateur_EtatID_fkey")
+}
+
+model Musique {
+  MusiqueID            Int                    @id @default(autoincrement())
+  Titre                String                 @db.VarChar(100)
+  CheminAcces          String                 @db.VarChar(255)
+  CheminImage          String?                @db.VarChar(255)
+  Premium              Boolean                @default(false)
+  EtatID               Int
+  UtilisateurID        Int?
+  CreateDate           DateTime?              @default(now())
+  Etat                 Etat                   @relation(fields: [EtatID], references: [EtatID])
+  Utilisateur          Utilisateur?           @relation(fields: [UtilisateurID], references: [UtilisateurID])
+  AlbumMusiques        AlbumMusique[]
+  Log                  Log[]
+  MusiqueGenreMusiques MusiqueGenreMusique[]
+
+  @@index([EtatID], map: "Musique_EtatID_fkey")
+  @@index([UtilisateurID], map: "Musique_UtilisateurID_fkey")
+}
+
+model MusiqueGenre {
+  MusiqueGenreID       Int                    @id @default(autoincrement())
+  Nom                  String                 @db.VarChar(100)
+  UtilisateurID        Int?
+  CreateDate           DateTime?              @default(now())
+  Utilisateur          Utilisateur?           @relation(fields: [UtilisateurID], references: [UtilisateurID])
+  MusiqueGenreAlbums   MusiqueGenreAlbum[]
+  MusiqueGenreMusiques MusiqueGenreMusique[]
+
+  @@index([UtilisateurID], map: "MusiqueGenre_UtilisateurID_fkey")
+}
+
+model MusiqueGenreMusique {
+  MusiqueGenreMusiqueID Int          @id @default(autoincrement())
+  MusiqueID             Int
+  MusiqueGenreID        Int
+  UtilisateurID         Int?
+  CreateDate            DateTime?    @default(now())
+  Musique               Musique      @relation(fields: [MusiqueID], references: [MusiqueID], onDelete: Cascade)
+  MusiqueGenre          MusiqueGenre @relation(fields: [MusiqueGenreID], references: [MusiqueGenreID], onDelete: Cascade)
+  Utilisateur           Utilisateur? @relation(fields: [UtilisateurID], references: [UtilisateurID])
+
+  @@unique([MusiqueID, MusiqueGenreID], map: "uniq_musique_genre_musique")
+  @@index([MusiqueID], map: "MusiqueGenreMusique_MusiqueID_fkey")
+  @@index([MusiqueGenreID], map: "MusiqueGenreMusique_MusiqueGenreID_fkey")
+  @@index([UtilisateurID], map: "MusiqueGenreMusique_UtilisateurID_fkey")
+}
+
+model Album {
+  AlbumID             Int                  @id @default(autoincrement())
+  Titre               String               @db.VarChar(100)
+  CheminImage         String?              @db.VarChar(255)
+  EtatID              Int
+  UtilisateurID       Int?
+  CreateDate          DateTime?            @default(now())
+  Etat                Etat                 @relation(fields: [EtatID], references: [EtatID])
+  Utilisateur         Utilisateur?         @relation(fields: [UtilisateurID], references: [UtilisateurID])
+  AlbumMusiques       AlbumMusique[]
+  Log                 Log[]
+  MusiqueGenreAlbums  MusiqueGenreAlbum[]
+
+  @@index([EtatID], map: "Album_EtatID_fkey")
+  @@index([UtilisateurID], map: "Album_UtilisateurID_fkey")
+}
+
+model AlbumMusique {
+  AlbumMusiqueID Int          @id @default(autoincrement())
+  AlbumID        Int
+  MusiqueID      Int
+  UtilisateurID  Int?
+  CreateDate     DateTime?    @default(now())
+  Album          Album        @relation(fields: [AlbumID], references: [AlbumID], onDelete: Cascade)
+  Musique        Musique      @relation(fields: [MusiqueID], references: [MusiqueID], onDelete: Cascade)
+  Utilisateur    Utilisateur? @relation(fields: [UtilisateurID], references: [UtilisateurID])
+
+  @@unique([AlbumID, MusiqueID], map: "uniq_album_musique")
+  @@index([AlbumID], map: "AlbumMusique_AlbumID_fkey")
+  @@index([MusiqueID], map: "AlbumMusique_MusiqueID_fkey")
+  @@index([UtilisateurID], map: "AlbumMusique_UtilisateurID_fkey")
+}
+
+model MusiqueGenreAlbum {
+  MusiqueGenreAlbumID Int          @id @default(autoincrement())
+  AlbumID             Int
+  MusiqueGenreID      Int
+  UtilisateurID       Int?
+  CreateDate          DateTime?    @default(now())
+  Album               Album        @relation(fields: [AlbumID], references: [AlbumID], onDelete: Cascade)
+  MusiqueGenre        MusiqueGenre @relation(fields: [MusiqueGenreID], references: [MusiqueGenreID], onDelete: Cascade)
+  Utilisateur         Utilisateur? @relation(fields: [UtilisateurID], references: [UtilisateurID])
+
+  @@unique([AlbumID, MusiqueGenreID], map: "uniq_album_musique_genre")
+  @@index([AlbumID], map: "MusiqueGenreAlbum_AlbumID_fkey")
+  @@index([MusiqueGenreID], map: "MusiqueGenreAlbum_MusiqueGenreID_fkey")
+  @@index([UtilisateurID], map: "MusiqueGenreAlbum_UtilisateurID_fkey")
 }
 
 model UserSeriesWatchReset {
@@ -325,6 +429,8 @@ model Log {
   VideoID        Int?
   SeriesID       Int?
   SaisonID       Int?
+  MusiqueID      Int?
+  AlbumID        Int?
   Champ          String?     @db.VarChar(80)
   AncienneValeur String?     @db.Text
   NouvelleValeur String?     @db.Text
@@ -335,11 +441,15 @@ model Log {
   CreateDate     DateTime?   @default(now())
   action         Action      @relation(fields: [ActionID], references: [ActionID])
   utilisateur    Utilisateur @relation(fields: [UtilisateurID], references: [UtilisateurID])
+  Album          Album?      @relation(fields: [AlbumID], references: [AlbumID], map: "fk_log_album")
+  Musique        Musique?    @relation(fields: [MusiqueID], references: [MusiqueID], map: "fk_log_musique")
   Saison         Saison?     @relation(fields: [SaisonID], references: [SaisonID], map: "fk_log_saison")
   Series         Series?     @relation(fields: [SeriesID], references: [SeriesID], map: "fk_log_series")
   Video          Video?      @relation(fields: [VideoID], references: [VideoID], map: "fk_log_video")
 
   @@index([ActionID, DateAction], map: "idx_log_action_date")
+  @@index([AlbumID, DateAction], map: "idx_log_album_date")
+  @@index([MusiqueID, DateAction], map: "idx_log_musique_date")
   @@index([SaisonID, DateAction], map: "idx_log_saison_date")
   @@index([SeriesID, DateAction], map: "idx_log_series_date")
   @@index([UtilisateurID, DateAction], map: "idx_log_user_date")

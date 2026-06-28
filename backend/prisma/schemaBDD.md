@@ -93,6 +93,57 @@ model VideoSubtitle {
   Video           Video    @relation(fields: [VideoID], references: [VideoID])
 }
 
+model Musique {
+  MusiqueID     Int       @id @default(autoincrement())
+  Titre         String    @db.VarChar(100)
+  CheminAcces   String    @db.VarChar(255)
+  CheminImage   String?   @db.VarChar(255)
+  Premium       Boolean   @default(false)
+  EtatID        Int
+  UtilisateurID Int?
+  CreateDate    DateTime? @default(now())
+}
+
+model MusiqueGenre {
+  MusiqueGenreID Int       @id @default(autoincrement())
+  Nom            String    @db.VarChar(100)
+  UtilisateurID  Int?
+  CreateDate     DateTime? @default(now())
+}
+
+model MusiqueGenreMusique {
+  MusiqueGenreMusiqueID Int       @id @default(autoincrement())
+  MusiqueID             Int
+  MusiqueGenreID        Int
+  UtilisateurID         Int?
+  CreateDate            DateTime? @default(now())
+}
+
+model Album {
+  AlbumID       Int       @id @default(autoincrement())
+  Titre         String    @db.VarChar(100)
+  CheminImage   String?   @db.VarChar(255)
+  EtatID        Int
+  UtilisateurID Int?
+  CreateDate    DateTime? @default(now())
+}
+
+model AlbumMusique {
+  AlbumMusiqueID Int       @id @default(autoincrement())
+  AlbumID        Int
+  MusiqueID      Int
+  UtilisateurID  Int?
+  CreateDate     DateTime? @default(now())
+}
+
+model MusiqueGenreAlbum {
+  MusiqueGenreAlbumID Int       @id @default(autoincrement())
+  AlbumID             Int
+  MusiqueGenreID      Int
+  UtilisateurID       Int?
+  CreateDate          DateTime? @default(now())
+}
+
 model Utilisateur {
   UtilisateurID Int       @id @default(autoincrement())
   Surnom        String    @unique

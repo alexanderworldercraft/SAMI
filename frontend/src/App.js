@@ -13,6 +13,8 @@ import VideoListPage from './components/VideoListPage';
 import SagaListPage from './components/SagaListPage';
 import VideoSeePage from './components/VideoSeePage';
 import FormNewVideoPage from './components/FormNewVideoPage';
+import FormNewMusicPage from './components/FormNewMusicPage';
+import MusicPage from './components/MusicPage';
 import FooterPage from './components/FooterPage';
 import NotProtectedRoute from './components/NotProtectedRoute';
 import HomePage from './components/HomePage';
@@ -67,9 +69,14 @@ const routesMeta = {
   },
   "/videos": { title: `liste des vidéos - ${NameApp}`, description: `La liste des vidéos disponible sur ${NameApp}.` },
   "/sagas": { title: `liste des sagas - ${NameApp}`, description: `La liste des sagas disponible sur ${NameApp}.` },
+  "/musique": { title: `Musique - ${NameApp}`, description: `La liste des musiques disponible sur ${NameApp}.` },
   "/nouvelle-video": {
     title: `Formulaire pour ajout de vidéos - ${NameApp}`,
     description: `Formulaire d'ajout de vidéos sur ${NameApp}.`,
+  },
+  "/nouvelle-musique": {
+    title: `Formulaire pour ajout de musique - ${NameApp}`,
+    description: `Formulaire d'ajout de musiques et albums sur ${NameApp}.`,
   },
   "/updates": {
     title: `Mises à jour - ${NameApp}`,
@@ -100,8 +107,8 @@ export default function App() {
       <Routes>
         {/* Pages sans Navbar */}
         <Route path="/login" element={<LoginPage />} />
-// register désactivé pour bridé la création de compte
-       <Route path="/register" element={<LoginPage />} />
+        {/* Register désactivé pour brider la création de compte */}
+        <Route path="/register" element={<LoginPage />} />
 
         {/* Pages AVEC sidebar */}
         <Route
@@ -140,6 +147,16 @@ export default function App() {
             <ProtectedRoute>
               <AppShell>
                 <SagaListPage />
+              </AppShell>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/musique"
+          element={
+            <ProtectedRoute>
+              <AppShell>
+                <MusicPage />
               </AppShell>
             </ProtectedRoute>
           }
@@ -191,6 +208,16 @@ export default function App() {
             <ProtectedAdminRoute>
               <AppShell>
                 <FormNewVideoPage />
+              </AppShell>
+            </ProtectedAdminRoute>
+          }
+        />
+        <Route
+          path="/nouvelle-musique"
+          element={
+            <ProtectedAdminRoute>
+              <AppShell>
+                <FormNewMusicPage />
               </AppShell>
             </ProtectedAdminRoute>
           }
