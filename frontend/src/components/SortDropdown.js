@@ -10,6 +10,7 @@ import { ChevronUpDownIcon } from "@heroicons/react/16/solid";
  *  - "ancien"  => Ancien -> Récent (CreateDate asc; null = très ancien en premier)
  *  - "most"    => Regardé le plus (logs / points)
  *  - "least"   => Regardé le moins (logs / points)
+ *  - "trending"=> Regardé le plus sur les 30 derniers jours
  */
 // const OPTIONS = [
 //   { value: "az",     label: "A-Z" },
@@ -26,8 +27,9 @@ const OPTIONS = [
   { value: "recent", label: "Ajout — plus récent" },
   { value: "ancien", label: "Ajout — plus ancien" },
 
-  { value: "most",   label: "Popularité — la plus vue" },
-  { value: "least",  label: "Popularité — la moins vue" },
+  { value: "trending", label: "Popularité — tendances en ce moment" },
+  { value: "most",   label: "Popularité — total la plus vue" },
+  { value: "least",  label: "Popularité — total la moins vue" },
 ];
 
 const SortDropdown = ({ sort, setSort }) => {

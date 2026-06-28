@@ -7,7 +7,7 @@ import SortDropdown from "./SortDropdown"; // ⬅️ nouveau
 import VideoOptionsDropdown from "./VideoOptionsDropdown";
 
 const apiUrl = process.env.REACT_APP_URL_LOCAL;
-const VALID_SORTS = ["az", "za", "recent", "ancien", "most", "least"];
+const VALID_SORTS = ["az", "za", "recent", "ancien", "most", "least", "trending"];
 
 const VideoListPage = () => {
   const location = useLocation();

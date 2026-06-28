@@ -402,7 +402,7 @@ const HomePage = () => {
             <VideoListTendance
                 videos={popular30Days}
                 title="Tendances en ce moment"
-                description="Les contenus les plus regardés cette semaine."
+                description="Les contenus les plus regardés sur les 30 derniers jours."
             />
 
             <GenreFeaturedVideoSection

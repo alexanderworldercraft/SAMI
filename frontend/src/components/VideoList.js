@@ -2,6 +2,16 @@ import React from "react";
 import ContentPreviewTooltip from "./ContentPreviewTooltip";
 
 const apiUrl = process.env.REACT_APP_URL_LOCAL;
+const NEW_CONTENT_WINDOW_DAYS = 30;
+
+const isRecentDate = (date) => {
+  if (!date) return false;
+
+  const value = new Date(date).getTime();
+  if (!Number.isFinite(value)) return false;
+
+  return value >= Date.now() - NEW_CONTENT_WINDOW_DAYS * 24 * 60 * 60 * 1000;
+};
 
 const VideoList = ({ videos = [], overlayActions, onItemClick, gridClassName = "" }) => {
   const getImageUrl = (cheminImage, type) => {
@@ -24,6 +34,17 @@ const VideoList = ({ videos = [], overlayActions, onItemClick, gridClassName = "
           className={`${badgeBaseClass} border-sky-200/35 from-sky-400/95 via-blue-500/95 to-cyan-400/95 text-white shadow-sky-950/55 ring-1 ring-sky-100/25`}
         >
           Nouvel épisode
+        </span>
+      );
+    }
+
+    if (item.type === "video" && isRecentDate(item.CreateDate)) {
+      badges.push(
+        <span
+          key="new-film"
+          className={`${badgeBaseClass} border-sky-200/35 from-sky-400/95 via-blue-500/95 to-cyan-400/95 text-white shadow-sky-950/55 ring-1 ring-sky-100/25`}
+        >
+          Nouveau film
         </span>
       );
     }

@@ -1176,7 +1176,7 @@ export const getTotalSeries = async (request, reply) => {
 
 // Récupérer les vidéos et séries avec recherche, pagination, tri et filtres par genres
 export const getVideosAndSeries = async (request, reply) => {
-  // ⬇️ NOUVEAU: on supporte sort= 'az' | 'za' | 'recent' | 'ancien' | 'most' | 'least'
+  // ⬇️ NOUVEAU: on supporte sort= 'az' | 'za' | 'recent' | 'ancien' | 'most' | 'least' | 'trending'
   // - rétro-compatibilité: si 'sort' est absent, on garde 'order' (asc/desc) pour A-Z / Z-A
   const {
     page = 1,
@@ -1195,8 +1195,9 @@ export const getVideosAndSeries = async (request, reply) => {
 
   // Normalise le paramètre sort
   const sort = (rawSort || "").toLowerCase();
-  const isSortProvided = ["az", "za", "recent", "ancien", "most", "least"].includes(sort);
-  const isWatchSort = sort === "most" || sort === "least";
+  const isSortProvided = ["az", "za", "recent", "ancien", "most", "least", "trending"].includes(sort);
+  const isTrendingSort = sort === "trending";
+  const isWatchSort = sort === "most" || sort === "least" || isTrendingSort;
   const isOngoingRequested = isTruthyQueryValue(rawOngoing);
   const shouldHideWatched = isTruthyQueryValue(rawHideWatched);
   const shouldHidePremium = isTruthyQueryValue(rawHidePremium);
@@ -1370,6 +1371,7 @@ export const getVideosAndSeries = async (request, reply) => {
                 by: ["VideoID"],
                 where: {
                   ActionID: action.ActionID,
+                  ...(isTrendingSort ? { DateAction: { gte: newEpisodeThreshold } } : {}),
                   VideoID: { in: filmIds },
                 },
                 _count: { _all: true },
@@ -1380,6 +1382,7 @@ export const getVideosAndSeries = async (request, reply) => {
                 by: ["SeriesID"],
                 where: {
                   ActionID: action.ActionID,
+                  ...(isTrendingSort ? { DateAction: { gte: newEpisodeThreshold } } : {}),
                   SeriesID: { in: seriesIds },
                 },
                 _count: { _all: true },
@@ -1538,6 +1541,10 @@ export const getVideosAndSeries = async (request, reply) => {
       // Ancien → Récent (dates nulles = très anciennes => en haut)
       sorted = allItems.sort((a, b) => safeEpoch(a.CreateDate) - safeEpoch(b.CreateDate));
     } else if (sort === "most") {
+      sorted = allItems.sort(
+        (a, b) => getWatchScore(b) - getWatchScore(a) || a.Titre.localeCompare(b.Titre)
+      );
+    } else if (sort === "trending") {
       sorted = allItems.sort(
         (a, b) => getWatchScore(b) - getWatchScore(a) || a.Titre.localeCompare(b.Titre)
       );

@@ -7,7 +7,7 @@ const apiUrl = process.env.REACT_APP_URL_LOCAL;
 const VideoListTendance = ({
   videos = [],
   title = "Tendances en ce moment",
-  description = "Les contenus les plus regardes cette semaine.",
+  description = "Les contenus les plus regardes sur les 30 derniers jours.",
 }) => {
   const navigate = useNavigate();
 
@@ -46,7 +46,7 @@ const VideoListTendance = ({
   };
 
   const handleSeeAll = () => {
-    navigate("/videos?sort=most");
+    navigate("/videos?sort=trending");
   };
 
   if (!videos.length) {
