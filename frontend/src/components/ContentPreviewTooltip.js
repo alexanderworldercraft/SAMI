@@ -3,6 +3,8 @@ import { createPortal } from "react-dom";
 import api from "../services/api";
 
 const apiUrl = process.env.REACT_APP_URL_LOCAL;
+const TOOLTIP_OPEN_DELAY_MS = 200;
+const TOOLTIP_FADE_MS = 300;
 
 let settingPromise = null;
 const getPreviewSetting = () => {
@@ -49,6 +51,8 @@ const ContentPreviewTooltip = ({ item, title, className = "", children }) => {
   const [loading, setLoading] = useState(false);
   const [frameIndex, setFrameIndex] = useState(0);
   const [hasTried, setHasTried] = useState(false);
+  const [tooltipVisible, setTooltipVisible] = useState(false);
+  const [shouldRenderTooltip, setShouldRenderTooltip] = useState(false);
   const [position, setPosition] = useState({ top: 0, left: 0, placement: "top" });
 
   const updatePosition = useCallback(() => {
@@ -160,25 +164,50 @@ const ContentPreviewTooltip = ({ item, title, className = "", children }) => {
     };
   }, [hovered, updatePosition]);
 
-  const showTooltip =
+  const canShowTooltip =
     hovered &&
     enabled &&
     videoId &&
     (loading || frames.length > 0) &&
     typeof document !== "undefined";
+
+  useEffect(() => {
+    let openTimer;
+    let closeTimer;
+
+    if (canShowTooltip) {
+      setShouldRenderTooltip(true);
+      openTimer = window.setTimeout(() => {
+        setTooltipVisible(true);
+      }, TOOLTIP_OPEN_DELAY_MS);
+    } else {
+      setTooltipVisible(false);
+      closeTimer = window.setTimeout(() => {
+        setShouldRenderTooltip(false);
+      }, TOOLTIP_FADE_MS);
+    }
+
+    return () => {
+      window.clearTimeout(openTimer);
+      window.clearTimeout(closeTimer);
+    };
+  }, [canShowTooltip]);
+
   const activeFrame = frames[frameIndex] || frames[0];
   const handleFrameError = () => {
     setFrames((currentFrames) => currentFrames.filter((_, index) => index !== frameIndex));
     setFrameIndex(0);
   };
-  const tooltip = showTooltip ? (
+  const tooltip = shouldRenderTooltip ? (
     <div
-      className="pointer-events-none w-72 rounded-xl border border-sky-200/25 bg-slate-950/95 p-2 text-white shadow-2xl shadow-sky-950/40 ring-1 ring-white/10 backdrop-blur-xl"
+      className="pointer-events-none w-72 rounded-xl border border-sky-200/25 bg-slate-950/95 p-2 text-white shadow-2xl shadow-sky-950/40 ring-1 ring-white/10 backdrop-blur-xl transition duration-300 ease-out"
       style={{
         position: "fixed",
         top: `${position.top}px`,
         left: `${position.left}px`,
         zIndex: 99999,
+        opacity: tooltipVisible ? 1 : 0,
+        transform: `translateY(${tooltipVisible ? "0" : position.placement === "top" ? "6px" : "-6px"}) scale(${tooltipVisible ? 1 : 0.98})`,
       }}
     >
       <div className="overflow-hidden rounded-lg bg-slate-900">
