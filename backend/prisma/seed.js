@@ -165,6 +165,11 @@ async function main() {
         Criticite: 1,
       },
       {
+        Nom: "musique_first_play",
+        Description: "Utilisateur écoute X musique.",
+        Criticite: 0,
+      },
+      {
         Nom: "musique_update",
         Description: "Utilisateur MAJ X musique.",
         Criticite: 1,

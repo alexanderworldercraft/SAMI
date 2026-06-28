@@ -2,6 +2,73 @@ import React from "react";
 
 const updates = [
   {
+    version: "7.0.0",
+    title: "Branche Musique et lecteur audio",
+    date: "28 juin 2026",
+    sections: [
+      {
+        title: "Base de donnees musique",
+        items: [
+          "Ajout des tables Musique, MusiqueGenre, MusiqueGenreMusique, Album, AlbumMusique et MusiqueGenreAlbum.",
+          "Les genres musicaux sont separes des genres films et series pour garder des catalogues independants.",
+          "Les musiques peuvent etre reliees a plusieurs genres et plusieurs albums.",
+          "Les albums peuvent etre relies a plusieurs genres musicaux et contenir plusieurs musiques.",
+          "Les relations UtilisateurID permettent d'identifier l'utilisateur qui cree les musiques, albums et genres musicaux.",
+        ],
+      },
+      {
+        title: "Logs et historique",
+        items: [
+          "Ajout des actions musique_create, musique_update, musique_soft_delete, musique_restore et musique_delete.",
+          "Ajout des actions album_create, album_update, album_soft_delete, album_restore et album_delete.",
+          "Ajout des actions musique_genre_create, musique_genre_update et musique_genre_delete.",
+          "Ajout de l'action musique_first_play pour journaliser l'ecoute d'une musique par utilisateur.",
+          "La table Log possede maintenant MusiqueID et AlbumID pour rattacher proprement les evenements musique sans polluer les Meta.",
+        ],
+      },
+      {
+        title: "Stockage des fichiers",
+        items: [
+          "Les fichiers audio sont stockes dans uploads/musique/MusiqueID/musique.",
+          "Les affiches de musiques sont stockees dans uploads/musique/MusiqueID/affiche.",
+          "Les affiches d'albums sont stockees dans uploads/album/AlbumID/affiche.",
+          "Les uploads audio sont traites en flux vers un fichier temporaire avant de rejoindre leur dossier final.",
+          "La suppression definitive nettoie les dossiers physiques des musiques et albums concernes.",
+        ],
+      },
+      {
+        title: "Nouvelle musique",
+        items: [
+          "Ajout de la page Nouvelle musique avec les onglets Musique, Album et Genres.",
+          "Le formulaire Musique impose maintenant un fichier audio et ne propose plus de chemin d'acces manuel.",
+          "Les champs Genres musicaux, Albums et Musiques de l'album reprennent le style des selects de SAMI avec recherche integree.",
+          "Les formulaires permettent d'ajouter une musique avec image, premium, genres et albums associes.",
+          "Les formulaires permettent aussi de creer des albums avec image, genres et musiques associees.",
+        ],
+      },
+      {
+        title: "Administration",
+        items: [
+          "Ajout d'une section Gestion des contenus musicaux dans la page Administration.",
+          "La section reprend le style de Gestion des contenus avec des tabs directs Musiques, Albums et Genres.",
+          "Les administrateurs peuvent modifier les titres, les relations, le statut premium et placer musiques ou albums en corbeille.",
+          "Les selects de gestion utilisent les dropdowns SAMI avec barre de recherche.",
+          "Les corbeilles ajoutent les tabs Musiques et Albums pour restaurer ou supprimer definitivement les contenus musicaux.",
+        ],
+      },
+      {
+        title: "Page Musique",
+        items: [
+          "Ajout d'une page Musique accessible depuis la navigation.",
+          "Le lecteur audio est maintenant un composant independant en haut de page et reste visible au scroll.",
+          "Le lecteur possede une playlist retractable en footer avec ajout depuis une musique ou depuis un album complet.",
+          "La lecture enchaine automatiquement les musiques de la playlist et retire le titre termine de la file.",
+          "Ajout des controles precedent, suivant, repetition de toute la playlist et repetition du titre actuel.",
+        ],
+      },
+    ],
+  },
+  {
     version: "6.14.0",
     title: "Tooltip experimental de previsualisation video",
     date: "28 juin 2026",

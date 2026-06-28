@@ -492,3 +492,115 @@ export const logVideoResumePlay = async (request, reply) => {
     return reply.code(500).send({ error: "Erreur serveur." });
   }
 };
+
+const toLoggedMusiquePayload = (musique) => {
+  if (!musique) return null;
+
+  return {
+    MusiqueID: musique.MusiqueID,
+    Titre: musique.Titre,
+    CheminAcces: musique.CheminAcces,
+    CheminImage: musique.CheminImage,
+    Premium: musique.Premium,
+    EtatID: musique.EtatID,
+    Genres: (musique.MusiqueGenreMusiques || []).map((link) => link.MusiqueGenre),
+    Albums: (musique.AlbumMusiques || []).map((link) => link.Album),
+  };
+};
+
+export const logMusiqueFirstPlay = async (request, reply) => {
+  try {
+    const { MusiqueID } = request.body || {};
+    const musiqueId = parseInt(MusiqueID, 10);
+
+    if (Number.isNaN(musiqueId)) {
+      return reply.code(400).send({ error: "MusiqueID invalide." });
+    }
+
+    const userId = request.user?.userId;
+    if (!userId) {
+      return reply.code(401).send({ error: "Non authentifié." });
+    }
+
+    const exists = await prisma.musique.findUnique({
+      where: { MusiqueID: musiqueId },
+      select: { MusiqueID: true, Titre: true, EtatID: true },
+    });
+
+    if (!exists || exists.EtatID !== 1) {
+      return reply.code(404).send({ error: "Musique introuvable." });
+    }
+
+    const res = await createLog({
+      request,
+      UtilisateurID: Number(userId),
+      ActionNom: "musique_first_play",
+      MusiqueID: musiqueId,
+      Champ: "player",
+      AncienneValeur: null,
+      NouvelleValeur: "play",
+      Meta: {
+        serverTime: new Date().toISOString(),
+        Titre: exists.Titre,
+      },
+      DedupeMs: 5000,
+    });
+
+    if (!res.ok && res.reason === "ACTION_NOT_FOUND") {
+      return reply.code(500).send({ error: "Action 'musique_first_play' manquante en BDD." });
+    }
+
+    return reply.send({ ok: true });
+  } catch (err) {
+    console.error("❌ logMusiqueFirstPlay:", err);
+    return reply.code(500).send({ error: "Erreur serveur." });
+  }
+};
+
+export const getPreviousMusiquePlay = async (request, reply) => {
+  try {
+    const userId = request.user?.userId;
+    if (!userId) {
+      return reply.code(401).send({ error: "Non authentifié." });
+    }
+
+    const currentMusiqueId = Number.parseInt(request.query?.currentMusiqueId, 10);
+    const action = await prisma.action.findUnique({
+      where: { Nom: "musique_first_play" },
+      select: { ActionID: true },
+    });
+
+    if (!action) {
+      return reply.code(500).send({ error: "Action 'musique_first_play' manquante en BDD." });
+    }
+
+    const latestLogs = await prisma.log.findMany({
+      where: {
+        UtilisateurID: Number(userId),
+        ActionID: action.ActionID,
+        MusiqueID: { not: null },
+      },
+      orderBy: { DateAction: "desc" },
+      take: 20,
+      include: {
+        Musique: {
+          include: {
+            MusiqueGenreMusiques: { include: { MusiqueGenre: true } },
+            AlbumMusiques: { include: { Album: true } },
+          },
+        },
+      },
+    });
+
+    const previous = latestLogs.find((log) => {
+      if (!log.Musique || log.Musique.EtatID !== 1) return false;
+      if (Number.isInteger(currentMusiqueId) && log.MusiqueID === currentMusiqueId) return false;
+      return true;
+    });
+
+    return reply.send({ musique: previous ? toLoggedMusiquePayload(previous.Musique) : null });
+  } catch (err) {
+    console.error("❌ getPreviousMusiquePlay:", err);
+    return reply.code(500).send({ error: "Erreur serveur." });
+  }
+};
