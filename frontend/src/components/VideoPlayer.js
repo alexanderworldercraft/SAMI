@@ -358,7 +358,7 @@ const VideoPlayer = ({ video, backgroundBlur, onVideoElement, skipFirstPlayLogKe
       >
         <video
           ref={videoRef}
-          className="relative z-10 w-full h-full object-contain block"
+          className="relative z-10 w-full h-full rounded-xl xl:rounded-2xl object-contain block"
           controls
           preload="auto"
         ></video>

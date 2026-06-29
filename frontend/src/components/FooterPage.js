@@ -16,7 +16,7 @@ const FooterPage = () => {
 
       <footer className="p-6 mx-auto container dark:text-neutral-100 border-t border-slate-800 flex flex-row justify-between gap-4">
         <div className="grid gap-2">
-          <p className="text-base text-center italic font-semibold">© 2024-2025 SAMI.WORLDERCRAFT.FR All Rights Reserved.</p>
+          <p className="text-base text-center italic font-semibold">© 2024-2026 SAMI.WORLDERCRAFT.FR All Rights Reserved.</p>
           <a
             href="/updates"
             className="text-sm font-semibold text-sky-600 transition duration-200 hover:text-sky-500 dark:text-sky-300 dark:hover:text-sky-200"
