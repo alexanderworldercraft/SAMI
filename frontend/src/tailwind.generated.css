@@ -2082,6 +2082,16 @@
     }
   }
 
+  .border-emerald-400\/40 {
+    border-color: #00d29466;
+  }
+
+  @supports (color: color-mix(in lab, red, red)) {
+    .border-emerald-400\/40 {
+      border-color: color-mix(in oklab, var(--color-emerald-400) 40%, transparent);
+    }
+  }
+
   .border-emerald-700 {
     border-color: var(--color-emerald-700);
   }
@@ -2173,6 +2183,16 @@
   @supports (color: color-mix(in lab, red, red)) {
     .border-red-400\/30 {
       border-color: color-mix(in oklab, var(--color-red-400) 30%, transparent);
+    }
+  }
+
+  .border-red-400\/40 {
+    border-color: #ff656866;
+  }
+
+  @supports (color: color-mix(in lab, red, red)) {
+    .border-red-400\/40 {
+      border-color: color-mix(in oklab, var(--color-red-400) 40%, transparent);
     }
   }
 
@@ -3962,10 +3982,6 @@
     padding-right: calc(var(--spacing) * 10);
   }
 
-  .pb-1 {
-    padding-bottom: var(--spacing);
-  }
-
   .pb-2 {
     padding-bottom: calc(var(--spacing) * 2);
   }
@@ -5402,10 +5418,6 @@
     color: var(--color-neutral-400);
   }
 
-  .placeholder\:text-neutral-500::placeholder {
-    color: var(--color-neutral-500);
-  }
-
   .placeholder\:text-neutral-700::placeholder {
     color: var(--color-neutral-700);
   }
@@ -5899,10 +5911,6 @@
     }
   }
 
-  .focus\:ring-sky-500:focus {
-    --tw-ring-color: var(--color-sky-500);
-  }
-
   .focus\:ring-sky-600:focus {
     --tw-ring-color: var(--color-sky-600);
   }
@@ -6387,11 +6395,6 @@
     .sm\:text-lg {
       font-size: var(--text-lg);
       line-height: var(--tw-leading, var(--text-lg--line-height));
-    }
-
-    .sm\:text-sm {
-      font-size: var(--text-sm);
-      line-height: var(--tw-leading, var(--text-sm--line-height));
     }
 
     .sm\:text-sm\/6 {
@@ -7169,11 +7172,6 @@
 
   .dark\:bg-yellow-950:is(.dark *) {
     background-color: var(--color-yellow-950);
-  }
-
-  .dark\:bg-gradient-to-br:is(.dark *) {
-    --tw-gradient-position: to bottom right in oklab;
-    background-image: linear-gradient(var(--tw-gradient-stops));
   }
 
   .dark\:bg-\[radial-gradient\(circle_at_50\%_0\%\,rgba\(14\,165\,233\,0\.30\)\,transparent_42\%\)\,linear-gradient\(135deg\,rgba\(2\,6\,23\,0\.96\)\,rgba\(12\,74\,110\,0\.35\)_54\%\,rgba\(2\,6\,23\,0\.94\)\)\]:is(.dark *) {
