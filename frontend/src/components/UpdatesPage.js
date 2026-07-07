@@ -2,6 +2,51 @@ import React from "react";
 
 const updates = [
   {
+    version: "7.0.1",
+    title: "Feedback detaille des traitements video",
+    date: "30 juin 2026",
+    sections: [
+      {
+        title: "Nouvelle video",
+        items: [
+          "La card de traitement affiche maintenant une ligne par video ajoutee au lieu de barres globales partagees.",
+          "Chaque video garde son propre suivi de telechargement, d'analyse, de conversions par resolution et de validation finale.",
+          "Les traitements simultanes ne se melangent plus grace a un identifiant de traitement dedie pour chaque ajout video.",
+          "Les etapes terminees sont masquees par defaut pour garder la card lisible pendant les conversions longues.",
+          "Un bouton accordeon par video permet d'afficher ou masquer les evenements deja termines.",
+        ],
+      },
+      {
+        title: "Informations de traitement",
+        items: [
+          "Chaque sous-card affiche le titre de la video, la piste audio detectee et les sous-titres extraits.",
+          "Les episodes affichent aussi Saison.Numero et Series.Titre quand une saison est associee a la video.",
+          "La progression est maintenant individuelle pour le telechargement et pour chaque resolution encodee.",
+          "Les erreurs de conversion restent visibles meme quand les evenements termines sont masques.",
+          "La validation finale confirme que la video a bien ete enregistree apres l'encodage et le deplacement des fichiers.",
+        ],
+      },
+      {
+        title: "Estimation du temps restant",
+        items: [
+          "Ajout d'une estimation du temps restant sur l'etape en cours a partir du temps ecoule et du pourcentage atteint.",
+          "L'estimation se met a jour a chaque evenement de progression recu par socket.",
+          "Les etapes a 0% ou deja terminees n'affichent pas d'estimation pour eviter les valeurs incoherentes.",
+          "Les barres de progression affichent maintenant correctement les etapes qui demarrent a 0%.",
+        ],
+      },
+      {
+        title: "Backend et sockets",
+        items: [
+          "Les evenements socket progress de addVideo transportent maintenant processingId, status, video et resolution quand necessaire.",
+          "Le backend envoie les informations audio, sous-titres, saison et serie apres l'analyse des metadonnees.",
+          "Chaque resolution emet un evenement de fin ou d'erreur pour alimenter la validation individuelle cote frontend.",
+          "Un evenement completed par video est emis a la fin du traitement pour cloturer proprement la ligne concernee.",
+        ],
+      },
+    ],
+  },
+  {
     version: "7.0.0",
     title: "Branche Musique et lecteur audio",
     date: "28 juin 2026",

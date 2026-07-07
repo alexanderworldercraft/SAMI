@@ -22,6 +22,29 @@ const DELETED_ETAT_ID = 2;
 const normalizeLangTag = (value) =>
   (value || "und").toLowerCase().replace(/[^a-z0-9_-]/g, "");
 
+const buildAddVideoAudioLabel = (stream) => {
+  if (!stream) return "Non detecte";
+  const parts = [
+    stream.tags?.language,
+    stream.tags?.title,
+    stream.codec_name,
+    stream.channels ? `${stream.channels} canaux` : null,
+  ].filter(Boolean);
+  return parts.length > 0 ? parts.join(" - ") : `Flux ${stream.index}`;
+};
+
+const buildAddVideoProcessingVideoInfo = ({ data, processingId, audioStream, subtitleInfos, saison }) => ({
+  processingId,
+  titre: data.titre || data.videoOriginalName || "Video sans titre",
+  audio: buildAddVideoAudioLabel(audioStream),
+  subtitles:
+    subtitleInfos.length > 0
+      ? subtitleInfos.map((subtitle) => subtitle.label).filter(Boolean)
+      : [],
+  saisonNumero: saison?.Numero ?? null,
+  seriesTitre: saison?.Series?.Titre ?? null,
+});
+
 const getUserIdFromRequest = (request) => {
   const authHeader = request?.headers?.authorization || request?.headers?.Authorization;
   if (!authHeader || typeof authHeader !== "string") return null;
@@ -2683,8 +2706,10 @@ export const addEpisode = async (request, reply) => {
 // Ajouter une nouvelle vidéo (CPU)
 export const addVideo = async (req, reply, fastify) => {
   try {
+    const processingId = `addvideo-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     console.log("[addVideo] Début du traitement", {
       contentType: req.headers["content-type"],
+      processingId,
     });
     const parts = req.parts();
     const data = {};
@@ -2754,6 +2779,15 @@ export const addVideo = async (req, reply, fastify) => {
               if (progress !== null) {
                 fastify.io.emit('progress', {
                   stage: 'upload',
+                  status: 'download',
+                  processingId,
+                  video: buildAddVideoProcessingVideoInfo({
+                    data,
+                    processingId,
+                    audioStream: null,
+                    subtitleInfos: [],
+                    saison: null,
+                  }),
                   progress,
                 });
               }
@@ -2770,6 +2804,15 @@ export const addVideo = async (req, reply, fastify) => {
 
             fastify.io.emit('progress', {
               stage: 'upload',
+              status: 'download',
+              processingId,
+              video: buildAddVideoProcessingVideoInfo({
+                data,
+                processingId,
+                audioStream: null,
+                subtitleInfos: [],
+                saison: null,
+              }),
               progress: 100,
             });
 
@@ -2873,6 +2916,20 @@ export const addVideo = async (req, reply, fastify) => {
       raw: rawSaisonId,
       normalized: data.SaisonID,
     });
+
+    const saisonInfo = data.SaisonID
+      ? await prisma.saison.findUnique({
+        where: { SaisonID: data.SaisonID },
+        select: {
+          Numero: true,
+          Series: {
+            select: {
+              Titre: true,
+            },
+          },
+        },
+      })
+      : null;
 
     let videoFileSize = "no-size";
     try {
@@ -3070,6 +3127,22 @@ export const addVideo = async (req, reply, fastify) => {
     });
     console.log("[addVideo] Genres de langue détectés :", autoLanguageGenreNames);
 
+    const processingVideoInfo = buildAddVideoProcessingVideoInfo({
+      data,
+      processingId,
+      audioStream: selectedAudioStream,
+      subtitleInfos,
+      saison: saisonInfo,
+    });
+
+    fastify.io.emit('progress', {
+      stage: 'analysis',
+      status: 'metadata',
+      processingId,
+      video: processingVideoInfo,
+      progress: 100,
+    });
+
     // Ajoute l'option pour sélectionner la piste audio
     const audioStreamOption = `-map 0:${audioTrackIndex}`;
 
@@ -3163,6 +3236,9 @@ export const addVideo = async (req, reply, fastify) => {
               fastify.io.emit('progress', {
                 stage: 'conversion',
                 resolution: res.label,
+                status: 'conversion',
+                processingId,
+                video: processingVideoInfo,
                 progress: percent,
               });
             })
@@ -3179,6 +3255,15 @@ export const addVideo = async (req, reply, fastify) => {
             .run();
         });
 
+        fastify.io.emit('progress', {
+          stage: 'conversion',
+          resolution: res.label,
+          status: 'conversion-completed',
+          processingId,
+          video: processingVideoInfo,
+          progress: 100,
+        });
+
         playlistPaths.push({
           resolutionPlaylist: path.relative(hlsDir, resolutionPlaylist),
           bitrate: res.bitrate,
@@ -3186,6 +3271,15 @@ export const addVideo = async (req, reply, fastify) => {
           height: Math.round(res.width * 9 / 16),
         });
       } catch (err) {
+        fastify.io.emit('progress', {
+          stage: 'conversion',
+          resolution: res.label,
+          status: 'conversion-error',
+          processingId,
+          video: processingVideoInfo,
+          progress: 100,
+          error: err.message,
+        });
         console.warn(`Échec de la conversion pour la résolution ${res.label}. Passer à la suivante.`);
         continue;
       }
@@ -3357,6 +3451,16 @@ export const addVideo = async (req, reply, fastify) => {
     }
 
     console.log("Vidéo ajoutée avec succès à la base de données :", updatedVideo);
+    fastify.io.emit('progress', {
+      stage: 'completed',
+      status: 'completed',
+      processingId,
+      video: {
+        ...processingVideoInfo,
+        videoId: updatedVideo.VideoID,
+      },
+      progress: 100,
+    });
     reply.send({ message: 'Vidéo ajoutée avec succès.', video: updatedVideo });
   } catch (err) {
     console.error(err);

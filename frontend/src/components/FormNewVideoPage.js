@@ -27,6 +27,56 @@ function classNames(...classes) {
   return classes.filter(Boolean).join(" ");
 }
 
+const normalizeProgress = (progress) => {
+  const numericProgress = Number(progress);
+  if (!Number.isFinite(numericProgress)) return 0;
+  return Math.min(Math.max(Math.round(numericProgress), 0), 100);
+};
+
+const getProgressTaskId = (data) =>
+  data.processingId ||
+  data.video?.processingId ||
+  data.video?.videoId ||
+  `${data.video?.titre || "video"}-${data.stage || "task"}`;
+
+const getProgressStepId = (data) =>
+  data.stage === "conversion" && data.resolution
+    ? `conversion-${data.resolution}`
+    : data.stage || "traitement";
+
+const getProgressStepLabel = (data) => {
+  if (data.stage === "conversion") return `Conversion ${data.resolution || ""}`.trim();
+  if (data.stage === "analysis") return "Informations vidéo";
+  if (data.stage === "upload") return "Téléchargement";
+  if (data.stage === "completed") return "Validation finale";
+  if (data.stage === "initial-encoding") return "Réencodage initial";
+  return data.stage || "Traitement";
+};
+
+const getProgressStatusLabel = (data) => {
+  if (data.status === "conversion-completed") return "Conversion validée";
+  if (data.status === "conversion-error") return "Conversion en erreur";
+  if (data.status === "completed") return "Vidéo enregistrée";
+  if (data.status === "metadata") return "Audio et sous-titres détectés";
+  if (data.stage === "upload") return "Réception du fichier";
+  return "Traitement en cours";
+};
+
+const mergeVideoInfo = (currentVideo = {}, nextVideo = {}) => ({
+  ...currentVideo,
+  ...Object.fromEntries(
+    Object.entries(nextVideo || {}).filter(([, value]) => value !== undefined && value !== null && value !== "")
+  ),
+});
+
+const getEtaMs = (step, progress, now) => {
+  if (!step || progress <= 0 || progress >= 100) return null;
+  const startedAt = step.startedAt || now;
+  const elapsedMs = now - startedAt;
+  if (elapsedMs <= 0) return null;
+  return Math.round((elapsedMs / progress) * (100 - progress));
+};
+
 // Définition des tabs
 const tabs = [
   { id: "video", name: "Vidéo", icon: UserIcon },
@@ -41,7 +91,6 @@ const tabs = [
 ];
 
 const FormNewVideoPage = () => {
-  const [completed, setCompleted] = useState(false);
   const [tasksHistory, setTasksHistory] = useState([]);
   const [isCardVisible, setIsCardVisible] = useState(false);
 
@@ -55,45 +104,75 @@ const FormNewVideoPage = () => {
       setIsCardVisible(true);
 
       setTasksHistory((prev) => {
-        const taskId =
-          data.stage === "conversion" ? `conversion-${data.resolution}` : data.stage;
-
-        const taskLabel =
-          data.stage === "conversion"
-            ? `Conversion ${data.resolution} ...`
-            : data.stage === "initial-encoding"
-            ? "Réencodage initial ..."
-            : data.stage === "upload"
-            ? "Téléchargement ..."
-            : data.stage;
-
+        const now = Date.now();
+        const taskId = getProgressTaskId(data);
+        const stepId = getProgressStepId(data);
+        const progress = normalizeProgress(data.progress);
         const index = prev.findIndex((t) => t.id === taskId);
+        const existingTask = index !== -1 ? prev[index] : null;
+        const existingSteps = existingTask?.steps || [];
+        const stepIndex = existingSteps.findIndex((step) => step.id === stepId);
+        const existingStep = stepIndex !== -1 ? existingSteps[stepIndex] : null;
+
+        const updatedStep = {
+          ...(existingStep || {}),
+          id: stepId,
+          label: getProgressStepLabel(data),
+          statusLabel: getProgressStatusLabel(data),
+          progress,
+          error: data.error || existingStep?.error || null,
+          startedAt: existingStep?.startedAt || now,
+          updatedAt: now,
+          completed:
+            data.stage === "completed" ||
+            data.status === "completed" ||
+            data.status === "conversion-completed" ||
+            progress >= 100,
+        };
+
+        updatedStep.etaMs = getEtaMs(updatedStep, progress, now);
+
+        const nextSteps =
+          stepIndex !== -1
+            ? [
+                ...existingSteps.slice(0, stepIndex),
+                updatedStep,
+                ...existingSteps.slice(stepIndex + 1),
+              ]
+            : [...existingSteps, updatedStep];
+
+        const updatedTask = {
+          ...(existingTask || {}),
+          id: taskId,
+          label: data.video?.titre || existingTask?.label || getProgressStepLabel(data),
+          video: mergeVideoInfo(existingTask?.video, data.video),
+          steps: nextSteps,
+          completed: data.stage === "completed" || data.status === "completed",
+          error: data.error || existingTask?.error || null,
+          updatedAt: now,
+        };
 
         if (index !== -1) {
-          const updated = {
-            ...prev[index],
-            progress: data.progress,
-            completed: data.progress === 100,
-          };
-          return [...prev.slice(0, index), updated, ...prev.slice(index + 1)];
+          return [...prev.slice(0, index), updatedTask, ...prev.slice(index + 1)];
         }
 
-        return [
-          ...prev,
-          {
-            id: taskId,
-            label: taskLabel,
-            progress: data.progress,
-            completed: data.progress === 100,
-            error: null,
-          },
-        ];
+        return [...prev, updatedTask];
       });
     });
 
     socket.on("completed", () => {
-      setTasksHistory((prev) => prev.map((t) => ({ ...t, completed: true })));
-      setCompleted(true);
+      setTasksHistory((prev) =>
+        prev.map((task) => ({
+          ...task,
+          completed: true,
+          steps: task.steps.map((step) => ({
+            ...step,
+            completed: true,
+            progress: 100,
+            etaMs: null,
+          })),
+        }))
+      );
     });
 
     return () => socket.disconnect();
