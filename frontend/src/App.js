@@ -28,6 +28,9 @@ import UpdatesPage from "./components/UpdatesPage";
 import GeneralMessageBanner from "./components/GeneralMessageBanner";
 import MusicStickyPlayer from "./components/MusicStickyPlayer";
 import { MusicPlayerProvider, useMusicPlayer } from "./context/MusicPlayerContext";
+import PrivacyPolicyPage from "./components/PrivacyPolicyPage";
+import TermsOfUsePage from "./components/TermsOfUsePage";
+import DataCompliancePage from "./components/DataCompliancePage";
 
 const NameApp = process.env.REACT_APP_NAME + " " + process.env.REACT_APP_VER;
 
@@ -101,6 +104,18 @@ const routesMeta = {
   "/updates": {
     title: `Mises à jour - ${NameApp}`,
     description: `Historique des mises à jour de ${NameApp}.`,
+  },
+  "/politique-confidentialite": {
+    title: `Politique de confidentialité - ${NameApp}`,
+    description: `Politique de confidentialité de ${NameApp}.`,
+  },
+  "/conditions-utilisation": {
+    title: `Conditions d'utilisation - ${NameApp}`,
+    description: `Conditions d'utilisation de ${NameApp}.`,
+  },
+  "/conformite-donnees": {
+    title: `Conformité des données - ${NameApp}`,
+    description: `Conformité des données de ${NameApp}.`,
   },
 };
 
@@ -250,6 +265,36 @@ export default function App() {
             <NotProtectedRoute>
               <AppShell>
                 <UpdatesPage />
+              </AppShell>
+            </NotProtectedRoute>
+          }
+        />
+        <Route
+          path="/politique-confidentialite"
+          element={
+            <NotProtectedRoute>
+              <AppShell>
+                <PrivacyPolicyPage />
+              </AppShell>
+            </NotProtectedRoute>
+          }
+        />
+        <Route
+          path="/conditions-utilisation"
+          element={
+            <NotProtectedRoute>
+              <AppShell>
+                <TermsOfUsePage />
+              </AppShell>
+            </NotProtectedRoute>
+          }
+        />
+        <Route
+          path="/conformite-donnees"
+          element={
+            <NotProtectedRoute>
+              <AppShell>
+                <DataCompliancePage />
               </AppShell>
             </NotProtectedRoute>
           }

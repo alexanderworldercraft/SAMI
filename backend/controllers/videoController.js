@@ -1,322 +1,50 @@
 import fs from 'fs';
 import path from 'path';
 import ffmpeg from 'fluent-ffmpeg';
-import jwt from 'jsonwebtoken';
 import { prisma } from "../services/db.js";
 import { startOfDay, endOfDay, startOfMonth, endOfMonth, subDays } from "date-fns";
-import { fileURLToPath } from "url";
 import { createLog, updateLatestVideoPlayLogProgress } from "./logController.js";
 import { isContentPreviewActive } from "./appSettingController.js";
 import { ensureAdmin, ensureSuperAdmin } from "../services/authz.js";
-import { ETAT, GRADE } from "../constants.js";
+import { ETAT } from "../constants.js";
 import { isTruthyValue, parsePositiveInt } from "../utils/requestParsing.js";
+import {
+  ERROR_ROOT,
+  TEMP_ROOT,
+  VIDEO_ROOT,
+  removeStoredPath,
+  resolveUploadPath,
+} from "../services/video/videoPaths.js";
+import {
+  generateVideoPreviewFramesFromMaster,
+  getExistingPreviewFrames,
+} from "../services/video/videoPreviewService.js";
+import {
+  attachWatchStatus,
+  countWatchedEpisodesAfterReset,
+  getSeriesResetMap,
+  getUserIdFromRequest,
+} from "../services/video/videoWatchStatusService.js";
+import {
+  canAccessPremium,
+  isVideoPremium,
+  normalizeProgress,
+} from "../services/video/videoAccess.js";
+import {
+  ADDVIDEO_DEDUPE_MS,
+  addVideoDedupeCache,
+  buildAddVideoProcessingVideoInfo,
+  cleanupAddVideoTemp,
+  ensureGenreIdsByNames,
+  getAutoLanguageGenreNames,
+  isDuplicateAddVideo,
+  normalizeLangTag,
+} from "../services/video/videoImportHelpers.js";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const BACKEND_ROOT = path.join(__dirname, "..");
-const UPLOADS_ROOT = path.join(BACKEND_ROOT, "uploads");
-const VIDEO_ROOT = path.join(UPLOADS_ROOT, "video");
-const TEMP_ROOT = path.join(UPLOADS_ROOT, "tmp");
-const IMAGE_ROOT = path.join(UPLOADS_ROOT, "images");
-const ERROR_ROOT = path.join(UPLOADS_ROOT, "Error_videos");
 const ACTIVE_ETAT_ID = ETAT.ACTIVE;
 const DELETED_ETAT_ID = ETAT.DELETED;
 
-const normalizeLangTag = (value) =>
-  (value || "und").toLowerCase().replace(/[^a-z0-9_-]/g, "");
-
-const buildAddVideoAudioLabel = (stream) => {
-  if (!stream) return "Non detecte";
-  const parts = [
-    stream.tags?.language,
-    stream.tags?.title,
-    stream.codec_name,
-    stream.channels ? `${stream.channels} canaux` : null,
-  ].filter(Boolean);
-  return parts.length > 0 ? parts.join(" - ") : `Flux ${stream.index}`;
-};
-
-const buildAddVideoProcessingVideoInfo = ({ data, processingId, audioStream, subtitleInfos, saison }) => ({
-  processingId,
-  titre: data.titre || data.videoOriginalName || "Video sans titre",
-  audio: buildAddVideoAudioLabel(audioStream),
-  subtitles:
-    subtitleInfos.length > 0
-      ? subtitleInfos.map((subtitle) => subtitle.label).filter(Boolean)
-      : [],
-  saisonNumero: saison?.Numero ?? null,
-  seriesTitre: saison?.Series?.Titre ?? null,
-});
-
-const getUserIdFromRequest = (request) => {
-  const authHeader = request?.headers?.authorization || request?.headers?.Authorization;
-  if (!authHeader || typeof authHeader !== "string") return null;
-  const token = authHeader.split(" ")[1];
-  if (!token) return null;
-  try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const userId = decoded?.userId;
-    return Number.isFinite(Number(userId)) ? Number(userId) : null;
-  } catch (err) {
-    return null;
-  }
-};
-
-const getSeriesResetMap = async (userId, seriesIds) => {
-  const ids = Array.from(
-    new Set((seriesIds || []).map((id) => Number(id)).filter(Number.isInteger))
-  );
-
-  if (!userId || ids.length === 0) return new Map();
-
-  const resets = await prisma.userSeriesWatchReset.findMany({
-    where: {
-      UserID: Number(userId),
-      SeriesID: { in: ids },
-    },
-    select: {
-      SeriesID: true,
-      ResetAt: true,
-    },
-  });
-
-  return new Map(resets.map((reset) => [reset.SeriesID, reset.ResetAt]));
-};
-
-const countWatchedEpisodesAfterReset = (logs, resetBySeriesId = new Map()) => {
-  const watchedVideoIdsBySeries = new Map();
-
-  (logs || []).forEach((log) => {
-    const seriesId = log.SeriesID;
-    const videoId = log.VideoID;
-    if (!seriesId || !videoId) return;
-
-    const resetAt = resetBySeriesId.get(seriesId);
-    if (resetAt && new Date(log.DateAction) <= new Date(resetAt)) return;
-
-    if (!watchedVideoIdsBySeries.has(seriesId)) {
-      watchedVideoIdsBySeries.set(seriesId, new Set());
-    }
-    watchedVideoIdsBySeries.get(seriesId).add(videoId);
-  });
-
-  const counts = new Map();
-  watchedVideoIdsBySeries.forEach((videoIds, seriesId) => {
-    counts.set(seriesId, videoIds.size);
-  });
-
-  return counts;
-};
-
 const isTruthyQueryValue = isTruthyValue;
-
-const attachWatchStatus = async (items, userId) => {
-  if (!userId || !Array.isArray(items) || items.length === 0) return items;
-
-  const action = await prisma.action.findUnique({
-    where: { Nom: "video_first_play" },
-    select: { ActionID: true },
-  });
-
-  if (!action?.ActionID) return items;
-
-  const filmIds = items.filter((item) => item.type === "video").map((item) => item.id);
-  const seriesIds = items.filter((item) => item.type === "series").map((item) => item.id);
-  const resetBySeriesId = await getSeriesResetMap(userId, seriesIds);
-
-  const [filmLogCounts, seriesEpisodeTotalsRaw, seriesWatchedRaw] = await Promise.all([
-    filmIds.length > 0
-      ? prisma.log.groupBy({
-          by: ["VideoID"],
-          where: {
-            ActionID: action.ActionID,
-            UtilisateurID: userId,
-            VideoID: { in: filmIds },
-          },
-          _count: { _all: true },
-        })
-      : [],
-    seriesIds.length > 0
-      ? prisma.saison.findMany({
-          where: { SeriesID: { in: seriesIds } },
-          select: {
-            SeriesID: true,
-            _count: { select: { Episodes: true } },
-          },
-        })
-      : [],
-    seriesIds.length > 0
-      ? prisma.log.findMany({
-          where: {
-            ActionID: action.ActionID,
-            UtilisateurID: userId,
-            SeriesID: { in: seriesIds },
-            VideoID: { not: null },
-          },
-          select: {
-            SeriesID: true,
-            VideoID: true,
-            DateAction: true,
-          },
-        })
-      : [],
-  ]);
-
-  const watchedFilmIds = new Set(filmLogCounts.map((row) => row.VideoID));
-
-  const seriesEpisodeTotals = new Map();
-  seriesEpisodeTotalsRaw.forEach((row) => {
-    const prev = seriesEpisodeTotals.get(row.SeriesID) || 0;
-    seriesEpisodeTotals.set(row.SeriesID, prev + row._count.Episodes);
-  });
-
-  const seriesWatchedCounts = countWatchedEpisodesAfterReset(seriesWatchedRaw, resetBySeriesId);
-
-  return items.map((item) => {
-    if (item.type === "video") {
-      return { ...item, Watched: watchedFilmIds.has(item.id) };
-    }
-
-    if (item.type === "series") {
-      const total = seriesEpisodeTotals.get(item.id) || 0;
-      const watched = seriesWatchedCounts.get(item.id) || 0;
-      return {
-        ...item,
-        WatchedCount: watched,
-        TotalEpisodes: total,
-        WatchedAll: total > 0 && watched >= total,
-      };
-    }
-
-    return item;
-  });
-};
-
-const ADDVIDEO_DEDUPE_MS = 2000;
-const addVideoDedupeCache = new Map();
-
-const isDuplicateAddVideo = (key, meta = {}, windowMs = ADDVIDEO_DEDUPE_MS) => {
-  const now = Date.now();
-  const lastSeen = addVideoDedupeCache.get(key);
-  if (lastSeen && now - lastSeen.ts < windowMs) {
-    if (meta.saisonId != null && lastSeen.saisonId == null) {
-      lastSeen.saisonId = meta.saisonId;
-    }
-    return { duplicate: true, saisonId: lastSeen.saisonId };
-  }
-  addVideoDedupeCache.set(key, { ts: now, saisonId: meta.saisonId ?? null });
-  for (const [k, entry] of addVideoDedupeCache.entries()) {
-    if (now - entry.ts > windowMs) addVideoDedupeCache.delete(k);
-  }
-  return { duplicate: false, saisonId: meta.saisonId ?? null };
-};
-
-const cleanupAddVideoTemp = (paths = []) => {
-  for (const target of paths) {
-    if (!target) continue;
-    try {
-      fs.rmSync(target, { recursive: true, force: true });
-    } catch (err) {
-      console.warn("Nettoyage temp échoué :", err.message);
-    }
-  }
-};
-
-const FRENCH_LANG_CODES = new Set(["fr", "fra", "fre", "frf", "vff", "vfq"]);
-const JAPANESE_LANG_CODES = new Set(["ja", "jp", "jpn", "jap"]);
-const getStreamLanguage = (stream) => normalizeLangTag(stream?.tags?.language);
-
-const getAudioLanguageGenre = (stream) => {
-  const language = getStreamLanguage(stream);
-  if (!language || language === "und") return null;
-  if (FRENCH_LANG_CODES.has(language)) return "FR";
-  if (JAPANESE_LANG_CODES.has(language)) return "JP";
-  return "VO";
-};
-
-const hasFrenchSubtitle = (subtitleStreams = []) =>
-  subtitleStreams.some((stream) => FRENCH_LANG_CODES.has(getStreamLanguage(stream)));
-
-const getAutoLanguageGenreNames = ({ audioStream, subtitleStreams }) => {
-  const names = new Set();
-  const audioGenre = getAudioLanguageGenre(audioStream);
-  if (audioGenre) names.add(audioGenre);
-  if (audioGenre && audioGenre !== "FR" && hasFrenchSubtitle(subtitleStreams)) {
-    names.add("VOSTFR");
-  }
-  return Array.from(names);
-};
-
-const ensureGenreIdsByNames = async (genreNames = []) => {
-  const names = Array.from(new Set(
-    genreNames
-      .map((name) => String(name || "").trim())
-      .filter(Boolean)
-  ));
-
-  if (names.length === 0) return [];
-
-  const existingGenres = await prisma.genre.findMany({
-    where: { Nom: { in: names } },
-    select: { GenreID: true, Nom: true },
-  });
-
-  const existingByName = new Map(
-    existingGenres.map((genre) => [genre.Nom.toLowerCase(), genre])
-  );
-
-  const createdGenres = [];
-  for (const name of names) {
-    const key = name.toLowerCase();
-    if (existingByName.has(key)) continue;
-
-    const genre = await prisma.genre.create({ data: { Nom: name } });
-    existingByName.set(key, genre);
-    createdGenres.push(genre);
-    console.log("[addVideo] Genre auto créé :", name);
-  }
-
-  return [...existingGenres, ...createdGenres].map((genre) => genre.GenreID);
-};
-
-// Helper : contenu premium ?
-function isVideoPremium(video) {
-  const videoPremium = !!video.Premium;
-  const seriesPremium = !!video.Saison?.Series?.Premium;
-  return videoPremium || seriesPremium;
-}
-
-// Helper : l'utilisateur a-t-il le droit d'accéder au premium ?
-function canAccessPremium(user) {
-  if (!user) return false;
-
-  const isAdmin = user.GradeID === GRADE.SUPER_ADMIN || user.GradeID === GRADE.ADMIN;
-  if (isAdmin) return true;
-
-  if (!user.PremiumEndDate) return false;
-
-  const now = new Date();
-  const end = new Date(user.PremiumEndDate);
-  return end > now;
-}
-
-const normalizeProgress = (progress) => {
-  if (!progress) return null;
-  const progressPercent =
-    progress.ProgressPercent === null || progress.ProgressPercent === undefined
-      ? (progress.Timecode / progress.Duration) * 100
-      : Number(progress.ProgressPercent);
-
-  return {
-    UserVideoProgressID: progress.UserVideoProgressID?.toString?.() || String(progress.UserVideoProgressID),
-    UserID: progress.UserID,
-    VideoID: progress.VideoID,
-    Timecode: progress.Timecode,
-    Duration: progress.Duration,
-    ProgressPercent: Number.isFinite(progressPercent) ? Number(progressPercent.toFixed(2)) : 0,
-    UpdatedAt: progress.UpdatedAt,
-  };
-};
 
 const ensureVideoAdmin = async (request, reply) => {
   const admin = await ensureAdmin(request, reply);
@@ -326,177 +54,6 @@ const ensureVideoAdmin = async (request, reply) => {
 const ensureVideoSuperAdmin = async (request, reply) => {
   const admin = await ensureSuperAdmin(request, reply);
   return admin?.userId || null;
-};
-
-const removeStoredPath = (relativePath, { recursive = false } = {}) => {
-  if (!relativePath || relativePath.includes("default")) return;
-
-  const cleanedRel = relativePath.replace(/^[/\\]+/, "");
-  const absolutePath = path.join(BACKEND_ROOT, cleanedRel);
-  const normalizedRoot = path.resolve(UPLOADS_ROOT);
-  const normalizedTarget = path.resolve(absolutePath);
-
-  if (!normalizedTarget.startsWith(normalizedRoot) || !fs.existsSync(normalizedTarget)) return;
-
-  try {
-    fs.rmSync(normalizedTarget, { recursive, force: true });
-  } catch (error) {
-    console.warn("Suppression du fichier vidéo échouée :", error.message);
-  }
-};
-
-const resolveUploadPath = (relativePath) => {
-  if (!relativePath) return null;
-
-  const cleanedRel = String(relativePath).replace(/^[/\\]+/, "");
-  const absolutePath = path.resolve(BACKEND_ROOT, cleanedRel);
-  const normalizedUploadsRoot = path.resolve(UPLOADS_ROOT);
-
-  if (!absolutePath.startsWith(normalizedUploadsRoot)) return null;
-  return absolutePath;
-};
-
-const readPlaylistLines = (playlistPath) => {
-  const content = fs.readFileSync(playlistPath, "utf8");
-  return content
-    .split(/\r?\n/)
-    .map((line) => line.trim())
-    .filter(Boolean);
-};
-
-const resolvePlaylistReference = (baseFilePath, reference) => {
-  const cleanReference = String(reference || "").split("?")[0].trim();
-  if (!cleanReference || cleanReference.startsWith("#")) return null;
-
-  const absolutePath = path.resolve(path.dirname(baseFilePath), cleanReference);
-  const normalizedUploadsRoot = path.resolve(UPLOADS_ROOT);
-
-  if (!absolutePath.startsWith(normalizedUploadsRoot)) return null;
-  return absolutePath;
-};
-
-const get240pPlaylistPath = (masterPlaylistPath) => {
-  const lines = readPlaylistLines(masterPlaylistPath);
-  const direct240p = lines.find((line) => !line.startsWith("#") && line.includes("240p/playlist.m3u8"));
-
-  if (direct240p) return resolvePlaylistReference(masterPlaylistPath, direct240p);
-
-  for (let index = 0; index < lines.length; index += 1) {
-    const line = lines[index];
-    if (!line.startsWith("#EXT-X-STREAM-INF") || !/426x240|240p/i.test(line)) continue;
-
-    const nextMediaLine = lines.slice(index + 1).find((candidate) => !candidate.startsWith("#"));
-    if (nextMediaLine) return resolvePlaylistReference(masterPlaylistPath, nextMediaLine);
-  }
-
-  return null;
-};
-
-const pickPreviewSegments = (segmentPaths, limit = 10) => {
-  if (segmentPaths.length <= limit) return segmentPaths;
-
-  const step = Math.max(1, Math.floor(segmentPaths.length / limit));
-  const selected = [];
-
-  for (let index = 0; index < segmentPaths.length && selected.length < limit; index += step) {
-    selected.push(segmentPaths[index]);
-  }
-
-  return selected;
-};
-
-const extractFrameFromSegment = (segmentPath, outputPath) =>
-  new Promise((resolve, reject) => {
-    ffmpeg(segmentPath)
-      .seekInput(0.1)
-      .frames(1)
-      .outputOptions(["-q:v 4"])
-      .on("end", resolve)
-      .on("error", reject)
-      .save(outputPath);
-  });
-
-const getVideoScopedPreviewDir = (videoId) =>
-  path.join(VIDEO_ROOT, String(videoId), "preview");
-
-const getLegacyPreviewDir = (videoId) =>
-  path.join(UPLOADS_ROOT, "previews", String(videoId));
-
-const getPreviewFrameUrlsFromDir = (videoId, previewDir, urlPrefix) => {
-  if (!fs.existsSync(previewDir)) return [];
-
-  return fs
-    .readdirSync(previewDir)
-    .filter((filename) => /\.(jpe?g|png|webp)$/i.test(filename))
-    .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
-    .slice(0, 10)
-    .map((filename) => `${urlPrefix}/${filename}`);
-};
-
-const getExistingPreviewFrames = (videoId) => {
-  const scopedFrames = getPreviewFrameUrlsFromDir(
-    videoId,
-    getVideoScopedPreviewDir(videoId),
-    `/uploads/video/${videoId}/preview`
-  );
-
-  if (scopedFrames.length > 0) return scopedFrames;
-
-  return getPreviewFrameUrlsFromDir(
-    videoId,
-    getLegacyPreviewDir(videoId),
-    `/uploads/previews/${videoId}`
-  );
-};
-
-const generateVideoPreviewFramesFromMaster = async ({ videoId, masterPlaylistPath }) => {
-  const existingFrames = getExistingPreviewFrames(videoId);
-  if (existingFrames.length > 0) return existingFrames;
-
-  if (!masterPlaylistPath || !fs.existsSync(masterPlaylistPath)) {
-    throw new Error("Playlist HLS introuvable.");
-  }
-
-  const playlist240pPath = get240pPlaylistPath(masterPlaylistPath);
-  if (!playlist240pPath || !fs.existsSync(playlist240pPath)) {
-    throw new Error("Playlist 240p introuvable.");
-  }
-
-  const segmentPaths = readPlaylistLines(playlist240pPath)
-    .filter((line) => !line.startsWith("#") && /\.ts(?:\?|$)/i.test(line))
-    .map((line) => resolvePlaylistReference(playlist240pPath, line))
-    .filter((segmentPath) => segmentPath && fs.existsSync(segmentPath));
-
-  const selectedSegments = pickPreviewSegments(segmentPaths);
-  if (!selectedSegments.length) {
-    throw new Error("Aucun segment 240p exploitable.");
-  }
-
-  const previewDir = getVideoScopedPreviewDir(videoId);
-  fs.mkdirSync(previewDir, { recursive: true });
-
-  const frames = [];
-  for (let index = 0; index < selectedSegments.length; index += 1) {
-    const outputFilename = `frame-${String(index + 1).padStart(2, "0")}.jpg`;
-    const outputPath = path.join(previewDir, outputFilename);
-
-    if (!fs.existsSync(outputPath)) {
-      try {
-        await extractFrameFromSegment(selectedSegments[index], outputPath);
-      } catch (error) {
-        console.warn(`Aperçu vidéo ${videoId}: frame ${index + 1} ignorée`, error.message);
-        continue;
-      }
-    }
-
-    frames.push(`/uploads/video/${videoId}/preview/${outputFilename}`);
-  }
-
-  if (!frames.length) {
-    throw new Error("Aucune image de prévisualisation générée.");
-  }
-
-  return frames;
 };
 
 export const getVideoPreviewFrames = async (request, reply) => {
@@ -2481,18 +2038,12 @@ export const updateVideoImage = async (request, reply) => {
     }
 
     if (oldVideo && oldVideo.CheminImage) {
-      const oldPath = path.join(BACKEND_ROOT, oldVideo.CheminImage);
       if (
-        fs.existsSync(oldPath) &&
         !oldVideo.CheminImage.includes("default") &&
         oldVideo.CheminImage.startsWith(path.join("uploads", "video", String(videoId), "affiche"))
       ) {
-        try {
-          fs.unlinkSync(oldPath);
-          console.log(`🗑️ Ancienne image supprimée : ${oldVideo.CheminImage}`);
-        } catch (err) {
-          console.warn("⚠️ Erreur lors de la suppression de l'ancienne image :", err.message);
-        }
+        removeStoredPath(oldVideo.CheminImage);
+        console.log(`Ancienne image supprimée : ${oldVideo.CheminImage}`);
       }
     }
 
