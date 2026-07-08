@@ -23,7 +23,7 @@ import {
   Cog6ToothIcon,
 } from '@heroicons/react/24/outline'
 import { ChevronDownIcon } from '@heroicons/react/20/solid'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import api from '../services/api'
 import SearchBar from './SearchBar'
 import ThemeToggle from './ThemeToggle'
@@ -177,10 +177,10 @@ export default function NavBar() {
             {/* Sidebar mobile */}
             <div className="relative flex grow flex-col gap-y-5 overflow-y-auto bg-white px-6 pb-4 dark:bg-gray-900 dark:ring dark:ring-white/10 dark:before:pointer-events-none dark:before:absolute dark:before:inset-0 dark:before:bg-black/10">
               <div className="relative flex h-16 shrink-0 items-center">
-                <a href="/" className="flex items-center gap-3">
+                <Link to="/" className="flex items-center gap-3">
                   <img src="/logo.png" alt="Logo" className="h-8 w-auto" />
                   <span className="text-sm font-semibold text-gray-900 dark:text-white">SAMI</span>
-                </a>
+                </Link>
               </div>
 
               <nav className="relative flex flex-1 flex-col">
@@ -192,8 +192,9 @@ export default function NavBar() {
                         const active = location.pathname === item.href
                         return (
                           <li key={item.name}>
-                            <a
-                              href={item.href}
+                            <Link
+                              to={item.href}
+                              onClick={() => setSidebarOpen(false)}
                               className={navItemClass(active)}
                             >
                               <item.icon
@@ -201,7 +202,7 @@ export default function NavBar() {
                                 className={navIconClass(active)}
                               />
                               {item.name}
-                            </a>
+                            </Link>
                           </li>
                         )
                       })}
@@ -244,8 +245,9 @@ export default function NavBar() {
 
                   {/* Settings */}
                   <li className="mt-auto">
-                    <a
-                      href="/settings"
+                    <Link
+                      to="/settings"
+                      onClick={() => setSidebarOpen(false)}
                       className="group -mx-2 flex gap-x-3 rounded-md p-2 text-sm/6 font-semibold text-gray-700 hover:bg-gray-50 hover:text-sky-600 dark:text-gray-300 dark:hover:bg-white/5 dark:hover:text-white"
                     >
                       <Cog6ToothIcon
@@ -253,7 +255,7 @@ export default function NavBar() {
                         className="size-6 shrink-0 text-gray-400 group-hover:text-sky-600 dark:group-hover:text-white"
                       />
                       Paramètres
-                    </a>
+                    </Link>
                   </li>
                 </ul>
               </nav>
@@ -272,10 +274,10 @@ export default function NavBar() {
         >
           <div className="flex grow flex-col gap-y-5 overflow-y-auto border-r border-gray-200 bg-white px-6 pb-4 dark:border-white/10 dark:bg-black/50">
             <div className="flex h-16 shrink-0 items-center">
-              <a href="/" className="flex items-center gap-3">
+              <Link to="/" className="flex items-center gap-3">
                 <img src="/logo.png" alt="Logo" className="h-8 w-auto" />
                 <span className="text-sm font-semibold text-gray-900 dark:text-white">SAMI</span>
-              </a>
+              </Link>
             </div>
 
             <nav className="flex flex-1 flex-col">
@@ -287,8 +289,8 @@ export default function NavBar() {
                       const active = location.pathname === item.href
                       return (
                         <li key={item.name}>
-                          <a
-                            href={item.href}
+                          <Link
+                            to={item.href}
                             className={navItemClass(active)}
                           >
                             <item.icon
@@ -296,7 +298,7 @@ export default function NavBar() {
                               className={navIconClass(active)}
                             />
                             {item.name}
-                          </a>
+                          </Link>
                         </li>
                       )
                     })}
@@ -339,8 +341,8 @@ export default function NavBar() {
 
                 {/* Settings */}
                 <li className="mt-auto">
-                  <a
-                    href="/settings"
+                  <Link
+                    to="/settings"
                     className="group -mx-2 flex gap-x-3 rounded-md p-2 text-sm/6 font-semibold text-gray-700 hover:bg-gray-50 hover:text-sky-600 dark:text-gray-300 dark:hover:bg-white/5 dark:hover:text-white"
                   >
                     <Cog6ToothIcon
@@ -348,7 +350,7 @@ export default function NavBar() {
                       className="size-6 shrink-0 text-gray-400 group-hover:text-sky-600 dark:group-hover:text-white"
                     />
                     Paramètres
-                  </a>
+                  </Link>
                 </li>
               </ul>
             </nav>
@@ -425,12 +427,12 @@ export default function NavBar() {
                     >
                       {dropdownItems.map((item) => (
                         <MenuItem key={item.name}>
-                          <a
-                            href={item.href}
+                          <Link
+                            to={item.href}
                             className="block px-3 py-2 text-sm/6 text-gray-900 data-[focus]:bg-gray-50 data-[focus]:outline-none dark:text-white dark:data-[focus]:bg-white/5"
                           >
                             {item.name}
-                          </a>
+                          </Link>
                         </MenuItem>
                       ))}
 

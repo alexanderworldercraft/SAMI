@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { PlayIcon } from "@heroicons/react/20/solid";
 import PaginationPage from "./PaginationPage";
 
@@ -325,25 +326,25 @@ const RawWatchHistoryList = ({ watchLogs = [], emptyText }) => {
                   />
                 </div>
               ) : (
-              <a href={`/lecture/${item.videoId}`} className="shrink-0">
+              <Link to={`/lecture/${item.videoId}`} className="shrink-0">
                 <img
                   src={getImageUrl(item.image)}
                   alt={item.title}
                   className="h-24 w-20 rounded-lg object-cover ring-1 ring-white/10"
                 />
-              </a>
+              </Link>
               )}
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
                   {item.deleted ? (
                     <span className="line-clamp-2 text-sm font-bold text-white">{item.title}</span>
                   ) : (
-                    <a
-                      href={`/lecture/${item.videoId}`}
+                    <Link
+                      to={`/lecture/${item.videoId}`}
                       className="line-clamp-2 text-sm font-bold text-white hover:text-sky-100"
                     >
                       {item.title}
-                    </a>
+                    </Link>
                   )}
                   <span className="rounded-full border border-sky-300/25 bg-sky-500/10 px-2 py-0.5 text-[11px] font-bold text-sky-200">
                     {actionLabels[item.actionName] || item.actionName || "Lecture"}
@@ -365,13 +366,13 @@ const RawWatchHistoryList = ({ watchLogs = [], emptyText }) => {
                 <ProgressBar progress={item.progress} />
               </div>
               {!item.deleted && (
-                <a
-                  href={`/lecture/${item.videoId}`}
+                <Link
+                  to={`/lecture/${item.videoId}`}
                   className="grid size-12 shrink-0 place-items-center rounded-full border border-white/10 bg-white/10 text-white transition duration-200 hover:bg-sky-500/30"
                   aria-label="Lire"
                 >
                   <PlayIcon className="size-5" />
-                </a>
+                </Link>
               )}
             </div>
           </li>
@@ -442,8 +443,8 @@ const WatchHistoryCards = ({
                 className="col-span-1 flex max-h-60 rounded-md"
               >
                 {imageIsLink ? (
-                  <a
-                    href={imageHref}
+                  <Link
+                    to={imageHref}
                     className={classNames(
                       "flex max-h-60 shrink-0 items-center justify-center rounded-l-md text-sm font-medium text-white",
                       "bg-slate-800"
@@ -454,7 +455,7 @@ const WatchHistoryCards = ({
                       alt={card.title}
                       className="object-cover w-full h-full aspect-2/3 rounded-l-md"
                     />
-                  </a>
+                  </Link>
                 ) : (
                   <div className="flex max-h-60 shrink-0 items-center justify-center rounded-l-md bg-slate-800 text-sm font-medium text-white">
                   <img
@@ -476,12 +477,12 @@ const WatchHistoryCards = ({
                         </span>
                       </div>
                     ) : (
-                      <a
-                        href={`/lecture/${card.videoId}`}
+                      <Link
+                        to={`/lecture/${card.videoId}`}
                         className="font-medium text-white truncate hover:text-white"
                       >
                         {card.title}
-                      </a>
+                      </Link>
                     )}
                     {isSeries ? (
                       <div className="mt-1 space-y-2 text-xs text-slate-300">
@@ -496,15 +497,15 @@ const WatchHistoryCards = ({
                                     : ""}
                                 </span>
                               ) : (
-                                <a
-                                  href={`/lecture/${episode.videoId}`}
+                                <Link
+                                  to={`/lecture/${episode.videoId}`}
                                   className="font-semibold text-slate-200 truncate hover:text-white"
                                 >
                                   {episode.title}
                                   {episode.seasonNumber
                                     ? ` (S${episode.seasonNumber})`
                                     : ""}
-                                </a>
+                                </Link>
                               )}
                               {episode.deleted && (
                                 <span className="rounded-full border border-red-300/25 bg-red-500/10 px-2 py-0.5 text-[10px] font-bold text-red-200">

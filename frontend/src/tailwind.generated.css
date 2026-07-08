@@ -248,6 +248,7 @@
     --ease-in-out: cubic-bezier(.4, 0, .2, 1);
     --animate-spin: spin 1s linear infinite;
     --animate-pulse: pulse 2s cubic-bezier(.4, 0, .6, 1) infinite;
+    --blur-sm: 8px;
     --blur-md: 12px;
     --blur-xl: 24px;
     --blur-2xl: 40px;
@@ -586,6 +587,10 @@
     top: 0;
   }
 
+  .top-1\/2 {
+    top: 50%;
+  }
+
   .top-2 {
     top: calc(var(--spacing) * 2);
   }
@@ -652,6 +657,10 @@
 
   .left-2 {
     left: calc(var(--spacing) * 2);
+  }
+
+  .left-4 {
+    left: calc(var(--spacing) * 4);
   }
 
   .left-full {
@@ -1108,11 +1117,6 @@
     height: calc(var(--spacing) * 12);
   }
 
-  .size-14 {
-    width: calc(var(--spacing) * 14);
-    height: calc(var(--spacing) * 14);
-  }
-
   .size-16 {
     width: calc(var(--spacing) * 16);
     height: calc(var(--spacing) * 16);
@@ -1240,8 +1244,16 @@
     max-height: calc(var(--spacing) * 96);
   }
 
+  .max-h-\[70vh\] {
+    max-height: 70vh;
+  }
+
   .max-h-\[80vh\] {
     max-height: 80vh;
+  }
+
+  .max-h-\[90vh\] {
+    max-height: 90vh;
   }
 
   .max-h-\[calc\(100vh-4rem\)\] {
@@ -1400,6 +1412,10 @@
     width: min(92vw, 34rem);
   }
 
+  .w-\[min\(960px\,calc\(100vw-2rem\)\)\] {
+    width: min(960px, 100vw - 2rem);
+  }
+
   .w-\[var\(--button-width\)\] {
     width: var(--button-width);
   }
@@ -1470,6 +1486,10 @@
 
   .max-w-\[calc\(100\%-1rem\)\] {
     max-width: calc(100% - 1rem);
+  }
+
+  .max-w-\[calc\(100vw-2rem\)\] {
+    max-width: calc(100vw - 2rem);
   }
 
   .max-w-full {
@@ -1699,6 +1719,10 @@
 
   .justify-end {
     justify-content: flex-end;
+  }
+
+  .justify-start {
+    justify-content: flex-start;
   }
 
   .gap-1 {
@@ -4058,6 +4082,10 @@
     padding-left: calc(var(--spacing) * 10);
   }
 
+  .pl-12 {
+    padding-left: calc(var(--spacing) * 12);
+  }
+
   .text-center {
     text-align: center;
   }
@@ -4545,6 +4573,12 @@
 
   .opacity-100 {
     opacity: 1;
+  }
+
+  .shadow-2xl\/30 {
+    --tw-shadow-alpha: 30%;
+    --tw-shadow: 0 25px 50px -12px var(--tw-shadow-color, oklab(0% 0 0 / .3));
+    box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow);
   }
 
   .shadow-xl\/30 {
@@ -5160,6 +5194,12 @@
 
   .backdrop-blur-md {
     --tw-backdrop-blur: blur(var(--blur-md));
+    -webkit-backdrop-filter: var(--tw-backdrop-blur, ) var(--tw-backdrop-brightness, ) var(--tw-backdrop-contrast, ) var(--tw-backdrop-grayscale, ) var(--tw-backdrop-hue-rotate, ) var(--tw-backdrop-invert, ) var(--tw-backdrop-opacity, ) var(--tw-backdrop-saturate, ) var(--tw-backdrop-sepia, );
+    backdrop-filter: var(--tw-backdrop-blur, ) var(--tw-backdrop-brightness, ) var(--tw-backdrop-contrast, ) var(--tw-backdrop-grayscale, ) var(--tw-backdrop-hue-rotate, ) var(--tw-backdrop-invert, ) var(--tw-backdrop-opacity, ) var(--tw-backdrop-saturate, ) var(--tw-backdrop-sepia, );
+  }
+
+  .backdrop-blur-sm {
+    --tw-backdrop-blur: blur(var(--blur-sm));
     -webkit-backdrop-filter: var(--tw-backdrop-blur, ) var(--tw-backdrop-brightness, ) var(--tw-backdrop-contrast, ) var(--tw-backdrop-grayscale, ) var(--tw-backdrop-hue-rotate, ) var(--tw-backdrop-invert, ) var(--tw-backdrop-opacity, ) var(--tw-backdrop-saturate, ) var(--tw-backdrop-sepia, );
     backdrop-filter: var(--tw-backdrop-blur, ) var(--tw-backdrop-brightness, ) var(--tw-backdrop-contrast, ) var(--tw-backdrop-grayscale, ) var(--tw-backdrop-hue-rotate, ) var(--tw-backdrop-invert, ) var(--tw-backdrop-opacity, ) var(--tw-backdrop-saturate, ) var(--tw-backdrop-sepia, );
   }
@@ -5852,6 +5892,10 @@
       color: var(--color-sky-700);
     }
 
+    .hover\:text-slate-900:hover {
+      color: var(--color-slate-900);
+    }
+
     .hover\:text-slate-950:hover {
       color: var(--color-slate-950);
     }
@@ -5947,6 +5991,16 @@
 
   .focus\:ring-sky-400:focus {
     --tw-ring-color: var(--color-sky-400);
+  }
+
+  .focus\:ring-sky-400\/20:focus {
+    --tw-ring-color: #00bcfe33;
+  }
+
+  @supports (color: color-mix(in lab, red, red)) {
+    .focus\:ring-sky-400\/20:focus {
+      --tw-ring-color: color-mix(in oklab, var(--color-sky-400) 20%, transparent);
+    }
   }
 
   .focus\:ring-sky-400\/40:focus {
@@ -6186,6 +6240,10 @@
   }
 
   @media not all and (min-width: 40rem) {
+    .max-sm\:left-4 {
+      left: calc(var(--spacing) * 4);
+    }
+
     .max-sm\:max-h-\[calc\(100dvh-2rem\)\] {
       max-height: calc(100dvh - 2rem);
     }
@@ -6305,6 +6363,10 @@
 
     .sm\:w-full {
       width: 100%;
+    }
+
+    .sm\:max-w-44 {
+      max-width: calc(var(--spacing) * 44);
     }
 
     .sm\:max-w-lg {

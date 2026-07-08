@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { buildCookieValue, parseCookieValue } from "../utils/cookieValue";
 
@@ -437,7 +437,7 @@ const LoginPage = () => {
         )}
 
         <p className="mt-4 text-center">
-          Vous n'avez pas de compte ? <a href="/register" className="text-sky-600 hover:text-sky-700">S'inscrire</a>
+          Vous n'avez pas de compte ? <Link to="/register" className="text-sky-600 hover:text-sky-700">S'inscrire</Link>
         </p>
       </div>
     </div>

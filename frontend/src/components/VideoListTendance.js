@@ -1,5 +1,5 @@
 import React from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import ContentPreviewTooltip from "./ContentPreviewTooltip";
 
 const apiUrl = process.env.REACT_APP_URL_LOCAL;
@@ -94,8 +94,8 @@ const VideoListTendance = ({
                   isLead ? "col-span-2 sm:col-span-2 xl:col-span-1" : ""
                 }`}
               >
-                <a
-                  href={getTargetUrl(item)}
+                <Link
+                  to={getTargetUrl(item)}
                   className="group block min-w-0 transition duration-300 hover:-translate-y-1"
                 >
                   <article className="min-w-0">
@@ -167,7 +167,7 @@ const VideoListTendance = ({
                       </div>
                     )}
                   </article>
-                </a>
+                </Link>
               </ContentPreviewTooltip>
             );
           })}

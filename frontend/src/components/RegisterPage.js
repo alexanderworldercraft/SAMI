@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import axios from "axios";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 //import ImagePreview from "./ImagePreview";
 
 const RegisterPage = () => {
@@ -123,9 +123,9 @@ const RegisterPage = () => {
         </form>
         <p className="mt-4 text-center">
           Vous avez déjà un compte ?{" "}
-          <a href="/login" className="text-sky-600 hover:text-sky-700">
+          <Link to="/login" className="text-sky-600 hover:text-sky-700">
             Se connecter
-          </a>
+          </Link>
         </p>
       </div>
     </div>

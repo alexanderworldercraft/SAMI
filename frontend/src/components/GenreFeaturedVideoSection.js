@@ -1,5 +1,5 @@
 import React from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { PlayIcon } from "@heroicons/react/24/solid";
 import ContentPreviewTooltip from "./ContentPreviewTooltip";
 
@@ -57,8 +57,8 @@ const GenreFeaturedVideoSection = ({
 
     return (
       <ContentPreviewTooltip item={item} title={item.Titre} className={className}>
-        <a
-          href={getTargetUrl(item)}
+        <Link
+          to={getTargetUrl(item)}
           className="group relative block min-h-[116px] overflow-hidden rounded-xl border border-white/15 bg-slate-950 transition duration-300 hover:-translate-y-1 hover:border-sky-300/70"
         >
           <img
@@ -73,7 +73,7 @@ const GenreFeaturedVideoSection = ({
               <p className="mt-0.5 line-clamp-1 text-xs text-slate-300">{getSeasonLabel(item)}</p>
             )}
           </div>
-        </a>
+        </Link>
       </ContentPreviewTooltip>
     );
   };
@@ -87,8 +87,8 @@ const GenreFeaturedVideoSection = ({
 
     return (
       <ContentPreviewTooltip item={featured} title={featured.Titre} className="xl:col-start-2 xl:row-span-2">
-        <a
-          href={getTargetUrl(featured)}
+        <Link
+          to={getTargetUrl(featured)}
           className="group relative block min-h-[260px] overflow-hidden rounded-xl border border-sky-200/40 bg-slate-950 shadow-2xl shadow-sky-950/40 transition duration-300 hover:-translate-y-1 hover:border-sky-300/80"
         >
           <img
@@ -110,7 +110,7 @@ const GenreFeaturedVideoSection = ({
               Regarder
             </span>
           </div>
-        </a>
+        </Link>
       </ContentPreviewTooltip>
     );
   };
@@ -148,8 +148,8 @@ const GenreFeaturedVideoSection = ({
               title={standardVideos[4].Titre}
               className="sm:col-span-2 xl:col-start-4 xl:row-span-2 xl:col-span-1"
             >
-              <a
-                href={getTargetUrl(standardVideos[4])}
+              <Link
+                to={getTargetUrl(standardVideos[4])}
                 className="group relative block h-full overflow-hidden rounded-xl border border-white/15 bg-slate-950 transition duration-300 hover:-translate-y-1 hover:border-sky-300/70"
               >
                 <img
@@ -164,7 +164,7 @@ const GenreFeaturedVideoSection = ({
                     <p className="mt-0.5 line-clamp-1 text-xs text-slate-300">{getSeasonLabel(standardVideos[4])}</p>
                   )}
                 </div>
-              </a>
+              </Link>
             </ContentPreviewTooltip>
           ) : (
             <div className="rounded-xl border border-white/10 bg-white/5 sm:col-span-2 xl:col-start-4 xl:row-span-2 xl:col-span-1" />

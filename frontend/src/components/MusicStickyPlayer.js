@@ -14,6 +14,7 @@ import {
   XMarkIcon,
 } from "@heroicons/react/24/outline";
 import api from "../services/api";
+import { useMusicPlayer } from "../context/MusicPlayerContext";
 
 const apiUrl = process.env.REACT_APP_URL_LOCAL;
 
@@ -36,22 +37,35 @@ const normalizeMusique = (musique) => ({
 
 const formatTime = (seconds) => {
   if (!Number.isFinite(seconds) || seconds <= 0) return "0:00";
+  const hours = Math.floor(seconds / 3600);
   const minutes = Math.floor(seconds / 60);
   const remainingSeconds = Math.floor(seconds % 60).toString().padStart(2, "0");
+  if (hours > 0) {
+    const remainingMinutes = Math.floor((seconds % 3600) / 60).toString().padStart(2, "0");
+    return `${hours}:${remainingMinutes}:${remainingSeconds}`;
+  }
   return `${minutes}:${remainingSeconds}`;
 };
 
 const MusicStickyPlayer = ({ playlist, setPlaylist }) => {
   const audioRef = useRef(null);
   const ringRef = useRef(null);
-  const [playerCollapsed, setPlayerCollapsed] = useState(false);
-  const [playlistOpen, setPlaylistOpen] = useState(true);
-  const [repeatMode, setRepeatMode] = useState("off");
-  const [playedIds, setPlayedIds] = useState([]);
+  const previousPlaylistLengthRef = useRef(playlist.length);
+  const {
+    playerCollapsed,
+    setPlayerCollapsed,
+    playlistOpen,
+    setPlaylistOpen,
+    repeatMode,
+    setRepeatMode,
+    playedIds,
+    setPlayedIds,
+    volume,
+    setVolume,
+  } = useMusicPlayer();
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
-  const [volume, setVolume] = useState(0.8);
   const [volumeOpen, setVolumeOpen] = useState(false);
   const [draggedPlaylistKey, setDraggedPlaylistKey] = useState("");
   const currentMusic = playlist[0] || null;
@@ -67,6 +81,18 @@ const MusicStickyPlayer = ({ playlist, setPlaylist }) => {
   };
 
   useEffect(() => {
+    const previousLength = previousPlaylistLengthRef.current;
+
+    if (playlist.length === 0) {
+      setPlayerCollapsed(true);
+    } else if (previousLength === 0) {
+      setPlayerCollapsed(false);
+    }
+
+    previousPlaylistLengthRef.current = playlist.length;
+  }, [playlist.length, setPlayerCollapsed]);
+
+  useEffect(() => {
     if (!currentMusic?.MusiqueID) return;
 
     setPlayedIds((current) =>
@@ -78,7 +104,7 @@ const MusicStickyPlayer = ({ playlist, setPlaylist }) => {
     api.post("/logs/musique-first-play", { MusiqueID: currentMusic.MusiqueID }).catch((error) => {
       console.error("Erreur log musique_first_play :", error);
     });
-  }, [currentMusic?.MusiqueID, currentTrackKey]);
+  }, [currentMusic?.MusiqueID, currentTrackKey, setPlayedIds]);
 
   useEffect(() => {
     if (!audioRef.current) return;
@@ -265,38 +291,19 @@ const MusicStickyPlayer = ({ playlist, setPlaylist }) => {
   };
 
   return (
-    <section className="sticky top-4 z-30 mx-auto mb-8 max-w-5xl overflow-hidden rounded-2xl border border-sky-500/10 bg-white/95 shadow-2xl shadow-slate-950/10 backdrop-blur max-sm:max-h-[calc(100dvh-2rem)] max-sm:overflow-y-auto dark:bg-slate-950/95 dark:text-white dark:shadow-sky-950/30">
-      <div className="flex items-center justify-between gap-3 border-b border-sky-500/10 bg-white/70 px-4 py-3 dark:bg-slate-950/80 sm:px-6">
-        <div className="min-w-0">
-          <p className="text-xs font-bold uppercase text-sky-500 dark:text-sky-300">SAMI music</p>
-          <h2 className="truncate text-sm font-black text-slate-950 dark:text-white">
-            {currentMusic ? currentMusic.Titre : "Aucune musique en lecture"}
-          </h2>
-        </div>
-        <button
-          type="button"
-          onClick={() => setPlayerCollapsed((current) => !current)}
-          className="inline-flex shrink-0 items-center gap-2 rounded-full border border-sky-300/40 bg-sky-500/15 px-4 py-2 text-sm font-bold text-slate-900 transition hover:bg-sky-500/25 dark:text-white"
-          aria-expanded={!playerCollapsed}
-          aria-label={playerCollapsed ? "Déplier le lecteur" : "Réduire le lecteur"}
-        >
-          <span>{playerCollapsed ? "Déplier" : "Réduire"}</span>
-          <ChevronDownIcon className={`size-4 transition ${playerCollapsed ? "" : "rotate-180"}`} />
-        </button>
-      </div>
-
+    <section className={`fixed bottom-4 right-4 z-50 overflow-hidden rounded-2xl border border-sky-500/10 bg-white/95 shadow-2xl/30 shadow-slate-950/20 backdrop-blur max-sm:left-4 dark:bg-slate-950/95 dark:text-white dark:shadow-sky-950/30 ${playerCollapsed ? "w-fit max-w-[calc(100vw-2rem)]" : "w-[min(960px,calc(100vw-2rem))] max-sm:max-h-[calc(100dvh-2rem)] max-sm:overflow-y-auto"}`}>
       <div className="bg-[radial-gradient(circle_at_50%_0%,rgba(14,165,233,0.24),transparent_42%),linear-gradient(135deg,rgba(2,132,199,0.18),rgba(15,23,42,0.04)_48%,rgba(14,165,233,0.12))] dark:bg-[radial-gradient(circle_at_50%_0%,rgba(14,165,233,0.30),transparent_42%),linear-gradient(135deg,rgba(2,6,23,0.96),rgba(12,74,110,0.35)_54%,rgba(2,6,23,0.94))]">
         {playerCollapsed ? (
-          <div className="flex flex-col gap-4 px-4 py-4 sm:flex-row sm:items-center sm:px-6">
-            <div className="flex min-w-0 flex-1 items-center gap-3">
-              <div className="size-14 shrink-0 overflow-hidden rounded-full border border-sky-300/30 bg-slate-200 dark:bg-slate-800">
+          <div className="flex items-center gap-2 px-3 py-3">
+            <div className="flex min-w-0 items-center gap-2">
+              <div className="size-10 shrink-0 overflow-hidden rounded-full border border-sky-300/30 bg-slate-200 dark:bg-slate-800">
                 {imageSrc ? (
                   <img src={imageSrc} alt="" className="h-full w-full object-cover" />
                 ) : (
-                  <div className="flex h-full w-full items-center justify-center text-lg font-black text-sky-500">S</div>
+                  <div className="flex h-full w-full items-center justify-center text-sm font-black text-sky-500">S</div>
                 )}
               </div>
-              <div className="min-w-0">
+              <div className="hidden min-w-0 sm:block sm:max-w-44">
                 <p className="truncate text-sm font-black text-slate-950 dark:text-white">
                   {currentMusic ? currentMusic.Titre : "Aucune musique en lecture"}
                 </p>
@@ -305,21 +312,41 @@ const MusicStickyPlayer = ({ playlist, setPlaylist }) => {
                 </p>
               </div>
             </div>
-            <div className="flex items-center justify-center gap-3">
+            <div className="flex shrink-0 items-center justify-center gap-1">
               <button type="button" onClick={playPrevious} disabled={!currentMusic} className="rounded-full p-2 text-slate-800 transition hover:bg-sky-500/15 disabled:cursor-not-allowed disabled:opacity-40 dark:text-white" aria-label="Musique précédente">
                 <BackwardIcon className="size-5" />
               </button>
-              <button type="button" onClick={togglePlay} disabled={!audioSrc} className="flex size-12 items-center justify-center rounded-full bg-sky-500 text-white shadow-lg shadow-sky-500/25 transition hover:bg-sky-400 disabled:cursor-not-allowed disabled:opacity-50" aria-label={isPlaying ? "Mettre en pause" : "Lire"}>
-                {isPlaying ? <PauseIcon className="size-6" /> : <PlayIcon className="ml-0.5 size-6" />}
+              <button type="button" onClick={togglePlay} disabled={!audioSrc} className="flex size-10 items-center justify-center rounded-full bg-sky-500 text-white shadow-lg shadow-sky-500/25 transition hover:bg-sky-400 disabled:cursor-not-allowed disabled:opacity-50" aria-label={isPlaying ? "Mettre en pause" : "Lire"}>
+                {isPlaying ? <PauseIcon className="size-5" /> : <PlayIcon className="ml-0.5 size-5" />}
               </button>
               <button type="button" onClick={playNext} disabled={playlist.length <= 1} className="rounded-full p-2 text-slate-800 transition hover:bg-sky-500/15 disabled:cursor-not-allowed disabled:opacity-40 dark:text-white" aria-label="Musique suivante">
                 <ForwardIcon className="size-5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setPlayerCollapsed(false)}
+                className="inline-flex shrink-0 items-center gap-2 rounded-full border border-sky-300/40 bg-sky-500/15 px-4 py-2 text-sm font-bold text-slate-900 transition hover:bg-sky-500/25 dark:text-white"
+                aria-expanded="false"
+                aria-label="Deplier le lecteur"
+              >
+                <span className="sr-only">Deplier</span>
+                <ChevronDownIcon className="size-4" />
               </button>
             </div>
           </div>
         ) : (
           <div className={`relative ${playlistOpen ? "md:pr-[320px]" : ""}`}>
             <div className="grid gap-5 px-4 py-5 sm:px-6 xl:grid-cols-[220px_minmax(0,1fr)_auto] xl:items-center">
+              <button
+                type="button"
+                onClick={() => setPlayerCollapsed(true)}
+                className="absolute right-4 top-4 z-20 inline-flex shrink-0 items-center gap-2 rounded-full border border-sky-300/40 bg-white/80 px-4 py-2 text-sm font-bold text-slate-900 shadow-lg shadow-slate-950/10 backdrop-blur transition hover:bg-sky-500/25 dark:bg-slate-950/80 dark:text-white"
+                aria-expanded="true"
+                aria-label="Reduire le lecteur"
+              >
+                <span>Reduire</span>
+                <ChevronDownIcon className="size-4 rotate-180 transition" />
+              </button>
               <div className="mx-auto flex w-full max-w-[220px] flex-col items-center">
                 <div
                   ref={ringRef}
@@ -380,7 +407,7 @@ const MusicStickyPlayer = ({ playlist, setPlaylist }) => {
               <button type="button" onClick={playPrevious} disabled={!currentMusic} className="rounded-full p-3 text-slate-800 transition hover:bg-sky-500/15 disabled:cursor-not-allowed disabled:opacity-40 dark:text-white" aria-label="Musique précédente">
                 <BackwardIcon className="size-7" />
               </button>
-              <button type="button" onClick={togglePlay} disabled={!audioSrc} className="flex size-16 items-center justify-center rounded-full bg-sky-500 text-white shadow-xl shadow-sky-500/30 transition hover:bg-sky-400 disabled:cursor-not-allowed disabled:opacity-50" aria-label={isPlaying ? "Mettre en pause" : "Lire"}>
+              <button type="button" onClick={togglePlay} disabled={!audioSrc} className="flex size-16 items-center justify-center rounded-full aspect-square bg-sky-500 text-white shadow-xl shadow-sky-500/30 transition hover:bg-sky-400 disabled:cursor-not-allowed disabled:opacity-50" aria-label={isPlaying ? "Mettre en pause" : "Lire"}>
                 {isPlaying ? <PauseIcon className="size-8" /> : <PlayIcon className="ml-1 size-8" />}
               </button>
               <button type="button" onClick={playNext} disabled={playlist.length <= 1} className="rounded-full p-3 text-slate-800 transition hover:bg-sky-500/15 disabled:cursor-not-allowed disabled:opacity-40 dark:text-white" aria-label="Musique suivante">
@@ -431,7 +458,7 @@ const MusicStickyPlayer = ({ playlist, setPlaylist }) => {
 
             {playlistOpen && (
               <aside className="max-h-72 overflow-auto border-t border-sky-500/10 bg-slate-50/70 px-4 py-4 dark:bg-slate-950/60 sm:px-6 md:absolute md:bottom-0 md:right-0 md:top-0 md:h-auto md:w-[320px] md:max-h-none md:border-l md:border-t-0">
-                <div className="mb-3 flex items-center justify-between gap-3">
+                <div className="mb-3 py-2 flex items-center justify-start gap-3">
                   <h3 className="text-sm font-black uppercase text-slate-600 dark:text-slate-300">Playlist</h3>
                   {playlist.length > 0 && (
                     <button type="button" onClick={clearPlaylist} className="text-sm font-bold text-red-600 hover:text-red-700 dark:text-red-300">

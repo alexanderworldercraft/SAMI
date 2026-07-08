@@ -2,6 +2,59 @@ import React from "react";
 
 const updates = [
   {
+    version: "7.1.0",
+    title: "Page Musique et lecteur audio persistant",
+    date: "7 juillet 2026",
+    sections: [
+      {
+        title: "Lecteur musique",
+        items: [
+          "Le lecteur musique devient une card flottante detachee du contenu de la page.",
+          "Le mode reduit est maintenant compact tout en gardant les boutons precedent, lecture, suivant et deplier accessibles.",
+          "Le lecteur est reduit par defaut quand aucune musique n'est en cours ou en pause.",
+          "Le lecteur se deplie automatiquement au premier ajout de musique puis conserve son etat pendant les ajouts suivants.",
+          "Le bouton Reduire est place au-dessus de la playlist pour rester cliquable quand la file est ouverte.",
+        ],
+      },
+      {
+        title: "Persistance de lecture",
+        items: [
+          "Ajout d'un contexte global MusicPlayer pour conserver la playlist et les reglages du lecteur entre les pages autorisees.",
+          "La playlist, le volume, le mode de repetition, l'etat reduit/deplie et l'ouverture de la playlist suivent la navigation interne.",
+          "Le lecteur suit les pages Musique, Videos, Nouvelle video, Nouvelle musique, Personnes, detail personne et Sagas.",
+          "Le lecteur n'est pas affiche sur les autres pages et n'apparait pas hors page Musique quand la playlist est vide.",
+          "Les liens internes principaux utilisent maintenant Link de React Router pour eviter les rechargements complets de l'application.",
+        ],
+      },
+      {
+        title: "Page Musique",
+        items: [
+          "Ajout d'une barre de recherche dynamique pour filtrer les musiques et les albums pendant la saisie.",
+          "La recherche d'album utilise le titre de l'album et les titres des musiques qu'il contient.",
+          "Ajout d'une pagination independante pour les musiques avec retour automatique en haut de la section concernee.",
+          "Ajout d'une pagination independante pour les albums avec retour automatique en haut de la section concernee.",
+          "Les cards d'albums ouvrent maintenant une modal listant les musiques de l'album avec ajout individuel ou ajout de tout l'album.",
+        ],
+      },
+      {
+        title: "Navigation interne",
+        items: [
+          "Les liens internes de la navigation principale passent de liens href a Link pour garder l'etat de l'application.",
+          "Les cards personnes, videos, series, tendances, sections de genres, historiques, calendrier, footer et pages login/register utilisent aussi la navigation React Router.",
+          "Les liens mailto et les chemins de fichiers restent en liens natifs quand ils ne correspondent pas a une route React.",
+          "La navigation vers les pages de lecture conserve la route existante /lecture/:id.",
+        ],
+      },
+      {
+        title: "Affichage du temps",
+        items: [
+          "Le temps du lecteur affiche maintenant les heures quand la duree ou la progression depasse 60 minutes.",
+          "Les durees plus courtes conservent le format minutes:secondes.",
+        ],
+      },
+    ],
+  },
+  {
     version: "7.0.1",
     title: "Feedback detaille des traitements video",
     date: "30 juin 2026",

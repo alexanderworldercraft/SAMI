@@ -26,6 +26,8 @@ import PersonDetailsPage from "./components/PersonDetailsPage";
 import MaintenanceBanner from "./components/MaintenanceBanner";
 import UpdatesPage from "./components/UpdatesPage";
 import GeneralMessageBanner from "./components/GeneralMessageBanner";
+import MusicStickyPlayer from "./components/MusicStickyPlayer";
+import { MusicPlayerProvider, useMusicPlayer } from "./context/MusicPlayerContext";
 
 const NameApp = process.env.REACT_APP_NAME + " " + process.env.REACT_APP_VER;
 
@@ -49,6 +51,24 @@ function AppShell({ children, withFooter = true, contentClassName = "" }) {
       </div>
     </>
   );
+}
+
+function PersistentMusicPlayer() {
+  const location = useLocation();
+  const { playlist, setPlaylist } = useMusicPlayer();
+  const isMusicPage = location.pathname === "/musique";
+  const canShowMusicPlayer =
+    isMusicPage ||
+    location.pathname === "/nouvelle-video" ||
+    location.pathname === "/nouvelle-musique" ||
+    location.pathname === "/personnes" ||
+    location.pathname.startsWith("/personnes/") ||
+    location.pathname === "/sagas" ||
+    location.pathname === "/videos";
+
+  if (!canShowMusicPlayer || (!isMusicPage && playlist.length === 0)) return null;
+
+  return <MusicStickyPlayer playlist={playlist} setPlaylist={setPlaylist} />;
 }
 
 
@@ -101,10 +121,12 @@ function MetaUpdater() {
 export default function App() {
   return (
     <NavProvider>
-    <Router>
-      <MetaUpdater />
-      <MaintenanceBanner />
-      <Routes>
+    <MusicPlayerProvider>
+      <Router>
+        <MetaUpdater />
+        <MaintenanceBanner />
+        <PersistentMusicPlayer />
+        <Routes>
         {/* Pages sans Navbar */}
         <Route path="/login" element={<LoginPage />} />
         {/* Register désactivé pour brider la création de compte */}
@@ -244,8 +266,9 @@ export default function App() {
             </NotProtectedRoute>
           }
         />
-      </Routes>
-    </Router>
+        </Routes>
+      </Router>
+    </MusicPlayerProvider>
     </NavProvider>
   );
 }

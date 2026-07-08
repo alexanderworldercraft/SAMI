@@ -1,5 +1,6 @@
 // CalendarSAMI.js
 import { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
 import { ChevronLeftIcon, ChevronRightIcon, XMarkIcon } from '@heroicons/react/20/solid';
 import { Dialog, DialogPanel, DialogTitle } from '@headlessui/react';
 import { format, startOfWeek, addDays, isSameDay, isSameMonth, startOfMonth } from 'date-fns';
@@ -186,12 +187,18 @@ export default function CalendarSAMI() {
                           <div className="flex items-center gap-4">
                             <img src={`${process.env.REACT_APP_URL_LOCAL}/${item.CheminImage}`} alt={item.Titre} className="h-16 w-12 rounded-lg object-cover shadow-md" />
                             <div className="min-w-0">
-                              <a
-                                href={link || '#'}
-                                className={classNames("line-clamp-2 text-sm font-bold text-slate-950 dark:text-white", link ? "hover:text-sky-600 dark:hover:text-sky-300" : "opacity-50 cursor-default")}
-                              >
-                                {item.Titre}
-                              </a>
+                              {link ? (
+                                <Link
+                                  to={link}
+                                  className="line-clamp-2 text-sm font-bold text-slate-950 hover:text-sky-600 dark:text-white dark:hover:text-sky-300"
+                                >
+                                  {item.Titre}
+                                </Link>
+                              ) : (
+                                <span className="line-clamp-2 cursor-default text-sm font-bold text-slate-950 opacity-50 dark:text-white">
+                                  {item.Titre}
+                                </span>
+                              )}
                               <div className="mt-1 text-xs font-semibold text-slate-500 dark:text-slate-400">
                                 {item.type === 'video' && item.SaisonID ? `Épisode de la série "${item.SerieTitre || 'Inconnue'}"` :
                                  item.type === 'video' ? 'Film' :
