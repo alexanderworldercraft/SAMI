@@ -24,9 +24,19 @@ import { Server as SocketIOServer } from "socket.io";
 import cron from 'node-cron';
 import { rotateGenreFeaturedContent } from './services/genreFeaturedContentService.js';
 import { createDatabaseBackup } from './services/databaseBackupService.js';
+import { globalRateLimit } from "./middlewares/rateLimitMiddleware.js";
+import {
+    createCorsOriginValidator,
+    securityHeadersMiddleware,
+} from "./middlewares/securityMiddleware.js";
+import { setStaticFileHeaders } from "./utils/staticHeaders.js";
 
 // URL publique
 const PUBLIC_URL = process.env.PUBLIC_URL;
+const PUBLIC_ORIGINS = String(PUBLIC_URL || "")
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean);
 // Host publique
 const PUBLIC_HOST = process.env.PUBLIC_HOST;
 
@@ -46,7 +56,7 @@ const fastify = Fastify({
 
 const io = new SocketIOServer(fastify.server, { 
     cors: { 
-      origin: PUBLIC_URL, 
+      origin: PUBLIC_ORIGINS.length > 1 ? PUBLIC_ORIGINS : PUBLIC_ORIGINS[0], 
       methods: ["GET", "POST"], 
     }, 
   }); 
@@ -88,10 +98,12 @@ fastify.register(fastifySwaggerUI, {
     }
 });
 
+fastify.addHook("onRequest", securityHeadersMiddleware);
+
 // Configurer CORS
 fastify.register(fastifyCors, {
-    origin: PUBLIC_URL, // Autoriser les requêtes depuis cette origine
-    methods: ['GET', 'POST', 'PUT', 'DELETE'],
+    origin: createCorsOriginValidator(PUBLIC_URL),
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     credentials: true,
     exposedHeaders: ['Content-Disposition', 'X-Backup-Filename'],
 });
@@ -100,6 +112,16 @@ fastify.register(fastifyCors, {
 fastify.register(fastifyMultipart, {
     limits: { fileSize: 50 * 1024 * 1024 * 1024 }, // Limite à 50 Go
 });
+
+fastify.setErrorHandler((error, request, reply) => {
+    if (error?.statusCode === 413 || error?.code === "FST_REQ_FILE_TOO_LARGE") {
+        return reply.status(413).send({ error: "Fichier trop volumineux." });
+    }
+
+    return reply.send(error);
+});
+
+fastify.addHook("onRequest", globalRateLimit);
 
 // Enregistrer les routes
 fastify.register(userRoutes, { prefix: '/api/users' });
@@ -116,6 +138,14 @@ fastify.register(sagaRoutes, { prefix: "/api/sagas" });
 fastify.register(universeRoutes, { prefix: "/api/universes" });
 fastify.register(musicRoutes, { prefix: "/api/music" });
 
+fastify.all("/uploads/BDD", async (request, reply) => {
+    return reply.status(404).send({ error: "Not found" });
+});
+
+fastify.all("/uploads/BDD/*", async (request, reply) => {
+    return reply.status(404).send({ error: "Not found" });
+});
+
 // Enregistrer les fichiers statiques pour le frontend
 fastify.register(fastifyStatic, {
     root: path.join(__dirname, '../frontend/build'),
@@ -128,6 +158,7 @@ fastify.register(fastifyStatic, {
 fastify.register(fastifyStatic, {
     root: path.join(__dirname, 'uploads'),
     prefix: '/uploads/', // Fichiers utilisateurs accessibles depuis /uploads/
+    setHeaders: setStaticFileHeaders,
 });
 
 // Gérer toutes les autres routes non définies (React Router support)

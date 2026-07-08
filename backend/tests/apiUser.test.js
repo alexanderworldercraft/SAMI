@@ -13,13 +13,14 @@ const secretKey = process.env.JWT_SECRET;
 
 describe('userController', () => {
   it('should register a new user', async () => {
-    const request = { body: { surnom: 'user1', email: 'user1@example.com', motDePasse: 'password123', cheminImage: 'path/to/image.jpg' } };
+    const request = { body: { surnom: 'user1', email: 'user1@example.com', motDePasse: 'Password123!', cheminImage: 'path/to/image.jpg' } };
     const reply = { send: vi.fn() };
 
     const salt = await bcrypt.genSalt(10);
-    const hashedPassword = await bcrypt.hash('password123', salt);
-    const mockUser = { UtilisateurID: 1, surnom: 'user1', email: 'user1@example.com', motDePasse: hashedPassword, cheminImage: 'path/to/image.jpg', salt };
+    const hashedPassword = await bcrypt.hash('Password123!', salt);
+    const mockUser = { UtilisateurID: 1, Surnom: 'user1', Email: 'user1@example.com', MotDePasse: hashedPassword, CheminImage: 'path/to/image.jpg', Salt: salt, GradeID: 3 };
 
+    vi.spyOn(userRepository, 'getUserBySurnomOrEmail').mockResolvedValue(null);
     vi.spyOn(userRepository, 'createUser').mockResolvedValue(mockUser);
 
     await userController.register(request, reply);
@@ -33,7 +34,7 @@ describe('userController', () => {
 
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash('password123', salt);
-    const mockUser = { UtilisateurID: 1, surnom: 'user1', motDePasse: hashedPassword, salt };
+    const mockUser = { UtilisateurID: 1, Surnom: 'user1', MotDePasse: hashedPassword, Salt: salt };
 
     vi.spyOn(userRepository, 'getUserBySurnom').mockResolvedValue(mockUser);
 

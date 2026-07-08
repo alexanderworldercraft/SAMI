@@ -25,8 +25,8 @@ export default async function (fastify) {
     fastify.get("/:id/genres", getSerieGenres);
     fastify.get("/:id", getSeriesById);
 
-    fastify.post("/", createSeries); // Route pour créer une série
-    fastify.post("/:id/saisons", addSaison); // Ajouter une saison à une série
+    fastify.post("/", { preHandler: authMiddleware }, createSeries); // Route pour créer une série
+    fastify.post("/:id/saisons", { preHandler: authMiddleware }, addSaison); // Ajouter une saison à une série
 
     fastify.delete("/saisons/:saisonId", { preHandler: authMiddleware }, deleteSaison);
     fastify.delete("/:id/image", { preHandler: authMiddleware }, deleteSerieImage);

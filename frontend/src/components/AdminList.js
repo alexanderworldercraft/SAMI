@@ -387,7 +387,7 @@ const AdminList = () => {
       setErrorMessage("");
 
       const response = await axios.get(`${apiBaseUrl}/api/users/admins`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+        withCredentials: true,
       });
       setAdmins(response.data || []);
       setCurrentPage(1); // reset page si la liste change
@@ -402,7 +402,7 @@ const AdminList = () => {
   const fetchCurrentUser = async () => {
     try {
       const response = await axios.get(`${apiBaseUrl}/api/users/me`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+        withCredentials: true,
       });
       setCurrentUserGrade(response.data.GradeID);
     } catch (error) {
@@ -418,9 +418,7 @@ const AdminList = () => {
         `${apiBaseUrl}/api/users/activity-summary`,
         {
           params: { days: 7 },
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
+          withCredentials: true,
         }
       );
 
@@ -448,7 +446,7 @@ const AdminList = () => {
       await axios.put(
         `${apiBaseUrl}/api/users/change-etat`,
         { userId, newEtat },
-        { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
+        { withCredentials: true }
       );
       fetchAdmins();
     } catch (error) {
@@ -462,9 +460,7 @@ const AdminList = () => {
       setLoadingWatchHistory(true);
       const response = await axios.get(
         `${apiBaseUrl}/api/users/watch-history/${userId}`,
-        {
-          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-        }
+        { withCredentials: true }
       );
       setWatchHistoryMap((prev) => ({
         ...prev,

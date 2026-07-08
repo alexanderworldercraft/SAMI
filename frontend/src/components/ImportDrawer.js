@@ -59,13 +59,15 @@ export default function ImportDrawer() {
       CheminImage,
       SaisonID: selectedSeason || null,
       GenreIDs: selectedGenres,
-      Subtitles: subtitles.filter(s => s.Label && s.CheminSubtitle),
-      UtilisateurID: user.UtilisateurID
+      Subtitles: subtitles.filter(s => s.Label && s.CheminSubtitle)
     };
 
     const response = await fetch(`${apiUrl}/api/import/video`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include',
       body: JSON.stringify(payload)
     });
 

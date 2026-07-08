@@ -16,24 +16,11 @@ const SeasonsManager = () => {
     const [selectedSeries, setSelectedSeries] = useState(null);
     const [newSeasonNumber, setNewSeasonNumber] = useState("");
     const [notification, setNotification] = useState(null);
-    const [user, setUser] = useState(null);
     const [searchTerm, setSearchTerm] = useState("");
 
     const filteredSeries = series.filter((serie) =>
         serie.Titre.toLowerCase().includes(searchTerm.toLowerCase())
     );
-
-    useEffect(() => {
-        const fetchUser = async () => {
-            try {
-                const response = await api.get('/users/me');
-                setUser(response.data);
-            } catch (error) {
-                console.error("Erreur lors de la récupération de l'utilisateur :", error);
-            }
-        };
-        fetchUser();
-    }, []);
 
     useEffect(() => {
         const fetchSeries = async () => {
@@ -62,25 +49,19 @@ const SeasonsManager = () => {
         }
 
         try {
-            const response = await fetch(`${apiUrl}/api/series/${selectedSeries.SeriesID}/saisons`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    Numero: parseInt(newSeasonNumber),
-                    UtilisateurID: parseInt(user.UtilisateurID),
-                }),
+            const response = await api.post(`/series/${selectedSeries.SeriesID}/saisons`, {
+                Numero: parseInt(newSeasonNumber, 10),
             });
 
-            if (response.ok) {
+            if (response.status >= 200 && response.status < 300) {
                 showNotification("Saison ajoutée avec succès !", "✅", "success");
                 setNewSeasonNumber("");
             } else {
-                const error = await response.json();
-                console.error("Erreur :", error);
+                console.error("Erreur :", response.data);
                 showNotification("Erreur lors de l'ajout de la saison.", "⚠️", "error");
             }
         } catch (error) {
-            console.error("Erreur lors de l'ajout de la saison :", error);
+            console.error("Erreur lors de l'ajout de la saison :", error.response?.data || error);
             showNotification("Erreur lors de l'ajout de la saison.", "⚠️", "error");
         }
     };

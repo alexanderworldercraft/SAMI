@@ -31,7 +31,10 @@ describe('userController - Error Cases', () => {
     await userController.login(request, reply);
 
     expect(reply.status).toHaveBeenCalledWith(401);
-    expect(reply.send).toHaveBeenCalledWith({ error: 'Invalid credentials' });
+    expect(reply.send).toHaveBeenCalledWith({
+      error: 'Identifiants invalides.',
+      attemptsRemaining: 2,
+    });
   });
 
   it('should return 401 error if old password is incorrect during password update', async () => {

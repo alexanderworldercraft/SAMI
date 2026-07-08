@@ -77,12 +77,14 @@ const VideoPlayer = ({ video, backgroundBlur, onVideoElement, skipFirstPlayLogKe
     // -------------------------
     // 1) HLS setup
     // -------------------------
+    const sourceUrl = `${process.env.REACT_APP_URL_LOCAL}/${video.CheminAcces}`;
+
     if (Hls.isSupported()) {
       const hls = new Hls({
         // debug: true,
       });
 
-      hls.loadSource(`${process.env.REACT_APP_URL_LOCAL}/${video.CheminAcces}`);
+      hls.loadSource(sourceUrl);
       hls.attachMedia(videoElement);
 
       hls.on(Hls.Events.MANIFEST_PARSED, () => {
@@ -94,7 +96,15 @@ const VideoPlayer = ({ video, backgroundBlur, onVideoElement, skipFirstPlayLogKe
         );
       });
 
+      hls.on(Hls.Events.ERROR, (_event, data) => {
+        console.warn("Erreur HLS:", data);
+      });
+
       hlsRef.current = hls;
+    } else if (videoElement.canPlayType("application/vnd.apple.mpegurl")) {
+      videoElement.src = sourceUrl;
+    } else {
+      console.warn("Lecteur HLS non supporté par ce navigateur.");
     }
 
     // -------------------------

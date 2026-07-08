@@ -65,7 +65,7 @@ const SettingsPage = () => {
       setWatchLoading(true);
       setWatchError("");
       const response = await axios.get("/api/users/watch-history/me", {
-        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+        withCredentials: true,
       });
       setWatchLogs(response.data || []);
       setWatchLoaded(true);
@@ -106,7 +106,7 @@ const SettingsPage = () => {
 
       const [userResponse, genresResponse, defaultsResponse] = await Promise.all([
         axios.get("/api/users/me", {
-          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+          withCredentials: true,
         }),
         axios.get("/api/genres"),
         axios.get("/api/genres/homepage-defaults"),
@@ -189,7 +189,7 @@ const SettingsPage = () => {
       await axios.put(
         `/api/genres/${userId}`,
         { GenreIDs: finalIds },
-        { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
+        { withCredentials: true }
       );
       setGenreSuccess("Genres enregistrés.");
     } catch (err) {
@@ -218,7 +218,7 @@ const SettingsPage = () => {
       await axios.put(
         `/api/genres/${userId}`,
         { GenreIDs: [] },
-        { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } }
+        { withCredentials: true }
       );
       setSelectedGenres(fallbackIds);
       setGenreSuccess("Choix réinitialisés sur les genres par défaut.");

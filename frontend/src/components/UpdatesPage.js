@@ -2,6 +2,83 @@ import React from "react";
 
 const updates = [
   {
+    version: "7.2.0",
+    title: "Durcissement securite et stabilite streaming",
+    date: "8 juillet 2026",
+    sections: [
+      {
+        title: "Authentification et autorisations",
+        items: [
+          "Le token JWT est maintenant porte par un cookie HttpOnly securise au lieu du localStorage cote frontend.",
+          "Le client API envoie les identifiants avec les requetes protegees et les routes privees verifient la session via /api/users/me.",
+          "Le backend accepte le cookie d'authentification tout en gardant la compatibilite avec l'ancien header Bearer.",
+          "Les creations de comptes n'acceptent plus de grade envoye par le frontend.",
+          "Le backend assigne directement le grade Utilisateur pour l'inscription classique et le grade Admin pour l'inscription administrateur protegee.",
+        ],
+      },
+      {
+        title: "Administration",
+        items: [
+          "Les routes d'administration et d'edition utilisent maintenant les middlewares ensureAdmin ou ensureSuperAdmin.",
+          "Les actions sensibles recuperent l'utilisateur connecte depuis request.user.userId au lieu de valeurs envoyees par le client.",
+          "Les formulaires admin de series, saisons, personnes et genres passent par le client API authentifie.",
+          "Les anciens controles frontend de grade ont ete retires des flux de creation de compte.",
+          "La creation de comptes administrateur est isolee sur une route protegee par super administrateur.",
+        ],
+      },
+      {
+        title: "API et limites",
+        items: [
+          "Ajout d'un rate limit global sur les routes API avec exemption des preflight OPTIONS.",
+          "Ajout de limites plus strictes sur les endpoints de connexion, inscription et reinitialisation de mot de passe.",
+          "Les uploads video et audio conservent la limite de 50 Go necessaire a l'application.",
+          "Les endpoints d'images sont limites a 50 Mo afin de reduire les abus multipart.",
+          "Les erreurs de fichier trop volumineux renvoient maintenant une reponse 413 coherente.",
+        ],
+      },
+      {
+        title: "Paiement premium",
+        items: [
+          "L'ancien endpoint public de premium gratuit a ete retire.",
+          "Ajout d'un module de paiement factice separe pour preparer l'integration future d'un vrai prestataire.",
+          "Le checkout premium factice cree une session controlee par le backend.",
+          "Le webhook factice valide le paiement simule avant d'activer le premium.",
+          "Le flux premium gratuit n'est plus declenchable directement depuis une route publique non verifiee.",
+        ],
+      },
+      {
+        title: "Fichiers et chemins",
+        items: [
+          "Le dossier BDD est deplace de uploads/BDD vers backend/BDD.",
+          "Les chemins de sauvegarde de base de donnees pointent maintenant vers le nouveau dossier backend/BDD.",
+          "L'ancien chemin uploads/BDD est bloque cote statique pour eviter l'exposition directe des sauvegardes.",
+          "Les noms de fichiers recus par upload sont normalises avec path.basename sur les routes sensibles.",
+          "Les images de videos, series, personnes, sagas, profils et musiques reduisent le risque de traversal.",
+        ],
+      },
+      {
+        title: "Headers et streaming",
+        items: [
+          "Ajout de headers de securite globaux : nosniff, frame deny, no-referrer, permissions-policy et HSTS en HTTPS.",
+          "La configuration CORS utilise une allowlist basee sur l'URL publique de l'application.",
+          "Les origines Socket.IO suivent la meme logique que les routes HTTP.",
+          "Les fichiers HLS et media exposent maintenant des types MIME explicites compatibles avec nosniff.",
+          "Le lecteur video garde un fallback HLS natif et journalise les erreurs Hls.js pour faciliter le diagnostic.",
+        ],
+      },
+      {
+        title: "Series et lecture",
+        items: [
+          "Les requetes de selection series/saisons ne bouclent plus sur toutes les saisons de toutes les series.",
+          "L'API des series renvoie les informations necessaires aux cards sans declencher de rafale de requetes cote frontend.",
+          "Les cards de series conservent le lien vers le premier episode disponible de la premiere saison.",
+          "Les champs attendus par les cards et les pages de lecture sont preserves dans la reponse /api/series.",
+          "Le rate limit a ete ajuste pour absorber les rafraichissements legitimes de l'interface sans masquer les abus reels.",
+        ],
+      },
+    ],
+  },
+  {
     version: "7.1.0",
     title: "Page Musique et lecteur audio persistant",
     date: "7 juillet 2026",
@@ -461,7 +538,7 @@ const updates = [
           "Ajout d'une nouvelle section Sauvegarde base de donnees dans la page Administration.",
           "La section est reservee au super administrateur.",
           "Le lancement d'une sauvegarde demande le mot de passe du compte connecte.",
-          "Une sauvegarde manuelle cree une copie SQL dans uploads/BDD.",
+          "Une sauvegarde manuelle cree une copie SQL dans backend/BDD.",
           "Une seconde copie est automatiquement telechargee sur l'appareil du super administrateur.",
         ],
       },
@@ -472,7 +549,7 @@ const updates = [
           "La sauvegarde hebdomadaire utilise maintenant le meme service que la sauvegarde manuelle.",
           "Les sauvegardes automatiques conservent le format de nom existant.",
           "Les sauvegardes manuelles ajoutent l'heure et le suffixe manual dans le nom du fichier.",
-          "Le dossier uploads/BDD est cree automatiquement si necessaire.",
+          "Le dossier backend/BDD est cree automatiquement si necessaire.",
         ],
       },
       {

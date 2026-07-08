@@ -46,10 +46,7 @@ const HomePage = () => {
         return popular30Days[Math.floor(Math.random() * popular30Days.length)];
     }, [popular30Days]);
 
-    const getAuthHeaders = () => {
-        const token = localStorage.getItem("token");
-        return token ? { Authorization: `Bearer ${token}` } : undefined;
-    };
+    const getFetchOptions = () => ({ credentials: "include" });
 
     const getImageUrl = (path) => {
         if (!path) return `./imageDefault.png`;
@@ -155,10 +152,9 @@ const HomePage = () => {
     useEffect(() => {
         const fetchPopular30Days = async () => {
             try {
-                const headers = getAuthHeaders();
                 const response = await fetch(
                     `${apiUrl}/api/videos/popular-30-days`,
-                    headers ? { headers } : undefined
+                    getFetchOptions()
                 );
                 const data = await response.json();
                 setPopular30Days(data);
@@ -251,29 +247,27 @@ const HomePage = () => {
     useEffect(() => {
         if (genre1 && genre2 && genre3 && genre4 && genre5) {
             // Appel à l'API pour obtenir les recommandations
-            const headers = getAuthHeaders();
-
-            fetch(`${apiUrl}/api/videos/recommandation/1/${genre1}`, headers ? { headers } : undefined)
+            fetch(`${apiUrl}/api/videos/recommandation/1/${genre1}`, getFetchOptions())
                 .then(response => response.json())
                 .then(data => setRecommendations1(data))
                 .catch(error => console.error('Error fetching recommendations:', error));
 
-            fetch(`${apiUrl}/api/videos/recommandation/2/${genre2}`, headers ? { headers } : undefined)
+            fetch(`${apiUrl}/api/videos/recommandation/2/${genre2}`, getFetchOptions())
                 .then(response => response.json())
                 .then(data => setRecommendations2(data))
                 .catch(error => console.error('Error fetching recommendations:', error));
 
-            fetch(`${apiUrl}/api/videos/recommandation/3/${genre3}`, headers ? { headers } : undefined)
+            fetch(`${apiUrl}/api/videos/recommandation/3/${genre3}`, getFetchOptions())
                 .then(response => response.json())
                 .then(data => setRecommendations3(data))
                 .catch(error => console.error('Error fetching recommendations:', error));
 
-            fetch(`${apiUrl}/api/videos/recommandation/4/${genre4}`, headers ? { headers } : undefined)
+            fetch(`${apiUrl}/api/videos/recommandation/4/${genre4}`, getFetchOptions())
                 .then(response => response.json())
                 .then(data => setRecommendations4(data))
                 .catch(error => console.error('Error fetching recommendations:', error));
 
-            fetch(`${apiUrl}/api/videos/recommandation/5/${genre5}`, headers ? { headers } : undefined)
+            fetch(`${apiUrl}/api/videos/recommandation/5/${genre5}`, getFetchOptions())
                 .then(response => response.json())
                 .then(data => setRecommendations5(data))
                 .catch(error => console.error('Error fetching recommendations:', error));

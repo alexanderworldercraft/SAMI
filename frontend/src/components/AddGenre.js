@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import Notification from "./Notification";
+import api from "../services/api";
 
-const apiUrl = process.env.REACT_APP_URL_LOCAL || "https://192.168.0.17:1234";
 const fieldClass = "block w-full rounded-xl border border-sky-500/20 bg-white/85 px-4 py-3 text-sm font-semibold text-slate-900 shadow-sm transition duration-200 hover:border-sky-400/60 focus:outline-none focus:ring-2 focus:ring-sky-400 dark:bg-slate-950/65 dark:text-white";
 const labelClass = "block text-sm/6 font-bold text-slate-700 dark:text-slate-200";
 const submitClass = "inline-flex items-center justify-center rounded-lg border border-sky-300/40 bg-sky-500/15 px-5 py-3 text-sm font-bold text-slate-900 transition duration-200 hover:border-sky-300/80 hover:bg-sky-500/25 dark:text-white";
@@ -21,24 +21,17 @@ const AddGenre = () => {
     console.log("Données envoyées au backend :", Nom);
 
     try {
-      const response = await fetch(`${apiUrl}/api/genres/`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          Nom: Nom,
-        }),
-      });
+      const response = await api.post("/genres", { Nom });
 
-      const data = await response.json();
-      if (response.ok) {
+      if (response.status >= 200 && response.status < 300) {
         showNotification("Genre ajoutée avec succès.", "success", "✅");
         setNom("");
       } else {
-        showNotification(data.error || "Erreur lors de l'ajout du genre.", "error", "⚠️");
+        showNotification(response.data?.error || "Erreur lors de l'ajout du genre.", "error", "⚠️");
       }
     } catch (error) {
       console.error("Erreur :", error);
-      showNotification("Erreur interne du serveur.", "error", "⚠️");
+      showNotification(error.response?.data?.error || "Erreur interne du serveur.", "error", "⚠️");
     }
   };
 

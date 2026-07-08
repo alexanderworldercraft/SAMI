@@ -3,8 +3,9 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { prisma } from "../services/db.js";
 import { ensureAdmin, ensureSuperAdmin as ensureSharedSuperAdmin } from "../services/authz.js";
-import { ETAT } from "../constants.js";
+import { ETAT, MULTIPART_LIMITS } from "../constants.js";
 import { isTruthyValue, parsePositiveInt } from "../utils/requestParsing.js";
+import { isMultipartFileTooLargeError, sendMultipartFileTooLarge } from "../utils/multipartErrors.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -365,7 +366,7 @@ export const createSaga = async (request, reply) => {
   if (!admin) return;
 
   try {
-    const parts = request.parts();
+    const parts = request.parts({ limits: { fileSize: MULTIPART_LIMITS.IMAGE_FILE_SIZE } });
     let Titre = "";
     let Resumer = "";
     let EtatID = ACTIVE_ETAT_ID;
@@ -417,6 +418,7 @@ export const createSaga = async (request, reply) => {
 
     return reply.status(201).send({ ...saga, CheminImage });
   } catch (error) {
+    if (isMultipartFileTooLargeError(error)) return sendMultipartFileTooLarge(reply);
     console.error("Erreur lors de la création de la saga :", error);
     return reply.status(500).send({ error: error.message || "Erreur lors de la création de la saga." });
   }
@@ -459,7 +461,7 @@ export const updateSagaImage = async (request, reply) => {
   if (!sagaId) return reply.status(400).send({ error: "SagaID invalide." });
 
   try {
-    const parts = request.parts();
+    const parts = request.parts({ limits: { fileSize: MULTIPART_LIMITS.IMAGE_FILE_SIZE } });
     let savedPath = null;
 
     for await (const part of parts) {
@@ -491,6 +493,7 @@ export const updateSagaImage = async (request, reply) => {
 
     return reply.send(updated);
   } catch (error) {
+    if (isMultipartFileTooLargeError(error)) return sendMultipartFileTooLarge(reply);
     console.error("Erreur lors de la mise à jour de l'image saga :", error);
     return reply.status(500).send({ error: error.message || "Erreur lors de la mise à jour de l'image de la saga." });
   }

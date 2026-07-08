@@ -13,30 +13,17 @@ const SeriesAndSeasonSelector = ({ selectedSeries, setSelectedSeries, selectedSe
   const [searchTerm, setSearchTerm] = useState("");
 
   useEffect(() => {
-    const fetchSeriesWithSeasons = async () => {
+    const fetchSeries = async () => {
       try {
         const response = await fetch(`${process.env.REACT_APP_URL_LOCAL}/api/series`);
         const data = await response.json();
-
-        const seriesWithSeasons = await Promise.all(
-          data.map(async (serie) => {
-            try {
-              const seasonsRes = await fetch(`${process.env.REACT_APP_URL_LOCAL}/api/series/${serie.SeriesID}/saisons`);
-              const seasonsData = await seasonsRes.json();
-              return { ...serie, hasSeasons: Array.isArray(seasonsData) && seasonsData.length > 0 };
-            } catch {
-              return { ...serie, hasSeasons: false };
-            }
-          })
-        );
-
-        setSeries(seriesWithSeasons);
+        setSeries(Array.isArray(data) ? data : []);
       } catch (error) {
         console.error("Erreur lors de la récupération des séries :", error);
       }
     };
 
-    fetchSeriesWithSeasons();
+    fetchSeries();
   }, []);
 
   useEffect(() => {
@@ -90,10 +77,10 @@ const SeriesAndSeasonSelector = ({ selectedSeries, setSelectedSeries, selectedSe
                   <ListboxOption
                     key={serie.SeriesID}
                     value={serie}
-                    disabled={!serie.hasSeasons}
-                    className={({ active, disabled }) =>
+                    disabled={serie.hasSeasons === false}
+                    className={({ active }) =>
                       `relative cursor-default select-none py-2 pl-10 pr-4 ${
-                        disabled ? "text-slate-400 italic" :
+                        serie.hasSeasons === false ? "text-slate-400 italic" :
                         active ? "bg-sky-500/15 text-sky-700 dark:text-sky-300" : "text-slate-700 dark:text-slate-200"
                       }`
                     }

@@ -103,6 +103,9 @@ export const getHomepageDefaultGenres = async (request, reply) => {
 
 // Ajouter un nouveau genre
 export const addGenre = async (request, reply) => {
+  const isAdmin = await ensureAdmin(request, reply);
+  if (!isAdmin) return;
+
   const Nom = request.body?.Nom?.trim();
 
   if (!Nom) {
@@ -123,15 +126,19 @@ export const addGenre = async (request, reply) => {
 };
 
 export const addAdminGenre = async (request, reply) => {
-  const isAdmin = await ensureAdmin(request, reply);
-  if (!isAdmin) return;
-
   return addGenre(request, reply);
 };
 // Ajoute un nouveau genre à l'utilisateur
 export const addGenreUtilisateur = async (request, reply) => {
   const { id } = request.params;
   const { GenreID } = request.body;
+  const authenticatedUserId = Number(request.user?.userId);
+  const targetUserId = Number.parseInt(id, 10);
+
+  if (!Number.isInteger(authenticatedUserId) || authenticatedUserId !== targetUserId) {
+    return reply.status(403).send({ error: "Forbidden" });
+  }
+
   const test = [
     {"UtilisateurID": id, "GenreID": GenreID }
   ];
@@ -311,6 +318,7 @@ export const deleteGenre = async (request, reply) => {
 export const updateGenreUtilisateur = async (request, reply) => {
   const { id } = request.params;
   const { GenreIDs } = request.body || {};
+  const authenticatedUserId = Number(request.user?.userId);
 
   if (!Array.isArray(GenreIDs)) {
     return reply.status(400).send({ error: "GenreIDs doit être un tableau." });
@@ -319,6 +327,10 @@ export const updateGenreUtilisateur = async (request, reply) => {
   const userId = Number.parseInt(id, 10);
   if (!Number.isInteger(userId)) {
     return reply.status(400).send({ error: "UtilisateurID invalide." });
+  }
+
+  if (!Number.isInteger(authenticatedUserId) || authenticatedUserId !== userId) {
+    return reply.status(403).send({ error: "Forbidden" });
   }
 
   const sanitized = GenreIDs

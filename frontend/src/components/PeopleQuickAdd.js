@@ -2,7 +2,6 @@ import React, { useEffect, useState } from "react";
 import api from "../services/api";
 import ImageUploader from "./ImageUploader";
 
-const apiUrl = process.env.REACT_APP_URL_LOCAL;
 const fieldClass = "block w-full rounded-xl border border-sky-500/20 bg-white/85 px-4 py-3 text-sm font-semibold text-slate-900 shadow-sm transition duration-200 hover:border-sky-400/60 focus:outline-none focus:ring-2 focus:ring-sky-400 dark:bg-slate-950/65 dark:text-white";
 const labelClass = "mb-2 block text-sm/6 font-bold text-slate-700 dark:text-slate-200";
 const submitClass = "inline-flex items-center justify-center rounded-lg border border-sky-300/40 bg-sky-500/15 px-5 py-3 text-sm font-bold text-slate-900 transition duration-200 hover:border-sky-300/80 hover:bg-sky-500/25 disabled:cursor-not-allowed disabled:opacity-60 dark:text-white";
@@ -50,15 +49,7 @@ export default function PeopleQuickAdd() {
       if (Surnom.trim()) form.append("Surnom", Surnom.trim());
       if (imageFile) form.append("image", imageFile);
 
-      const resp = await fetch(`${apiUrl}/api/people`, {
-        method: "POST",
-        body: form
-      });
-
-      if (!resp.ok) {
-        const err = await resp.json().catch(()=>({}));
-        throw new Error(err?.error || "Échec de la création.");
-      }
+      await api.post("/people", form);
 
       setMsg({ type: "success", text: "Personne créée." });
       setNom(""); setPrenom(""); setSurnom(""); setImageFile(null);

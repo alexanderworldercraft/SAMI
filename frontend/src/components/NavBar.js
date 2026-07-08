@@ -135,14 +135,11 @@ export default function NavBar() {
 
   // Petite fonction pour gérer la déconnexion proprement
   const handleLogout = async () => {
-    const token = localStorage.getItem('token')
     try {
-      if (token) {
-        await fetch('/api/users/logout', {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${token}` },
-        })
-      }
+      await fetch('/api/users/logout', {
+        method: 'POST',
+        credentials: 'include',
+      })
     } catch (err) {
       console.error('Erreur lors de la déconnexion :', err)
     } finally {

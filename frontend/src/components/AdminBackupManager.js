@@ -83,7 +83,7 @@ const AdminBackupManager = () => {
       const filename = filenameFromHeaders(response.headers);
       downloadBlob(response.data, filename);
       setCurrentPassword("");
-      setMessage(`Sauvegarde créée dans uploads/BDD/${filename} et téléchargée.`);
+      setMessage(`Sauvegarde créée dans backend/BDD/${filename} et téléchargée.`);
     } catch (error) {
       console.error("Erreur lors de la sauvegarde manuelle :", error);
       const blobError = error.response?.data instanceof Blob
@@ -117,7 +117,7 @@ const AdminBackupManager = () => {
         <p className="text-sm font-bold uppercase text-sky-500 dark:text-sky-400">Super administration</p>
         <h2 className="mt-1 text-2xl font-black text-slate-950 dark:text-white">Sauvegarde base de données</h2>
         <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-300">
-          Crée une sauvegarde SQL dans uploads/BDD et télécharge une seconde copie sur cet appareil.
+          Crée une sauvegarde SQL dans backend/BDD et télécharge une seconde copie sur cet appareil.
         </p>
       </div>
 

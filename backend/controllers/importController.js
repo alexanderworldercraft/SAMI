@@ -1,5 +1,6 @@
 import { prisma } from "../services/db.js";
 import { ETAT } from "../constants.js";
+import { ensureAdmin } from "../services/authz.js";
 
 export const importVideo = async (request, reply) => {
   const {
@@ -9,13 +10,15 @@ export const importVideo = async (request, reply) => {
     CheminImage,
     SaisonID,
     GenreIDs = [],
-    Subtitles = [],
-    UtilisateurID
+    Subtitles = []
   } = request.body;
 
-  if (!Titre || !CheminAcces || !CheminImage || !UtilisateurID) {
+  const admin = await ensureAdmin(request, reply);
+  if (!admin) return;
+
+  if (!Titre || !CheminAcces || !CheminImage) {
     return reply.code(400).send({
-      error: "Les champs Titre, CheminAcces, CheminImage et UtilisateurID sont obligatoires."
+      error: "Les champs Titre, CheminAcces et CheminImage sont obligatoires."
     });
   }
 
@@ -31,7 +34,7 @@ export const importVideo = async (request, reply) => {
         CheminImage: cheminImageFinal,
         EtatID: ETAT.ACTIVE,
         SaisonID: SaisonID || null,
-        UtilisateurID: parseInt(UtilisateurID, 10)
+        UtilisateurID: admin.userId
       }
     });
 

@@ -76,8 +76,8 @@ const SubscriptionPlans = () => {
       setError(null);
       setSuccess(null);
 
-      // Appel à l’API pour changer de plan (fake)
-      const response = await api.post("/users/premium", { plan: planId });
+      // Checkout factice: le backend génère et vérifie un événement de paiement simulé.
+      const response = await api.post("/users/premium/fake-checkout", { plan: planId });
 
       // Mise à jour de l'état local user
       const { PremiumEndDate, isPremium } = response.data;

@@ -29,15 +29,15 @@ export default async function (fastify) {
   fastify.get("/:id", getGenres); // Récupère la liste des genres préfèrer de l'utilisateur
 
   //POST
-  fastify.post("/", addGenre); // Ajoute un nouveau genre
+  fastify.post("/", { preHandler: authMiddleware }, addGenre); // Ajoute un nouveau genre
   fastify.post("/admin", { preHandler: authMiddleware }, addAdminGenre);
   fastify.post("/featured/refresh", { preHandler: authMiddleware }, refreshFeaturedGenres);
-  fastify.post("/:id", addGenreUtilisateur); // Ajoute un nouveau genre à l'utilisateur
+  fastify.post("/:id", { preHandler: authMiddleware }, addGenreUtilisateur); // Ajoute un nouveau genre à l'utilisateur
 
   // PUT
   fastify.put("/homepage-defaults", { preHandler: authMiddleware }, updateHomepageDefaultGenres);
   fastify.put("/admin/:id", { preHandler: authMiddleware }, updateGenre);
-  fastify.put("/:id", updateGenreUtilisateur); // Mettre à jour les genre de l'utilisateur
+  fastify.put("/:id", { preHandler: authMiddleware }, updateGenreUtilisateur); // Mettre à jour les genre de l'utilisateur
 
   // DELETE
   fastify.delete("/admin/:id", { preHandler: authMiddleware }, deleteGenre);

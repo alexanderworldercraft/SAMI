@@ -4,7 +4,8 @@ import { fileURLToPath } from "url";
 import { prisma } from "../services/db.js";
 import { createLog } from "./logController.js";
 import { ensureAdmin as ensureSharedAdmin, ensureSuperAdmin as ensureSharedSuperAdmin } from "../services/authz.js";
-import { ETAT } from "../constants.js";
+import { ETAT, MULTIPART_LIMITS } from "../constants.js";
+import { isMultipartFileTooLargeError, sendMultipartFileTooLarge } from "../utils/multipartErrors.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -54,12 +55,40 @@ const safeExt = (filename, fallback = "") => {
   return ext || fallback;
 };
 
-const savePart = async (part, targetPath) => {
+const getLimitForPart = (part) => (
+  part.fieldname === "image"
+    ? MULTIPART_LIMITS.IMAGE_FILE_SIZE
+    : MULTIPART_LIMITS.VIDEO_FILE_SIZE
+);
+
+const savePart = async (part, targetPath, maxBytes = MULTIPART_LIMITS.VIDEO_FILE_SIZE) => {
   await fs.promises.mkdir(path.dirname(targetPath), { recursive: true });
-  await new Promise((resolve, reject) => {
+  try {
+    await new Promise((resolve, reject) => {
+    let bytes = 0;
     const stream = fs.createWriteStream(targetPath);
-    part.file.pipe(stream).on("finish", resolve).on("error", reject);
-  });
+    const rejectWithLimit = () => {
+      const error = new Error("File size limit exceeded");
+      error.statusCode = 413;
+      error.code = "FST_REQ_FILE_TOO_LARGE";
+      part.file.destroy(error);
+      stream.destroy(error);
+    };
+
+    part.file.on("data", (chunk) => {
+      bytes += chunk.length;
+      if (bytes > maxBytes) rejectWithLimit();
+    });
+
+    part.file
+      .pipe(stream)
+      .on("finish", resolve)
+      .on("error", reject);
+    });
+  } catch (error) {
+    await fs.promises.rm(targetPath, { force: true }).catch(() => {});
+    throw error;
+  }
 };
 
 const readMultipart = async (request) => {
@@ -67,15 +96,16 @@ const readMultipart = async (request) => {
   const files = {};
   const tmpDir = path.join(MUSIC_ROOT, "tmp", `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`);
 
-  for await (const part of request.parts()) {
+  for await (const part of request.parts({ limits: { fileSize: MULTIPART_LIMITS.VIDEO_FILE_SIZE } })) {
     if (part.type === "file") {
+      const safeFilename = path.basename(part.filename || "upload");
       const tmpPath = path.join(
         tmpDir,
-        `${part.fieldname}_${Date.now()}${safeExt(part.filename, ".upload")}`
+        `${part.fieldname}_${Date.now()}${safeExt(safeFilename, ".upload")}`
       );
-      await savePart(part, tmpPath);
+      await savePart(part, tmpPath, getLimitForPart(part));
       files[part.fieldname] = {
-        filename: part.filename || "upload",
+        filename: safeFilename,
         mimetype: part.mimetype || "",
         tmpPath,
       };
@@ -404,6 +434,7 @@ export const createMusique = async (request, reply) => {
     });
     return reply.status(201).send(formatMusique(created));
   } catch (error) {
+    if (isMultipartFileTooLargeError(error)) return sendMultipartFileTooLarge(reply);
     console.error("Erreur lors de l'ajout de la musique :", error);
     return reply.status(500).send({ error: "Erreur lors de l'ajout de la musique." });
   }
@@ -496,6 +527,7 @@ export const updateMusique = async (request, reply) => {
     });
     return reply.send(formatMusique(updated));
   } catch (error) {
+    if (isMultipartFileTooLargeError(error)) return sendMultipartFileTooLarge(reply);
     console.error("Erreur lors de la mise à jour de la musique :", error);
     return reply.status(500).send({ error: "Erreur lors de la mise à jour de la musique." });
   }
@@ -553,6 +585,7 @@ export const createAlbum = async (request, reply) => {
     });
     return reply.status(201).send(formatAlbum(created));
   } catch (error) {
+    if (isMultipartFileTooLargeError(error)) return sendMultipartFileTooLarge(reply);
     console.error("Erreur lors de l'ajout de l'album :", error);
     return reply.status(500).send({ error: "Erreur lors de l'ajout de l'album." });
   }
@@ -630,6 +663,7 @@ export const updateAlbum = async (request, reply) => {
     });
     return reply.send(formatAlbum(updated));
   } catch (error) {
+    if (isMultipartFileTooLargeError(error)) return sendMultipartFileTooLarge(reply);
     console.error("Erreur lors de la mise à jour de l'album :", error);
     return reply.status(500).send({ error: "Erreur lors de la mise à jour de l'album." });
   }

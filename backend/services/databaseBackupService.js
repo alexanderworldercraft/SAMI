@@ -6,7 +6,7 @@ import { spawn } from "child_process";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const BACKUP_DIR = path.join(__dirname, "../uploads/BDD");
+const BACKUP_DIR = path.join(__dirname, "../BDD");
 
 const pad = (value) => String(value).padStart(2, "0");
 
@@ -78,7 +78,7 @@ export function createDatabaseBackup({ kind = "auto" } = {}) {
       resolve({
         filename,
         filePath,
-        relativePath: `/uploads/BDD/${filename}`,
+        relativePath: `/BDD/${filename}`,
       });
     };
 

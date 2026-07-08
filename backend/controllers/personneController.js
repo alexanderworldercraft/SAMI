@@ -3,6 +3,9 @@ import { prisma } from "../services/db.js";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+import { ensureAdmin } from "../services/authz.js";
+import { MULTIPART_LIMITS } from "../constants.js";
+import { isMultipartFileTooLargeError, sendMultipartFileTooLarge } from "../utils/multipartErrors.js";
 
 // Util
 const __filename = fileURLToPath(import.meta.url);
@@ -20,14 +23,18 @@ if (!fs.existsSync(peopleTmpAbs)) fs.mkdirSync(peopleTmpAbs, { recursive: true }
  */
 export const createPersonne = async (request, reply) => {
   try {
-    const parts = request.parts();
+    const admin = await ensureAdmin(request, reply);
+    if (!admin) return;
+
+    const parts = request.parts({ limits: { fileSize: MULTIPART_LIMITS.IMAGE_FILE_SIZE } });
     let Nom = "", Prenom = "", Surnom = null;
     let tempPath = null;
     let tempExt = null;
 
     for await (const part of parts) {
       if (part.type === "file" && part.fieldname === "image") {
-        const ext = path.extname(part.filename).toLowerCase();
+        const originalFilename = path.basename(part.filename || "");
+        const ext = path.extname(originalFilename).toLowerCase();
         if (!/\.(jpg|jpeg|png|webp|gif)$/i.test(ext)) {
           return reply.code(400).send({ error: "Format d'image non supporté." });
         }
@@ -75,6 +82,7 @@ export const createPersonne = async (request, reply) => {
 
     return reply.code(201).send(personne);
   } catch (e) {
+    if (isMultipartFileTooLargeError(e)) return sendMultipartFileTooLarge(reply);
     console.error("createPersonne:", e);
     return reply.code(500).send({ error: "Erreur lors de la création de la personne." });
   }
@@ -86,8 +94,11 @@ export const createPersonne = async (request, reply) => {
  */
 export const updatePersonnePhoto = async (request, reply) => {
   try {
+    const admin = await ensureAdmin(request, reply);
+    if (!admin) return;
+
     const { id } = request.params;
-    const parts = request.parts();
+    const parts = request.parts({ limits: { fileSize: MULTIPART_LIMITS.IMAGE_FILE_SIZE } });
 
     let savedPath = null;
     let tempPath = null;
@@ -95,7 +106,8 @@ export const updatePersonnePhoto = async (request, reply) => {
 
     for await (const part of parts) {
       if (part.type === "file" && part.fieldname === "image") {
-        const ext = path.extname(part.filename).toLowerCase();
+        const originalFilename = path.basename(part.filename || "");
+        const ext = path.extname(originalFilename).toLowerCase();
         if (!/\.(jpg|jpeg|png|webp|gif)$/i.test(ext)) {
           return reply.code(400).send({ error: "Format d'image non supporté." });
         }
@@ -144,6 +156,7 @@ export const updatePersonnePhoto = async (request, reply) => {
 
     return reply.send(updated);
   } catch (e) {
+    if (isMultipartFileTooLargeError(e)) return sendMultipartFileTooLarge(reply);
     console.error("updatePersonnePhoto:", e);
     return reply.code(500).send({ error: "Erreur lors de la mise à jour de la photo." });
   }
@@ -185,6 +198,9 @@ export const searchPeople = async (request, reply) => {
  */
 export const linkPersonne = async (request, reply) => {
   try {
+    const admin = await ensureAdmin(request, reply);
+    if (!admin) return;
+
     const { id } = request.params;
     const { type, contenuId, EstActeur = false, EstRealisateur = false } = request.body || {};
 
@@ -252,6 +268,9 @@ export const linkPersonne = async (request, reply) => {
  */
 export const unlinkPersonne = async (request, reply) => {
   try {
+    const admin = await ensureAdmin(request, reply);
+    if (!admin) return;
+
     const { id } = request.params; // PersonneID
     const { type, contenuId, EstActeur, EstRealisateur } = request.body || {};
 

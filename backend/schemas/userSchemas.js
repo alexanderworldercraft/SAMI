@@ -30,7 +30,6 @@ export const registerSchema = {
             surnom: { type: 'string', description: 'Nom d’utilisateur.' },
             email: { type: 'string', format: 'email', description: 'Adresse email.' },
             motDePasse: { type: 'string', description: 'Mot de passe de l’utilisateur.' },
-            gradeId: { type: 'integer', description: 'Grade optionnel de l’utilisateur.' },
         },
     },
     response: {

@@ -11,7 +11,16 @@ import nodemailer from 'nodemailer';
 import { subDays } from 'date-fns';
 import { createLog, getClientIp } from "./logController.js";
 import { prisma } from "../services/db.js";
-import { ADMIN_GRADE_IDS, ETAT, GRADE } from "../constants.js";
+import { ADMIN_GRADE_IDS, AUTH_COOKIE_NAME, ETAT, GRADE, MULTIPART_LIMITS } from "../constants.js";
+import { ensureSuperAdmin } from "../services/authz.js";
+import { getJwtFromRequest } from "../middlewares/authMiddleware.js";
+import { isMultipartFileTooLargeError, sendMultipartFileTooLarge } from "../utils/multipartErrors.js";
+import {
+  computePremiumEndDate,
+  createFakePaymentEvent,
+  isAllowedPremiumPlan,
+  verifyFakePaymentPayload,
+} from "../services/payment/fakePremiumPaymentService.js";
 
 // Durée de vie des tokens par GradeID
 // 1 = SuperAdmin, 2 = Admin, 3 = Utilisateur
@@ -24,6 +33,13 @@ const TOKEN_EXPIRATIONS_BY_GRADE = {
 // Valeur par défaut si GradeID est absent ou non mappé
 const TOKEN_DEFAULT_EXPIRATION = '12h';
 
+const TOKEN_EXPIRATION_SECONDS = Object.freeze({
+  "4h": 4 * 60 * 60,
+  "8h": 8 * 60 * 60,
+  "12h": 12 * 60 * 60,
+  "30d": 30 * 24 * 60 * 60,
+});
+
 // Choisit la durée de vie du token en fonction du grade de l'utilisateur
 function getTokenExpirationForUser(user) {
   if (user.GradeID && TOKEN_EXPIRATIONS_BY_GRADE[user.GradeID]) {
@@ -31,6 +47,52 @@ function getTokenExpirationForUser(user) {
   }
 
   return TOKEN_DEFAULT_EXPIRATION;
+}
+
+function getTokenMaxAgeSeconds(expiration) {
+  return TOKEN_EXPIRATION_SECONDS[expiration] || TOKEN_EXPIRATION_SECONDS[TOKEN_DEFAULT_EXPIRATION];
+}
+
+function shouldUseSecureCookie() {
+  return process.env.COOKIE_SECURE === "true"
+    || process.env.NODE_ENV === "production"
+    || (process.env.PUBLIC_URL || "").startsWith("https://")
+    || Boolean(process.env.HTTPS);
+}
+
+function buildAuthCookie(value, maxAgeSeconds) {
+  const secure = shouldUseSecureCookie() ? " Secure;" : "";
+  return [
+    `${AUTH_COOKIE_NAME}=${encodeURIComponent(value)}`,
+    "Path=/",
+    "HttpOnly",
+    "SameSite=Lax",
+    `Max-Age=${maxAgeSeconds}`,
+    secure.trim(),
+  ].filter(Boolean).join("; ");
+}
+
+function setReplyHeader(reply, name, value) {
+  if (typeof reply.header === "function") {
+    reply.header(name, value);
+  }
+}
+
+function clearAuthCookie(reply) {
+  setReplyHeader(
+    reply,
+    "Set-Cookie",
+    `${AUTH_COOKIE_NAME}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${shouldUseSecureCookie() ? "; Secure" : ""}`
+  );
+}
+
+function getDecodedAuthUser(request) {
+  if (request.user) return request.user;
+
+  const token = getJwtFromRequest(request);
+  if (!token) return null;
+
+  return jwt.verify(token, secretKey);
 }
 
 function isUserPremium(user) {
@@ -274,6 +336,71 @@ dotenv.config();
 
 const secretKey = process.env.JWT_SECRET;
 
+async function createUserFromMultipart(request, reply, gradeId) {
+  const fields = {};
+  let cheminImage = null;
+
+  if (typeof request.parts === "function") {
+    const parts = request.parts({ limits: { fileSize: MULTIPART_LIMITS.IMAGE_FILE_SIZE } });
+
+    for await (const part of parts) {
+      if (part.file) {
+        const safeName = path.basename(part.filename || "profile-image");
+        const fileName = `${Date.now()}-${safeName}`;
+        const uploadPath = path.join(__dirname, "../uploads/pp", fileName);
+
+        await fs.promises.writeFile(uploadPath, await part.toBuffer());
+        cheminImage = `/uploads/pp/${fileName}`;
+      } else {
+        fields[part.fieldname] = part.value;
+      }
+    }
+  } else {
+    Object.assign(fields, request.body || {});
+    cheminImage = fields.cheminImage || fields.CheminImage || null;
+  }
+
+  const { surnom, email, motDePasse } = fields;
+
+  if (!surnom || !email || !motDePasse) {
+    reply.status(400).send({ error: "Surnom, Email, and Mot de Passe are required" });
+    return null;
+  }
+
+  if (!validatePassword(motDePasse)) {
+    reply.status(400).send({
+      error:
+        "Le mot de passe doit contenir entre 8 et 20 caractères, inclure une majuscule, une minuscule, un chiffre et un caractère spécial.",
+    });
+    return null;
+  }
+
+  const existingUser = await userRepository.getUserBySurnomOrEmail(surnom, email);
+  if (existingUser) {
+    reply.status(400).send({
+      error:
+        existingUser.Surnom === surnom
+          ? "Ce surnom est déjà utilisé. Veuillez en choisir un autre."
+          : "Cet email est déjà utilisé. Veuillez en choisir un autre.",
+    });
+    return null;
+  }
+
+  const salt = await bcrypt.genSalt(10);
+  const hashedPassword = await bcrypt.hash(motDePasse, salt);
+
+  return userRepository.createUser({
+    Surnom: surnom,
+    Email: email,
+    MotDePasse: hashedPassword,
+    CheminImage: cheminImage,
+    Salt: salt,
+    GradeID: gradeId,
+    EtatID: ETAT.ACTIVE,
+    PremiumEndDate: new Date(),
+  });
+}
+
 function validatePassword(password) {
   const minLength = 8;
   const maxLength = 20;
@@ -363,68 +490,42 @@ export const userController = {
 
   async register(request, reply) {
     try {
-      const parts = request.parts(); // Permet de lire les fichiers et champs
-      let fields = {};
-      let cheminImage = null;
+      const user = await createUserFromMultipart(request, reply, GRADE.USER);
+      if (!user) return;
 
-      for await (const part of parts) {
-        if (part.file) {
-          const fileName = `${Date.now()}-${part.filename}`;
-          const uploadPath = path.join(__dirname, '../uploads/pp', fileName);
+      reply.send(user);
+    } catch (err) {
+      if (isMultipartFileTooLargeError(err)) return sendMultipartFileTooLarge(reply);
+      console.error('Error in register:', err);
+      reply.status(500).send({ error: 'Internal Server Error', message: err.message });
+    }
+  },
 
-          await fs.promises.writeFile(uploadPath, await part.toBuffer());
-          cheminImage = `/uploads/pp/${fileName}`;
-        } else {
-          fields[part.fieldname] = part.value;
-        }
-      }
+  async registerAdmin(request, reply) {
+    try {
+      const superAdmin = await ensureSuperAdmin(request, reply);
+      if (!superAdmin) return;
 
-      const { surnom, email, motDePasse, gradeId } = fields;
+      const user = await createUserFromMultipart(request, reply, GRADE.ADMIN);
+      if (!user) return;
 
-      if (!surnom || !email || !motDePasse) {
-        return reply.status(400).send({ error: 'Surnom, Email, and Mot de Passe are required' });
-      }
-
-      // Valider le mot de passe
-      if (!validatePassword(motDePasse)) {
-        return reply.status(400).send({
-          error:
-            'Le mot de passe doit contenir entre 8 et 20 caractères, inclure une majuscule, une minuscule, un chiffre et un caractère spécial.',
-        });
-      }
-
-      // Vérifier si le surnom ou l'email existe déjà
-      const existingUser = await userRepository.getUserBySurnomOrEmail(surnom, email);
-      if (existingUser) {
-        return reply.status(400).send({
-          error: existingUser.Surnom === surnom
-            ? 'Ce surnom est déjà utilisé. Veuillez en choisir un autre.'
-            : 'Cet email est déjà utilisé. Veuillez en choisir un autre.',
-        });
-      }
-
-      const salt = await bcrypt.genSalt(10);
-      const hashedPassword = await bcrypt.hash(motDePasse, salt);
-
-      // Ajouter un grade et un état par défaut
-      const DEFAULT_GRADE_ID = 3; // Grade utilisateur standard
-      const DEFAULT_ETAT_ID = 1; // Etat actif par défaut
-
-      const user = await userRepository.createUser({
-        Surnom: surnom,
-        Email: email,
-        MotDePasse: hashedPassword,
-        CheminImage: cheminImage,
-        Salt: salt,
-        GradeID: gradeId ? parseInt(gradeId) : DEFAULT_GRADE_ID,
-        EtatID: DEFAULT_ETAT_ID,
-        PremiumEndDate: new Date(),
+      await createLog({
+        request,
+        UtilisateurID: superAdmin.userId,
+        ActionNom: "admin_create",
+        Champ: "GradeID",
+        NouvelleValeur: String(GRADE.ADMIN),
+        Meta: {
+          createdUserId: user.UtilisateurID,
+          createdSurnom: user.Surnom,
+        },
       });
 
       reply.send(user);
     } catch (err) {
-      console.error('Error in register:', err);
-      reply.status(500).send({ error: 'Internal Server Error', message: err.message });
+      if (isMultipartFileTooLargeError(err)) return sendMultipartFileTooLarge(reply);
+      console.error("Error in registerAdmin:", err);
+      reply.status(500).send({ error: "Internal Server Error", message: err.message });
     }
   },
 
@@ -580,7 +681,8 @@ export const userController = {
         console.error("Erreur lors du log de connexion :", logErr);
       }
 
-      reply.send({ token });
+      setReplyHeader(reply, "Set-Cookie", buildAuthCookie(token, getTokenMaxAgeSeconds(tokenExpiration)));
+      reply.send({ message: "Connexion réussie" });
     } catch (err) {
       console.error('Error in login:', err);
       reply.status(500).send({ error: 'Internal Server Error', message: err.message });
@@ -589,24 +691,15 @@ export const userController = {
 
   async logout(request, reply) {
     try {
-      const authHeader = request.headers.authorization;
-      if (!authHeader) {
-        return reply.status(401).send({ error: 'No token provided' });
-      }
+      const token = getJwtFromRequest(request);
+      const decoded = token ? jwt.verify(token, process.env.JWT_SECRET) : null;
+      const userId = decoded?.userId;
 
-      const token = authHeader.split(' ')[1];
-      if (!token) {
-        return reply.status(401).send({ error: 'Invalid token format' });
-      }
+      const action = userId
+        ? await prisma.action.findUnique({ where: { Nom: 'deconnexion' } })
+        : null;
 
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
-      const userId = decoded.userId;
-
-      const action = await prisma.action.findUnique({
-        where: { Nom: 'deconnexion' }
-      });
-
-      if (action) {
+      if (action && userId) {
         await createLog({
           request,
           UtilisateurID: userId,
@@ -614,10 +707,12 @@ export const userController = {
         });
       }
 
+      clearAuthCookie(reply);
       reply.send({ message: 'Déconnexion enregistrée' });
     } catch (err) {
       console.error('Error in logout:', err);
-      reply.status(500).send({ error: 'Internal Server Error', message: err.message });
+      clearAuthCookie(reply);
+      reply.status(200).send({ message: 'Déconnexion enregistrée' });
     }
   },
 
@@ -641,13 +736,11 @@ export const userController = {
   },
 
   async deleteUser(request, reply) {
-    const token = request.headers['authorization']?.split(' ')[1];
-    if (!token) {
-      return reply.status(401).send({ error: 'Unauthorized' });
-    }
-
     try {
-      const decoded = jwt.verify(token, secretKey);
+      const decoded = getDecodedAuthUser(request);
+      if (!decoded?.surnom) {
+        return reply.status(401).send({ error: 'Unauthorized' });
+      }
       const { surnom } = request.body;
 
       if (decoded.surnom !== surnom) {
@@ -662,13 +755,11 @@ export const userController = {
   },
 
   async updateSurnom(request, reply) {
-    const token = request.headers['authorization']?.split(' ')[1];
-    if (!token) {
-      return reply.status(401).send({ error: 'Unauthorized' });
-    }
-
     try {
-      const decoded = jwt.verify(token, secretKey);
+      const decoded = getDecodedAuthUser(request);
+      if (!decoded?.surnom) {
+        return reply.status(401).send({ error: 'Unauthorized' });
+      }
       const { newSurnom } = request.body;
 
       if (!newSurnom) {
@@ -683,13 +774,11 @@ export const userController = {
   },
 
   async updateEmail(request, reply) {
-    const token = request.headers['authorization']?.split(' ')[1];
-    if (!token) {
-      return reply.status(401).send({ error: 'Unauthorized' });
-    }
-
     try {
-      const decoded = jwt.verify(token, secretKey);
+      const decoded = getDecodedAuthUser(request);
+      if (!decoded?.surnom) {
+        return reply.status(401).send({ error: 'Unauthorized' });
+      }
       const { newEmail } = request.body;
 
       if (!newEmail) {
@@ -704,13 +793,11 @@ export const userController = {
   },
 
   async updateProfileImage(request, reply) {
-    const token = request.headers['authorization']?.split(' ')[1];
-    if (!token) {
-      return reply.status(401).send({ error: 'Unauthorized' });
-    }
-
     try {
-      const decoded = jwt.verify(token, secretKey);
+      const decoded = getDecodedAuthUser(request);
+      if (!decoded?.surnom) {
+        return reply.status(401).send({ error: 'Unauthorized' });
+      }
       const { cheminImage } = request.body;
 
       await userRepository.updateUserProfileImage(decoded.surnom, cheminImage);
@@ -721,13 +808,11 @@ export const userController = {
   },
 
   async deleteProfileImage(request, reply) {
-    const token = request.headers['authorization']?.split(' ')[1];
-    if (!token) {
-      return reply.status(401).send({ error: 'Unauthorized' });
-    }
-
     try {
-      const decoded = jwt.verify(token, secretKey);
+      const decoded = getDecodedAuthUser(request);
+      if (!decoded?.surnom) {
+        return reply.status(401).send({ error: 'Unauthorized' });
+      }
 
       await userRepository.deleteUserProfileImage(decoded.surnom);
       reply.send({ message: 'Profile image deleted successfully' });
@@ -737,19 +822,17 @@ export const userController = {
   },
 
   async updateUser(request, reply) {
-    const token = request.headers['authorization']?.split(' ')[1];
-    if (!token) {
-      return reply.status(401).send({ error: 'Unauthorized' });
-    }
-
     try {
-      const decoded = jwt.verify(token, secretKey);
-      const parts = request.parts();
+      const { userId } = request.user || {};
+      if (!userId) {
+        return reply.status(401).send({ error: 'Unauthorized' });
+      }
+      const parts = request.parts({ limits: { fileSize: MULTIPART_LIMITS.IMAGE_FILE_SIZE } });
       let fields = {};
       let newImagePath = null;
       let oldImagePath = null; // Pour stocker le chemin de l'ancienne image si elle existe
 
-      const user = await userRepository.getUserWithSecretById(decoded.userId); // Récupère les infos actuelles de l'utilisateur
+      const user = await userRepository.getUserWithSecretById(userId); // Récupère les infos actuelles de l'utilisateur
       const idNumber = user?.UtilisateurID;
       const id = idNumber?.toString();
 
@@ -760,7 +843,8 @@ export const userController = {
       // Lire les champs et fichiers
       for await (const part of parts) {
         if (part.file) {
-          const fileName = `${Date.now()}-${part.filename}`;
+          const safeName = path.basename(part.filename || "profile-image");
+          const fileName = `${Date.now()}-${safeName}`;
           const uploadPath = path.join(__dirname, '../uploads/pp/', id, '/', fileName);
 
           // Vérifier si le dossier existe
@@ -910,7 +994,7 @@ export const userController = {
       }
 
       // Mettre à jour les données de l'utilisateur
-      const updatedUser = await userRepository.updateUserById(decoded.userId, updateData);
+      const updatedUser = await userRepository.updateUserById(userId, updateData);
 
       // Supprimer l'ancienne image si une nouvelle est ajoutée ou si l'image est supprimée
       if ((removeImage === 'true' || newImagePath) && oldImagePath) {
@@ -932,7 +1016,7 @@ export const userController = {
         if (actionUpdate) {
           await prisma.log.create({
             data: {
-              UtilisateurID: decoded.userId,
+              UtilisateurID: userId,
               ActionID: actionUpdate.ActionID,
             },
           });
@@ -945,6 +1029,7 @@ export const userController = {
 
       reply.send({ message: 'User updated successfully', user: updatedUser });
     } catch (err) {
+      if (isMultipartFileTooLargeError(err)) return sendMultipartFileTooLarge(reply);
       console.error('Error in updateUser:', err);
       reply.status(500).send({ error: 'Internal Server Error', message: err.message });
     }
@@ -953,18 +1038,13 @@ export const userController = {
   async getAdmins(request, reply) {
     // console.log("getAdmins a été appelé"); // Log pour vérifier si la méthode est appelée
     try {
-      const token = request.headers["authorization"]?.split(" ")[1];
-      // console.log("Token reçu:", token); // Logguer le token
-
-      if (!token) {
+      const { userId } = request.user || {};
+      if (!userId) {
         return reply.status(401).send({ error: "Unauthorized" });
       }
 
-      const decoded = jwt.verify(token, secretKey);
-      // console.log("Données décodées du JWT:", decoded); // Logguer les données décodées
-
       // Vérifier si l'utilisateur est superadmin ou admin
-      const user = await userRepository.getUserById(decoded.userId);
+      const user = await userRepository.getUserById(userId);
       // console.log("Utilisateur récupéré:", user); // Logguer les infos utilisateur
 
       if (!user || !ADMIN_GRADE_IDS.includes(user.GradeID)) {
@@ -987,15 +1067,13 @@ export const userController = {
 
   async getUsersByCriteria(request, reply) {
     try {
-      const token = request.headers["authorization"]?.split(" ")[1];
-      if (!token) {
+      const { userId } = request.user || {};
+      if (!userId) {
         return reply.status(401).send({ error: "Unauthorized" });
       }
 
-      const decoded = jwt.verify(token, secretKey);
-
       // Vérifier si l'utilisateur est superadmin ou admin
-      const user = await userRepository.getUserById(decoded.userId);
+      const user = await userRepository.getUserById(userId);
       if (!user || !ADMIN_GRADE_IDS.includes(user.GradeID)) {
         return reply.status(403).send({ error: "Forbidden" });
       }
@@ -1013,15 +1091,13 @@ export const userController = {
 
   async changeUserEtat(request, reply) {
     try {
-      const token = request.headers["authorization"]?.split(" ")[1];
-      if (!token) {
+      const { userId: currentUserId } = request.user || {};
+      if (!currentUserId) {
         return reply.status(401).send({ error: "Unauthorized" });
       }
 
-      const decoded = jwt.verify(token, secretKey);
-
       // Vérifie si l'utilisateur qui effectue l'action est SuperAdmin ou Admin
-      const user = await userRepository.getUserById(decoded.userId);
+      const user = await userRepository.getUserById(currentUserId);
       if (!user || !ADMIN_GRADE_IDS.includes(user.GradeID)) {
         return reply.status(403).send({ error: "Forbidden" });
       }
@@ -1087,15 +1163,14 @@ export const userController = {
 
   async deleteAccount(request, reply) {
     try {
-      const token = request.headers["authorization"]?.split(" ")[1];
-      if (!token) {
+      const { userId } = request.user || {};
+      if (!userId) {
         return reply.status(401).send({ error: "Unauthorized" });
       }
 
-      const decoded = jwt.verify(token, secretKey);
       const { currentPassword } = request.body || {};
 
-      const user = await userRepository.getUserWithSecretById(decoded.userId);
+      const user = await userRepository.getUserWithSecretById(userId);
       if (!user) {
         console.log("Utilisateur introuvable");
         return reply.status(404).send({ error: "Utilisateur introuvable." });
@@ -1398,16 +1473,13 @@ export const userController = {
   },
   async getUserActivitySummary(request, reply) {
     try {
-      const token = request.headers["authorization"]?.split(" ")[1];
-      if (!token) {
+      const { userId } = request.user || {};
+      if (!userId) {
         return reply.status(401).send({ error: "Unauthorized" });
       }
 
-      // Vérifier le token JWT
-      const decoded = jwt.verify(token, secretKey);
-
       // Vérifier si l'utilisateur est Admin ou SuperAdmin
-      const currentUser = await userRepository.getUserById(decoded.userId);
+      const currentUser = await userRepository.getUserById(userId);
       if (!currentUser || !ADMIN_GRADE_IDS.includes(currentUser.GradeID)) {
         return reply.status(403).send({ error: "Forbidden" });
       }
@@ -1562,15 +1634,13 @@ export const userController = {
 
   async getUsersForAdminPanel(request, reply) {
     try {
-      const token = request.headers["authorization"]?.split(" ")[1];
-      if (!token) {
+      const { userId } = request.user || {};
+      if (!userId) {
         return reply.status(401).send({ error: "Unauthorized" });
       }
 
-      const decoded = jwt.verify(token, secretKey);
-
       // Vérifier si l'utilisateur est Admin ou SuperAdmin
-      const currentUser = await userRepository.getUserById(decoded.userId);
+      const currentUser = await userRepository.getUserById(userId);
       if (!currentUser || !ADMIN_GRADE_IDS.includes(currentUser.GradeID)) {
         return reply.status(403).send({ error: "Forbidden" });
       }
@@ -1596,35 +1666,56 @@ export const userController = {
     }
   },
 
-  async updatePremiumPlan(request, reply) {
+  async createFakePremiumCheckout(request, reply) {
     try {
-      const { userId } = request.user;       // fourni par authMiddleware
-      const { plan } = request.body;         // "FREE", "MONTHLY", "YEARLY"
+      const { userId } = request.user;
+      const { plan } = request.body;
 
-      const allowedPlans = ["FREE", "MONTHLY", "YEARLY"];
-      if (!allowedPlans.includes(plan)) {
+      if (!isAllowedPremiumPlan(plan)) {
         return reply
           .status(400)
           .send({ error: "Plan d'abonnement invalide." });
       }
 
-      let newPremiumEndDate = null;
-      const now = new Date();
+      const event = createFakePaymentEvent({ userId, plan });
+      return userController.handleFakePremiumPaymentEvent(request, reply, event.payload, event.signature);
+    } catch (err) {
+      console.error("Error in createFakePremiumCheckout:", err);
+      return reply
+        .status(500)
+        .send({ error: "Internal Server Error", message: err.message });
+    }
+  },
 
-      if (plan === "MONTHLY") {
-        // Premium 1 mois à partir de maintenant
-        newPremiumEndDate = new Date(now);
-        newPremiumEndDate.setMonth(newPremiumEndDate.getMonth() + 1);
+  async fakePremiumPaymentWebhook(request, reply) {
+    try {
+      const signature = request.headers["x-fake-payment-signature"];
+      return userController.handleFakePremiumPaymentEvent(request, reply, request.body, signature);
+    } catch (err) {
+      console.error("Error in fakePremiumPaymentWebhook:", err);
+      return reply
+        .status(500)
+        .send({ error: "Internal Server Error", message: err.message });
+    }
+  },
 
-        // Teste 1min check
-        // newPremiumEndDate = new Date(now);
-        // newPremiumEndDate.setMinutes(newPremiumEndDate.getMinutes() + 1);
-      } else if (plan === "YEARLY") {
-        // Premium 1 an à partir de maintenant
-        newPremiumEndDate = new Date(now);
-        newPremiumEndDate.setFullYear(newPremiumEndDate.getFullYear() + 1);
+  async handleFakePremiumPaymentEvent(request, reply, payload, signature) {
+    try {
+      if (!verifyFakePaymentPayload(payload, signature)) {
+        return reply.status(401).send({ error: "Signature de paiement invalide." });
       }
-      // plan === "FREE" -> newPremiumEndDate = null
+
+      if (payload?.provider !== "fake" || payload?.event !== "premium.payment.succeeded") {
+        return reply.status(400).send({ error: "Evénement de paiement invalide." });
+      }
+
+      const userId = Number(payload.userId);
+      const plan = payload.plan;
+      if (!Number.isInteger(userId) || !isAllowedPremiumPlan(plan)) {
+        return reply.status(400).send({ error: "Payload de paiement invalide." });
+      }
+
+      const newPremiumEndDate = computePremiumEndDate(plan);
 
       const updatedUser = await prisma.utilisateur.update({
         where: { UtilisateurID: userId },
@@ -1644,7 +1735,18 @@ export const userController = {
         isPremium = end > new Date();
       }
 
-      // TODO (optionnel) : logguer l'action dans Log / Action
+      await createLog({
+        request,
+        UtilisateurID: userId,
+        ActionNom: "premium_payment_fake",
+        Champ: "PremiumEndDate",
+        NouvelleValeur: updatedUser.PremiumEndDate ? updatedUser.PremiumEndDate.toISOString() : null,
+        Meta: {
+          paymentId: payload.paymentId,
+          plan,
+          provider: payload.provider,
+        },
+      });
 
       return reply.send({
         message:
@@ -1657,7 +1759,7 @@ export const userController = {
         isPremium,
       });
     } catch (err) {
-      console.error("Error in updatePremiumPlan:", err);
+      console.error("Error in handleFakePremiumPaymentEvent:", err);
       return reply
         .status(500)
         .send({ error: "Internal Server Error", message: err.message });

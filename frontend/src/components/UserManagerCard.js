@@ -455,9 +455,7 @@ const UserManagerCard = ({ onStateChange }) => {
             gradeId: 3, // utilisateurs classiques
             scope: tabConfig.scope,
           },
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
+          withCredentials: true,
         }
       );
 
@@ -479,9 +477,7 @@ const UserManagerCard = ({ onStateChange }) => {
         `${apiBaseUrl}/api/users/activity-summary`,
         {
           params: { days: 7 },
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
+          withCredentials: true,
         }
       );
 
@@ -580,11 +576,7 @@ const UserManagerCard = ({ onStateChange }) => {
           userId: user.UtilisateurID,
           newEtat,
         },
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-        }
+        { withCredentials: true }
       );
 
       if (onStateChange) onStateChange();
@@ -601,9 +593,7 @@ const UserManagerCard = ({ onStateChange }) => {
       setLoadingWatchHistory(true);
       const response = await axios.get(
         `${apiBaseUrl}/api/users/watch-history/${userId}`,
-        {
-          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-        }
+        { withCredentials: true }
       );
       setWatchHistoryMap((prev) => ({
         ...prev,

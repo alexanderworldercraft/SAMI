@@ -143,10 +143,7 @@ const VideoSeePage = () => {
 
   useEffect(() => {
     // Appel à l'API pour obtenir les recommandations par genres (original)
-    const token = localStorage.getItem("token");
-    const headers = token ? { Authorization: `Bearer ${token}` } : undefined;
-
-    fetch(`${apiUrl}/api/videos/recommandation/${id}`, headers ? { headers } : undefined)
+    fetch(`${apiUrl}/api/videos/recommandation/${id}`, { credentials: "include" })
       .then(response => response.json())
       .then(data => setRecommendations(data))
       .catch(error => console.error('Error fetching recommendations:', error));

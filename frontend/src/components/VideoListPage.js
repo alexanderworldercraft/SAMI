@@ -82,9 +82,6 @@ const VideoListPage = () => {
         : "";
 
       // ⬇️ on bascule vers ?sort= (az|za|recent|ancien). 'order' reste géré en back pour rétro-compat.
-      const token = localStorage.getItem("token");
-      const headers = token ? { Authorization: `Bearer ${token}` } : undefined;
-
       const optionsQuery = [
         videoOptions.onlyOngoingSeries ? "ongoing=1" : "",
         videoOptions.hideWatched ? "hideWatched=1" : "",
@@ -94,7 +91,7 @@ const VideoListPage = () => {
 
       const response = await fetch(
         `${apiUrl}/api/videos?page=${page}&sort=${sort}&search=${encodeURIComponent(search)}${genresQuery}${optionsQuery}`,
-        headers ? { headers } : undefined
+        { credentials: "include" }
       );
 
       if (!response.ok) throw new Error("Erreur lors de la récupération des vidéos.");

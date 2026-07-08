@@ -3,16 +3,13 @@ import api from '../services/api';
 import { Navigate } from 'react-router-dom';
 
 function ProtectedAdminRoute({ children }) {
-    const token = localStorage.getItem("token");
     const [isAuthorized, setIsAuthorized] = React.useState(false);
     const [loading, setLoading] = React.useState(true);
   
     React.useEffect(() => {
       const checkAuthorization = async () => {
         try {
-          const response = await api.get("/users/me", {
-            headers: { Authorization: `Bearer ${token}` },
-          });
+          const response = await api.get("/users/me");
   
           const { GradeID } = response.data;
           if (GradeID === 1 || GradeID === 2) {
@@ -27,12 +24,8 @@ function ProtectedAdminRoute({ children }) {
         }
       };
   
-      if (token) {
-        checkAuthorization();
-      } else {
-        setLoading(false);
-      }
-    }, [token]);
+      checkAuthorization();
+    }, []);
   
     if (loading) {
       return <div>Chargement...</div>;

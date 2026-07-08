@@ -254,6 +254,11 @@ async function main() {
         Description: "Super administrateur lance une sauvegarde manuelle de la base de données.",
         Criticite: 3,
       },
+      {
+        Nom: "premium_payment_fake",
+        Description: "Utilisateur s'abonne au premium fake.",
+        Criticite: 0,
+      },
     ]),
     skipDuplicates: true, // Évite les erreurs si les grades existent déjà
   });

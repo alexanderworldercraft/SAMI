@@ -6,6 +6,8 @@ import path from 'path';
 import { fileURLToPath } from "url";
 import { createLog } from "./logController.js";
 import { ensureAdmin } from "../services/authz.js";
+import { MULTIPART_LIMITS } from "../constants.js";
+import { isMultipartFileTooLargeError, sendMultipartFileTooLarge } from "../utils/multipartErrors.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -41,9 +43,12 @@ const ensureSeriesAdmin = async (request, reply) => {
 // Ajouter une nouvelle série
 export const createSeries = async (request, reply) => {
   try {
+    const adminUserId = await ensureSeriesAdmin(request, reply);
+    if (!adminUserId) return;
+
     console.log("Début du traitement multipart...");
 
-    const parts = request.parts();
+    const parts = request.parts({ limits: { fileSize: MULTIPART_LIMITS.IMAGE_FILE_SIZE } });
     let Titre = "";
     let Resumer = "";
     let CheminImage = null;
@@ -57,12 +62,13 @@ export const createSeries = async (request, reply) => {
     for await (const part of parts) {
       if (part.type === "file") {
         // Gestion du fichier image
-        console.log(`Fichier image reçu : ${part.filename}`);
+        const safeOriginalFilename = path.basename(part.filename || "");
+        console.log(`Fichier image reçu : ${safeOriginalFilename}`);
         const tempSerieDir = path.join(TEMP_ROOT, "serie");
         if (!fs.existsSync(tempSerieDir)) {
           fs.mkdirSync(tempSerieDir, { recursive: true });
         }
-        imageExt = path.extname(part.filename).toLowerCase();
+        imageExt = path.extname(safeOriginalFilename).toLowerCase();
         const tempFilename = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}${imageExt}`;
         imageTempPath = path.join(tempSerieDir, tempFilename);
         const writeStream = fs.createWriteStream(imageTempPath);
@@ -100,7 +106,7 @@ export const createSeries = async (request, reply) => {
         Resumer,
         CheminImage: CheminImage || "",
         EtatID,
-        UtilisateurID,
+        UtilisateurID: adminUserId,
       },
     });
 
@@ -137,6 +143,7 @@ export const createSeries = async (request, reply) => {
     console.log("Série créée avec succès :", responseSeries);
     reply.status(201).send(responseSeries);
   } catch (error) {
+    if (isMultipartFileTooLargeError(error)) return sendMultipartFileTooLarge(reply);
     console.error("Erreur lors de la création de la série :", error);
     reply.status(500).send({ error: "Erreur lors de la création de la série." });
   }
@@ -145,14 +152,16 @@ export const createSeries = async (request, reply) => {
 // Ajouter une nouvelle saison à une série
 export const addSaison = async (request, reply) => {
   const { id } = request.params; // ID de la série
-  const { Numero, UtilisateurID } = request.body;
+  const { Numero } = request.body;
+  const adminUserId = await ensureSeriesAdmin(request, reply);
+  if (!adminUserId) return;
 
   try {
     const saison = await prisma.saison.create({
       data: {
         Numero,
         SeriesID: parseInt(id),
-        UtilisateurID,
+        UtilisateurID: adminUserId,
       },
     });
 
@@ -225,9 +234,48 @@ export const getAllSeries = async (request, reply) => {
       select: {
         SeriesID: true,
         Titre: true,
+        Resumer: true,
+        Premium: true,
+        CheminImage: true,
+        CreateDate: true,
+        _count: {
+          select: { Saisons: true },
+        },
+        Saisons: {
+          orderBy: { Numero: "asc" },
+          take: 1,
+          select: {
+            SaisonID: true,
+            Numero: true,
+            Episodes: {
+              where: { EtatID: ETAT.ACTIVE },
+              orderBy: { Titre: "asc" },
+              take: 1,
+              select: { VideoID: true },
+            },
+          },
+        },
       },
     });
-    reply.send(series);
+    reply.send(
+      series.map((serie) => {
+        const firstVideo = serie.Saisons?.[0]?.Episodes?.[0] || null;
+
+        return {
+          SeriesID: serie.SeriesID,
+          id: serie.SeriesID,
+          type: "series",
+          Titre: serie.Titre,
+          Resumer: serie.Resumer,
+          Premium: serie.Premium,
+          CheminImage: serie.CheminImage,
+          CreateDate: serie.CreateDate ?? null,
+          FirstVideoID: firstVideo?.VideoID || null,
+          Saisons: serie._count.Saisons,
+          hasSeasons: serie._count.Saisons > 0,
+        };
+      })
+    );
   } catch (error) {
     console.error("Erreur lors de la récupération des séries :", error);
     reply.status(500).send({ error: "Erreur lors de la récupération des séries." });
@@ -458,10 +506,8 @@ export const updateSerieTitle = async (request, reply) => {
 
   try {
     const seriesId = parseInt(id, 10);
-    const userId = request.user?.userId;
-    if (!userId || !Number.isFinite(Number(userId))) {
-      return reply.code(401).send({ error: "Non autorisé." });
-    }
+    const userId = await ensureSeriesAdmin(request, reply);
+    if (!userId) return;
 
     const before = await prisma.series.findUnique({
       where: { SeriesID: seriesId },
@@ -509,10 +555,8 @@ export const updateSerieResumer = async (request, reply) => {
 
   try {
     const seriesId = parseInt(id, 10);
-    const userId = request.user?.userId;
-    if (!userId || !Number.isFinite(Number(userId))) {
-      return reply.code(401).send({ error: "Non autorisé." });
-    }
+    const userId = await ensureSeriesAdmin(request, reply);
+    if (!userId) return;
 
     const before = await prisma.series.findUnique({
       where: { SeriesID: seriesId },
@@ -551,11 +595,9 @@ export const updateSerieResumer = async (request, reply) => {
 export const updateSerieImage = async (request, reply) => {
   try {
     const { id } = request.params;
-    const userId = request.user?.userId;
-    if (!userId || !Number.isFinite(Number(userId))) {
-      return reply.code(401).send({ error: "Non autorisé." });
-    }
-    const parts = request.parts();
+    const userId = await ensureSeriesAdmin(request, reply);
+    if (!userId) return;
+    const parts = request.parts({ limits: { fileSize: MULTIPART_LIMITS.IMAGE_FILE_SIZE } });
 
     const serieDir = path.join(SERIE_ROOT, String(id));
     console.log("[serie:image] start", { seriesId: Number(id), userId });
@@ -592,7 +634,7 @@ export const updateSerieImage = async (request, reply) => {
     // Lire le fichier multipart (champ 'image')
     for await (const part of parts) {
       if (part.type === "file" && part.fieldname === "image") {
-        const originalFilename = part.filename || "";
+        const originalFilename = path.basename(part.filename || "");
         const mime = (part.mimetype || "").toLowerCase();
         let ext = path.extname(originalFilename).toLowerCase();
         if (mime && !mime.startsWith("image/")) {
@@ -658,6 +700,7 @@ export const updateSerieImage = async (request, reply) => {
 
     return reply.send(updated); // { CheminImage: 'uploads/images/xxx.ext' }
   } catch (error) {
+    if (isMultipartFileTooLargeError(error)) return sendMultipartFileTooLarge(reply);
     console.error("❌ updateSerieImage:", error);
     return reply.code(500).send({ error: "Erreur lors de la mise à jour de l'image de la série." });
   }
@@ -737,10 +780,8 @@ export const updateSerieGenres = async (request, reply) => {
 
   try {
     const seriesId = parseInt(id, 10);
-    const userId = request.user?.userId;
-    if (!userId || !Number.isFinite(Number(userId))) {
-      return reply.code(401).send({ error: "Non autorisé." });
-    }
+    const userId = await ensureSeriesAdmin(request, reply);
+    if (!userId) return;
 
     const uniqueIds = [
       ...new Set(GenreIDs.map((g) => parseInt(g, 10)).filter(Number.isInteger)),

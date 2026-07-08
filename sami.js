@@ -1,5 +1,4 @@
 import Fastify from "fastify";
-import fs from 'fs';
 import { fileURLToPath } from 'url';
 import path from 'path';
 import fastifyStatic from '@fastify/static';
@@ -25,19 +24,9 @@ import { Server as SocketIOServer } from "socket.io";
 import cron from 'node-cron';
 import { rotateGenreFeaturedContent } from './services/genreFeaturedContentService.js';
 import { createDatabaseBackup } from './services/databaseBackupService.js';
-import { globalRateLimit } from "./middlewares/rateLimitMiddleware.js";
-import {
-    createCorsOriginValidator,
-    securityHeadersMiddleware,
-} from "./middlewares/securityMiddleware.js";
-import { setStaticFileHeaders } from "./utils/staticHeaders.js";
 
 // URL publique
 const PUBLIC_URL = process.env.PUBLIC_URL;
-const PUBLIC_ORIGINS = String(PUBLIC_URL || "")
-    .split(",")
-    .map((origin) => origin.trim())
-    .filter(Boolean);
 // Host publique
 const PUBLIC_HOST = process.env.PUBLIC_HOST;
 
@@ -45,47 +34,19 @@ const PUBLIC_HOST = process.env.PUBLIC_HOST;
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Lire les fichiers de certificat SSL
-let privateKey, certificate;
-try {
-    console.log('Reading SSL certificate files...');
-    privateKey = fs.readFileSync(path.join('ssl/private.key'));
-    certificate = fs.readFileSync(path.join('ssl/certificate.crt'));
-    console.log('SSL certificate files read successfully.');
-} catch (err) {
-    console.error('Error reading SSL certificate files:', err);
-    process.exit(1);
-}
 // Création d'une instance de Fastify avec le logger activé pour un suivi des requêtes et erreurs
 const fastify = Fastify({
-    https: {
-        key: privateKey,
-        cert: certificate
-    },
-    // Activation du logger pour journaliser les requêtes et les erreurs
-    // logger: {
-    //     level: 'info', // Niveau de journalisation (info, warn, error)
-    //     transport: {
-    //         target: 'pino-pretty', // Utiliser pino-pretty pour un affichage plus lisible dans la console
-    //         options: {
-    //             translateTime: 'SYS:yyyy-mm-dd HH:MM:ss',
-    //             ignore: 'pid,hostname',
-    //         },
-    //     },
-    // },
-
-    // Configuration de l'instance AJV (JSON Schema Validator) intégrée de Fastify
     ajv: {
-        customOptions: { 
-            removeAdditional: true // Supprime les propriétés non définies dans le schéma
-        }
-    }
+        customOptions: { removeAdditional: true }
+    },
+    // Permet d'utiliser X-Forwarded-For / X-Real-IP via un reverse proxy
+    trustProxy: true,
 });
 
 
 const io = new SocketIOServer(fastify.server, { 
     cors: { 
-      origin: PUBLIC_ORIGINS.length > 1 ? PUBLIC_ORIGINS : PUBLIC_ORIGINS[0], 
+      origin: PUBLIC_URL, 
       methods: ["GET", "POST"], 
     }, 
   }); 
@@ -127,12 +88,10 @@ fastify.register(fastifySwaggerUI, {
     }
 });
 
-fastify.addHook("onRequest", securityHeadersMiddleware);
-
 // Configurer CORS
 fastify.register(fastifyCors, {
-    origin: createCorsOriginValidator(PUBLIC_URL),
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    origin: PUBLIC_URL, // Autoriser les requêtes depuis cette origine
+    methods: ['GET', 'POST', 'PUT', 'DELETE'],
     credentials: true,
     exposedHeaders: ['Content-Disposition', 'X-Backup-Filename'],
 });
@@ -141,16 +100,6 @@ fastify.register(fastifyCors, {
 fastify.register(fastifyMultipart, {
     limits: { fileSize: 50 * 1024 * 1024 * 1024 }, // Limite à 50 Go
 });
-
-fastify.setErrorHandler((error, request, reply) => {
-    if (error?.statusCode === 413 || error?.code === "FST_REQ_FILE_TOO_LARGE") {
-        return reply.status(413).send({ error: "Fichier trop volumineux." });
-    }
-
-    return reply.send(error);
-});
-
-fastify.addHook("onRequest", globalRateLimit);
 
 // Enregistrer les routes
 fastify.register(userRoutes, { prefix: '/api/users' });
@@ -167,14 +116,6 @@ fastify.register(sagaRoutes, { prefix: "/api/sagas" });
 fastify.register(universeRoutes, { prefix: "/api/universes" });
 fastify.register(musicRoutes, { prefix: "/api/music" });
 
-fastify.all("/uploads/BDD", async (request, reply) => {
-    return reply.status(404).send({ error: "Not found" });
-});
-
-fastify.all("/uploads/BDD/*", async (request, reply) => {
-    return reply.status(404).send({ error: "Not found" });
-});
-
 // Enregistrer les fichiers statiques pour le frontend
 fastify.register(fastifyStatic, {
     root: path.join(__dirname, '../frontend/build'),
@@ -187,7 +128,6 @@ fastify.register(fastifyStatic, {
 fastify.register(fastifyStatic, {
     root: path.join(__dirname, 'uploads'),
     prefix: '/uploads/', // Fichiers utilisateurs accessibles depuis /uploads/
-    setHeaders: setStaticFileHeaders,
 });
 
 // Gérer toutes les autres routes non définies (React Router support)
@@ -243,8 +183,8 @@ cron.schedule('0 9 * * 1', async () => {
 const start = async () => {
     try {
         console.log(`Starting server on port ${process.env.PORTS}...`);
-        await fastify.listen({ port: process.env.PORTS, host: '0.0.0.0' });
-        console.log(`Server listening on ${process.env.HTTPS}:${process.env.PORTS}`);
+        await fastify.listen({ port: process.env.PORTS, host: '127.0.0.1' });
+        console.log(`Server listening on ${process.env.PUBLIC_URL}`);
     } catch (err) {
         console.error('Error starting server:', err);
         process.exit(1);

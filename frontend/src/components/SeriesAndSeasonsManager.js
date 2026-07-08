@@ -16,21 +16,6 @@ const SeriesAndSeasonsManager = () => {
     const [notification, setNotification] = useState(null);
     const [genres, setGenres] = useState([]);
     const [selectedGenres, setSelectedGenres] = useState([]);
-    const [user, setUser] = useState(null);
-
-    useEffect(() => {
-        const fetchUser = async () => {
-            try {
-                const response = await api.get('/users/me');
-                //console.log('User profile data:', response.data); // Log des données utilisateur
-                setUser(response.data);
-            } catch (error) {
-                console.error("Erreur lors de la récupération de l'utilisateur :", error);
-            }
-        };
-        fetchUser();
-    }, []);
-
     useEffect(() => {
         const fetchGenres = async () => {
             try {
@@ -71,7 +56,6 @@ const SeriesAndSeasonsManager = () => {
         e.preventDefault();
 
         const formData = new FormData();
-        formData.append("UtilisateurID", user.UtilisateurID || "");
         formData.append("Titre", newSeriesTitle);
         formData.append("Resumer", newSeriesSummary);
         formData.append("GenreIDs", JSON.stringify(selectedGenres));
@@ -79,24 +63,20 @@ const SeriesAndSeasonsManager = () => {
         formData.append("EtatID", 1); // Exemple d'état par défaut
 
         try {
-            const response = await fetch(`${apiUrl}/api/series`, {
-                method: "POST",
-                body: formData,
-            });
+            const response = await api.post("/series", formData);
 
-            if (response.ok) {
+            if (response.status >= 200 && response.status < 300) {
                 showNotification("Série ajoutée avec succès !", "✅", "success");
                 setNewSeriesTitle("");
                 setNewSeriesSummary("");
                 setNewSeriesImage(null);
                 fetchSeries(); // Actualiser la liste des séries
             } else {
-                const error = await response.json();
-                console.error("Erreur :", error);
+                console.error("Erreur :", response.data);
                 showNotification("Erreur lors de l'ajout de la série.", "⚠️", "error");
             }
         } catch (error) {
-            console.error("Erreur lors de l'ajout de la série :", error);
+            console.error("Erreur lors de l'ajout de la série :", error.response?.data || error);
             showNotification("Erreur lors de l'ajout de la série.", "⚠️", "error");
         }
     };
@@ -111,25 +91,19 @@ const SeriesAndSeasonsManager = () => {
         }
 
         try {
-            const response = await fetch(`${apiUrl}/api/series/${selectedSeries}/saisons`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    Numero: parseInt(newSeasonNumber),
-                    UtilisateurID: parseInt(user.UtilisateurID),
-                }),
+            const response = await api.post(`/series/${selectedSeries}/saisons`, {
+                Numero: parseInt(newSeasonNumber, 10),
             });
 
-            if (response.ok) {
+            if (response.status >= 200 && response.status < 300) {
                 showNotification("Saison ajoutée avec succès !", "✅", "success");
                 setNewSeasonNumber("");
             } else {
-                const error = await response.json();
-                console.error("Erreur :", error);
+                console.error("Erreur :", response.data);
                 showNotification("Erreur lors de l'ajout de la saison.", "⚠️", "error");
             }
         } catch (error) {
-            console.error("Erreur lors de l'ajout de la saison :", error);
+            console.error("Erreur lors de l'ajout de la saison :", error.response?.data || error);
             showNotification("Erreur lors de l'ajout de la saison.", "⚠️", "error");
         }
     };

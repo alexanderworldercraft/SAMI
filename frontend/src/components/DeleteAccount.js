@@ -28,11 +28,7 @@ const DeleteAccount = () => {
       const response = await axios.put(
         `${process.env.REACT_APP_URL_LOCAL}/api/users/delete-account`,
         { currentPassword: password }, // 🔐 on envoie le MDP
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-        }
+        { withCredentials: true }
       );
       console.log("Request sent to backend");
 

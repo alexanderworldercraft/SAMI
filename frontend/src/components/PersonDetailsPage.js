@@ -180,16 +180,7 @@ export default function PersonDetailsPage() {
                       const formData = new FormData();
                       formData.append("image", newImageFile);
 
-                      // Appel REST: PUT /api/people/:id/photo
-                      const resp = await fetch(`${apiUrl}/api/people/${p.PersonneID}/photo`, {
-                        method: "PUT",
-                        body: formData,
-                      });
-                      if (!resp.ok) {
-                        const err = await resp.json().catch(() => ({}));
-                        throw new Error(err?.error || "Échec de l’upload de l’image.");
-                      }
-                      const json = await resp.json(); // { CheminImage: 'uploads/images/people/...' }
+                      const { data: json } = await api.put(`/people/${p.PersonneID}/photo`, formData);
 
                       // MAJ de l’état local pour refléter la nouvelle image
                       setData((prev) => prev

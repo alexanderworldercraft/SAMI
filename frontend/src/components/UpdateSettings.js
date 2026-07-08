@@ -66,9 +66,9 @@ const UpdateSettings = () => {
     try {
       const response = await axios.put("/api/users/update", formData, {
         headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
           "Content-Type": "multipart/form-data",
         },
+        withCredentials: true,
       });
 
       setSuccessMessage("Les paramètres ont été mis à jour avec succès.");
@@ -139,7 +139,7 @@ const UpdateSettings = () => {
     const fetchUser = async () => {
       try {
         const response = await axios.get("/api/users/me", {
-          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+          withCredentials: true,
         });
         setUser(response.data);
         setSurnom(response.data.Surnom);

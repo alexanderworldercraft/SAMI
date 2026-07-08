@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
-import axios from "axios";
 import ImagePreview from "./ImagePreview";
+import api from "../services/api";
 
 const FormNewAdmin = () => {
   const [surnom, setSurnom] = useState("");
@@ -13,9 +13,7 @@ const FormNewAdmin = () => {
   useEffect(() => {
     const checkSuperAdmin = async () => {
       try {
-        const response = await axios.get("/api/users/me", {
-          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-        });
+        const response = await api.get("/users/me");
         if (response.data.GradeID === 1) {
           setIsSuperAdmin(true);
         }
@@ -60,20 +58,9 @@ const FormNewAdmin = () => {
       formData.append("surnom", surnom);
       formData.append("email", email);
       formData.append("motDePasse", motDePasse);
-      formData.append("gradeId", 2); // Ajouter le gradeId
       if (image) formData.append("image", image);
 
-      const apiBaseUrl = process.env.REACT_APP_URL_LOCAL;
-
-      const response = await axios.post(
-        `${apiBaseUrl}/api/users/register`,
-        formData,
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("token")}`,
-          },
-        }
-      );
+      const response = await api.post("/users/admin/register", formData);
       console.log("Admin created successfully:", response.data);
       setErrorMessage("");
       setSurnom("");

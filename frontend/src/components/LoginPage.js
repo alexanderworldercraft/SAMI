@@ -185,9 +185,11 @@ const LoginPage = () => {
     }
 
     try {
-      const response = await axios.post(`${apiBaseUrl}/api/users/login`, {
+      await axios.post(`${apiBaseUrl}/api/users/login`, {
         surnom,
         motDePasse,
+      }, {
+        withCredentials: true,
       });
 
       // Succès : on reset tout
@@ -195,11 +197,7 @@ const LoginPage = () => {
       setIsLocked(false);
       setLockRemaining(0);
       setError('');
-
-      const { token } = response.data;
-      if (token) {
-        localStorage.setItem('token', token);
-      }
+      localStorage.removeItem('token');
 
       navigate('/');
     } catch (err) {

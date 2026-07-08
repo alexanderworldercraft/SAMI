@@ -1,6 +1,11 @@
 // routes/userRoutes.js
 import { userController } from '../controllers/userController.js';
 import { authMiddleware } from '../middlewares/authMiddleware.js';
+import {
+  authRateLimit,
+  passwordResetRateLimit,
+  registerRateLimit,
+} from "../middlewares/rateLimitMiddleware.js";
 import { userRepository } from '../models/user.js';
 
 // petite fonction utilitaire
@@ -17,16 +22,18 @@ function isUserPremium(user) {
 // Ajout des schema pour la documentation des routes.
 export default async function userRoutes(fastify, options) {
   fastify.post("/logout", userController.logout);
-  fastify.post('/register', userController.register);
-  fastify.post('/login', userController.login);
-  fastify.post('/reset-password', userController.resetPassword);
-  fastify.post('/premium', { preHandler: authMiddleware }, userController.updatePremiumPlan);
+  fastify.post('/register', { preHandler: registerRateLimit }, userController.register);
+  fastify.post('/admin/register', { preHandler: [registerRateLimit, authMiddleware] }, userController.registerAdmin);
+  fastify.post('/login', { preHandler: authRateLimit }, userController.login);
+  fastify.post('/reset-password', { preHandler: passwordResetRateLimit }, userController.resetPassword);
+  fastify.post('/premium/fake-checkout', { preHandler: authMiddleware }, userController.createFakePremiumCheckout);
+  fastify.post('/premium/webhook/fake', userController.fakePremiumPaymentWebhook);
 
-  fastify.put('/update', { preHandler: fastify.auth }, userController.updateUser);
-  fastify.put('/delete-account', userController.deleteAccount);
-  fastify.put('/change-etat', userController.changeUserEtat);
+  fastify.put('/update', { preHandler: authMiddleware }, userController.updateUser);
+  fastify.put('/delete-account', { preHandler: authMiddleware }, userController.deleteAccount);
+  fastify.put('/change-etat', { preHandler: authMiddleware }, userController.changeUserEtat);
 
-  fastify.delete('/delete-profile-image', { preHandler: fastify.auth }, userController.deleteProfileImage);
+  fastify.delete('/delete-profile-image', { preHandler: authMiddleware }, userController.deleteProfileImage);
 
   fastify.get('/get-users', { preHandler: authMiddleware }, userController.getUsersByCriteria);
   fastify.get('/admins', { preHandler: authMiddleware }, userController.getAdmins);

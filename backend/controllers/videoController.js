@@ -6,8 +6,9 @@ import { startOfDay, endOfDay, startOfMonth, endOfMonth, subDays } from "date-fn
 import { createLog, updateLatestVideoPlayLogProgress } from "./logController.js";
 import { isContentPreviewActive } from "./appSettingController.js";
 import { ensureAdmin, ensureSuperAdmin } from "../services/authz.js";
-import { ETAT } from "../constants.js";
+import { ETAT, MULTIPART_LIMITS } from "../constants.js";
 import { isTruthyValue, parsePositiveInt } from "../utils/requestParsing.js";
+import { isMultipartFileTooLargeError, sendMultipartFileTooLarge } from "../utils/multipartErrors.js";
 import {
   ERROR_ROOT,
   TEMP_ROOT,
@@ -241,6 +242,8 @@ export const getAdditionsForDate = async (req, reply) => {
 // MAJ du status de films ou série
 export const moveVideoToSeason = async (request, reply) => {
   const { videoId, SaisonID } = request.body;
+  const userId = await ensureVideoAdmin(request, reply);
+  if (!userId) return;
 
   try {
     const updatedVideo = await prisma.video.update({
@@ -1949,8 +1952,9 @@ export const getVideoDetails = async (request, reply) => {
 export const updateVideoImage = async (request, reply) => {
   try {
     const { id } = request.params;
-    const userId = request.user?.userId;
-    const parts = request.parts();
+    const userId = await ensureVideoAdmin(request, reply);
+    if (!userId) return;
+    const parts = request.parts({ limits: { fileSize: MULTIPART_LIMITS.IMAGE_FILE_SIZE } });
 
     const videoId = parseInt(id, 10);
     console.log("[video:image] start", { videoId, userId });
@@ -1993,7 +1997,7 @@ export const updateVideoImage = async (request, reply) => {
     // Lecture du fichier multipart
     for await (const part of parts) {
       if (part.type === "file" && part.fieldname === "image") {
-        const filename = part.filename || "";
+        const filename = path.basename(part.filename || "");
         const mime = (part.mimetype || "").toLowerCase();
         let ext = path.extname(filename).toLowerCase();
         if (mime && !mime.startsWith("image/")) {
@@ -2057,29 +2061,27 @@ export const updateVideoImage = async (request, reply) => {
 
     // Log audit image
 
-    if (userId && Number.isFinite(Number(userId))) {
-      // Contexte série/saison si épisode
-      const ctx = await prisma.video.findUnique({
-        where: { VideoID: parseInt(id, 10) },
-        select: { SaisonID: true, Saison: { select: { SeriesID: true } } },
-      });
+    const ctx = await prisma.video.findUnique({
+      where: { VideoID: parseInt(id, 10) },
+      select: { SaisonID: true, Saison: { select: { SeriesID: true } } },
+    });
 
-      await createLog({
-        request,
-        UtilisateurID: Number(userId),
-        ActionNom: "video_update",
-        VideoID: parseInt(id, 10),
-        SaisonID: ctx?.SaisonID ?? null,
-        SeriesID: ctx?.Saison?.SeriesID ?? null,
-        Champ: "CheminImage",
-        AncienneValeur: oldVideo?.CheminImage ?? null,
-        NouvelleValeur: savedPath,
-        DedupeMs: 2000,
-      });
-    }
+    await createLog({
+      request,
+      UtilisateurID: Number(userId),
+      ActionNom: "video_update",
+      VideoID: parseInt(id, 10),
+      SaisonID: ctx?.SaisonID ?? null,
+      SeriesID: ctx?.Saison?.SeriesID ?? null,
+      Champ: "CheminImage",
+      AncienneValeur: oldVideo?.CheminImage ?? null,
+      NouvelleValeur: savedPath,
+      DedupeMs: 2000,
+    });
 
     reply.send(updated);
   } catch (error) {
+    if (isMultipartFileTooLargeError(error)) return sendMultipartFileTooLarge(reply);
     console.error("❌ Erreur updateVideoImage:", error);
     reply.code(500).send({ error: "Erreur lors de la mise à jour de l'image." });
   }
@@ -2183,6 +2185,8 @@ export const getNavigationInfo = async (request, reply) => {
 // Ajouter une vidéo à une saison
 export const addEpisode = async (request, reply) => {
   const { Titre, Resumer, CheminAcces, CheminImage, EtatID, GenreIDs, SeriesID, Numero } = request.body;
+  const userId = await ensureVideoAdmin(request, reply);
+  if (!userId) return;
 
   try {
     // Trouver la saison correspondante
@@ -2206,6 +2210,7 @@ export const addEpisode = async (request, reply) => {
         CheminImage,
         EtatID,
         SaisonID: saison.SaisonID,
+        UtilisateurID: userId,
         VideoGenres: {
           create: GenreIDs.map((GenreID) => ({ GenreID })),
         },
@@ -2222,12 +2227,15 @@ export const addEpisode = async (request, reply) => {
 // Ajouter une nouvelle vidéo (CPU)
 export const addVideo = async (req, reply, fastify) => {
   try {
+    const adminUserId = await ensureVideoAdmin(req, reply);
+    if (!adminUserId) return;
+
     const processingId = `addvideo-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     console.log("[addVideo] Début du traitement", {
       contentType: req.headers["content-type"],
       processingId,
     });
-    const parts = req.parts();
+    const parts = req.parts({ limits: { fileSize: MULTIPART_LIMITS.VIDEO_FILE_SIZE } });
     const data = {};
     const videoRoot = VIDEO_ROOT;
     const tempRoot = TEMP_ROOT;
@@ -2261,9 +2269,10 @@ export const addVideo = async (req, reply, fastify) => {
           if (normalizedName === "saisonid") data.SaisonID = fieldValue;
           if (normalizedName === "utilisateurid") data.utilisateurID = fieldValue;
         } else {
-          const extension = path.extname(part.filename).toLowerCase();
+          const safeOriginalFilename = path.basename(part.filename || "");
+          const extension = path.extname(safeOriginalFilename).toLowerCase();
           const mimeType = part.mimetype;
-          console.log(`Traitement du fichier : ${part.filename}, Type MIME : ${mimeType}`);
+          console.log(`Traitement du fichier : ${safeOriginalFilename}, Type MIME : ${mimeType}`);
 
           // Extensions vidéos autorisées
           const videoExtensions = /\.(avi|mov|mkv|webm|flv|wmv|mp4)$/i;
@@ -2276,7 +2285,7 @@ export const addVideo = async (req, reply, fastify) => {
             mimeType === 'application/octet-stream'; // certains navigateurs / serveurs envoient ça
 
           if (isVideoMime && videoExtensions.test(extension)) {
-            if (!data.videoOriginalName) data.videoOriginalName = part.filename;
+            if (!data.videoOriginalName) data.videoOriginalName = safeOriginalFilename;
             const filePath = path.join(tempVideoDir, `${Date.now()}${extension}`);
             const writeStream = fs.createWriteStream(filePath);
             let uploadedBytes = 0;
@@ -2347,7 +2356,7 @@ export const addVideo = async (req, reply, fastify) => {
             data.imageTempExt = extension;
           } else {
             console.warn(
-              `Fichier ignoré : ${part.filename}, Type MIME : ${mimeType}, Extension : ${extension}`
+              `Fichier ignoré : ${safeOriginalFilename}, Type MIME : ${mimeType}, Extension : ${extension}`
             );
           }
         }
@@ -2372,27 +2381,7 @@ export const addVideo = async (req, reply, fastify) => {
       Object.assign(data, req.body || {});
     }
 
-    // 2) Normaliser les variantes possibles de l’ID utilisateur
-    const rawUserId =
-      data.utilisateurID ??
-      data.UtilisateurID ??
-      data.utilisateurId ??
-      data.userId ??
-      data.userID;
-
-    // 3) Nettoyage + casting
-    const utilisateurID =
-      rawUserId === undefined || rawUserId === null
-        ? undefined
-        : Number(String(rawUserId).trim());
-
-    // 4) Validation robuste
-    if (!Number.isFinite(utilisateurID) || utilisateurID <= 0) {
-      return reply.code(400).send({ error: "Le utilisateurID est obligatoire et doit être un entier > 0." });
-    }
-
-    // 5) Conserver pour la suite
-    data.utilisateurID = utilisateurID;
+    data.utilisateurID = adminUserId;
 
     console.log('[addVideo] Payload reçu (champs texte) :', { ...data });
 
@@ -2979,6 +2968,7 @@ export const addVideo = async (req, reply, fastify) => {
     });
     reply.send({ message: 'Vidéo ajoutée avec succès.', video: updatedVideo });
   } catch (err) {
+    if (isMultipartFileTooLargeError(err)) return sendMultipartFileTooLarge(reply);
     console.error(err);
     reply.code(500).send({ error: 'Erreur lors du traitement de la vidéo.' });
   }
@@ -3061,11 +3051,6 @@ export const updateVideoTitle = async (request, reply) => {
     return reply.status(400).send({ error: "Le titre ne peut pas être vide." });
   }
 
-  // ✅ Auth obligatoire (évite UtilisateurID=0 et logs pourris)
-  const userId = request.user?.userId;
-  if (!userId) {
-    return reply.status(401).send({ error: "Non authentifié." });
-  }
   // en tout début de updateVideoTitle
   const reqId = request.id ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`;
   console.log(
@@ -3073,10 +3058,8 @@ export const updateVideoTitle = async (request, reply) => {
   );
 
   try {
-    const userId = request.user?.userId;
-    if (!userId || !Number.isFinite(Number(userId))) {
-      return reply.code(401).send({ error: "Non autorisé." });
-    }
+    const userId = await ensureVideoAdmin(request, reply);
+    if (!userId) return;
 
     const before = await prisma.video.findUnique({
       where: { VideoID: videoId },
@@ -3134,10 +3117,8 @@ export const updateVideoResumer = async (request, reply) => {
   try {
     const videoId = parseInt(id, 10);
 
-    const userId = request.user?.userId;
-    if (!userId || !Number.isFinite(Number(userId))) {
-      return reply.code(401).send({ error: "Non autorisé." });
-    }
+    const userId = await ensureVideoAdmin(request, reply);
+    if (!userId) return;
 
     const before = await prisma.video.findUnique({
       where: { VideoID: videoId },
@@ -3248,11 +3229,8 @@ export const updateVideoGenres = async (request, reply) => {
     const videoId = parseInt(id, 10);
     const uniqueIds = [...new Set(GenreIDs.map((g) => parseInt(g, 10)).filter(Number.isInteger))];
 
-    // Vérifie que la vidéo existe
-    const userId = request.user?.userId;
-    if (!userId || !Number.isFinite(Number(userId))) {
-      return reply.code(401).send({ error: "Non autorisé." });
-    }
+    const userId = await ensureVideoAdmin(request, reply);
+    if (!userId) return;
 
     const existing = await prisma.video.findUnique({
       where: { VideoID: videoId },
