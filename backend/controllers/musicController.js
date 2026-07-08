@@ -3,6 +3,8 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { prisma } from "../services/db.js";
 import { createLog } from "./logController.js";
+import { ensureAdmin as ensureSharedAdmin, ensureSuperAdmin as ensureSharedSuperAdmin } from "../services/authz.js";
+import { ETAT } from "../constants.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -10,44 +12,17 @@ const BACKEND_ROOT = path.join(__dirname, "..");
 const UPLOADS_ROOT = path.join(BACKEND_ROOT, "uploads");
 const MUSIC_ROOT = path.join(UPLOADS_ROOT, "musique");
 const ALBUM_ROOT = path.join(UPLOADS_ROOT, "album");
-const ACTIVE_ETAT_ID = 1;
-const DELETED_ETAT_ID = 2;
+const ACTIVE_ETAT_ID = ETAT.ACTIVE;
+const DELETED_ETAT_ID = ETAT.DELETED;
 
 const ensureAdmin = async (request, reply) => {
-  const userId = Number(request.user?.userId);
-  if (!Number.isInteger(userId)) {
-    reply.code(401).send({ error: "Non autorisé." });
-    return null;
-  }
-
-  const user = await prisma.utilisateur.findUnique({
-    where: { UtilisateurID: userId },
-    select: { GradeID: true },
-  });
-
-  if (!user || (user.GradeID !== 1 && user.GradeID !== 2)) {
-    reply.status(403).send({ error: "Accès réservé aux administrateurs." });
-    return null;
-  }
-
-  return userId;
+  const admin = await ensureSharedAdmin(request, reply);
+  return admin?.userId || null;
 };
 
 const ensureSuperAdmin = async (request, reply) => {
-  const userId = await ensureAdmin(request, reply);
-  if (!userId) return null;
-
-  const user = await prisma.utilisateur.findUnique({
-    where: { UtilisateurID: userId },
-    select: { GradeID: true },
-  });
-
-  if (user?.GradeID !== 1) {
-    reply.status(403).send({ error: "Accès réservé au super administrateur." });
-    return null;
-  }
-
-  return userId;
+  const admin = await ensureSharedSuperAdmin(request, reply);
+  return admin?.userId || null;
 };
 
 const parseId = (value) => {

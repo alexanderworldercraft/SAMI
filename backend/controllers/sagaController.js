@@ -2,6 +2,9 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import { prisma } from "../services/db.js";
+import { ensureAdmin, ensureSuperAdmin as ensureSharedSuperAdmin } from "../services/authz.js";
+import { ETAT } from "../constants.js";
+import { isTruthyValue, parsePositiveInt } from "../utils/requestParsing.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -9,8 +12,8 @@ const BACKEND_ROOT = path.join(__dirname, "..");
 const UPLOADS_ROOT = path.join(BACKEND_ROOT, "uploads");
 const SAGA_ROOT = path.join(UPLOADS_ROOT, "saga");
 const TEMP_ROOT = path.join(UPLOADS_ROOT, "tmp");
-const ACTIVE_ETAT_ID = 1;
-const DELETED_ETAT_ID = 2;
+const ACTIVE_ETAT_ID = ETAT.ACTIVE;
+const DELETED_ETAT_ID = ETAT.DELETED;
 
 const allowedImageExts = new Set([
   ".jpg",
@@ -40,43 +43,14 @@ const mimeToExt = {
   "image/tiff": ".tiff",
 };
 
-const parsePositiveInt = (value) => {
-  const parsed = Number(value);
-  if (!Number.isFinite(parsed)) return null;
-  const intValue = Math.floor(parsed);
-  return intValue > 0 ? intValue : null;
-};
-
-const isTruthy = (value) => ["1", "true", "yes", "on"].includes(String(value || "").toLowerCase());
+const isTruthy = isTruthyValue;
 
 const ensureSagaAdmin = async (request, reply) => {
-  const userId = Number(request.user?.userId);
-  if (!Number.isInteger(userId)) {
-    reply.code(401).send({ error: "Non autorisé." });
-    return null;
-  }
-
-  const user = await prisma.utilisateur.findUnique({
-    where: { UtilisateurID: userId },
-    select: { GradeID: true },
-  });
-
-  if (!user || (user.GradeID !== 1 && user.GradeID !== 2)) {
-    reply.status(403).send({ error: "Accès réservé aux administrateurs." });
-    return null;
-  }
-
-  return { userId, gradeId: user.GradeID };
+  return ensureAdmin(request, reply);
 };
 
 const ensureSuperAdmin = async (request, reply) => {
-  const admin = await ensureSagaAdmin(request, reply);
-  if (!admin) return null;
-  if (admin.gradeId !== 1) {
-    reply.status(403).send({ error: "Accès réservé au super administrateur." });
-    return null;
-  }
-  return admin;
+  return ensureSharedSuperAdmin(request, reply);
 };
 
 const removeStoredSagaImage = (relativePath) => {

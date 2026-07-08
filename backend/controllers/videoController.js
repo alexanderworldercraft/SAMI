@@ -7,6 +7,9 @@ import { startOfDay, endOfDay, startOfMonth, endOfMonth, subDays } from "date-fn
 import { fileURLToPath } from "url";
 import { createLog, updateLatestVideoPlayLogProgress } from "./logController.js";
 import { isContentPreviewActive } from "./appSettingController.js";
+import { ensureAdmin, ensureSuperAdmin } from "../services/authz.js";
+import { ETAT, GRADE } from "../constants.js";
+import { isTruthyValue, parsePositiveInt } from "../utils/requestParsing.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -16,8 +19,8 @@ const VIDEO_ROOT = path.join(UPLOADS_ROOT, "video");
 const TEMP_ROOT = path.join(UPLOADS_ROOT, "tmp");
 const IMAGE_ROOT = path.join(UPLOADS_ROOT, "images");
 const ERROR_ROOT = path.join(UPLOADS_ROOT, "Error_videos");
-const ACTIVE_ETAT_ID = 1;
-const DELETED_ETAT_ID = 2;
+const ACTIVE_ETAT_ID = ETAT.ACTIVE;
+const DELETED_ETAT_ID = ETAT.DELETED;
 
 const normalizeLangTag = (value) =>
   (value || "und").toLowerCase().replace(/[^a-z0-9_-]/g, "");
@@ -105,8 +108,7 @@ const countWatchedEpisodesAfterReset = (logs, resetBySeriesId = new Map()) => {
   return counts;
 };
 
-const isTruthyQueryValue = (value) =>
-  ["1", "true", "yes", "on"].includes(String(value || "").toLowerCase());
+const isTruthyQueryValue = isTruthyValue;
 
 const attachWatchStatus = async (items, userId) => {
   if (!userId || !Array.isArray(items) || items.length === 0) return items;
@@ -288,7 +290,7 @@ function isVideoPremium(video) {
 function canAccessPremium(user) {
   if (!user) return false;
 
-  const isAdmin = user.GradeID === 1 || user.GradeID === 2;
+  const isAdmin = user.GradeID === GRADE.SUPER_ADMIN || user.GradeID === GRADE.ADMIN;
   if (isAdmin) return true;
 
   if (!user.PremiumEndDate) return false;
@@ -297,13 +299,6 @@ function canAccessPremium(user) {
   const end = new Date(user.PremiumEndDate);
   return end > now;
 }
-
-const parsePositiveInt = (value) => {
-  const parsed = Number(value);
-  if (!Number.isFinite(parsed)) return null;
-  const intValue = Math.floor(parsed);
-  return intValue > 0 ? intValue : null;
-};
 
 const normalizeProgress = (progress) => {
   if (!progress) return null;
@@ -324,43 +319,13 @@ const normalizeProgress = (progress) => {
 };
 
 const ensureVideoAdmin = async (request, reply) => {
-  const userId = Number(request.user?.userId);
-  if (!Number.isInteger(userId)) {
-    reply.code(401).send({ error: "Non autorisé." });
-    return null;
-  }
-
-  const user = await prisma.utilisateur.findUnique({
-    where: { UtilisateurID: userId },
-    select: { GradeID: true },
-  });
-
-  if (!user || (user.GradeID !== 1 && user.GradeID !== 2)) {
-    reply.status(403).send({ error: "Accès réservé aux administrateurs." });
-    return null;
-  }
-
-  return userId;
+  const admin = await ensureAdmin(request, reply);
+  return admin?.userId || null;
 };
 
 const ensureVideoSuperAdmin = async (request, reply) => {
-  const userId = Number(request.user?.userId);
-  if (!Number.isInteger(userId)) {
-    reply.code(401).send({ error: "Non autorisé." });
-    return null;
-  }
-
-  const user = await prisma.utilisateur.findUnique({
-    where: { UtilisateurID: userId },
-    select: { GradeID: true },
-  });
-
-  if (!user || user.GradeID !== 1) {
-    reply.status(403).send({ error: "Accès réservé au super administrateur." });
-    return null;
-  }
-
-  return userId;
+  const admin = await ensureSuperAdmin(request, reply);
+  return admin?.userId || null;
 };
 
 const removeStoredPath = (relativePath, { recursive = false } = {}) => {
@@ -3338,7 +3303,7 @@ export const addVideo = async (req, reply, fastify) => {
         Resumer: data.resumer || null, // Inclure le résumé
         CheminAcces: path.join("uploads", "video", "pending", "master.m3u8"),
         CheminImage: "",
-        EtatID: 1,
+        EtatID: ACTIVE_ETAT_ID,
         SaisonID: data.SaisonID || null, // Inclure la saison
 
         // Identifie quand et qui à ajouter une vidéo
@@ -3795,23 +3760,15 @@ export const updateVideoGenres = async (request, reply) => {
 // Active ou désactive le flag Premium sur une vidéo
 export const updateVideoPremium = async (request, reply) => {
   try {
+    const userId = await ensureVideoAdmin(request, reply);
+    if (!userId) return;
+
     const { id } = request.params;           // ID de la vidéo dans l'URL
     const { Premium } = request.body;        // booléen attendu dans le body
-    const { userId } = request.user;         // injecté par authMiddleware
 
     // Validation basique du body
     if (typeof Premium !== "boolean") {
       return reply.code(400).send({ error: "Le champ 'Premium' doit être un booléen." });
-    }
-
-    // Vérifier le grade de l'utilisateur (Admin / SuperAdmin uniquement)
-    const user = await prisma.utilisateur.findUnique({
-      where: { UtilisateurID: userId },
-      select: { GradeID: true },
-    });
-
-    if (!user || (user.GradeID !== 1 && user.GradeID !== 2)) {
-      return reply.code(403).send({ error: "Accès réservé aux administrateurs." });
     }
 
     const videoId = parseInt(id, 10);

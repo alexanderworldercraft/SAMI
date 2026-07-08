@@ -1,4 +1,5 @@
 import { prisma } from "../services/db.js";
+import { ETAT } from "../constants.js";
 
 export const importVideo = async (request, reply) => {
   const {
@@ -28,7 +29,7 @@ export const importVideo = async (request, reply) => {
         Resumer: Resumer || null,
         CheminAcces: cheminAccesFinal,
         CheminImage: cheminImageFinal,
-        EtatID: 1, // fixe, par défaut
+        EtatID: ETAT.ACTIVE,
         SaisonID: SaisonID || null,
         UtilisateurID: parseInt(UtilisateurID, 10)
       }

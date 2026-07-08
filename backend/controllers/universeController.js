@@ -1,45 +1,18 @@
 import { prisma } from "../services/db.js";
+import { ensureAdmin, ensureSuperAdmin as ensureSharedSuperAdmin } from "../services/authz.js";
+import { ETAT } from "../constants.js";
+import { isTruthyValue, parsePositiveInt } from "../utils/requestParsing.js";
 
-const ACTIVE_ETAT_ID = 1;
-const DELETED_ETAT_ID = 2;
-
-const parsePositiveInt = (value) => {
-  const parsed = Number(value);
-  if (!Number.isFinite(parsed)) return null;
-  const intValue = Math.floor(parsed);
-  return intValue > 0 ? intValue : null;
-};
-
-const isTruthy = (value) => ["1", "true", "yes", "on"].includes(String(value || "").toLowerCase());
+const ACTIVE_ETAT_ID = ETAT.ACTIVE;
+const DELETED_ETAT_ID = ETAT.DELETED;
+const isTruthy = isTruthyValue;
 
 const ensureUniverseAdmin = async (request, reply) => {
-  const userId = Number(request.user?.userId);
-  if (!Number.isInteger(userId)) {
-    reply.code(401).send({ error: "Non autorisé." });
-    return null;
-  }
-
-  const user = await prisma.utilisateur.findUnique({
-    where: { UtilisateurID: userId },
-    select: { GradeID: true },
-  });
-
-  if (!user || (user.GradeID !== 1 && user.GradeID !== 2)) {
-    reply.status(403).send({ error: "Accès réservé aux administrateurs." });
-    return null;
-  }
-
-  return { userId, gradeId: user.GradeID };
+  return ensureAdmin(request, reply);
 };
 
 const ensureSuperAdmin = async (request, reply) => {
-  const admin = await ensureUniverseAdmin(request, reply);
-  if (!admin) return null;
-  if (admin.gradeId !== 1) {
-    reply.status(403).send({ error: "Accès réservé au super administrateur." });
-    return null;
-  }
-  return admin;
+  return ensureSharedSuperAdmin(request, reply);
 };
 
 const normalizeSaga = (saga) => ({

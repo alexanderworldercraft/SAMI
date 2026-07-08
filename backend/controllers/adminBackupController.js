@@ -3,6 +3,7 @@ import bcrypt from "bcrypt";
 import { prisma } from "../services/db.js";
 import { createDatabaseBackup } from "../services/databaseBackupService.js";
 import { createLog } from "./logController.js";
+import { GRADE } from "../constants.js";
 
 const ensureSuperAdminWithPassword = async (request, reply) => {
   const userId = Number(request.user?.userId);
@@ -28,7 +29,7 @@ const ensureSuperAdminWithPassword = async (request, reply) => {
     },
   });
 
-  if (!user || user.GradeID !== 1) {
+  if (!user || user.GradeID !== GRADE.SUPER_ADMIN) {
     reply.status(403).send({ error: "Accès réservé au super administrateur." });
     return null;
   }

@@ -5,6 +5,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from "url";
 import { createLog } from "./logController.js";
+import { ensureAdmin } from "../services/authz.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -33,23 +34,8 @@ const removeStoredSeriesImage = (relativePath) => {
 };
 
 const ensureSeriesAdmin = async (request, reply) => {
-  const userId = Number(request.user?.userId);
-  if (!Number.isInteger(userId)) {
-    reply.code(401).send({ error: "Non autorisé." });
-    return null;
-  }
-
-  const user = await prisma.utilisateur.findUnique({
-    where: { UtilisateurID: userId },
-    select: { GradeID: true },
-  });
-
-  if (!user || (user.GradeID !== 1 && user.GradeID !== 2)) {
-    reply.status(403).send({ error: "Accès réservé aux administrateurs." });
-    return null;
-  }
-
-  return userId;
+  const admin = await ensureAdmin(request, reply);
+  return admin?.userId || null;
 };
 
 // Ajouter une nouvelle série
@@ -807,24 +793,14 @@ export const updateSerieGenres = async (request, reply) => {
 // Active ou désactive le flag Premium sur une série
 export const updateSeriePremium = async (request, reply) => {
   try {
-    if (!request.user?.userId || !Number.isFinite(Number(request.user.userId))) {
-      return reply.code(401).send({ error: "Non autorisé." });
-    }
+    const userId = await ensureSeriesAdmin(request, reply);
+    if (!userId) return;
+
     const { id } = request.params;
     const { Premium } = request.body;
-    const userId = Number(request.user.userId);
 
     if (typeof Premium !== "boolean") {
       return reply.code(400).send({ error: "Le champ 'Premium' doit être un booléen." });
-    }
-
-    const user = await prisma.utilisateur.findUnique({
-      where: { UtilisateurID: userId },
-      select: { GradeID: true },
-    });
-
-    if (!user || (user.GradeID !== 1 && user.GradeID !== 2)) {
-      return reply.code(403).send({ error: "Accès réservé aux administrateurs." });
     }
 
     const seriesId = parseInt(id, 10);

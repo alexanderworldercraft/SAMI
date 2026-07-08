@@ -7,12 +7,11 @@ import dotenv from 'dotenv';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { PrismaClient } from '@prisma/client';
 import nodemailer from 'nodemailer';
 import { subDays } from 'date-fns';
 import { createLog, getClientIp } from "./logController.js";
-
-const prisma = new PrismaClient();
+import { prisma } from "../services/db.js";
+import { ADMIN_GRADE_IDS, ETAT, GRADE } from "../constants.js";
 
 // Durée de vie des tokens par GradeID
 // 1 = SuperAdmin, 2 = Admin, 3 = Utilisateur
@@ -128,7 +127,7 @@ async function buildWatchHistoryPayload(userId, limit) {
             take: 1,
             select: {
               Episodes: {
-                where: { EtatID: 1 },
+                where: { EtatID: ETAT.ACTIVE },
                 orderBy: { Titre: "asc" },
                 take: 1,
                 select: { VideoID: true },
@@ -968,7 +967,7 @@ export const userController = {
       const user = await userRepository.getUserById(decoded.userId);
       // console.log("Utilisateur récupéré:", user); // Logguer les infos utilisateur
 
-      if (!user || (user.GradeID !== 1 && user.GradeID !== 2)) {
+      if (!user || !ADMIN_GRADE_IDS.includes(user.GradeID)) {
         return reply.status(403).send({ error: "Forbidden" });
       }
 
@@ -997,11 +996,11 @@ export const userController = {
 
       // Vérifier si l'utilisateur est superadmin ou admin
       const user = await userRepository.getUserById(decoded.userId);
-      if (!user || (user.GradeID !== 1 && user.GradeID !== 2)) {
+      if (!user || !ADMIN_GRADE_IDS.includes(user.GradeID)) {
         return reply.status(403).send({ error: "Forbidden" });
       }
 
-      const { gradeId = 3, etatId = 1 } = request.query; // Paramètres par défaut : utilisateurs classiques actifs
+      const { gradeId = GRADE.USER, etatId = ETAT.ACTIVE } = request.query; // Paramètres par défaut : utilisateurs classiques actifs
 
       // Récupérer les utilisateurs correspondant aux critères
       const users = await userRepository.getUsersByCriteria(Number(gradeId), Number(etatId));
@@ -1023,14 +1022,14 @@ export const userController = {
 
       // Vérifie si l'utilisateur qui effectue l'action est SuperAdmin ou Admin
       const user = await userRepository.getUserById(decoded.userId);
-      if (!user || (user.GradeID !== 1 && user.GradeID !== 2)) {
+      if (!user || !ADMIN_GRADE_IDS.includes(user.GradeID)) {
         return reply.status(403).send({ error: "Forbidden" });
       }
 
       const { userId, newEtat } = request.body;
 
       // Vérifie les paramètres de la requête
-      if (!userId || ![1, 3].includes(newEtat)) {
+      if (!userId || ![ETAT.ACTIVE, ETAT.BLOCKED].includes(newEtat)) {
         return reply.status(400).send({ error: "Invalid request parameters" });
       }
 
@@ -1064,7 +1063,7 @@ export const userController = {
       const user = await userRepository.getUserById(decoded.userId);
 
       // Vérifier si l'utilisateur est superadmin
-      if (!user || user.GradeID !== 1) {
+      if (!user || user.GradeID !== GRADE.SUPER_ADMIN) {
         return reply.status(403).send({ error: "Forbidden" });
       }
 
@@ -1072,7 +1071,7 @@ export const userController = {
       const targetUser = await userRepository.getUserById(userId);
 
       // Empêcher de modifier les superadmins
-      if (targetUser.GradeID === 1) {
+      if (targetUser.GradeID === GRADE.SUPER_ADMIN) {
         return reply.status(403).send({ error: "Cannot modify a superadmin." });
       }
 
@@ -1185,7 +1184,7 @@ export const userController = {
       const currentTimestamp = new Date().toISOString().replace(/[:.]/g, "-");
 
       const deletedEmail =
-        user.GradeID === 1 || user.GradeID === 2
+        ADMIN_GRADE_IDS.includes(user.GradeID)
           ? "Admin@delete.com"
           : "Utilisateur@delete.com";
 
@@ -1199,7 +1198,7 @@ export const userController = {
           Email: deletedEmail,
           MotDePasse: deletedMotDePasse,
           CheminImage: null,
-          EtatID: 2, // État supprimé
+          EtatID: ETAT.DELETED,
         });
         console.log("Utilisateur mis à jour :", updatedUser);
       } catch (err) {
@@ -1409,7 +1408,7 @@ export const userController = {
 
       // Vérifier si l'utilisateur est Admin ou SuperAdmin
       const currentUser = await userRepository.getUserById(decoded.userId);
-      if (!currentUser || (currentUser.GradeID !== 1 && currentUser.GradeID !== 2)) {
+      if (!currentUser || !ADMIN_GRADE_IDS.includes(currentUser.GradeID)) {
         return reply.status(403).send({ error: "Forbidden" });
       }
 
@@ -1519,7 +1518,7 @@ export const userController = {
   async getUserWatchHistory(request, reply) {
     try {
       const currentUser = await userRepository.getUserById(request.user?.userId);
-      if (!currentUser || (currentUser.GradeID !== 1 && currentUser.GradeID !== 2)) {
+      if (!currentUser || !ADMIN_GRADE_IDS.includes(currentUser.GradeID)) {
         return reply.status(403).send({ error: "Forbidden" });
       }
 
@@ -1572,11 +1571,11 @@ export const userController = {
 
       // Vérifier si l'utilisateur est Admin ou SuperAdmin
       const currentUser = await userRepository.getUserById(decoded.userId);
-      if (!currentUser || (currentUser.GradeID !== 1 && currentUser.GradeID !== 2)) {
+      if (!currentUser || !ADMIN_GRADE_IDS.includes(currentUser.GradeID)) {
         return reply.status(403).send({ error: "Forbidden" });
       }
 
-      const { gradeId = 3, scope = "activeBlocked" } = request.query;
+      const { gradeId = GRADE.USER, scope = "activeBlocked" } = request.query;
 
       const usersBrut = await userRepository.getUsersForAdminPanel(
         Number(gradeId),

@@ -1,24 +1,9 @@
 import { prisma } from "../services/db.js";
 import { createLog } from "./logController.js";
+import { ensureAdmin as ensureSharedAdmin } from "../services/authz.js";
 
 const ensureAdmin = async (request, reply) => {
-  const userId = Number(request.user?.userId);
-  if (!Number.isInteger(userId)) {
-    reply.status(401).send({ error: "Unauthorized" });
-    return false;
-  }
-
-  const user = await prisma.utilisateur.findUnique({
-    where: { UtilisateurID: userId },
-    select: { GradeID: true },
-  });
-
-  if (!user || (user.GradeID !== 1 && user.GradeID !== 2)) {
-    reply.status(403).send({ error: "Accès réservé aux administrateurs." });
-    return false;
-  }
-
-  return true;
+  return Boolean(await ensureSharedAdmin(request, reply, { unauthorizedError: "Unauthorized" }));
 };
 
 const getAdminMessageOrCreate = async () => {

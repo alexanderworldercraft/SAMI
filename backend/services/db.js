@@ -2,7 +2,7 @@
 import { PrismaClient } from "@prisma/client";
 
 // Initialisation d'une instance de PrismaClient pour gérer les opérations sur la base de données
-let client = new PrismaClient();
+const client = new PrismaClient();
 
 // Log de confirmation de connexion à la base de données pour le débogage
 console.log("[DEBUG] Connected to DB");
