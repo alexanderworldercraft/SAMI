@@ -5,7 +5,6 @@ import { CheckIcon } from '@heroicons/react/20/solid';
 import { ChevronUpDownIcon } from '@heroicons/react/16/solid';
 import api from '../services/api';
 
-const apiUrl = process.env.REACT_APP_URL_LOCAL || "https://192.168.0.17:1234";
 const fieldClass = "block w-full rounded-xl border border-sky-500/20 bg-white/85 px-4 py-3 text-sm font-semibold text-slate-900 shadow-sm transition duration-200 hover:border-sky-400/60 focus:outline-none focus:ring-2 focus:ring-sky-400 dark:bg-slate-950/65 dark:text-white";
 const labelClass = "mb-2 block text-sm/6 font-bold text-slate-700 dark:text-slate-200";
 const submitClass = "inline-flex items-center justify-center rounded-lg border border-sky-300/40 bg-sky-500/15 px-5 py-3 text-sm font-bold text-slate-900 transition duration-200 hover:border-sky-300/80 hover:bg-sky-500/25 dark:text-white";
@@ -19,17 +18,17 @@ const SeasonsManager = () => {
     const [searchTerm, setSearchTerm] = useState("");
 
     const filteredSeries = series.filter((serie) =>
-        serie.Titre.toLowerCase().includes(searchTerm.toLowerCase())
+        (serie.Titre || "").toLowerCase().includes(searchTerm.toLowerCase())
     );
 
     useEffect(() => {
         const fetchSeries = async () => {
             try {
-                const response = await fetch(`${apiUrl}/api/series`);
-                const data = await response.json();
-                setSeries(data);
+                const response = await api.get("/series");
+                setSeries(Array.isArray(response.data) ? response.data : []);
             } catch (error) {
                 console.error("Erreur lors de la récupération des séries :", error);
+                setSeries([]);
             }
         };
         fetchSeries();

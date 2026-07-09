@@ -7,8 +7,6 @@ import api from '../services/api';
 
 // import NotificationTester from './NotificationTester';
 
-const apiUrl = process.env.REACT_APP_URL_LOCAL || "https://192.168.0.17:1234";
-
 const fieldClass = "block w-full rounded-xl border border-sky-500/20 bg-white/85 px-4 py-3 text-sm font-semibold text-slate-900 shadow-sm transition duration-200 hover:border-sky-400/60 focus:outline-none focus:ring-2 focus:ring-sky-400 dark:bg-slate-950/65 dark:text-white";
 const labelClass = "block text-sm/6 font-bold text-slate-700 dark:text-slate-200";
 const submitClass = "inline-flex items-center justify-center rounded-lg border border-sky-300/40 bg-sky-500/15 px-5 py-3 text-sm font-bold text-slate-900 transition duration-200 hover:border-sky-300/80 hover:bg-sky-500/25 dark:text-white";
@@ -62,19 +60,30 @@ const NewVideoForm = () => {
         }
     };
 
-    // Récupérer les genres depuis l'API
-    const fetchGenres = async () => {
-        try {
-            const response = await fetch(`${apiUrl}/api/genres`);
-            const data = await response.json();
-            setGenres(data);
-        } catch (error) {
-            showNotification("Erreur lors de la récupération des genres.", "⚠️", "error");
-        }
-    };
-
     useEffect(() => {
+        let isMounted = true;
+
+        const fetchGenres = async () => {
+            try {
+                const response = await api.get("/genres");
+                if (isMounted) setGenres(Array.isArray(response.data) ? response.data : []);
+            } catch (error) {
+                if (!isMounted) return;
+                setGenres([]);
+                setNotification({
+                    message: "Erreur lors de la récupération des genres.",
+                    type: "error",
+                    icon: "⚠️",
+                    duration: 5000,
+                });
+            }
+        };
+
         fetchGenres();
+
+        return () => {
+            isMounted = false;
+        };
     }, []);
 
     const handleSubmit = async (e) => {

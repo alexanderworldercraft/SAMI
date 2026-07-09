@@ -4,8 +4,6 @@ import Notification from "./Notification";
 import GenreList from "./GenreList";
 import api from '../services/api';
 
-const apiUrl = process.env.REACT_APP_URL_LOCAL || "https://192.168.0.17:1234";
-
 const SeriesAndSeasonsManager = () => {
     const [series, setSeries] = useState([]);
     const [newSeriesTitle, setNewSeriesTitle] = useState("");
@@ -19,11 +17,11 @@ const SeriesAndSeasonsManager = () => {
     useEffect(() => {
         const fetchGenres = async () => {
             try {
-                const response = await fetch(`${apiUrl}/api/genres`);
-                const data = await response.json();
-                setGenres(data);
+                const response = await api.get("/genres");
+                setGenres(Array.isArray(response.data) ? response.data : []);
             } catch (error) {
                 console.error("Erreur lors de la récupération des genres :", error);
+                setGenres([]);
             }
         };
         fetchGenres();
@@ -32,11 +30,11 @@ const SeriesAndSeasonsManager = () => {
     // Récupérer toutes les séries
     const fetchSeries = async () => {
         try {
-            const response = await fetch(`${apiUrl}/api/series`);
-            const data = await response.json();
-            setSeries(data);
+            const response = await api.get("/series");
+            setSeries(Array.isArray(response.data) ? response.data : []);
         } catch (error) {
             console.error("Erreur lors de la récupération des séries :", error);
+            setSeries([]);
         }
     };
 

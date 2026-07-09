@@ -71,18 +71,46 @@ const SagaContentManager = () => {
 
   useEffect(() => {
     const loadData = async () => {
-      try {
-        const [sagaResponse, videoResponse, seriesResponse] = await Promise.all([
-          api.get("/sagas/admin"),
-          api.get("/videos/admin"),
-          api.get("/series"),
-        ]);
-        setSagas(Array.isArray(sagaResponse.data) ? sagaResponse.data : []);
-        setVideos(Array.isArray(videoResponse.data) ? videoResponse.data : []);
-        setSeries(Array.isArray(seriesResponse.data) ? seriesResponse.data : []);
-      } catch (error) {
-        console.error("Erreur lors du chargement des données saga :", error);
-        showNotification("Impossible de charger les sagas ou contenus.", "⚠️", "error");
+      const [sagaResult, videoResult, seriesResult] = await Promise.allSettled([
+        api.get("/sagas/admin"),
+        api.get("/videos/admin"),
+        api.get("/series"),
+      ]);
+
+      if (sagaResult.status === "fulfilled") {
+        setSagas(Array.isArray(sagaResult.value.data) ? sagaResult.value.data : []);
+      } else {
+        console.error("Erreur lors du chargement admin des sagas :", sagaResult.reason);
+        try {
+          const fallbackResponse = await api.get("/sagas");
+          const fallbackSagas = Array.isArray(fallbackResponse.data)
+            ? fallbackResponse.data
+            : Array.isArray(fallbackResponse.data?.items)
+              ? fallbackResponse.data.items
+              : [];
+          setSagas(fallbackSagas);
+        } catch (fallbackError) {
+          console.error("Erreur lors du chargement public des sagas :", fallbackError);
+          setSagas([]);
+        }
+      }
+
+      if (videoResult.status === "fulfilled") {
+        setVideos(Array.isArray(videoResult.value.data) ? videoResult.value.data : []);
+      } else {
+        console.error("Erreur lors du chargement des vidéos admin :", videoResult.reason);
+        setVideos([]);
+      }
+
+      if (seriesResult.status === "fulfilled") {
+        setSeries(Array.isArray(seriesResult.value.data) ? seriesResult.value.data : []);
+      } else {
+        console.error("Erreur lors du chargement des séries :", seriesResult.reason);
+        setSeries([]);
+      }
+
+      if ([sagaResult, videoResult, seriesResult].some((result) => result.status === "rejected")) {
+        showNotification("Certaines listes n'ont pas pu être chargées.", "⚠️", "error");
       }
     };
 

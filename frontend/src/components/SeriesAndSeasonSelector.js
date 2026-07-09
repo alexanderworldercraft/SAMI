@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Listbox, ListboxButton, ListboxOptions, ListboxOption } from '@headlessui/react';
 import { ChevronUpDownIcon } from '@heroicons/react/16/solid';
 import { CheckIcon } from '@heroicons/react/20/solid';
+import api from "../services/api";
 
 const listboxButtonClass = "w-full cursor-default rounded-xl border border-sky-500/20 bg-white/85 py-3 pl-4 pr-10 text-left text-sm font-semibold text-slate-900 shadow-sm transition duration-200 hover:border-sky-400/60 focus:outline-none focus:ring-2 focus:ring-sky-400 dark:bg-slate-950/65 dark:text-white";
 const listboxOptionsClass = "z-[9999] max-h-72 w-[var(--button-width)] overflow-auto rounded-xl border border-sky-500/20 bg-white py-2 text-sm shadow-2xl shadow-sky-950/20 focus:outline-none dark:bg-slate-950 dark:text-slate-100";
@@ -15,11 +16,11 @@ const SeriesAndSeasonSelector = ({ selectedSeries, setSelectedSeries, selectedSe
   useEffect(() => {
     const fetchSeries = async () => {
       try {
-        const response = await fetch(`${process.env.REACT_APP_URL_LOCAL}/api/series`);
-        const data = await response.json();
-        setSeries(Array.isArray(data) ? data : []);
+        const response = await api.get("/series");
+        setSeries(Array.isArray(response.data) ? response.data : []);
       } catch (error) {
         console.error("Erreur lors de la récupération des séries :", error);
+        setSeries([]);
       }
     };
 
@@ -28,24 +29,26 @@ const SeriesAndSeasonSelector = ({ selectedSeries, setSelectedSeries, selectedSe
 
   useEffect(() => {
     if (selectedSeries?.SeriesID) {
+      setSelectedSeason("");
       const fetchSeasons = async () => {
         try {
-          const response = await fetch(`${process.env.REACT_APP_URL_LOCAL}/api/series/${selectedSeries.SeriesID}/saisons`);
-          const data = await response.json();
-          setSeasons(data);
+          const response = await api.get(`/series/${selectedSeries.SeriesID}/saisons`);
+          setSeasons(Array.isArray(response.data) ? response.data : []);
         } catch (error) {
           console.error("Erreur lors de la récupération des saisons :", error);
+          setSeasons([]);
         }
       };
 
       fetchSeasons();
     } else {
       setSeasons([]);
+      setSelectedSeason("");
     }
-  }, [selectedSeries]);
+  }, [selectedSeries, setSelectedSeason]);
 
   const filteredSeries = series.filter((s) =>
-    s.Titre.toLowerCase().includes(searchTerm.toLowerCase())
+    (s.Titre || "").toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
