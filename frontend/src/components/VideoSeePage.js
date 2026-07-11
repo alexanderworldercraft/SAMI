@@ -668,6 +668,10 @@ const VideoSeePage = () => {
                   onPremiumUpdate={(newPremium) =>
                     setVideo((prev) => ({ ...prev, Premium: newPremium }))
                   }
+                  isFavorite={!!video.IsFavorite}
+                  onFavoriteChange={(nextValue) =>
+                    setVideo((prev) => ({ ...prev, IsFavorite: nextValue }))
+                  }
                 />
               )}
             </div>
@@ -719,6 +723,10 @@ const VideoSeePage = () => {
                       onImageUpdate={handleSeriesImageUpdate}
                       onPremiumUpdate={(newPremium) =>
                         setSeries((prev) => ({ ...prev, Premium: newPremium }))
+                      }
+                      isFavorite={!!series.IsFavorite}
+                      onFavoriteChange={(nextValue) =>
+                        setSeries((prev) => ({ ...prev, IsFavorite: nextValue }))
                       }
                     />
                   </div>

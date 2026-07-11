@@ -60,6 +60,7 @@ model Series {
   SagaContents         SagaContent[]
   UserSeriesWatchReset UserSeriesWatchReset[]
   GenreFeaturedContent GenreFeaturedContent[]
+  UserFavoriteContent   UserFavoriteContent[]
 
   @@index([EtatID], map: "Series_EtatID_fkey")
   @@index([UtilisateurID], map: "Series_UtilisateurID_fkey")
@@ -113,6 +114,7 @@ model Video {
   UserVideoProgress    UserVideoProgress[]
   VideoSubtitles       VideoSubtitle[]
   GenreFeaturedContent GenreFeaturedContent[]
+  UserFavoriteContent   UserFavoriteContent[]
 
   @@index([EtatID], map: "Video_EtatID_fkey")
   @@index([SaisonID], map: "Video_SaisonID_fkey")
@@ -240,9 +242,27 @@ model Utilisateur {
   Videos               Video[]
   UserVideoProgress    UserVideoProgress[]
   UserSeriesWatchReset UserSeriesWatchReset[]
+  UserFavoriteContent   UserFavoriteContent[]
 
   @@index([GradeID], map: "Utilisateur_GradeID_fkey")
   @@index([EtatID], map: "Utilisateur_EtatID_fkey")
+}
+
+model UserFavoriteContent {
+  UserFavoriteContentID BigInt      @id @default(autoincrement())
+  UserID                Int
+  VideoID               Int?
+  SeriesID              Int?
+  CreateDate            DateTime?   @default(now())
+  Utilisateur           Utilisateur @relation(fields: [UserID], references: [UtilisateurID], onDelete: Cascade)
+  Video                 Video?      @relation(fields: [VideoID], references: [VideoID], onDelete: Cascade)
+  Series                Series?     @relation(fields: [SeriesID], references: [SeriesID], onDelete: Cascade)
+
+  @@unique([UserID, VideoID], map: "uniq_user_favorite_video")
+  @@unique([UserID, SeriesID], map: "uniq_user_favorite_series")
+  @@index([UserID], map: "idx_user_favorite_user")
+  @@index([VideoID], map: "idx_user_favorite_video")
+  @@index([SeriesID], map: "idx_user_favorite_series")
 }
 
 model Musique {

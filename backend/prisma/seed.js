@@ -259,6 +259,16 @@ async function main() {
         Description: "Utilisateur s'abonne au premium fake.",
         Criticite: 0,
       },
+      {
+        Nom: "favorite_add",
+        Description: "Utilisateur ajoute un contenu à ses favoris.",
+        Criticite: 0,
+      },
+      {
+        Nom: "favorite_remove",
+        Description: "Utilisateur retire un contenu de ses favoris.",
+        Criticite: 0,
+      },
     ]),
     skipDuplicates: true, // Évite les erreurs si les grades existent déjà
   });

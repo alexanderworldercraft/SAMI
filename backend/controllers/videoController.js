@@ -41,6 +41,10 @@ import {
   isDuplicateAddVideo,
   normalizeLangTag,
 } from "../services/video/videoImportHelpers.js";
+import {
+  attachFavoriteStatus,
+  getFavoriteKeysForItems,
+} from "../services/favoriteContentService.js";
 
 const ACTIVE_ETAT_ID = ETAT.ACTIVE;
 const DELETED_ETAT_ID = ETAT.DELETED;
@@ -736,6 +740,7 @@ export const getVideosAndSeries = async (request, reply) => {
     hideWatched: rawHideWatched,
     hidePremium: rawHidePremium,
     newOnly: rawNewOnly,
+    favorites: rawFavorites,
   } = request.query;
 
   const take = 40; // Nombre d'éléments par page
@@ -750,6 +755,7 @@ export const getVideosAndSeries = async (request, reply) => {
   const shouldHideWatched = isTruthyQueryValue(rawHideWatched);
   const shouldHidePremium = isTruthyQueryValue(rawHidePremium);
   const shouldListNewOnly = isTruthyQueryValue(rawNewOnly);
+  const shouldListFavoritesOnly = isTruthyQueryValue(rawFavorites);
   const newEpisodeThreshold = subDays(new Date(), 30);
 
   // Fonction utilitaire: date sûre => number (epoch). Null/undefined => 0 (considéré comme "très ancien")
@@ -1061,6 +1067,17 @@ export const getVideosAndSeries = async (request, reply) => {
       );
     }
 
+    if (shouldListFavoritesOnly) {
+      if (!userId) {
+        return reply.send({ items: [], totalItems: 0, totalPages: 0 });
+      }
+
+      const favoriteKeys = await getFavoriteKeysForItems(userId, allItems);
+      allItems = allItems
+        .filter((item) => favoriteKeys.has(`${item.type}:${item.id}`))
+        .map((item) => ({ ...item, IsFavorite: true }));
+    }
+
     if (shouldHideWatched && userId) {
       allItems = await attachWatchStatus(allItems, userId);
       allItems = allItems.filter((item) => {
@@ -1112,9 +1129,13 @@ export const getVideosAndSeries = async (request, reply) => {
     const paginatedItems = sorted.slice(skip, skip + take);
 
     // ---- WATCH STATUS (optionnel, par utilisateur) ----
-    const itemsWithWatch = userId
-      ? await attachWatchStatus(paginatedItems, userId)
+    const itemsWithFavorite = userId
+      ? await attachFavoriteStatus(paginatedItems, userId)
       : paginatedItems;
+
+    const itemsWithWatch = userId
+      ? await attachWatchStatus(itemsWithFavorite, userId)
+      : itemsWithFavorite;
 
     reply.send({
       items: itemsWithWatch,
@@ -1878,6 +1899,13 @@ export const getVideoDetails = async (request, reply) => {
         }));
     }
 
+    const favoriteKeys = await getFavoriteKeysForItems(userId, [
+      { type: "video", id: video.VideoID },
+      video.Saison?.Series?.SeriesID
+        ? { type: "series", id: video.Saison.Series.SeriesID }
+        : null,
+    ].filter(Boolean));
+
     // Si la vidéo fait partie d'une série, ajouter les informations supplémentaires
     if (video.Saison) {
       const series = video.Saison.Series;
@@ -1909,6 +1937,7 @@ export const getVideoDetails = async (request, reply) => {
           })),
           Acteurs: VideoActeurs,         // ⬅️ NOUVEAU
           Realisateurs: VideoRealisateurs, // ⬅️ NOUVEAU
+          IsFavorite: favoriteKeys.has(`video:${video.VideoID}`),
         },
         series: {
           SeriesID: series.SeriesID,
@@ -1919,6 +1948,7 @@ export const getVideoDetails = async (request, reply) => {
           CheminImage: series.CheminImage,
           Acteurs: SeriesActeurs,           // ⬅️ NOUVEAU
           Realisateurs: SeriesRealisateurs, // ⬅️ NOUVEAU
+          IsFavorite: favoriteKeys.has(`series:${series.SeriesID}`),
         },
       });
     } else {
@@ -1939,6 +1969,7 @@ export const getVideoDetails = async (request, reply) => {
           })),
           Acteurs: VideoActeurs,         // ⬅️ NOUVEAU
           Realisateurs: VideoRealisateurs, // ⬅️ NOUVEAU
+          IsFavorite: favoriteKeys.has(`video:${video.VideoID}`),
         },
       });
     }

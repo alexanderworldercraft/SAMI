@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
 import api from '../services/api';
 import ImageUploader from "./ImageUploader";
 import VideoList from "./VideoList";
 import GenreList from "./GenreList";
+import FavoriteButton from "./FavoriteButton";
 
 const apiUrl = process.env.REACT_APP_URL_LOCAL;
 
@@ -14,6 +16,8 @@ const SerieDetails = ({
   onImageUpdate,
   onPremiumUpdate,
   onNotify,
+  isFavorite = false,
+  onFavoriteChange,
 }) => {
 
   const [isPremium, setIsPremium] = useState(!!series.Premium);
@@ -226,6 +230,14 @@ const SerieDetails = ({
                   ✏️
                 </button>
               )}
+              <FavoriteButton
+                type="series"
+                id={series.SeriesID}
+                isFavorite={isFavorite}
+                onChange={onFavoriteChange}
+                size="lg"
+                className="absolute left-2 top-2 z-10"
+              />
             </div>
           ) : (
             <div className="mb-4">
@@ -348,12 +360,13 @@ const SerieDetails = ({
                       const color = colorClasses[index % colorClasses.length]; // boucle sur la liste
 
                       return (
-                        <span
+                        <Link
                           key={g.GenreID ?? g.Nom}
+                          to={`/videos?genres=${encodeURIComponent(g.GenreID)}`}
                           className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ring-1 ring-inset ${color}`}
                         >
                           {g.Nom}
-                        </span>
+                        </Link>
                       );
                     })
                   ) : (

@@ -1,11 +1,11 @@
 import jwt from "jsonwebtoken";
 import { prisma } from "../db.js";
+import { getJwtFromRequest } from "../../middlewares/authMiddleware.js";
 
 export const getUserIdFromRequest = (request) => {
-  const authHeader = request?.headers?.authorization || request?.headers?.Authorization;
-  if (!authHeader || typeof authHeader !== "string") return null;
-  const token = authHeader.split(" ")[1];
+  const token = getJwtFromRequest(request);
   if (!token) return null;
+
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const userId = decoded?.userId;

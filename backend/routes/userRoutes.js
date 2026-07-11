@@ -28,6 +28,8 @@ export default async function userRoutes(fastify, options) {
   fastify.post('/reset-password', { preHandler: passwordResetRateLimit }, userController.resetPassword);
   fastify.post('/premium/fake-checkout', { preHandler: authMiddleware }, userController.createFakePremiumCheckout);
   fastify.post('/premium/webhook/fake', userController.fakePremiumPaymentWebhook);
+  fastify.post('/favorites/status', { preHandler: authMiddleware }, userController.getFavoriteStatus);
+  fastify.post('/favorites/toggle', { preHandler: authMiddleware }, userController.toggleFavorite);
 
   fastify.put('/update', { preHandler: authMiddleware }, userController.updateUser);
   fastify.put('/delete-account', { preHandler: authMiddleware }, userController.deleteAccount);
@@ -41,6 +43,7 @@ export default async function userRoutes(fastify, options) {
   fastify.get('/activity-summary', { preHandler: authMiddleware }, userController.getUserActivitySummary);
   fastify.get('/watch-history/me', { preHandler: authMiddleware }, userController.getMyWatchHistory);
   fastify.get('/watch-history/:userId', { preHandler: authMiddleware }, userController.getUserWatchHistory);
+  fastify.get('/favorites/me', { preHandler: authMiddleware }, userController.getMyFavorites);
 
   fastify.get('/me', { preHandler: authMiddleware }, async (request, reply) => {
   try {

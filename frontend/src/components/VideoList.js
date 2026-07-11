@@ -1,6 +1,8 @@
-import React from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import ContentPreviewTooltip from "./ContentPreviewTooltip";
+import FavoriteButton from "./FavoriteButton";
+import api from "../services/api";
 
 const apiUrl = process.env.REACT_APP_URL_LOCAL;
 const NEW_CONTENT_WINDOW_DAYS = 30;
@@ -14,13 +16,72 @@ const isRecentDate = (date) => {
   return value >= Date.now() - NEW_CONTENT_WINDOW_DAYS * 24 * 60 * 60 * 1000;
 };
 
-const VideoList = ({ videos = [], overlayActions, onItemClick, gridClassName = "" }) => {
+const VideoList = ({ videos = [], overlayActions, onItemClick, gridClassName = "", onFavoriteChange }) => {
+  const favoriteItems = useMemo(
+    () =>
+      (videos || [])
+        .filter((item) => ["video", "series"].includes(item?.type) && item?.id)
+        .map((item) => ({ type: item.type, id: item.id, IsFavorite: !!item.IsFavorite })),
+    [videos]
+  );
+  const [favoriteMap, setFavoriteMap] = useState({});
+
+  useEffect(() => {
+    const initialMap = {};
+    favoriteItems.forEach((item) => {
+      initialMap[`${item.type}:${item.id}`] = item.IsFavorite;
+    });
+    setFavoriteMap(initialMap);
+
+    if (!favoriteItems.length) return;
+
+    let isMounted = true;
+    api
+      .post("/users/favorites/status", { items: favoriteItems })
+      .then((response) => {
+        if (!isMounted) return;
+        const nextMap = {};
+        (response.data || []).forEach((item) => {
+          nextMap[`${item.type}:${item.id}`] = !!item.IsFavorite;
+        });
+        setFavoriteMap((current) => ({ ...current, ...nextMap }));
+      })
+      .catch(() => {});
+
+    return () => {
+      isMounted = false;
+    };
+  }, [favoriteItems]);
+
   const getImageUrl = (cheminImage, type) => {
     // Fallbacks locaux (évite via.placeholder.*)
     if (cheminImage) return `${apiUrl}/${cheminImage}`;
     if (type === "person") return `${apiUrl}/uploads/images/people/default.webp`;
     // à ajuster si tu as un default pour vidéos/séries
     return `./imageDefault.png`;
+  };
+
+  const renderFavoriteButton = (item, className = "") => {
+    if (!["video", "series"].includes(item?.type) || !item?.id) return null;
+
+    const key = `${item.type}:${item.id}`;
+    return (
+      <FavoriteButton
+        type={item.type}
+        id={item.id}
+        isFavorite={!!favoriteMap[key]}
+        onChange={(nextValue) =>
+          {
+            setFavoriteMap((current) => ({
+              ...current,
+              [key]: nextValue,
+            }));
+            onFavoriteChange?.(item, nextValue);
+          }
+        }
+        className={className}
+      />
+    );
   };
 
   const renderBadges = (item) => {
@@ -69,7 +130,7 @@ const VideoList = ({ videos = [], overlayActions, onItemClick, gridClassName = "
       watchLabel = "Vu";
     } else if (item.type === "series") {
       const total = Number(item.TotalEpisodes || 0);
-      const watched = Number(item.WatchedCount || 0);
+      const watched = Math.min(Number(item.WatchedCount || 0), total);
       if (total > 0 && watched > 0) {
         if (watched >= total || item.WatchedAll) {
           watchLabel = "Vu";
@@ -181,11 +242,11 @@ const VideoList = ({ videos = [], overlayActions, onItemClick, gridClassName = "
           )
             :
           item.type === "series" ? (
-            <Link
-              key={`series-${item.id}`}
-              to={item.FirstVideoID ? `/lecture/${item.FirstVideoID}` : "#"}
-              className="group hover:-translate-y-2 duration-300"
-            >
+            <div key={`series-${item.id}`} className="group relative hover:-translate-y-2 duration-300">
+              <Link
+                to={item.FirstVideoID ? `/lecture/${item.FirstVideoID}` : "#"}
+                className="block"
+              >
               <ContentPreviewTooltip item={item} title={item.Titre}>
               <div className="min-h-full h-max max-h-max">
                 <div className="rounded-xl overflow-hidden border border-neutral-400 bg-gradient-to-br from-slate-950 to-slate-900 mb-2 relative transition duration-300 ease-in-out group-hover:border-blue-500">
@@ -209,7 +270,7 @@ const VideoList = ({ videos = [], overlayActions, onItemClick, gridClassName = "
                   )}
 
                   <div className="px-4 py-2 rounded-xl h-full w-full absolute top-0 left-0 opacity-0 group-hover:opacity-100 group-hover:bg-neutral-950/50 group-hover:backdrop-blur-2xl duration-300">
-                    <p className="line-clamp-5 text-xs text-neutral-50 text-justify">{item.Resumer} {/* Affichage résumer */}</p>
+                    <p className="line-clamp-5 pr-12 text-xs text-neutral-50 text-justify">{item.Resumer} {/* Affichage résumer */}</p>
                   </div>
                 </div>
                 <div className="relative capitalize text-center px-2 py-1 font-bold dark:text-neutral-300">
@@ -244,11 +305,14 @@ const VideoList = ({ videos = [], overlayActions, onItemClick, gridClassName = "
                 </div>
               </div>
               </ContentPreviewTooltip>
-            </Link>
+              </Link>
+              {renderFavoriteButton(item, "absolute right-2 top-2 z-30")}
+            </div>
           )
             :
             (
-              <Link key={`video-${item.id}`} to={`/lecture/${item.id}`} className="group hover:-translate-y-2 duration-300">
+              <div key={`video-${item.id}`} className="group relative hover:-translate-y-2 duration-300">
+              <Link to={`/lecture/${item.id}`} className="block">
                 <ContentPreviewTooltip item={item} title={item.Titre}>
                 <div className="min-h-full h-max max-h-max">
                   <div className="rounded-xl overflow-hidden border border-neutral-400 bg-gradient-to-br from-slate-950 to-slate-900 mb-2 relative transition duration-300 ease-in-out group-hover:border-blue-500">
@@ -271,7 +335,7 @@ const VideoList = ({ videos = [], overlayActions, onItemClick, gridClassName = "
                     )}
 
                     <div className="px-4 py-2 rounded-xl h-full w-full absolute top-0 left-0 opacity-0 group-hover:opacity-100 group-hover:bg-neutral-950/50 group-hover:backdrop-blur-2xl duration-300">
-                      <p className="line-clamp-5 text-xs text-neutral-50 text-justify">{item.Resumer} {/* Affichage résumer */}</p>
+                      <p className="line-clamp-5 pr-12 text-xs text-neutral-50 text-justify">{item.Resumer} {/* Affichage résumer */}</p>
                     </div>
                   </div>
                   <div className="relative capitalize text-center px-2 py-1 font-bold dark:text-neutral-300">
@@ -306,6 +370,8 @@ const VideoList = ({ videos = [], overlayActions, onItemClick, gridClassName = "
                 </div>
                 </ContentPreviewTooltip>
               </Link>
+              {renderFavoriteButton(item, "absolute right-2 top-2 z-30")}
+              </div>
             )
       )}
     </div>

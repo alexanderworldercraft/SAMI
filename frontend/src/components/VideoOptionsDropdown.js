@@ -23,6 +23,11 @@ const OPTIONS = [
     label: "Lister les nouveautés",
     description: "Affiche uniquement les ajouts et nouveaux épisodes récents.",
   },
+  {
+    key: "onlyFavorites",
+    label: "Lister les favoris",
+    description: "Affiche uniquement les films et séries ajoutés à vos favoris.",
+  },
 ];
 
 const ToggleOption = ({ option, checked, onChange }) => {

@@ -21,6 +21,11 @@ import {
   isAllowedPremiumPlan,
   verifyFakePaymentPayload,
 } from "../services/payment/fakePremiumPaymentService.js";
+import {
+  buildUserFavoritesPayload,
+  getFavoriteStatus,
+  toggleFavoriteContent,
+} from "../services/favoriteContentService.js";
 
 // Durée de vie des tokens par GradeID
 // 1 = SuperAdmin, 2 = Admin, 3 = Utilisateur
@@ -1629,6 +1634,76 @@ export const userController = {
       return reply
         .status(500)
         .send({ error: "Internal Server Error", message: err.message });
+    }
+  },
+
+  async getMyFavorites(request, reply) {
+    try {
+      const userId = Number(request.user?.userId);
+      if (!Number.isInteger(userId)) {
+        return reply.status(400).send({ error: "Invalid userId" });
+      }
+
+      const response = await buildUserFavoritesPayload(userId);
+      return reply.send(response);
+    } catch (err) {
+      console.error("Error in getMyFavorites:", err);
+      return reply
+        .status(500)
+        .send({ error: "Internal Server Error", message: err.message });
+    }
+  },
+
+  async getFavoriteStatus(request, reply) {
+    try {
+      const userId = Number(request.user?.userId);
+      if (!Number.isInteger(userId)) {
+        return reply.status(400).send({ error: "Invalid userId" });
+      }
+
+      const items = Array.isArray(request.body?.items) ? request.body.items : [];
+      const response = await getFavoriteStatus(userId, items);
+      return reply.send(response);
+    } catch (err) {
+      console.error("Error in getFavoriteStatus:", err);
+      return reply
+        .status(500)
+        .send({ error: "Internal Server Error", message: err.message });
+    }
+  },
+
+  async toggleFavorite(request, reply) {
+    try {
+      const userId = Number(request.user?.userId);
+      if (!Number.isInteger(userId)) {
+        return reply.status(400).send({ error: "Invalid userId" });
+      }
+
+      const type = request.body?.type;
+      const id = Number(request.body?.id);
+      const response = await toggleFavoriteContent({ userId, type, id });
+
+      await createLog({
+        request,
+        UtilisateurID: userId,
+        ActionNom: response.IsFavorite ? "favorite_add" : "favorite_remove",
+        VideoID: type === "video" ? id : null,
+        SeriesID: type === "series" ? id : null,
+        Champ: "favorite",
+        AncienneValeur: response.IsFavorite ? "false" : "true",
+        NouvelleValeur: response.IsFavorite ? "true" : "false",
+        Meta: {
+          contentType: type,
+          contentId: id,
+        },
+      });
+
+      return reply.send(response);
+    } catch (err) {
+      console.error("Error in toggleFavorite:", err);
+      return reply
+        .status(err.statusCode || 500)
+        .send({ error: err.statusCode ? err.message : "Internal Server Error", message: err.message });
     }
   },
 

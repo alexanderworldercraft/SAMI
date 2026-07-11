@@ -5,12 +5,14 @@ import DeleteAccount from "./DeleteAccount";
 import SubscriptionPlans from "./SubscriptionPlans";
 import WatchHistoryCards from "./WatchHistoryCards";
 import GenreSelect from "./GenreSelect";
+import VideoList from "./VideoList";
 
 import { ChevronDownIcon } from "@heroicons/react/16/solid";
 import {
   BuildingOfficeIcon,
   ClockIcon,
   CreditCardIcon,
+  StarIcon,
   TagIcon,
   UserIcon,
 } from "@heroicons/react/20/solid";
@@ -25,6 +27,7 @@ const tabs = [
   { id: "settings", name: "Paramètres", icon: UserIcon },
   { id: "subscription", name: "Abonnement", icon: CreditCardIcon },
   { id: "watchHistory", name: "Contenu regardé", icon: ClockIcon },
+  { id: "favorites", name: "Favoris", icon: StarIcon },
   { id: "genreGroups", name: "Groupes par genre", icon: TagIcon },
   { id: "deleteAccount", name: "Supprimer son compte", icon: BuildingOfficeIcon },
 ];
@@ -40,6 +43,11 @@ const SettingsPage = () => {
   const [watchSearch, setWatchSearch] = useState("");
   const [watchLoaded, setWatchLoaded] = useState(false);
   const [watchRawMode, setWatchRawMode] = useState(false);
+  const [favorites, setFavorites] = useState([]);
+  const [favoritesLoading, setFavoritesLoading] = useState(false);
+  const [favoritesError, setFavoritesError] = useState("");
+  const [favoritesSearch, setFavoritesSearch] = useState("");
+  const [favoritesLoaded, setFavoritesLoaded] = useState(false);
 
   const [genreLoaded, setGenreLoaded] = useState(false);
   const [genreSaving, setGenreSaving] = useState(false);
@@ -59,6 +67,12 @@ const SettingsPage = () => {
       return videoTitle.includes(s) || seriesTitle.includes(s);
     });
   }, [watchLogs, watchSearch]);
+
+  const filteredFavorites = useMemo(() => {
+    if (!favoritesSearch.trim()) return favorites;
+    const s = favoritesSearch.trim().toLowerCase();
+    return (favorites || []).filter((item) => (item?.Titre || "").toLowerCase().includes(s));
+  }, [favorites, favoritesSearch]);
 
   const fetchWatchHistory = async () => {
     try {
@@ -81,6 +95,28 @@ const SettingsPage = () => {
     if (currentTabId !== "watchHistory" || watchLoaded) return;
     fetchWatchHistory();
   }, [currentTabId, watchLoaded]);
+
+  const fetchFavorites = async () => {
+    try {
+      setFavoritesLoading(true);
+      setFavoritesError("");
+      const response = await axios.get("/api/users/favorites/me", {
+        withCredentials: true,
+      });
+      setFavorites(response.data || []);
+      setFavoritesLoaded(true);
+    } catch (error) {
+      console.error("Erreur lors du chargement des favoris:", error);
+      setFavoritesError("Impossible de charger les favoris.");
+    } finally {
+      setFavoritesLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (currentTabId !== "favorites" || favoritesLoaded) return;
+    fetchFavorites();
+  }, [currentTabId, favoritesLoaded]);
 
   const resolveDefaultIds = (genres, configuredDefaults = []) => {
     const configuredIds = (configuredDefaults || [])
@@ -285,6 +321,41 @@ const SettingsPage = () => {
               emptyText="Aucun contenu regardé pour le moment."
               rawMode={watchRawMode}
             />
+          </div>
+        );
+      case "favorites":
+        return (
+          <div>
+            <div className="mb-4 flex flex-wrap items-center gap-3">
+              <input
+                type="text"
+                placeholder="Rechercher par titre"
+                className="w-full rounded-xl border border-sky-500/20 bg-white/85 px-4 py-3 text-sm font-semibold text-slate-900 placeholder:text-slate-400 shadow-sm focus:outline-none focus:ring-2 focus:ring-sky-400 dark:bg-slate-950/65 dark:text-slate-100 sm:w-80"
+                value={favoritesSearch}
+                onChange={(e) => setFavoritesSearch(e.target.value)}
+              />
+            </div>
+
+            {favoritesError && (
+              <div className="mb-4 rounded-xl border border-red-400/30 bg-red-500/10 px-4 py-3 text-sm font-semibold text-red-700 dark:text-red-200">
+                {favoritesError}
+              </div>
+            )}
+
+            {favoritesLoading ? (
+              <p className="text-center text-neutral-400">Chargement des favoris...</p>
+            ) : (
+              <VideoList
+                videos={filteredFavorites}
+                gridClassName="!mx-0"
+                onFavoriteChange={(item, nextValue) => {
+                  if (nextValue) return;
+                  setFavorites((current) =>
+                    current.filter((favorite) => !(favorite.type === item.type && favorite.id === item.id))
+                  );
+                }}
+              />
+            )}
           </div>
         );
       case "genreGroups":

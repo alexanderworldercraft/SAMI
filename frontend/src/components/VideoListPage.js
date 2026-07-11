@@ -37,6 +37,7 @@ const VideoListPage = () => {
     hideWatched: false,
     hidePremium: false,
     onlyNew: false,
+    onlyFavorites: false,
   });
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -87,6 +88,7 @@ const VideoListPage = () => {
         videoOptions.hideWatched ? "hideWatched=1" : "",
         videoOptions.hidePremium ? "hidePremium=1" : "",
         videoOptions.onlyNew ? "newOnly=1" : "",
+        videoOptions.onlyFavorites ? "favorites=1" : "",
       ].filter(Boolean).map((value) => `&${value}`).join("");
 
       const response = await fetch(
