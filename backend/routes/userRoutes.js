@@ -44,6 +44,8 @@ export default async function userRoutes(fastify, options) {
   fastify.get('/watch-history/me', { preHandler: authMiddleware }, userController.getMyWatchHistory);
   fastify.get('/watch-history/:userId', { preHandler: authMiddleware }, userController.getUserWatchHistory);
   fastify.get('/favorites/me', { preHandler: authMiddleware }, userController.getMyFavorites);
+  fastify.get('/favorites/summary', { preHandler: authMiddleware }, userController.getFavoriteSummary);
+  fastify.get('/favorites/:userId', { preHandler: authMiddleware }, userController.getUserFavorites);
 
   fastify.get('/me', { preHandler: authMiddleware }, async (request, reply) => {
   try {

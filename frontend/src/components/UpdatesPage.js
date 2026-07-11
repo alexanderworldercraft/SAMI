@@ -2,6 +2,50 @@ import React from "react";
 
 const updates = [
   {
+    version: "7.3.0",
+    title: "Favoris et navigation par genre",
+    date: "11 juillet 2026",
+    sections: [
+      {
+        title: "Favoris",
+        items: [
+          "Ajout d'une table UserFavoriteContent pour relier les utilisateurs aux films et series mis en favoris.",
+          "Ajout d'une etoile de favori sur les cards films et series, independante du lien de lecture.",
+          "Ajout d'une etoile de favori sur les pages de lecture, au niveau de l'affiche du film ou de la serie.",
+          "Ajout d'un onglet Favoris dans les parametres utilisateur pour retrouver rapidement les films et series favoris.",
+          "Ajout d'une option Lister les favoris dans les options supplementaires de la page Videos.",
+        ],
+      },
+      {
+        title: "Administration des favoris",
+        items: [
+          "Les drawers administrateur et utilisateur affichent maintenant les favoris apres la section Contenu regarde.",
+          "Les listes de favoris dans les drawers sont paginees par groupes de 6 contenus.",
+          "Ajout d'une section Favoris des utilisateurs dans la page Administration.",
+          "La section admin permet de rechercher un contenu favori et de trier du plus favori au moins favori, ou l'inverse.",
+          "La section admin des favoris utilise une pagination de 6 contenus par page.",
+        ],
+      },
+      {
+        title: "Logs et API",
+        items: [
+          "Ajout des actions favorite_add et favorite_remove dans le seed pour journaliser les ajouts et retraits de favoris.",
+          "Les toggles de favoris creent maintenant un log rattache au VideoID ou au SeriesID concerne.",
+          "Ajout des endpoints utilisateurs et administrateurs pour recuperer, verifier, basculer et analyser les favoris.",
+          "La page Videos peut filtrer cote backend uniquement les contenus favoris de l'utilisateur connecte.",
+        ],
+      },
+      {
+        title: "Genres cliquables",
+        items: [
+          "Les badges de genres sur les pages detail film et serie deviennent des liens.",
+          "Un clic sur un badge de genre redirige vers la page Videos avec le filtre du genre actif.",
+          "Le mode edition des genres conserve son comportement existant avec les checkboxes.",
+        ],
+      },
+    ],
+  },
+  {
     version: "7.2.0",
     title: "Durcissement securite et stabilite streaming",
     date: "8 juillet 2026",

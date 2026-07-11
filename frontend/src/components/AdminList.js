@@ -12,6 +12,7 @@ import { XMarkIcon } from "@heroicons/react/24/outline";
 import PaginationPage from "./PaginationPage";
 import UserAvatar from "./UserAvatar";
 import WatchHistoryCards from "./WatchHistoryCardsAdminPanel";
+import FavoriteContentList from "./FavoriteContentList";
 
 const apiBaseUrl = process.env.REACT_APP_URL_LOCAL;
 const panelClass = "overflow-hidden rounded-2xl border border-sky-500/10 bg-white/80 shadow-xl shadow-slate-950/5 backdrop-blur dark:bg-slate-950/70 dark:shadow-sky-950/20";
@@ -71,7 +72,16 @@ function computeRiskLevel(activity) {
 }
 
 // Drawer pour afficher tous les détails d'un admin
-function AdminDrawer({ open, onClose, admin, activity, watchHistory, loadingWatchHistory }) {
+function AdminDrawer({
+  open,
+  onClose,
+  admin,
+  activity,
+  watchHistory,
+  loadingWatchHistory,
+  favorites,
+  loadingFavorites,
+}) {
   const [watchRawMode, setWatchRawMode] = useState(false);
 
   if (!admin) return null;
@@ -348,6 +358,14 @@ function AdminDrawer({ open, onClose, admin, activity, watchHistory, loadingWatc
                           rawMode={watchRawMode}
                         />
                       </div>
+                      <div>
+                        <FavoriteContentList
+                          favorites={favorites}
+                          loading={loadingFavorites}
+                          title="Favoris"
+                          emptyText="Aucun favori pour cet administrateur."
+                        />
+                      </div>
                     </dl>
                   </div>
                 </div>
@@ -370,11 +388,13 @@ const AdminList = () => {
   const [loadingAdmins, setLoadingAdmins] = useState(false);
   const [loadingActivity, setLoadingActivity] = useState(false);
   const [loadingWatchHistory, setLoadingWatchHistory] = useState(false);
+  const [loadingFavorites, setLoadingFavorites] = useState(false);
 
   // Drawer
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [selectedAdmin, setSelectedAdmin] = useState(null);
   const [watchHistoryMap, setWatchHistoryMap] = useState({});
+  const [favoritesMap, setFavoritesMap] = useState({});
 
   // Pagination
   const itemsPerPage = 20; // 20 admins par page (grille 4x4)
@@ -474,11 +494,31 @@ const AdminList = () => {
     }
   };
 
+  const fetchFavorites = async (userId) => {
+    try {
+      setLoadingFavorites(true);
+      const response = await axios.get(
+        `${apiBaseUrl}/api/users/favorites/${userId}`,
+        { withCredentials: true }
+      );
+      setFavoritesMap((prev) => ({
+        ...prev,
+        [userId]: response.data || [],
+      }));
+    } catch (error) {
+      console.error("Erreur lors du chargement des favoris:", error);
+      setFavoritesMap((prev) => ({ ...prev, [userId]: [] }));
+    } finally {
+      setLoadingFavorites(false);
+    }
+  };
+
   const openDrawerForAdmin = (admin) => {
     setSelectedAdmin(admin);
     setDrawerOpen(true);
     if (admin?.UtilisateurID) {
       fetchWatchHistory(admin.UtilisateurID);
+      fetchFavorites(admin.UtilisateurID);
     }
   };
 
@@ -684,6 +724,12 @@ const AdminList = () => {
               : []
           }
           loadingWatchHistory={loadingWatchHistory}
+          favorites={
+            selectedAdmin
+              ? favoritesMap[selectedAdmin.UtilisateurID] || []
+              : []
+          }
+          loadingFavorites={loadingFavorites}
           activity={
             selectedAdmin
               ? activityMap[selectedAdmin.UtilisateurID] || {

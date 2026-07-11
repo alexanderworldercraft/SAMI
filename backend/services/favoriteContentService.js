@@ -191,3 +191,130 @@ export const buildUserFavoritesPayload = async (userId) => {
     })
     .filter(Boolean);
 };
+
+export const buildFavoriteContentSummaryPayload = async ({
+  search = "",
+  sort = "desc",
+  page = 1,
+  take = 6,
+} = {}) => {
+  const [videoGroups, seriesGroups] = await Promise.all([
+    prisma.userFavoriteContent.groupBy({
+      by: ["VideoID"],
+      where: { VideoID: { not: null } },
+      _count: { UserID: true },
+    }),
+    prisma.userFavoriteContent.groupBy({
+      by: ["SeriesID"],
+      where: { SeriesID: { not: null } },
+      _count: { UserID: true },
+    }),
+  ]);
+
+  const videoIds = videoGroups.map((group) => group.VideoID).filter(Boolean);
+  const seriesIds = seriesGroups.map((group) => group.SeriesID).filter(Boolean);
+
+  const [videos, series] = await Promise.all([
+    videoIds.length
+      ? prisma.video.findMany({
+          where: { VideoID: { in: videoIds }, EtatID: ETAT.ACTIVE },
+          select: {
+            VideoID: true,
+            Titre: true,
+            Resumer: true,
+            CheminImage: true,
+            Premium: true,
+            CreateDate: true,
+          },
+        })
+      : [],
+    seriesIds.length
+      ? prisma.series.findMany({
+          where: { SeriesID: { in: seriesIds }, EtatID: ETAT.ACTIVE },
+          include: {
+            Saisons: {
+              include: {
+                Episodes: {
+                  where: { EtatID: ETAT.ACTIVE },
+                  take: 1,
+                  orderBy: { Titre: "asc" },
+                  select: { VideoID: true },
+                },
+              },
+              orderBy: { Numero: "asc" },
+            },
+          },
+        })
+      : [],
+  ]);
+
+  const videoById = new Map(videos.map((video) => [video.VideoID, video]));
+  const seriesById = new Map(series.map((serie) => [serie.SeriesID, serie]));
+
+  const videoItems = videoGroups
+    .map((group) => {
+      const video = videoById.get(group.VideoID);
+      if (!video) return null;
+
+      return {
+        id: video.VideoID,
+        type: "video",
+        title: video.Titre,
+        resume: video.Resumer,
+        image: video.CheminImage,
+        premium: video.Premium,
+        createDate: video.CreateDate,
+        favoriteCount: group._count.UserID,
+        targetUrl: `/lecture/${video.VideoID}`,
+      };
+    })
+    .filter(Boolean);
+
+  const seriesItems = seriesGroups
+    .map((group) => {
+      const serie = seriesById.get(group.SeriesID);
+      if (!serie) return null;
+
+      const firstVideoId = serie.Saisons?.[0]?.Episodes?.[0]?.VideoID || null;
+      return {
+        id: serie.SeriesID,
+        type: "series",
+        title: serie.Titre,
+        resume: serie.Resumer,
+        image: serie.CheminImage,
+        premium: serie.Premium,
+        createDate: serie.CreateDate,
+        favoriteCount: group._count.UserID,
+        targetUrl: firstVideoId ? `/lecture/${firstVideoId}` : "#",
+        seasons: serie.Saisons?.length || 0,
+      };
+    })
+    .filter(Boolean);
+
+  const normalizedSearch = search.trim().toLowerCase();
+  const filtered = [...videoItems, ...seriesItems].filter((item) =>
+    normalizedSearch ? item.title.toLowerCase().includes(normalizedSearch) : true
+  );
+
+  const direction = sort === "asc" ? 1 : -1;
+  const sorted = filtered.sort(
+    (a, b) =>
+      direction * (a.favoriteCount - b.favoriteCount) ||
+      a.title.localeCompare(b.title, "fr")
+  );
+
+  const safeTake = Math.min(Math.max(Number(take) || 6, 1), 50);
+  const safePage = Math.max(Number(page) || 1, 1);
+  const totalItems = sorted.length;
+  const totalPages = Math.max(1, Math.ceil(totalItems / safeTake));
+  const currentPage = Math.min(safePage, totalPages);
+  const start = (currentPage - 1) * safeTake;
+
+  return {
+    items: sorted.slice(start, start + safeTake),
+    totalItems,
+    totalPages,
+    currentPage,
+    itemsPerPage: safeTake,
+  };
+};

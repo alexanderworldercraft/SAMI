@@ -12,6 +12,7 @@ import { XMarkIcon } from "@heroicons/react/24/outline";
 import PaginationPage from "./PaginationPage";
 import UserAvatar from "./UserAvatar";
 import WatchHistoryCards from "./WatchHistoryCardsAdminPanel";
+import FavoriteContentList from "./FavoriteContentList";
 
 const apiBaseUrl = process.env.REACT_APP_URL_LOCAL;
 const panelClass = "overflow-hidden rounded-2xl border border-sky-500/10 bg-white/80 shadow-xl shadow-slate-950/5 backdrop-blur dark:bg-slate-950/70 dark:shadow-sky-950/20";
@@ -135,7 +136,16 @@ function UserTabs({ currentTab, onChange }) {
 }
 
 // Drawer pour afficher tous les détails d'un utilisateur
-function UserDrawer({ open, onClose, user, activity, watchHistory, loadingWatchHistory }) {
+function UserDrawer({
+  open,
+  onClose,
+  user,
+  activity,
+  watchHistory,
+  loadingWatchHistory,
+  favorites,
+  loadingFavorites,
+}) {
   const [watchRawMode, setWatchRawMode] = useState(false);
 
   if (!user) return null;
@@ -402,6 +412,14 @@ function UserDrawer({ open, onClose, user, activity, watchHistory, loadingWatchH
                           rawMode={watchRawMode}
                         />
                       </div>
+                      <div>
+                        <FavoriteContentList
+                          favorites={favorites}
+                          loading={loadingFavorites}
+                          title="Favoris"
+                          emptyText="Aucun favori pour cet utilisateur."
+                        />
+                      </div>
                     </dl>
                   </div>
                 </div>
@@ -423,6 +441,7 @@ const UserManagerCard = ({ onStateChange }) => {
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [loadingActivity, setLoadingActivity] = useState(false);
   const [loadingWatchHistory, setLoadingWatchHistory] = useState(false);
+  const [loadingFavorites, setLoadingFavorites] = useState(false);
   const [error, setError] = useState("");
 
   // Filtres / tri
@@ -439,6 +458,7 @@ const UserManagerCard = ({ onStateChange }) => {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
   const [watchHistoryMap, setWatchHistoryMap] = useState({});
+  const [favoritesMap, setFavoritesMap] = useState({});
 
   // Charge les utilisateurs pour le panel (actifs+bloqués ou supprimés)
   const fetchUsers = async () => {
@@ -607,12 +627,32 @@ const UserManagerCard = ({ onStateChange }) => {
     }
   };
 
+  const fetchFavorites = async (userId) => {
+    try {
+      setLoadingFavorites(true);
+      const response = await axios.get(
+        `${apiBaseUrl}/api/users/favorites/${userId}`,
+        { withCredentials: true }
+      );
+      setFavoritesMap((prev) => ({
+        ...prev,
+        [userId]: response.data || [],
+      }));
+    } catch (err) {
+      console.error("Erreur lors du chargement des favoris:", err);
+      setFavoritesMap((prev) => ({ ...prev, [userId]: [] }));
+    } finally {
+      setLoadingFavorites(false);
+    }
+  };
+
   // Ouvrir le drawer
   const openDrawerForUser = (user) => {
     setSelectedUser(user);
     setDrawerOpen(true);
     if (user?.UtilisateurID) {
       fetchWatchHistory(user.UtilisateurID);
+      fetchFavorites(user.UtilisateurID);
     }
   };
 
@@ -838,6 +878,12 @@ const UserManagerCard = ({ onStateChange }) => {
             : []
         }
         loadingWatchHistory={loadingWatchHistory}
+        favorites={
+          selectedUser
+            ? favoritesMap[selectedUser.UtilisateurID] || []
+            : []
+        }
+        loadingFavorites={loadingFavorites}
         activity={
           selectedUser
             ? activityMap[selectedUser.UtilisateurID] || {

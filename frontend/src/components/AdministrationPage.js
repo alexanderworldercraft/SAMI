@@ -7,6 +7,7 @@ import { ArrowPathIcon } from "@heroicons/react/24/outline";
 import AdminMessageSettings from "./AdminMessageSettings";
 import AdminGenreManager from "./AdminGenreManager";
 import AdminHomepageGenreManager from "./AdminHomepageGenreManager";
+import AdminFavoriteContentManager from "./AdminFavoriteContentManager";
 import AdminSeriesManager from "./AdminSeriesManager";
 import AdminSagaManager from "./AdminSagaManager";
 import AdminUniverseManager from "./AdminUniverseManager";
@@ -144,6 +145,7 @@ const AdministrationPage = () => {
             <AdminMessageSettings />
             <AdminExperimentalFeatures />
             <AdminHomepageGenreManager />
+            <AdminFavoriteContentManager />
             <TabbedAdminSection
                 title="Gestion des contenus"
                 description="Modifie les genres, séries, vidéos, sagas et univers depuis une seule zone."

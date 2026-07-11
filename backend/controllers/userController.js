@@ -22,6 +22,7 @@ import {
   verifyFakePaymentPayload,
 } from "../services/payment/fakePremiumPaymentService.js";
 import {
+  buildFavoriteContentSummaryPayload,
   buildUserFavoritesPayload,
   getFavoriteStatus,
   toggleFavoriteContent,
@@ -1648,6 +1649,50 @@ export const userController = {
       return reply.send(response);
     } catch (err) {
       console.error("Error in getMyFavorites:", err);
+      return reply
+        .status(500)
+        .send({ error: "Internal Server Error", message: err.message });
+    }
+  },
+
+  async getUserFavorites(request, reply) {
+    try {
+      const currentUser = await userRepository.getUserById(request.user?.userId);
+      if (!currentUser || !ADMIN_GRADE_IDS.includes(currentUser.GradeID)) {
+        return reply.status(403).send({ error: "Forbidden" });
+      }
+
+      const userId = Number(request.params.userId);
+      if (!Number.isInteger(userId)) {
+        return reply.status(400).send({ error: "Invalid userId" });
+      }
+
+      const response = await buildUserFavoritesPayload(userId);
+      return reply.send(response);
+    } catch (err) {
+      console.error("Error in getUserFavorites:", err);
+      return reply
+        .status(500)
+        .send({ error: "Internal Server Error", message: err.message });
+    }
+  },
+
+  async getFavoriteSummary(request, reply) {
+    try {
+      const currentUser = await userRepository.getUserById(request.user?.userId);
+      if (!currentUser || !ADMIN_GRADE_IDS.includes(currentUser.GradeID)) {
+        return reply.status(403).send({ error: "Forbidden" });
+      }
+
+      const response = await buildFavoriteContentSummaryPayload({
+        search: String(request.query?.search || ""),
+        sort: request.query?.sort === "asc" ? "asc" : "desc",
+        page: Number(request.query?.page || 1),
+        take: Number(request.query?.take || 6),
+      });
+      return reply.send(response);
+    } catch (err) {
+      console.error("Error in getFavoriteSummary:", err);
       return reply
         .status(500)
         .send({ error: "Internal Server Error", message: err.message });
