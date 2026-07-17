@@ -109,57 +109,6 @@ const MusicPage = () => {
             />
           </div>
 
-          <section ref={musicSectionRef}>
-            <h2 className="mb-3 text-lg font-black text-slate-950 dark:text-white">Toutes les musiques</h2>
-            {filteredMusiques.length === 0 ? (
-              <p className="rounded-xl border border-sky-500/10 bg-white/70 px-4 py-5 text-sm font-semibold text-slate-600 dark:bg-slate-950/40 dark:text-slate-300">
-                Aucune musique trouvee.
-              </p>
-            ) : (
-              <>
-                <ul className="divide-y divide-sky-500/10 overflow-hidden rounded-xl border border-sky-500/10 bg-white/70 dark:bg-slate-950/40">
-                  {paginatedMusiques.map((musique) => (
-                    <li key={musique.MusiqueID} className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center">
-                      <div className="min-w-0 flex-1">
-                        <p className="font-black text-slate-950 dark:text-white">{musique.Titre}</p>
-                        <p className="mt-1 text-xs font-semibold uppercase text-slate-500 dark:text-slate-400">
-                          #{musique.MusiqueID}
-                          {musique.Genres?.length ? ` - ${musique.Genres.map((genre) => genre.Nom).join(", ")}` : ""}
-                        </p>
-                      </div>
-                      <div className="flex flex-wrap items-center gap-2">
-                        {musique.Premium && (
-                          <span className="rounded-full border border-amber-300/40 bg-amber-500/15 px-3 py-1 text-xs font-bold text-amber-700 dark:text-amber-200">
-                            Premium
-                          </span>
-                        )}
-                        <button
-                          type="button"
-                          onClick={() => addMusicToPlaylist(musique)}
-                          className="inline-flex items-center justify-center gap-2 rounded-lg border border-sky-300/40 bg-sky-500/15 px-4 py-2 text-sm font-bold text-slate-900 transition hover:bg-sky-500/25 dark:text-white"
-                        >
-                          <PlusIcon className="size-5" />
-                          Ajouter à la playlist
-                        </button>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-                {totalMusicPages > 1 && (
-                  <PaginationPage
-                    currentPage={musicPage}
-                    totalPages={totalMusicPages}
-                    totalItems={filteredMusiques.length}
-                    itemsPerPage={MUSIC_ITEMS_PER_PAGE}
-                    onPageChange={setMusicPage}
-                    scrollTarget={musicSectionRef}
-                    scrollOffset={80}
-                  />
-                )}
-              </>
-            )}
-          </section>
-
           <section ref={albumSectionRef}>
             <h2 className="mb-3 text-lg font-black text-slate-950 dark:text-white">Albums</h2>
             {filteredAlbums.length === 0 ? (
@@ -212,6 +161,58 @@ const MusicPage = () => {
               </>
             )}
           </section>
+
+          <section ref={musicSectionRef}>
+            <h2 className="mb-3 text-lg font-black text-slate-950 dark:text-white">Toutes les musiques</h2>
+            {filteredMusiques.length === 0 ? (
+              <p className="rounded-xl border border-sky-500/10 bg-white/70 px-4 py-5 text-sm font-semibold text-slate-600 dark:bg-slate-950/40 dark:text-slate-300">
+                Aucune musique trouvee.
+              </p>
+            ) : (
+              <>
+                <ul className="divide-y divide-sky-500/10 overflow-hidden rounded-xl border border-sky-500/10 bg-white/70 dark:bg-slate-950/40">
+                  {paginatedMusiques.map((musique) => (
+                    <li key={musique.MusiqueID} className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center">
+                      <div className="min-w-0 flex-1">
+                        <p className="font-black text-slate-950 dark:text-white">{musique.Titre}</p>
+                        <p className="mt-1 text-xs font-semibold uppercase text-slate-500 dark:text-slate-400">
+                          #{musique.MusiqueID}
+                          {musique.Genres?.length ? ` - ${musique.Genres.map((genre) => genre.Nom).join(", ")}` : ""}
+                        </p>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        {musique.Premium && (
+                          <span className="rounded-full border border-amber-300/40 bg-amber-500/15 px-3 py-1 text-xs font-bold text-amber-700 dark:text-amber-200">
+                            Premium
+                          </span>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => addMusicToPlaylist(musique)}
+                          className="inline-flex items-center justify-center gap-2 rounded-lg border border-sky-300/40 bg-sky-500/15 px-4 py-2 text-sm font-bold text-slate-900 transition hover:bg-sky-500/25 dark:text-white"
+                        >
+                          <PlusIcon className="size-5" />
+                          Ajouter à la playlist
+                        </button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+                {totalMusicPages > 1 && (
+                  <PaginationPage
+                    currentPage={musicPage}
+                    totalPages={totalMusicPages}
+                    totalItems={filteredMusiques.length}
+                    itemsPerPage={MUSIC_ITEMS_PER_PAGE}
+                    onPageChange={setMusicPage}
+                    scrollTarget={musicSectionRef}
+                    scrollOffset={80}
+                  />
+                )}
+              </>
+            )}
+          </section>
+
         </div>
       </section>
 

@@ -233,10 +233,11 @@ function AdminDrawer({
                           </div>
                           <div className="flex justify-between">
                             <span className="text-slate-500 dark:text-slate-400">
-                              Dernière connexion
+                              Dernière activité
                             </span>
                             <span className="font-mono text-slate-700 dark:text-slate-100">
-                              {formatDateTime(admin.LastLogin)}
+                              {formatDateTime(admin.LastActivity)}
+                              {admin.LastActivityAction ? ` (${admin.LastActivityAction})` : ""}
                             </span>
                           </div>
                         </dd>

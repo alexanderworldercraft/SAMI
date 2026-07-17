@@ -306,7 +306,7 @@ const VideoList = ({ videos = [], overlayActions, onItemClick, gridClassName = "
               </div>
               </ContentPreviewTooltip>
               </Link>
-              {renderFavoriteButton(item, "absolute right-2 top-2 z-30")}
+              {renderFavoriteButton(item, "absolute right-2 bottom-16 z-30")}
             </div>
           )
             :
@@ -370,7 +370,7 @@ const VideoList = ({ videos = [], overlayActions, onItemClick, gridClassName = "
                 </div>
                 </ContentPreviewTooltip>
               </Link>
-              {renderFavoriteButton(item, "absolute right-2 top-2 z-30")}
+              {renderFavoriteButton(item, "absolute right-2 bottom-16 z-30")}
               </div>
             )
       )}

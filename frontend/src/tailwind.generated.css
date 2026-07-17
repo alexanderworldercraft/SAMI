@@ -643,6 +643,10 @@
     bottom: calc(var(--spacing) * 4);
   }
 
+  .bottom-16 {
+    bottom: calc(var(--spacing) * 16);
+  }
+
   .bottom-full {
     bottom: 100%;
   }

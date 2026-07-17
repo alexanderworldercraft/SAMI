@@ -291,9 +291,10 @@ function UserDrawer({
                             </span>
                           </div>
                           <div className="flex justify-between">
-                            <span className="text-slate-500 dark:text-slate-400">Dernière connexion</span>
+                            <span className="text-slate-500 dark:text-slate-400">Dernière activité</span>
                             <span className="font-mono text-slate-700 dark:text-slate-100">
-                              {formatDateTime(user.LastLogin)}
+                              {formatDateTime(user.LastActivity)}
+                              {user.LastActivityAction ? ` (${user.LastActivityAction})` : ""}
                             </span>
                           </div>
                         </dd>

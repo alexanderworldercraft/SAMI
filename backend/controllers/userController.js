@@ -260,6 +260,63 @@ async function buildWatchHistoryPayload(userId, limit) {
   });
 }
 
+async function getLastActivityByUserIds(userIds) {
+  const normalizedUserIds = Array.from(
+    new Set(
+      userIds
+        .map(Number)
+        .filter((userId) => Number.isInteger(userId) && userId > 0)
+    )
+  );
+
+  if (normalizedUserIds.length === 0) {
+    return new Map();
+  }
+
+  const rows = await prisma.log.groupBy({
+    by: ["UtilisateurID", "ActionID"],
+    where: {
+      UtilisateurID: { in: normalizedUserIds },
+    },
+    _max: {
+      DateAction: true,
+    },
+  });
+
+  const latestRows = new Map();
+  for (const row of rows) {
+    const current = latestRows.get(row.UtilisateurID);
+    const date = row._max.DateAction;
+    if (!date) continue;
+
+    if (!current || date > current.DateAction) {
+      latestRows.set(row.UtilisateurID, {
+        DateAction: date,
+        ActionID: row.ActionID,
+      });
+    }
+  }
+
+  const actionIds = Array.from(new Set([...latestRows.values()].map((row) => row.ActionID)));
+  const actions = actionIds.length > 0
+    ? await prisma.action.findMany({
+        where: { ActionID: { in: actionIds } },
+        select: { ActionID: true, Nom: true },
+      })
+    : [];
+  const actionNameById = new Map(actions.map((action) => [action.ActionID, action.Nom]));
+
+  return new Map(
+    [...latestRows.entries()].map(([userId, row]) => [
+      userId,
+      {
+        DateAction: row.DateAction,
+        ActionNom: actionNameById.get(row.ActionID) || null,
+      },
+    ])
+  );
+}
+
 // 🔐 Protection anti-brute-force (en mémoire, par process)
 const loginAttempts = new Map(); // key: "user:surnom" ou "ip:xxx"
 const LOGIN_MAX_ATTEMPTS = 3;
@@ -1058,9 +1115,14 @@ export const userController = {
       }
 
       const adminsBrut = await userRepository.getAdmins();
+      const lastActivityByUserId = await getLastActivityByUserIds(
+        adminsBrut.map((admin) => admin.UtilisateurID)
+      );
       // console.log("Admins récupérés:", admins); // Logguer les admins récupérés
       const admins = adminsBrut.map((admin) => ({
         ...admin,
+        LastActivity: lastActivityByUserId.get(admin.UtilisateurID)?.DateAction || null,
+        LastActivityAction: lastActivityByUserId.get(admin.UtilisateurID)?.ActionNom || null,
         isPremium: isUserPremium(admin),
       }));
 
@@ -1549,6 +1611,7 @@ export const userController = {
       }
 
       const userIds = Array.from(activityByUser.keys());
+      const lastActivityByUserId = await getLastActivityByUserIds(userIds);
 
       // Infos de base des utilisateurs concernés
       const users = await prisma.utilisateur.findMany({
@@ -1577,6 +1640,8 @@ export const userController = {
         GradeID: user.GradeID,
         CreateDate: user.CreateDate,
         LastLogin: user.LastLogin,
+        LastActivity: lastActivityByUserId.get(user.UtilisateurID)?.DateAction || null,
+        LastActivityAction: lastActivityByUserId.get(user.UtilisateurID)?.ActionNom || null,
         activity: activityByUser.get(user.UtilisateurID) || {
           totalLogsLastNDays: 0,
           byCriticite: {},
@@ -1771,9 +1836,14 @@ export const userController = {
         Number(gradeId),
         scope
       );
+      const lastActivityByUserId = await getLastActivityByUserIds(
+        usersBrut.map((user) => user.UtilisateurID)
+      );
 
       const users = usersBrut.map((u) => ({
         ...u,
+        LastActivity: lastActivityByUserId.get(u.UtilisateurID)?.DateAction || null,
+        LastActivityAction: lastActivityByUserId.get(u.UtilisateurID)?.ActionNom || null,
         isPremium: isUserPremium(u),
       }));
 

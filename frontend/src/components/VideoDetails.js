@@ -269,7 +269,7 @@ const VideoDetails = ({
               {canEdit && (
                 <button
                   onClick={handleEditImageClick}
-                  className="absolute right-2 top-2 rounded-lg border border-white/15 bg-slate-950/80 px-2 py-1 text-xs text-white backdrop-blur transition hover:border-sky-300/60 hover:bg-sky-500/20"
+                  className="absolute right-2 bottom-16 rounded-lg border border-white/15 bg-slate-950/80 px-2 py-1 text-xs text-white backdrop-blur transition hover:border-sky-300/60 hover:bg-sky-500/20"
                   title="Modifier l'image"
                 >
                   ✏️
