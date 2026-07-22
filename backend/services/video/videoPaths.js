@@ -10,7 +10,7 @@ export const UPLOADS_ROOT = path.join(BACKEND_ROOT, "uploads");
 export const VIDEO_ROOT = path.join(UPLOADS_ROOT, "video");
 export const TEMP_ROOT = path.join(UPLOADS_ROOT, "tmp");
 export const IMAGE_ROOT = path.join(UPLOADS_ROOT, "images");
-export const ERROR_ROOT = path.join(UPLOADS_ROOT, "Error_videos");
+export const ERROR_ROOT = path.join(BACKEND_ROOT, "var", "video-errors");
 
 export const removeStoredPath = (relativePath, { recursive = false } = {}) => {
   if (!relativePath || relativePath.includes("default")) return;

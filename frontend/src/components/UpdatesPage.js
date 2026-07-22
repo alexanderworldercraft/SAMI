@@ -2,6 +2,71 @@ import React from "react";
 
 const updates = [
   {
+    version: "7.4.0",
+    title: "Refactorisation serveur et pipeline video",
+    date: "22 juillet 2026",
+    sections: [
+      {
+        title: "Architecture serveur",
+        items: [
+          "La configuration Fastify est maintenant centralisee dans une fabrique commune partagee par les deux modes de demarrage.",
+          "Les points d'entree TLS direct et reverse proxy ne contiennent plus que leur configuration specifique.",
+          "Les routes, CORS, Socket.IO, Swagger, les fichiers statiques, le multipart et les middlewares sont enregistres au meme endroit.",
+          "Les certificats SSL sont recherches depuis un chemin stable relatif au backend, quel que soit le dossier depuis lequel le serveur est lance.",
+          "Les taches planifiees et le ping periodique de la base sont arretes proprement pendant la fermeture du serveur.",
+        ],
+      },
+      {
+        title: "Feedback de demarrage",
+        items: [
+          "Le chargement des certificats SSL affiche maintenant son avancement et confirme leur disponibilite.",
+          "Un bandeau de demarrage affiche le nom de l'application, l'URL publique, le host public et le port local.",
+          "Le nom affiche peut etre personnalise avec la variable APP_NAME et utilise SAMI par defaut.",
+          "Le serveur confirme explicitement son ecoute puis execute immediatement un vrai ping SQL vers la base de donnees.",
+          "Le port, l'horaire de sauvegarde et les informations publiques sont valides ou normalises avant le demarrage.",
+        ],
+      },
+      {
+        title: "Organisation des controleurs video",
+        items: [
+          "Le controleur video principal est decoupe en modules dedies au calendrier, a la progression de lecture et a l'import video.",
+          "Les exports historiques sont conserves afin de ne pas modifier les routes API existantes.",
+          "Les dates du calendrier, les mois et plusieurs identifiants recus par l'API sont maintenant valides avant les requetes Prisma.",
+          "Le detail d'une video ne charge plus les sous-titres deux fois et execute en parallele les lectures independantes des personnes et favoris.",
+        ],
+      },
+      {
+        title: "Import et conversion video",
+        items: [
+          "La fonction addVideo devient un orchestrateur plus court avec des services separes pour le multipart, FFmpeg et la persistance.",
+          "Chaque import utilise un espace temporaire isole qui est nettoye apres une reussite, une erreur ou une requete dupliquee.",
+          "Les metadonnees du fichier ne sont analysees qu'une fois et les vrais index des flux audio, video et sous-titres sont utilises par FFmpeg.",
+          "Les profils HLS respectent maintenant le ratio reel de la source et prennent en charge les videos plus petites que 240p.",
+          "La selection audio, les genres automatiques, les sous-titres et le feedback Socket.IO restent integres au traitement.",
+        ],
+      },
+      {
+        title: "Fiabilite et securite des imports",
+        items: [
+          "Les champs multipart, SaisonID et genres renvoient des erreurs claires lorsqu'ils sont invalides.",
+          "Les fichiers multipart ignores sont correctement consommes afin d'eviter de bloquer la lecture de la requete.",
+          "La video reste masquee jusqu'a la finalisation de ses fichiers et de ses relations en base de donnees.",
+          "La finalisation Prisma est transactionnelle et supprime la ligne ainsi que les fichiers crees si une etape echoue.",
+          "Les sources en erreur de conversion sont archivees hors du dossier public uploads et le client ne recoit plus de chemin disque sensible.",
+        ],
+      },
+      {
+        title: "Tests et verification",
+        items: [
+          "Ajout de tests pour la configuration serveur, le bandeau de demarrage, le calendrier et les helpers d'import video.",
+          "Ajout de tests multipart pour verifier le stockage isole de la source et les evenements de progression.",
+          "La creation Fastify est verifiee sans ouvrir de port reseau et les routes video sont controlees par injection HTTP.",
+          "La conversion HLS a ete validee avec une video synthetique et le schema Prisma reste valide.",
+        ],
+      },
+    ],
+  },
+  {
     version: "7.3.0",
     title: "Favoris et navigation par genre",
     date: "11 juillet 2026",

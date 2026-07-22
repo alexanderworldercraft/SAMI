@@ -9,6 +9,8 @@ import { rotateGenreFeaturedContent } from "../services/genreFeaturedContentServ
 import { createServer } from "./createServer.js";
 import {
   buildBackupCronExpression,
+  formatServerStartupBanner,
+  getServerStartupInfo,
   parseServerPort,
 } from "./serverConfig.js";
 
@@ -16,10 +18,14 @@ const backendRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "
 const DATABASE_KEEP_ALIVE_MS = 7 * 60 * 60 * 1000;
 
 export function loadTlsCredentials() {
-  return {
+  console.info("Lecture des certificats SSL...");
+  const credentials = {
     key: fs.readFileSync(path.join(backendRoot, "ssl/private.key")),
     cert: fs.readFileSync(path.join(backendRoot, "ssl/certificate.crt")),
   };
+  console.info("Certificats SSL chargés.");
+
+  return credentials;
 }
 
 function registerBackgroundJobs(server) {
@@ -31,9 +37,11 @@ function registerBackgroundJobs(server) {
   const keepDatabaseAlive = async () => {
     try {
       await prisma.$queryRaw`SELECT 1`;
-      console.info("Ping à la base de données réussi");
+      console.info("Ping base de données réussi.");
+      return true;
     } catch (error) {
-      console.error("Erreur lors du ping de la base de données :", error);
+      console.error("Échec du ping base de données :", error.message);
+      return false;
     }
   };
 
@@ -68,20 +76,34 @@ function registerBackgroundJobs(server) {
     clearInterval(keepAliveTimer);
     scheduledTasks.forEach((task) => task.stop());
   });
+
+  return { pingDatabase: keepDatabaseAlive };
 }
 
-export async function startServer({ host, tls = false, trustProxy = false } = {}) {
+export async function startServer({
+  host,
+  tls = false,
+  trustProxy = false,
+  appName = process.env.APP_NAME || "SAMI",
+} = {}) {
   const port = parseServerPort(process.env.PORTS);
   const https = tls ? loadTlsCredentials() : undefined;
   const server = createServer({ https, trustProxy });
+  const startupInfo = getServerStartupInfo({
+    appName,
+    publicUrl: process.env.PUBLIC_URL,
+    publicHost: process.env.PUBLIC_HOST,
+    port,
+    listenHost: host,
+    tls,
+  });
 
   try {
-    registerBackgroundJobs(server);
+    const { pingDatabase } = registerBackgroundJobs(server);
+    console.info(formatServerStartupBanner(startupInfo));
     await server.listen({ port, host });
-
-    const protocol = tls ? "https" : "http";
-    const publicAddress = process.env.PUBLIC_URL || `${protocol}://${host}:${port}`;
-    console.info(`Serveur SAMI démarré sur ${publicAddress}`);
+    console.info("Serveur démarré avec succès.");
+    await pingDatabase();
     return server;
   } catch (error) {
     await server.close().catch(() => {});

@@ -22,6 +22,7 @@ frontend/build/
 # Local media and generated user data
 backend/uploads/
 backend/uploads/**
+backend/var/
 uploads/
 
 # Archives and legacy exports
