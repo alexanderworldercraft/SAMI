@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 
 const updates = [
   {
@@ -1150,9 +1150,58 @@ const updates = [
   },
 ];
 
+const getUpdateAnchor = (version) => `version-${version.replace(/\./g, "-")}`;
+
 export default function UpdatesPage() {
+  const [activeVersion, setActiveVersion] = useState(updates[0]?.version || "");
+
+  useEffect(() => {
+    const syncVersionFromHash = () => {
+      const matchingUpdate = updates.find(
+        (update) => `#${getUpdateAnchor(update.version)}` === window.location.hash
+      );
+      if (matchingUpdate) setActiveVersion(matchingUpdate.version);
+    };
+
+    syncVersionFromHash();
+    window.addEventListener("hashchange", syncVersionFromHash);
+
+    if (!("IntersectionObserver" in window)) {
+      return () => window.removeEventListener("hashchange", syncVersionFromHash);
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visibleEntry = entries
+          .filter((entry) => entry.isIntersecting)
+          .sort(
+            (first, second) =>
+              Math.abs(first.boundingClientRect.top) - Math.abs(second.boundingClientRect.top)
+          )[0];
+
+        if (visibleEntry?.target.dataset.version) {
+          setActiveVersion(visibleEntry.target.dataset.version);
+        }
+      },
+      {
+        rootMargin: "-15% 0px -70% 0px",
+        threshold: [0, 0.25, 0.5, 1],
+      }
+    );
+
+    const updateArticles = updates
+      .map((update) => document.getElementById(getUpdateAnchor(update.version)))
+      .filter(Boolean);
+    updateArticles.forEach((article) => observer.observe(article));
+
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("hashchange", syncVersionFromHash);
+    };
+  }, []);
+
   return (
-    <div className="mx-auto max-w-5xl px-4 py-12 sm:px-6 lg:px-8">
+    <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
       <header className="mb-10">
         <p className="text-sm font-semibold uppercase tracking-[0.25em] text-sky-400">
           SAMI
@@ -1165,47 +1214,106 @@ export default function UpdatesPage() {
         </p>
       </header>
 
-      <div className="space-y-8">
-        {updates.map((update) => (
-          <article
-            key={update.version}
-            className="overflow-hidden rounded-2xl border border-slate-200 bg-white/80 shadow-xl shadow-slate-950/5 backdrop-blur dark:border-slate-800 dark:bg-slate-950/80 dark:shadow-black/20"
-          >
-            <div className="border-b border-slate-200 bg-gradient-to-r from-sky-500/15 via-blue-500/10 to-transparent px-6 py-5 dark:border-slate-800">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-                <div>
-                  <p className="text-sm font-bold text-sky-600 dark:text-sky-300">
-                    Version {update.version}
-                  </p>
-                  <h2 className="mt-1 text-2xl font-black text-slate-950 dark:text-white">
-                    {update.title}
-                  </h2>
-                </div>
-                <time className="text-sm font-medium text-slate-500 dark:text-slate-400">
-                  {update.date}
-                </time>
-              </div>
+      <div className="grid gap-8 lg:grid-cols-[18rem_minmax(0,1fr)] lg:items-start">
+        <aside className="min-w-0 lg:sticky lg:top-24">
+          <div className="rounded-2xl border border-slate-200 bg-white/80 p-4 shadow-xl shadow-slate-950/5 backdrop-blur dark:border-slate-800 dark:bg-slate-950/80 dark:shadow-black/20">
+            <div className="mb-4 px-2">
+              <p className="text-xs font-bold uppercase tracking-[0.2em] text-sky-600 dark:text-sky-300">
+                Navigation
+              </p>
+              <h2 className="mt-1 text-lg font-black text-slate-950 dark:text-white">
+                Versions de SAMI
+              </h2>
             </div>
 
-            <div className="grid gap-6 px-6 py-6">
-              {update.sections.map((section) => (
-                <section key={section.title}>
-                  <h3 className="text-base font-bold text-slate-950 dark:text-white">
-                    {section.title}
-                  </h3>
-                  <ul className="mt-3 grid gap-2 text-sm leading-6 text-slate-700 dark:text-slate-300">
-                    {section.items.map((item) => (
-                      <li key={item} className="flex gap-3">
-                        <span className="mt-2 size-1.5 shrink-0 rounded-full bg-sky-400" />
-                        <span>{item}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </section>
-              ))}
-            </div>
-          </article>
-        ))}
+            <nav aria-label="Navigation des mises a jour">
+              <ul className="flex gap-2 overflow-x-auto pb-2 lg:max-h-[calc(100vh-13rem)] lg:flex-col lg:overflow-y-auto lg:pr-2">
+                {updates.map((update) => {
+                  const isActive = update.version === activeVersion;
+                  return (
+                    <li key={update.version} className="min-w-60 lg:min-w-0">
+                      <a
+                        href={`#${getUpdateAnchor(update.version)}`}
+                        aria-current={isActive ? "location" : undefined}
+                        onClick={() => setActiveVersion(update.version)}
+                        className={`block rounded-xl border px-3 py-3 transition ${
+                          isActive
+                            ? "border-sky-400/70 bg-sky-500/15 shadow-sm shadow-sky-500/10"
+                            : "border-transparent hover:border-slate-200 hover:bg-slate-100/80 dark:hover:border-slate-700 dark:hover:bg-slate-900"
+                        }`}
+                      >
+                        <span
+                          className={`block text-sm font-black ${
+                            isActive
+                              ? "text-sky-700 dark:text-sky-300"
+                              : "text-slate-900 dark:text-white"
+                          }`}
+                        >
+                          Version {update.version}
+                        </span>
+                        <span className="mt-1 block text-xs font-medium leading-5 text-slate-500 dark:text-slate-400">
+                          {update.title}
+                        </span>
+                        <span className="mt-1 block text-[11px] text-slate-400 dark:text-slate-500">
+                          {update.date}
+                        </span>
+                      </a>
+                    </li>
+                  );
+                })}
+              </ul>
+            </nav>
+          </div>
+        </aside>
+
+        <div className="min-w-0 space-y-8">
+          {updates.map((update) => (
+            <article
+              id={getUpdateAnchor(update.version)}
+              data-version={update.version}
+              key={update.version}
+              aria-labelledby={`update-title-${getUpdateAnchor(update.version)}`}
+              className="scroll-mt-28 overflow-hidden rounded-2xl border border-slate-200 bg-white/80 shadow-xl shadow-slate-950/5 backdrop-blur dark:border-slate-800 dark:bg-slate-950/80 dark:shadow-black/20"
+            >
+              <div className="border-b border-slate-200 bg-gradient-to-r from-sky-500/15 via-blue-500/10 to-transparent px-6 py-5 dark:border-slate-800">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                  <div>
+                    <p className="text-sm font-bold text-sky-600 dark:text-sky-300">
+                      Version {update.version}
+                    </p>
+                    <h2
+                      id={`update-title-${getUpdateAnchor(update.version)}`}
+                      className="mt-1 text-2xl font-black text-slate-950 dark:text-white"
+                    >
+                      {update.title}
+                    </h2>
+                  </div>
+                  <time className="text-sm font-medium text-slate-500 dark:text-slate-400">
+                    {update.date}
+                  </time>
+                </div>
+              </div>
+
+              <div className="grid gap-6 px-6 py-6">
+                {update.sections.map((section) => (
+                  <section key={section.title}>
+                    <h3 className="text-base font-bold text-slate-950 dark:text-white">
+                      {section.title}
+                    </h3>
+                    <ul className="mt-3 grid gap-2 text-sm leading-6 text-slate-700 dark:text-slate-300">
+                      {section.items.map((item) => (
+                        <li key={item} className="flex gap-3">
+                          <span className="mt-2 size-1.5 shrink-0 rounded-full bg-sky-400" />
+                          <span>{item}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </section>
+                ))}
+              </div>
+            </article>
+          ))}
+        </div>
       </div>
     </div>
   );
