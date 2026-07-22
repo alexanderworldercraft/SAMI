@@ -2,8 +2,8 @@ import fs from 'fs';
 import path from 'path';
 import ffmpeg from 'fluent-ffmpeg';
 import { prisma } from "../services/db.js";
-import { startOfDay, endOfDay, startOfMonth, endOfMonth, subDays } from "date-fns";
-import { createLog, updateLatestVideoPlayLogProgress } from "./logController.js";
+import { subDays } from "date-fns";
+import { createLog } from "./logController.js";
 import { isContentPreviewActive } from "./appSettingController.js";
 import { ensureAdmin, ensureSuperAdmin } from "../services/authz.js";
 import { ETAT, MULTIPART_LIMITS } from "../constants.js";
@@ -29,7 +29,6 @@ import {
 import {
   canAccessPremium,
   isVideoPremium,
-  normalizeProgress,
 } from "../services/video/videoAccess.js";
 import {
   ADDVIDEO_DEDUPE_MS,
@@ -46,6 +45,17 @@ import {
   getFavoriteKeysForItems,
 } from "../services/favoriteContentService.js";
 
+export {
+  getAdditionsByDate,
+  getAdditionsForDate,
+} from "./videoCalendarController.js";
+export {
+  deleteVideoProgress,
+  getResumeProgressOverview,
+  getVideoProgress,
+  upsertVideoProgress,
+} from "./videoProgressController.js";
+
 const ACTIVE_ETAT_ID = ETAT.ACTIVE;
 const DELETED_ETAT_ID = ETAT.DELETED;
 
@@ -60,6 +70,17 @@ const ensureVideoSuperAdmin = async (request, reply) => {
   const admin = await ensureSuperAdmin(request, reply);
   return admin?.userId || null;
 };
+
+const mapLinkedPeople = (links, roleField) =>
+  links
+    .filter((link) => link[roleField])
+    .map((link) => ({
+      PersonneID: link.PersonneID,
+      Prenom: link.Personne.Prenom,
+      Nom: link.Personne.Nom,
+      Surnom: link.Personne.Surnom,
+      CheminImage: link.Personne.CheminImage,
+    }));
 
 export const getVideoPreviewFrames = async (request, reply) => {
   const videoId = parsePositiveInt(request.params?.id);
@@ -114,151 +135,35 @@ export const getVideoPreviewFrames = async (request, reply) => {
   }
 };
 
-// GET /calendar/added-by-date?year=2025&month=6
-export const getAdditionsByDate = async (req, reply) => {
-  try {
-    const year = parseInt(req.query.year);
-    const month = parseInt(req.query.month) - 1; // JS: 0-indexed
-
-    if (isNaN(year) || isNaN(month)) {
-      return reply.code(400).send({ error: "Paramètres année ou mois invalides" });
-    }
-
-    const from = startOfMonth(new Date(year, month));
-    const to = endOfMonth(new Date(year, month));
-
-    const videoCounts = await prisma.video.groupBy({
-      by: ["CreateDate"],
-      _count: true,
-      where: {
-        EtatID: ACTIVE_ETAT_ID,
-        CreateDate: {
-          not: null,
-          gte: from,
-          lte: to,
-        },
-      },
-    });
-
-    const seriesCounts = await prisma.series.groupBy({
-      by: ["CreateDate"],
-      _count: true,
-      where: {
-        CreateDate: {
-          not: null,
-          gte: from,
-          lte: to,
-        },
-      },
-    });
-
-    const combined = {};
-
-    for (const entry of [...videoCounts, ...seriesCounts]) {
-      const dateKey = entry.CreateDate.toISOString().split("T")[0];
-      combined[dateKey] = (combined[dateKey] || 0) + entry._count;
-    }
-
-    return reply.send(combined);
-  } catch (error) {
-    console.error("Erreur getAdditionsByDate:", error);
-    return reply.code(500).send({ error: "Erreur interne du serveur." });
-  }
-};
-
-// GET /calendar/items-by-day?date=2025-06-14
-export const getAdditionsForDate = async (req, reply) => {
-  try {
-    const date = req.query.date;
-    if (!date) {
-      return reply.code(400).send({ error: "Paramètre 'date' requis" });
-    }
-
-    const from = startOfDay(new Date(date));
-    const to = endOfDay(new Date(date));
-
-    const videos = await prisma.video.findMany({
-      where: {
-        EtatID: ACTIVE_ETAT_ID,
-        CreateDate: {
-          not: null,
-          gte: from,
-          lte: to,
-        },
-      },
-      select: {
-        VideoID: true,
-        Titre: true,
-        CheminImage: true,
-        SaisonID: true,
-        Saison: {
-          select: {
-            Series: {
-              select: {
-                Titre: true,
-              },
-            },
-          },
-        },
-      },
-    });
-
-    const series = await prisma.series.findMany({
-      where: {
-        CreateDate: {
-          not: null,
-          gte: from,
-          lte: to,
-        },
-      },
-      select: {
-        SeriesID: true,
-        Titre: true,
-        CheminImage: true,
-      },
-    });
-
-    const formatted = [
-      ...videos.map((v) => ({
-        id: v.VideoID,
-        Titre: v.Titre,
-        CheminImage: v.CheminImage,
-        type: "video",
-        SaisonID: v.SaisonID,
-        SerieTitre: v.Saison?.Series?.Titre || null,
-      })),
-      ...series.map((s) => ({
-        id: s.SeriesID,
-        Titre: s.Titre,
-        CheminImage: s.CheminImage,
-        type: "series",
-      })),
-    ];
-
-    return reply.send({ items: formatted });
-  } catch (error) {
-    console.error("Erreur getAdditionsForDate:", error);
-    return reply.code(500).send({ error: "Erreur interne du serveur." });
-  }
-};
-
-
 // MAJ du status de films ou série
 export const moveVideoToSeason = async (request, reply) => {
-  const { videoId, SaisonID } = request.body;
   const userId = await ensureVideoAdmin(request, reply);
   if (!userId) return;
 
+  const { videoId, SaisonID } = request.body || {};
+  const parsedVideoId = parsePositiveInt(videoId);
+  const hasTargetSeason = SaisonID !== undefined && SaisonID !== null && SaisonID !== "";
+  const parsedSeasonId = hasTargetSeason ? parsePositiveInt(SaisonID) : null;
+
+  if (!parsedVideoId || (hasTargetSeason && !parsedSeasonId)) {
+    return reply.status(400).send({ error: "VideoID ou SaisonID invalide." });
+  }
+
   try {
     const updatedVideo = await prisma.video.update({
-      where: { VideoID: parseInt(videoId) },
-      data: { SaisonID: SaisonID ? parseInt(SaisonID) : null },
+      where: { VideoID: parsedVideoId },
+      data: { SaisonID: parsedSeasonId },
     });
 
-    reply.send({ message: SaisonID ? "Vidéo déplacée dans la saison." : "Vidéo retirée de la série.", updatedVideo });
+    return reply.send({
+      message: parsedSeasonId
+        ? "Vidéo déplacée dans la saison."
+        : "Vidéo retirée de la série.",
+      updatedVideo,
+    });
   } catch (error) {
     console.error("Erreur lors du changement de saison :", error);
-    reply.status(500).send({ error: "Erreur lors du changement de saison." });
+    return reply.status(500).send({ error: "Erreur lors du changement de saison." });
   }
 };
 
@@ -1335,405 +1240,18 @@ export const getMostWatchedLast30Days = async (request, reply) => {
   }
 };
 
-export const getVideoProgress = async (request, reply) => {
-  const userId = parsePositiveInt(request.user?.userId);
-  const videoId = parsePositiveInt(request.params?.id);
-
-  if (!userId) {
-    return reply.status(401).send({ error: "Utilisateur non authentifié." });
-  }
-
-  if (!videoId) {
-    return reply.status(400).send({ error: "VideoID invalide." });
-  }
-
-  try {
-    const progress = await prisma.userVideoProgress.findUnique({
-      where: {
-        UserID_VideoID: {
-          UserID: userId,
-          VideoID: videoId,
-        },
-      },
-    });
-
-    return reply.send({ progress: normalizeProgress(progress) });
-  } catch (error) {
-    console.error("getVideoProgress error:", error);
-    return reply.status(500).send({ error: "Erreur interne du serveur." });
-  }
-};
-
-export const upsertVideoProgress = async (request, reply) => {
-  const userId = parsePositiveInt(request.user?.userId);
-  const videoId = parsePositiveInt(request.params?.id);
-  const timecode = parsePositiveInt(request.body?.Timecode ?? request.body?.timecode);
-  const duration = parsePositiveInt(request.body?.Duration ?? request.body?.duration);
-  const progressLogAction = request.body?.ProgressLogAction === "video_resume_play"
-    ? "video_resume_play"
-    : "video_first_play";
-
-  if (!userId) {
-    return reply.status(401).send({ error: "Utilisateur non authentifié." });
-  }
-
-  if (!videoId) {
-    return reply.status(400).send({ error: "VideoID invalide." });
-  }
-
-  if (!timecode || !duration) {
-    return reply.status(400).send({ error: "Timecode et Duration doivent être des entiers positifs." });
-  }
-
-  try {
-    const videoExists = await prisma.video.findUnique({
-      where: { VideoID: videoId },
-      select: { VideoID: true },
-    });
-
-    if (!videoExists) {
-      return reply.status(404).send({ error: "Vidéo non trouvée." });
-    }
-
-    const progressPercent = (timecode / duration) * 100;
-
-    if (progressPercent > 80) {
-      await prisma.userVideoProgress.deleteMany({
-        where: {
-          UserID: userId,
-          VideoID: videoId,
-        },
-      });
-
-      await updateLatestVideoPlayLogProgress({
-        UtilisateurID: userId,
-        VideoID: videoId,
-        endTimecode: duration,
-        duration,
-        final: true,
-        ActionNoms: [progressLogAction],
-      });
-
-      return reply.send({
-        progress: null,
-        deleted: true,
-        reason: "PROGRESS_OVER_80",
-      });
-    }
-
-    const progress = await prisma.userVideoProgress.upsert({
-      where: {
-        UserID_VideoID: {
-          UserID: userId,
-          VideoID: videoId,
-        },
-      },
-      create: {
-        UserID: userId,
-        VideoID: videoId,
-        Timecode: timecode,
-        Duration: duration,
-      },
-      update: {
-        Timecode: timecode,
-        Duration: duration,
-      },
-    });
-
-    await updateLatestVideoPlayLogProgress({
-      UtilisateurID: userId,
-      VideoID: videoId,
-      endTimecode: timecode,
-      duration,
-      final: false,
-      ActionNoms: [progressLogAction],
-    });
-
-    return reply.send({
-      progress: normalizeProgress(progress),
-      deleted: false,
-    });
-  } catch (error) {
-    console.error("upsertVideoProgress error:", error);
-    return reply.status(500).send({ error: "Erreur interne du serveur." });
-  }
-};
-
-export const deleteVideoProgress = async (request, reply) => {
-  const userId = parsePositiveInt(request.user?.userId);
-  const videoId = parsePositiveInt(request.params?.id);
-  const source = request.body?.Source ?? request.body?.source ?? request.query?.source;
-  const skipLogCompletion = source === "resume_modal";
-
-  if (!userId) {
-    return reply.status(401).send({ error: "Utilisateur non authentifié." });
-  }
-
-  if (!videoId) {
-    return reply.status(400).send({ error: "VideoID invalide." });
-  }
-
-  try {
-    const previousProgress = await prisma.userVideoProgress.findUnique({
-      where: {
-        UserID_VideoID: {
-          UserID: userId,
-          VideoID: videoId,
-        },
-      },
-      select: {
-        Duration: true,
-      },
-    });
-
-    await prisma.userVideoProgress.deleteMany({
-      where: {
-        UserID: userId,
-        VideoID: videoId,
-      },
-    });
-
-    if (previousProgress?.Duration && !skipLogCompletion) {
-      await updateLatestVideoPlayLogProgress({
-        UtilisateurID: userId,
-        VideoID: videoId,
-        endTimecode: previousProgress.Duration,
-        duration: previousProgress.Duration,
-        final: true,
-        ActionNoms: ["video_first_play"],
-      });
-    }
-
-    return reply.send({ progress: null, deleted: true });
-  } catch (error) {
-    console.error("deleteVideoProgress error:", error);
-    return reply.status(500).send({ error: "Erreur interne du serveur." });
-  }
-};
-
-const buildResumeProgressPayload = (progress) => {
-  if (!progress?.Video) return normalizeProgress(progress);
-
-  const normalized = normalizeProgress(progress);
-  return {
-    ...normalized,
-    Video: {
-      VideoID: progress.Video.VideoID,
-      Titre: progress.Video.Titre,
-      CheminImage: progress.Video.CheminImage,
-      SaisonID: progress.Video.SaisonID,
-      SaisonNumero: progress.Video.Saison?.Numero ?? null,
-      SeriesID: progress.Video.Saison?.Series?.SeriesID ?? null,
-      SeriesTitre: progress.Video.Saison?.Series?.Titre ?? null,
-      SeriesCheminImage: progress.Video.Saison?.Series?.CheminImage ?? null,
-    },
-  };
-};
-
-const buildSeriesContinuePayload = (video) => {
-  if (!video) return null;
-
-  return {
-    VideoID: video.VideoID,
-    Titre: video.Titre,
-    CheminImage: video.CheminImage,
-    SaisonID: video.SaisonID,
-    SaisonNumero: video.Saison?.Numero ?? null,
-    SeriesID: video.Saison?.Series?.SeriesID ?? null,
-    SeriesTitre: video.Saison?.Series?.Titre ?? null,
-    SeriesCheminImage: video.Saison?.Series?.CheminImage ?? null,
-  };
-};
-
-const findNextSeriesEpisodesForUser = async (userId, limit = 10) => {
-  const action = await prisma.action.findUnique({
-    where: { Nom: "video_first_play" },
-    select: { ActionID: true },
-  });
-
-  if (!action?.ActionID) return [];
-
-  const recentSeriesLogs = await prisma.log.findMany({
-    where: {
-      ActionID: action.ActionID,
-      UtilisateurID: userId,
-      SeriesID: { not: null },
-      VideoID: { not: null },
-    },
-    select: {
-      VideoID: true,
-      SeriesID: true,
-      DateAction: true,
-    },
-    orderBy: { DateAction: "desc" },
-    take: 100,
-  });
-
-  if (!recentSeriesLogs.length) return [];
-
-  const resetBySeriesId = await getSeriesResetMap(
-    userId,
-    recentSeriesLogs.map((log) => log.SeriesID)
-  );
-
-  const latestLogBySeries = [];
-  const seenSeriesIds = new Set();
-
-  for (const log of recentSeriesLogs) {
-    if (!log.SeriesID || seenSeriesIds.has(log.SeriesID)) continue;
-
-    const resetAt = resetBySeriesId.get(log.SeriesID);
-    if (resetAt && new Date(log.DateAction) <= new Date(resetAt)) continue;
-
-    seenSeriesIds.add(log.SeriesID);
-    latestLogBySeries.push(log);
-  }
-
-  if (!latestLogBySeries.length) return [];
-
-  const nextEpisodes = [];
-
-  for (const latestSeriesLog of latestLogBySeries) {
-    const resetAt = resetBySeriesId.get(latestSeriesLog.SeriesID);
-    const [series, watchedLogs] = await Promise.all([
-      prisma.series.findUnique({
-        where: { SeriesID: latestSeriesLog.SeriesID },
-        select: {
-          Saisons: {
-            select: {
-              Numero: true,
-              Episodes: {
-                select: {
-                  VideoID: true,
-                  Titre: true,
-                  CheminImage: true,
-                  SaisonID: true,
-                  Saison: {
-                    select: {
-                      Numero: true,
-                      Series: {
-                        select: {
-                          SeriesID: true,
-                          Titre: true,
-                          CheminImage: true,
-                        },
-                      },
-                    },
-                  },
-                },
-                orderBy: { Titre: "asc" },
-              },
-            },
-            orderBy: { Numero: "asc" },
-          },
-        },
-      }),
-      prisma.log.findMany({
-        where: {
-          ActionID: action.ActionID,
-          UtilisateurID: userId,
-          SeriesID: latestSeriesLog.SeriesID,
-          VideoID: { not: null },
-          ...(resetAt ? { DateAction: { gt: resetAt } } : {}),
-        },
-        select: { VideoID: true },
-      }),
-    ]);
-
-    const episodes = (series?.Saisons || []).flatMap((saison) => saison.Episodes || []);
-    const latestIndex = episodes.findIndex((episode) => episode.VideoID === latestSeriesLog.VideoID);
-    if (latestIndex === -1) continue;
-
-    const watchedVideoIds = new Set(watchedLogs.map((log) => log.VideoID).filter(Boolean));
-    const nextEpisode = episodes
-      .slice(latestIndex + 1)
-      .find((episode) => !watchedVideoIds.has(episode.VideoID));
-
-    if (nextEpisode) {
-      nextEpisodes.push(buildSeriesContinuePayload(nextEpisode));
-    }
-
-    if (nextEpisodes.length >= limit) break;
-  }
-
-  return nextEpisodes;
-};
-
-export const getResumeProgressOverview = async (request, reply) => {
-  const userId = parsePositiveInt(request.user?.userId);
-
-  if (!userId) {
-    return reply.status(401).send({ error: "Utilisateur non authentifié." });
-  }
-
-  const include = {
-    Video: {
-      select: {
-        VideoID: true,
-        Titre: true,
-        CheminImage: true,
-        SaisonID: true,
-        Saison: {
-          select: {
-            Numero: true,
-            Series: {
-              select: {
-                SeriesID: true,
-                Titre: true,
-                CheminImage: true,
-              },
-            },
-          },
-        },
-      },
-    },
-  };
-
-  try {
-    const [latest, total] = await Promise.all([
-      prisma.userVideoProgress.findFirst({
-        where: { UserID: userId },
-        orderBy: { UpdatedAt: "desc" },
-        include,
-      }),
-      prisma.userVideoProgress.count({
-        where: { UserID: userId },
-      }),
-    ]);
-
-    const random =
-      total > 0
-        ? await prisma.userVideoProgress.findFirst({
-            where: { UserID: userId },
-            orderBy: { UpdatedAt: "desc" },
-            skip: Math.floor(Math.random() * total),
-            include,
-          })
-        : null;
-    const nextSeriesEpisodes = total === 0 ? await findNextSeriesEpisodesForUser(userId) : [];
-    const nextSeriesEpisode = nextSeriesEpisodes[0] || null;
-
-    return reply.send({
-      latest: buildResumeProgressPayload(latest),
-      random: buildResumeProgressPayload(random),
-      nextSeriesEpisode,
-      nextSeriesEpisodes,
-      total,
-    });
-  } catch (error) {
-    console.error("getResumeProgressOverview error:", error);
-    return reply.status(500).send({ error: "Erreur interne du serveur." });
-  }
-};
 
 // Récupérer les détails d'une vidéo
 export const getVideoDetails = async (request, reply) => {
-  const { id } = request.params;
+  const videoId = parsePositiveInt(request.params?.id);
+  if (!videoId) {
+    return reply.status(400).send({ error: "VideoID invalide." });
+  }
 
   try {
     // 1) Récupérer la vidéo avec les infos nécessaires
     const video = await prisma.video.findUnique({
-      where: { VideoID: parseInt(id) },
+      where: { VideoID: videoId },
       include: {
         Saison: {
           include: {
@@ -1754,7 +1272,9 @@ export const getVideoDetails = async (request, reply) => {
         VideoGenres: {
           include: { Genre: true },
         },
-        VideoSubtitles: true,
+        VideoSubtitles: {
+          orderBy: { Label: "asc" },
+        },
       },
     });
 
@@ -1779,7 +1299,7 @@ export const getVideoDetails = async (request, reply) => {
     });
 
     if (!user) {
-      // Cas un peu chelou : token valide mais user plus en BDD
+      // Le token est valide, mais l'utilisateur n'existe plus en base.
       return reply.status(401).send({ error: "Utilisateur introuvable." });
     }
 
@@ -1828,83 +1348,31 @@ export const getVideoDetails = async (request, reply) => {
 
 
 
-    // Récupérer et trier les sous-titres séparément
-    const videoSubtitles = await prisma.videoSubtitle.findMany({
-      where: { VideoID: parseInt(id) },
-      orderBy: { Label: 'asc' }, // Tri des sous-titres par Label
-    });
-
-    // Ajouter les sous-titres triés à la réponse
-    if (video) {
-      video.VideoSubtitles = videoSubtitles; // Ajoute les sous-titres triés à l'objet vidéo
-    }
-
-    if (!video) {
-      return reply.status(404).send({ error: "Vidéo non trouvée." });
-    }
-
-    // --- Rattachements personnes pour la VIDEO courante ---
-    const videoLinks = await prisma.videoPersonne.findMany({
-      where: { VideoID: parseInt(id, 10) },
-      include: { Personne: true },
-    });
-
-    // Deux tableaux à plat avec { PersonneID, Prenom, Nom, Surnom, CheminImage }
-    const VideoActeurs = videoLinks
-      .filter(l => l.EstActeur)
-      .map(l => ({
-        PersonneID: l.PersonneID,
-        Prenom: l.Personne.Prenom,
-        Nom: l.Personne.Nom,
-        Surnom: l.Personne.Surnom,
-        CheminImage: l.Personne.CheminImage,
-      }));
-
-    const VideoRealisateurs = videoLinks
-      .filter(l => l.EstRealisateur)
-      .map(l => ({
-        PersonneID: l.PersonneID,
-        Prenom: l.Personne.Prenom,
-        Nom: l.Personne.Nom,
-        Surnom: l.Personne.Surnom,
-        CheminImage: l.Personne.CheminImage,
-      }));
-
-    // Si la vidéo est dans une série, on prépare aussi les personnes au NIVEAU SERIE
-    let SeriesActeurs = [];
-    let SeriesRealisateurs = [];
-    if (video.Saison?.Series?.SeriesID) {
-      const seriesId = video.Saison.Series.SeriesID;
-      const seriesLinks = await prisma.seriesPersonne.findMany({
-        where: { SeriesID: seriesId },
+    const seriesId = video.Saison?.Series?.SeriesID;
+    const [videoLinks, seriesLinks, favoriteKeys] = await Promise.all([
+      prisma.videoPersonne.findMany({
+        where: { VideoID: videoId },
         include: { Personne: true },
-      });
-      SeriesActeurs = seriesLinks
-        .filter(l => l.EstActeur)
-        .map(l => ({
-          PersonneID: l.PersonneID,
-          Prenom: l.Personne.Prenom,
-          Nom: l.Personne.Nom,
-          Surnom: l.Personne.Surnom,
-          CheminImage: l.Personne.CheminImage,
-        }));
-      SeriesRealisateurs = seriesLinks
-        .filter(l => l.EstRealisateur)
-        .map(l => ({
-          PersonneID: l.PersonneID,
-          Prenom: l.Personne.Prenom,
-          Nom: l.Personne.Nom,
-          Surnom: l.Personne.Surnom,
-          CheminImage: l.Personne.CheminImage,
-        }));
-    }
+      }),
+      seriesId
+        ? prisma.seriesPersonne.findMany({
+            where: { SeriesID: seriesId },
+            include: { Personne: true },
+          })
+        : [],
+      getFavoriteKeysForItems(
+        userId,
+        [
+          { type: "video", id: video.VideoID },
+          seriesId ? { type: "series", id: seriesId } : null,
+        ].filter(Boolean)
+      ),
+    ]);
 
-    const favoriteKeys = await getFavoriteKeysForItems(userId, [
-      { type: "video", id: video.VideoID },
-      video.Saison?.Series?.SeriesID
-        ? { type: "series", id: video.Saison.Series.SeriesID }
-        : null,
-    ].filter(Boolean));
+    const videoActeurs = mapLinkedPeople(videoLinks, "EstActeur");
+    const videoRealisateurs = mapLinkedPeople(videoLinks, "EstRealisateur");
+    const seriesActeurs = mapLinkedPeople(seriesLinks, "EstActeur");
+    const seriesRealisateurs = mapLinkedPeople(seriesLinks, "EstRealisateur");
 
     // Si la vidéo fait partie d'une série, ajouter les informations supplémentaires
     if (video.Saison) {
@@ -1920,7 +1388,7 @@ export const getVideoDetails = async (request, reply) => {
         })),
       }));
 
-      reply.send({
+      return reply.send({
         type: "series",
         video: {
           VideoID: video.VideoID,
@@ -1935,8 +1403,8 @@ export const getVideoDetails = async (request, reply) => {
             Label: subtitle.Label,
             CheminSubtitle: subtitle.CheminSubtitle,
           })),
-          Acteurs: VideoActeurs,         // ⬅️ NOUVEAU
-          Realisateurs: VideoRealisateurs, // ⬅️ NOUVEAU
+          Acteurs: videoActeurs,
+          Realisateurs: videoRealisateurs,
           IsFavorite: favoriteKeys.has(`video:${video.VideoID}`),
         },
         series: {
@@ -1946,13 +1414,13 @@ export const getVideoDetails = async (request, reply) => {
           Saisons: saisons,
           Premium: !!series.Premium,
           CheminImage: series.CheminImage,
-          Acteurs: SeriesActeurs,           // ⬅️ NOUVEAU
-          Realisateurs: SeriesRealisateurs, // ⬅️ NOUVEAU
+          Acteurs: seriesActeurs,
+          Realisateurs: seriesRealisateurs,
           IsFavorite: favoriteKeys.has(`series:${series.SeriesID}`),
         },
       });
     } else {
-      reply.send({
+      return reply.send({
         type: "film",
         video: {
           VideoID: video.VideoID,
@@ -1967,15 +1435,15 @@ export const getVideoDetails = async (request, reply) => {
             Label: subtitle.Label,
             CheminSubtitle: subtitle.CheminSubtitle,
           })),
-          Acteurs: VideoActeurs,         // ⬅️ NOUVEAU
-          Realisateurs: VideoRealisateurs, // ⬅️ NOUVEAU
+          Acteurs: videoActeurs,
+          Realisateurs: videoRealisateurs,
           IsFavorite: favoriteKeys.has(`video:${video.VideoID}`),
         },
       });
     }
   } catch (error) {
     console.error("Erreur lors de la récupération des détails de la vidéo :", error);
-    reply.status(500).send({ error: "Erreur lors de la récupération de la vidéo." });
+    return reply.status(500).send({ error: "Erreur lors de la récupération de la vidéo." });
   }
 };
 
