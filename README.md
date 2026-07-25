@@ -113,8 +113,8 @@ Le fichier source est `backend/prisma/schema.prisma`. Un diagramme est égalemen
 Clonez le dépôt, puis installez séparément les dépendances du backend et du frontend :
 
 ```bash
-git clone https://github.com/alexanderworldercraft/SAMI3.git
-cd SAMI3
+git clone https://github.com/alexanderworldercraft/SAMI.git
+cd SAMI
 
 cd backend
 npm install
