@@ -3,7 +3,10 @@ import path from 'path';
 import { prisma } from "../services/db.js";
 import { subDays } from "date-fns";
 import { createLog } from "./logController.js";
-import { isContentPreviewActive } from "./appSettingController.js";
+import {
+  isContentPreviewActive,
+  isPreviewLiveActive,
+} from "./appSettingController.js";
 import { ensureAdmin, ensureSuperAdmin } from "../services/authz.js";
 import { ETAT, MULTIPART_LIMITS } from "../constants.js";
 import { isTruthyValue, parsePositiveInt } from "../utils/requestParsing.js";
@@ -17,6 +20,10 @@ import {
   generateVideoPreviewFramesFromMaster,
   getExistingPreviewFrames,
 } from "../services/video/videoPreviewService.js";
+import {
+  generateVideoPreviewLiveFromMaster,
+  getExistingPreviewLive,
+} from "../services/video/videoPreviewLiveService.js";
 import {
   attachWatchStatus,
   countWatchedEpisodesAfterReset,
@@ -120,6 +127,51 @@ export const getVideoPreviewFrames = async (request, reply) => {
   } catch (error) {
     console.error("Erreur lors de la génération de l'aperçu vidéo :", error);
     return reply.status(500).send({ error: "Erreur lors de la génération de l'aperçu vidéo." });
+  }
+};
+
+export const getVideoPreviewLive = async (request, reply) => {
+  const videoId = parsePositiveInt(request.params?.id);
+
+  if (!videoId) {
+    return reply.status(400).send({ error: "VideoID invalide." });
+  }
+
+  try {
+    if (!(await isPreviewLiveActive())) {
+      return reply.status(403).send({ error: "Preview Live est désactivée." });
+    }
+
+    const video = await prisma.video.findFirst({
+      where: {
+        VideoID: videoId,
+        EtatID: ACTIVE_ETAT_ID,
+      },
+      select: {
+        VideoID: true,
+        CheminAcces: true,
+      },
+    });
+
+    if (!video) {
+      return reply.status(404).send({ error: "Vidéo introuvable." });
+    }
+
+    const existingPreview = getExistingPreviewLive(videoId);
+    if (existingPreview) {
+      return reply.send({ ...existingPreview, cached: true });
+    }
+
+    const masterPlaylistPath = resolveUploadPath(video.CheminAcces);
+    const preview = await generateVideoPreviewLiveFromMaster({
+      videoId,
+      masterPlaylistPath,
+    });
+
+    return reply.send({ ...preview, cached: false });
+  } catch (error) {
+    console.error("Erreur lors de la génération de Preview Live :", error);
+    return reply.status(500).send({ error: "Erreur lors de la génération de Preview Live." });
   }
 };
 

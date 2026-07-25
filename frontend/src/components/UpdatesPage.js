@@ -2,6 +2,63 @@ import React, { useEffect, useState } from "react";
 
 const updates = [
   {
+    version: "7.5.0",
+    title: "Preview Live et lecteur video personnalise",
+    date: "25 juillet 2026",
+    sections: [
+      {
+        title: "Fonctionnalite experimentale",
+        items: [
+          "Ajout du reglage preview_live dans AppSetting, independant du tooltip de previsualisation des affiches.",
+          "La page Fonctionnalites experimentales distingue maintenant clairement le tooltip des affiches et Preview Live dans le lecteur.",
+          "Ajout des endpoints /api/app-settings/preview-live pour lire et modifier l'etat global de la fonctionnalite.",
+          "Les changements d'etat sont journalises avec la nouvelle action preview_live_toggle.",
+          "Ajout d'une migration pour initialiser le reglage et l'action de log sur les bases existantes.",
+        ],
+      },
+      {
+        title: "Spritesheets et WebVTT",
+        items: [
+          "Ajout d'un service FFmpeg dedie qui extrait une vignette de la video toutes les quatre secondes.",
+          "Les vignettes de 160 par 90 pixels sont regroupees dans des spritesheets de 10 colonnes par 5 lignes.",
+          "Chaque spritesheet contient au maximum 50 images et couvre donc jusqu'a 200 secondes de video.",
+          "Un fichier WebVTT associe chaque plage temporelle a sa vignette avec des coordonnees xywh.",
+          "Les fichiers sont stockes dans uploads/video/VideoID/preview-live avec une publication atomique pour eviter les apercus incomplets.",
+        ],
+      },
+      {
+        title: "Videos nouvelles et existantes",
+        items: [
+          "Quand Preview Live est active, addVideo genere automatiquement les spritesheets apres la finalisation du HLS.",
+          "Ajout de l'endpoint GET /api/videos/:id/preview-live pour recuperer l'URL du WebVTT.",
+          "Pour une video existante sans apercu, le premier appel genere automatiquement les fichiers depuis sa playlist HLS.",
+          "Les apercus deja presents sont reutilises et les demandes simultanees pour une meme video partagent la meme generation.",
+          "La variante HLS 240p est privilegiee, avec un fallback sur la premiere variante disponible pour les petites videos.",
+        ],
+      },
+      {
+        title: "Lecteur video personnalise",
+        items: [
+          "Les controles natifs sont remplaces par une barre de lecture personnalisee integree au lecteur.",
+          "La barre affiche la progression lue, la partie mise en memoire et permet de rechercher precisement dans la video.",
+          "Le survol de la progression lit le WebVTT et affiche la bonne zone de la spritesheet avec son horodatage.",
+          "Le bouton CC active ou desactive la piste courante et affiche au survol ou au focus un menu de selection quand plusieurs sous-titres sont disponibles.",
+          "Les commandes de lecture, pause, volume, sourdine et plein ecran sont disponibles dans la nouvelle interface.",
+          "La selection de qualite HLS et l'eclairage d'ambiance existants sont conserves, avec une presentation adaptee aux petits ecrans.",
+        ],
+      },
+      {
+        title: "Tests et verification",
+        items: [
+          "Ajout de tests backend pour la limite de 50 images par spritesheet et la couverture de la fin de la video.",
+          "Ajout de tests frontend pour le parseur WebVTT et la presence des controles personnalises.",
+          "La generation a ete validee de bout en bout avec une video HLS synthetique et une spritesheet partielle.",
+          "Le schema Prisma, les tests backend, les tests frontend cibles et le build de production ont ete verifies.",
+        ],
+      },
+    ],
+  },
+  {
     version: "7.4.0",
     title: "Refactorisation serveur et pipeline video",
     date: "22 juillet 2026",

@@ -3,6 +3,7 @@ import api from "../services/api";
 
 const AdminExperimentalFeatures = () => {
   const [contentPreviewActive, setContentPreviewActive] = useState(false);
+  const [previewLiveActive, setPreviewLiveActive] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
@@ -11,8 +12,12 @@ const AdminExperimentalFeatures = () => {
   useEffect(() => {
     const fetchSettings = async () => {
       try {
-        const response = await api.get("/app-settings/content-preview");
-        setContentPreviewActive(Boolean(response.data?.active));
+        const [contentPreviewResponse, previewLiveResponse] = await Promise.all([
+          api.get("/app-settings/content-preview"),
+          api.get("/app-settings/preview-live"),
+        ]);
+        setContentPreviewActive(Boolean(contentPreviewResponse.data?.active));
+        setPreviewLiveActive(Boolean(previewLiveResponse.data?.active));
       } catch (error) {
         console.error("Erreur lors du chargement des fonctionnalités expérimentales :", error);
         setErrorMessage(error.response?.data?.error || "Impossible de charger les fonctionnalités expérimentales.");
@@ -46,6 +51,28 @@ const AdminExperimentalFeatures = () => {
     }
   };
 
+  const handleTogglePreviewLive = async () => {
+    const nextActive = !previewLiveActive;
+    setPreviewLiveActive(nextActive);
+    setSaving(true);
+    setMessage("");
+    setErrorMessage("");
+
+    try {
+      const response = await api.put("/app-settings/preview-live", {
+        active: nextActive,
+      });
+      setPreviewLiveActive(Boolean(response.data?.active));
+      setMessage(response.data?.active ? "Preview Live activée." : "Preview Live désactivée.");
+    } catch (error) {
+      console.error("Erreur lors de la mise à jour de Preview Live :", error);
+      setPreviewLiveActive(!nextActive);
+      setErrorMessage(error.response?.data?.error || "Impossible de mettre à jour Preview Live.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <section className="mx-auto my-8 max-w-4xl overflow-hidden rounded-2xl border border-sky-500/10 bg-white/80 shadow-xl shadow-slate-950/5 backdrop-blur dark:bg-slate-950/70 dark:shadow-sky-950/20">
       <div className="border-b border-sky-500/10 bg-gradient-to-r from-sky-500/15 via-blue-500/10 to-transparent px-6 py-5">
@@ -72,9 +99,9 @@ const AdminExperimentalFeatures = () => {
 
           <div className="flex flex-col gap-4 rounded-xl border border-sky-500/10 bg-white/70 p-5 dark:bg-slate-950/45 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h3 className="text-base font-black text-slate-950 dark:text-white">Tooltip de prévisualisation vidéo</h3>
+              <h3 className="text-base font-black text-slate-950 dark:text-white">Tooltip de prévisualisation des affiches</h3>
               <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-300">
-                Affiche au survol des cards un diaporama généré depuis les segments HLS 240p.
+                Affiche un diaporama au survol des affiches et des cards de contenu.
               </p>
             </div>
 
@@ -92,6 +119,34 @@ const AdminExperimentalFeatures = () => {
               <span
                 className={`inline-block size-6 rounded-full bg-white shadow transition duration-200 ${
                   contentPreviewActive ? "translate-x-9" : "translate-x-1"
+                }`}
+              />
+            </button>
+          </div>
+
+          <div className="mt-4 flex flex-col gap-4 rounded-xl border border-sky-500/10 bg-white/70 p-5 dark:bg-slate-950/45 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h3 className="text-base font-black text-slate-950 dark:text-white">Preview Live du lecteur vidéo</h3>
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-300">
+                Affiche une vignette de la vidéo au survol de la barre de progression personnalisée.
+                Les spritesheets sont générées toutes les 4 secondes, à raison de 50 images maximum par planche.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleTogglePreviewLive}
+              disabled={loading || saving}
+              className={`relative inline-flex h-8 w-16 shrink-0 items-center rounded-full border transition duration-200 ${
+                previewLiveActive
+                  ? "border-emerald-300/70 bg-emerald-500/80"
+                  : "border-slate-300/70 bg-slate-300/70 dark:border-slate-700 dark:bg-slate-800"
+              } disabled:cursor-not-allowed disabled:opacity-60`}
+            >
+              <span className="sr-only">Activer Preview Live</span>
+              <span
+                className={`inline-block size-6 rounded-full bg-white shadow transition duration-200 ${
+                  previewLiveActive ? "translate-x-9" : "translate-x-1"
                 }`}
               />
             </button>

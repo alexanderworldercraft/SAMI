@@ -250,6 +250,11 @@ async function main() {
         Criticite: 1,
       },
       {
+        Nom: "preview_live_toggle",
+        Description: "Changement d'état de la prévisualisation au survol de la barre vidéo.",
+        Criticite: 1,
+      },
+      {
         Nom: "manual_database_backup",
         Description: "Super administrateur lance une sauvegarde manuelle de la base de données.",
         Criticite: 3,

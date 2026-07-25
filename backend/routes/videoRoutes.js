@@ -33,7 +33,8 @@ import {
   restoreVideo,
   softDeleteVideo,
   deleteVideo,
-  getVideoPreviewFrames
+  getVideoPreviewFrames,
+  getVideoPreviewLive
 } from "../controllers/videoController.js";
 
 import { authMiddleware } from "../middlewares/authMiddleware.js";
@@ -48,6 +49,7 @@ export default async function (fastify) {
   fastify.get("/admin/deleted", { preHandler: authMiddleware }, getDeletedVideos);
   fastify.get("/:id/genres", getVideoGenres);
   fastify.get("/:id/preview-frames", getVideoPreviewFrames);
+  fastify.get("/:id/preview-live", getVideoPreviewLive);
   fastify.get("/:id", { preHandler: authMiddleware }, getVideoDetails);
   fastify.get("/random-film", getRandomFilm);
   fastify.get("/random-series", getRandomSeriesFirstEpisode);

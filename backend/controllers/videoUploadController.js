@@ -26,11 +26,15 @@ import {
   transcodeVideoToHls,
 } from "../services/video/videoTranscodingService.js";
 import { generateVideoPreviewFramesFromMaster } from "../services/video/videoPreviewService.js";
+import { generateVideoPreviewLiveFromMaster } from "../services/video/videoPreviewLiveService.js";
 import {
   isMultipartFileTooLargeError,
   sendMultipartFileTooLarge,
 } from "../utils/multipartErrors.js";
-import { isContentPreviewActive } from "./appSettingController.js";
+import {
+  isContentPreviewActive,
+  isPreviewLiveActive,
+} from "./appSettingController.js";
 
 const ensureVideoAdmin = async (request, reply) => {
   const admin = await ensureAdmin(request, reply);
@@ -218,6 +222,20 @@ export const addVideo = async (request, reply, fastify) => {
     } catch (error) {
       console.warn(
         `[addVideo] Prévisualisation non générée pour la vidéo ${updatedVideo.VideoID} :`,
+        error.message
+      );
+    }
+
+    try {
+      if (await isPreviewLiveActive()) {
+        await generateVideoPreviewLiveFromMaster({
+          videoId: updatedVideo.VideoID,
+          masterPlaylistPath: path.join(finalHlsDir, "master.m3u8"),
+        });
+      }
+    } catch (error) {
+      console.warn(
+        `[addVideo] Preview Live non générée pour la vidéo ${updatedVideo.VideoID} :`,
         error.message
       );
     }

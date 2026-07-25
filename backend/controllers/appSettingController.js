@@ -3,6 +3,7 @@ import { createLog } from "./logController.js";
 import { ensureAdmin as ensureSharedAdmin } from "../services/authz.js";
 
 const CONTENT_PREVIEW_KEY = "content_preview_tooltip";
+const PREVIEW_LIVE_KEY = "preview_live";
 
 const ensureAdmin = async (request, reply) => {
   const admin = await ensureSharedAdmin(request, reply, { unauthorizedError: "Unauthorized" });
@@ -39,19 +40,19 @@ const normalizeSettingValue = (value) => {
   };
 };
 
-const getContentPreviewSettingOrCreate = async () => {
+const getSettingOrCreate = async (key) => {
   await ensureAppSettingTable();
 
   await prisma.$executeRaw`
     INSERT INTO AppSetting (Cle, Valeur)
-    VALUES (${CONTENT_PREVIEW_KEY}, JSON_OBJECT('active', false))
+    VALUES (${key}, JSON_OBJECT('active', false))
     ON DUPLICATE KEY UPDATE Cle = Cle
   `;
 
   const rows = await prisma.$queryRaw`
     SELECT AppSettingID, Cle, Valeur, UpdatedAt, CreateDate
     FROM AppSetting
-    WHERE Cle = ${CONTENT_PREVIEW_KEY}
+    WHERE Cle = ${key}
     LIMIT 1
   `;
 
@@ -67,21 +68,21 @@ const getContentPreviewSettingOrCreate = async () => {
   return null;
 };
 
-const formatContentPreviewSetting = (setting) => ({
-  key: CONTENT_PREVIEW_KEY,
+const formatSetting = (key, setting) => ({
+  key,
   active: Boolean(setting?.Valeur?.active),
   updatedAt: setting?.UpdatedAt || null,
 });
 
 export const isContentPreviewActive = async () => {
-  const setting = await getContentPreviewSettingOrCreate();
+  const setting = await getSettingOrCreate(CONTENT_PREVIEW_KEY);
   return Boolean(setting?.Valeur?.active);
 };
 
 export const getContentPreviewSetting = async (_request, reply) => {
   try {
-    const setting = await getContentPreviewSettingOrCreate();
-    return reply.send(formatContentPreviewSetting(setting));
+    const setting = await getSettingOrCreate(CONTENT_PREVIEW_KEY);
+    return reply.send(formatSetting(CONTENT_PREVIEW_KEY, setting));
   } catch (error) {
     console.error("Erreur lors de la récupération du réglage d'aperçu :", error);
     return reply.status(500).send({ error: "Erreur lors de la récupération du réglage d'aperçu." });
@@ -99,7 +100,7 @@ export const updateContentPreviewSetting = async (request, reply) => {
     const userId = await ensureAdmin(request, reply);
     if (!userId) return;
 
-    const currentSetting = await getContentPreviewSettingOrCreate();
+    const currentSetting = await getSettingOrCreate(CONTENT_PREVIEW_KEY);
     const previousActive = Boolean(currentSetting?.Valeur?.active);
     const value = JSON.stringify({ active });
 
@@ -109,7 +110,7 @@ export const updateContentPreviewSetting = async (request, reply) => {
       WHERE Cle = ${CONTENT_PREVIEW_KEY}
     `;
 
-    const setting = await getContentPreviewSettingOrCreate();
+    const setting = await getSettingOrCreate(CONTENT_PREVIEW_KEY);
     await createLog({
       request,
       UtilisateurID: userId,
@@ -122,9 +123,65 @@ export const updateContentPreviewSetting = async (request, reply) => {
       },
     });
 
-    return reply.send(formatContentPreviewSetting(setting));
+    return reply.send(formatSetting(CONTENT_PREVIEW_KEY, setting));
   } catch (error) {
     console.error("Erreur lors de la mise à jour du réglage d'aperçu :", error);
     return reply.status(500).send({ error: "Erreur lors de la mise à jour du réglage d'aperçu." });
+  }
+};
+
+export const isPreviewLiveActive = async () => {
+  const setting = await getSettingOrCreate(PREVIEW_LIVE_KEY);
+  return Boolean(setting?.Valeur?.active);
+};
+
+export const getPreviewLiveSetting = async (_request, reply) => {
+  try {
+    const setting = await getSettingOrCreate(PREVIEW_LIVE_KEY);
+    return reply.send(formatSetting(PREVIEW_LIVE_KEY, setting));
+  } catch (error) {
+    console.error("Erreur lors de la récupération du réglage Preview Live :", error);
+    return reply.status(500).send({ error: "Erreur lors de la récupération du réglage Preview Live." });
+  }
+};
+
+export const updatePreviewLiveSetting = async (request, reply) => {
+  const { active } = request.body || {};
+
+  if (typeof active !== "boolean") {
+    return reply.status(400).send({ error: "active doit être un booléen." });
+  }
+
+  try {
+    const userId = await ensureAdmin(request, reply);
+    if (!userId) return;
+
+    const currentSetting = await getSettingOrCreate(PREVIEW_LIVE_KEY);
+    const previousActive = Boolean(currentSetting?.Valeur?.active);
+    const value = JSON.stringify({ active });
+
+    await prisma.$executeRaw`
+      UPDATE AppSetting
+      SET Valeur = ${value}
+      WHERE Cle = ${PREVIEW_LIVE_KEY}
+    `;
+
+    const setting = await getSettingOrCreate(PREVIEW_LIVE_KEY);
+    await createLog({
+      request,
+      UtilisateurID: userId,
+      ActionNom: "preview_live_toggle",
+      Champ: PREVIEW_LIVE_KEY,
+      AncienneValeur: String(previousActive),
+      NouvelleValeur: String(Boolean(setting?.Valeur?.active)),
+      Meta: {
+        key: PREVIEW_LIVE_KEY,
+      },
+    });
+
+    return reply.send(formatSetting(PREVIEW_LIVE_KEY, setting));
+  } catch (error) {
+    console.error("Erreur lors de la mise à jour du réglage Preview Live :", error);
+    return reply.status(500).send({ error: "Erreur lors de la mise à jour du réglage Preview Live." });
   }
 };
