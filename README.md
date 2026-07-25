@@ -1,126 +1,300 @@
 # SAMI
 
-SAMI, pour **Systeme d'Archivage Multimedia Integre**, est une application web personnelle de gestion et de lecture de contenus multimedia. Le projet regroupe un backend Fastify/Prisma, un frontend React, une base MySQL, une gestion des utilisateurs, des series, des videos, des genres, des personnes, des historiques de lecture et des contenus mis en avant.
+SAMI (**Système d’Archivage Multimédia Intégré**) est une médiathèque web privée permettant d’organiser, diffuser et suivre des films, séries et musiques depuis une seule interface.
 
-Ce depot remplace l'ancien depot SAMI obsolète. La base technique a ete reprise depuis le projet Vehicle, puis refondue pour devenir une application multimedia complete : nouvelles routes metier, nouveau schema Prisma, interface React dediee, suivi de lecture, administration, imports, tendances, contenus a la une et reprise intelligente.
+La version actuelle est la **7.5.0**. Elle repose sur un backend Fastify, une interface React, Prisma avec MySQL, un pipeline vidéo FFmpeg/HLS et Socket.IO pour le retour en temps réel des traitements.
 
-## Etat actuel
+## Fonctionnalités
 
-La page `UpdatesPage.js` documente les changements recents de l'application. La version actuelle met notamment en avant :
+### Vidéo
 
-- **6.3.1 - Reprise d'accueil plus intelligente** : priorite aux videos en cours, reprise du prochain episode de la serie la plus recente, puis fallback sur les tendances des 30 derniers jours.
-- **6.2.0 - Listes par genre avec contenu a la une** : sections par genre retravaillees, contenu mis en avant, rotation automatique chaque lundi a 9h00 et action manuelle d'administration.
-- **6.1.1 - Tendances sur l'accueil** : remplacement de l'ancien bloc des plus regardes par une section tendances avec mise en page dediee.
-- **6.1.0 - Recommencer une serie** : remise a zero du statut de visionnage d'une serie sans supprimer l'historique global.
+- catalogue de films et de séries, saisons et épisodes ;
+- lecture HLS avec choix de la qualité, sous-titres et éclairage d’ambiance ;
+- lecteur personnalisé avec progression lue, buffer, volume et plein écran ;
+- **Preview Live** expérimentale : aperçu au survol de la barre de lecture à partir de spritesheets et d’un fichier WebVTT ;
+- import et transcodage FFmpeg avec suivi de progression via Socket.IO ;
+- historique de lecture, reprise intelligente et remise à zéro d’une série ;
+- tendances, calendrier des ajouts et contenus mis en avant par genre ;
+- favoris, sagas et univers.
 
-## Stack
+### Musique
 
-- Backend : Node.js, Fastify, Prisma, Socket.IO, Swagger UI.
-- Frontend : React, React Router, Tailwind CSS, Axios, HLS.js.
-- Base de donnees : MySQL via Prisma.
-- Media : stockage local dans `backend/uploads`, non versionne dans git.
+- catalogue de morceaux et d’albums ;
+- genres musicaux et contenus premium ;
+- lecteur audio flottant et persistant pendant la navigation ;
+- gestion et import des contenus depuis l’administration.
 
-## Structure
+### Utilisateurs et administration
+
+- authentification JWT par cookie HttpOnly ;
+- profils utilisateur, grades, premium et préférences de genres ;
+- espaces protégés pour les administrateurs et super administrateurs ;
+- gestion des vidéos, séries, genres, personnes, sagas, univers et musiques ;
+- messages généraux, fonctionnalités expérimentales et statistiques ;
+- journalisation des actions et sauvegardes manuelles ou planifiées de MySQL ;
+- limitations de requêtes, contrôle CORS et en-têtes de sécurité.
+
+## Nouveautés de la version 7.5.0
+
+- activation globale de Preview Live depuis les fonctionnalités expérimentales ;
+- génération automatique d’une vignette toutes les quatre secondes ;
+- spritesheets de 50 images maximum et index temporel WebVTT ;
+- génération à l’import ou à la première demande pour une vidéo existante ;
+- nouveau lecteur vidéo personnalisé ;
+- aperçu horodaté au survol de la progression ;
+- menu de sélection des sous-titres et conservation des contrôles HLS existants.
+
+L’historique complet des versions, de la 6.1.0 à la 7.5.0, est disponible dans l’application à l’adresse `/updates` et dans `frontend/src/components/UpdatesPage.js`.
+
+## Stack technique
+
+| Couche | Technologies |
+| --- | --- |
+| Frontend | React 18, React Router, Tailwind CSS 4, Axios, Hls.js, Socket.IO Client |
+| Backend | Node.js, Fastify 5, Socket.IO, Swagger/OpenAPI |
+| Données | MySQL, Prisma 6 |
+| Médias | FFmpeg, HLS, WebVTT, stockage local |
+| Tests | Vitest, React Testing Library |
+
+## Architecture
 
 ```text
-backend/
-  controllers/       Logique metier des routes API
-  middlewares/       Authentification JWT
-  prisma/            Schema, migrations et seed
-  routes/            Routes Fastify
-  services/          Prisma et services recurrents
-  sami.js            Point d'entree du serveur
-
-frontend/
-  public/            Assets publics
-  src/               Application React
+sami/
+├── backend/
+│   ├── controllers/        # Logique des endpoints
+│   ├── middlewares/        # Authentification, autorisations et sécurité
+│   ├── prisma/             # Schéma Prisma, seed et ERD
+│   ├── routes/             # Déclaration des routes Fastify
+│   ├── server/             # Fabrique et démarrage du serveur
+│   ├── services/           # Base, sauvegardes, favoris, médias et tâches métier
+│   ├── tests/              # Tests Vitest du backend
+│   ├── uploads/            # Médias générés ou importés, non versionnés
+│   ├── BDD/                # Sauvegardes MySQL, non exposées publiquement
+│   └── sami.js             # Point d’entrée HTTPS
+├── frontend/
+│   ├── public/
+│   └── src/
+│       ├── components/     # Pages et composants React
+│       ├── context/        # Navigation et lecteur musical
+│       ├── services/       # Client API
+│       ├── utils/          # Utilitaires, dont le parseur Preview Live
+│       └── App.js          # Routes et structure générale de l’application
+└── README.md
 ```
 
-## Prerequis
+`backend/sami.js` lance le serveur TLS sur `0.0.0.0`. La configuration commune — routes, sécurité, CORS, multipart, fichiers statiques, Socket.IO et Swagger — se trouve dans `backend/server/createServer.js`.
 
-- Node.js 18 ou plus recent.
-- npm.
-- MySQL accessible localement ou sur serveur.
-- `ffmpeg` installe sur la machine qui traite les videos.
-- `mysqldump` disponible si la sauvegarde automatique de la base est utilisee.
-- Certificats SSL dans `backend/ssl/private.key` et `backend/ssl/certificate.crt`.
+## Modèle de données
+
+Le schéma Prisma décrit notamment :
+
+- les utilisateurs, grades, états et journaux d’actions ;
+- les vidéos, sous-titres, séries, saisons et progressions de lecture ;
+- les genres, préférences utilisateur et contenus mis en avant ;
+- les favoris de films et de séries ;
+- les sagas, univers et leur ordre de lecture ;
+- les personnes associées aux films et séries ;
+- les morceaux, albums et genres musicaux ;
+- les messages administratifs et réglages globaux de l’application.
+
+Le fichier source est `backend/prisma/schema.prisma`. Un diagramme est également disponible dans `backend/prisma/ERD.svg`.
+
+## Prérequis
+
+- Node.js 18 ou une version plus récente ;
+- npm ;
+- une base MySQL accessible ;
+- `ffmpeg` et `ffprobe` pour analyser et convertir les médias ;
+- `mysqldump` pour les sauvegardes de la base ;
+- un certificat et une clé TLS pour le démarrage avec `backend/sami.js`.
+
+## Installation
+
+Clonez le dépôt, puis installez séparément les dépendances du backend et du frontend :
+
+```bash
+git clone https://github.com/alexanderworldercraft/SAMI3.git
+cd SAMI3
+
+cd backend
+npm install
+npx prisma generate
+
+cd ../frontend
+npm install
+```
 
 ## Configuration
 
-Les vrais fichiers `.env` ne doivent pas etre versionnes. Utiliser les exemples fournis :
+Créez les fichiers d’environnement à partir des exemples :
 
 ```bash
 cp backend/.env.exemple backend/.env
 cp frontend/.env.exemple frontend/.env
 ```
 
-Adapter ensuite les valeurs a l'environnement local ou de production.
+Les principales variables du backend sont :
 
-## Installation backend
+| Variable | Rôle |
+| --- | --- |
+| `DATABASE_URL` | URL de connexion Prisma à MySQL |
+| `DB_HOST`, `DB_USER`, `DB_PASSWORD`, `DB_NAME` | Connexion utilisée notamment par les sauvegardes |
+| `JWT_SECRET` | Signature des jetons d’authentification |
+| `APP_NAME` | Nom affiché au démarrage |
+| `PORTS` | Port d’écoute du backend |
+| `PUBLIC_URL`, `PUBLIC_HOST` | URL et hôte publics, utilisés par CORS, Socket.IO et Swagger |
+| `BACKUP_DAY_OF_WEEK`, `BACKUP_TIME` | Planification de la sauvegarde MySQL |
+| `SMTP_*` | Envoi d’e-mails |
+| `USERNAMESUPERADMIN`, `PASSWORDSUPERADMIN`, `EMAILSUPERADMIN` | Compte super administrateur créé par le seed |
+
+Le frontend utilise principalement `REACT_APP_URL_LOCAL`, `REACT_APP_NAME` et `REACT_APP_VER`.
+
+Ne versionnez jamais les fichiers `.env`, les secrets, les certificats privés ou les sauvegardes de production.
+
+## Initialisation de la base
+
+Après avoir configuré `DATABASE_URL` :
 
 ```bash
 cd backend
-npm install
-npx prisma generate
-npx prisma migrate deploy
+npx prisma db push
 npm run seed
 ```
 
-En developpement, `npx prisma migrate dev` peut remplacer `migrate deploy` si de nouvelles migrations doivent etre creees.
+`prisma db push` synchronise directement le schéma avec la base. Pour un environnement géré par migrations, utilisez plutôt le workflow Prisma adapté à votre déploiement.
 
-## Installation frontend
+## Développement
+
+Lancez le frontend :
 
 ```bash
 cd frontend
-npm install
-npm run build
+npm start
 ```
 
-Le serveur Fastify sert ensuite le build React depuis `frontend/build`.
-
-## Demarrage
+Dans un autre terminal, lancez le backend HTTPS :
 
 ```bash
 cd backend
-npm run start
+npm start
 ```
 
-L'application est exposee sur l'adresse configuree avec `HTTPS` et `PORTS`. La documentation Swagger est disponible sur :
+Le point d’entrée attend les fichiers suivants :
 
 ```text
-https://<host>:<port>/documentation
+backend/ssl/private.key
+backend/ssl/certificate.crt
 ```
 
-## Routes principales
+L’interface de développement React utilise `REACT_APP_URL_LOCAL` pour joindre l’API.
 
-- `/api/users` : comptes, login, profils, premium, historique utilisateur.
-- `/api/videos` : videos, episodes, progression, tendances, imports media.
-- `/api/series` : series, saisons, episodes, remise a zero de visionnage.
-- `/api/genres` : genres et contenus a la une.
-- `/api/import` : import et traitement des fichiers.
-- `/api/people` : personnes liees aux contenus.
-- `/api/logs` : journalisation et statistiques.
+## Production
 
-## Donnees non versionnees
+Construisez d’abord l’interface :
 
-Le depot doit rester centre sur le code source. Les elements suivants sont exclus :
+```bash
+cd frontend
+npm run build
+```
 
-- `archives/`
-- `node_modules/`
-- `frontend/build/`
-- `backend/uploads/`
-- fichiers `.env`
-- certificats et cles SSL reels
-- logs, caches et fichiers temporaires
+Puis démarrez Fastify :
 
-Les fichiers d'exemple `.env.exemple` restent versionnes pour documenter la configuration attendue.
+```bash
+cd ../backend
+npm start
+```
 
-## Mise a jour du depot GitHub
+Fastify sert le build React depuis `frontend/build`, les médias depuis `/uploads/` et l’application React pour les routes inconnues. Les sauvegardes placées dans `backend/BDD` ne sont pas publiées par le serveur statique.
 
-Le depot cible est :
+La documentation de l’API est accessible à l’adresse :
 
 ```text
-https://github.com/alexanderworldercraft/SAMI3.git
+https://<hôte>:<port>/documentation
 ```
 
-La prochaine publication doit repartir d'une base propre avec ce projet SAMI actuel, sans l'ancien historique distant, sans `archives/`, sans `.env` et sans donnees locales. Le depot GitHub devra aussi etre renomme de `SAMI3` vers `SAMI`.
+## Routes de l’application
+
+| Route | Accès | Description |
+| --- | --- | --- |
+| `/` | public | Accueil |
+| `/login` | public | Connexion |
+| `/updates` | public | Historique des mises à jour |
+| `/videos` | authentifié | Films et séries |
+| `/lecture/:id` | authentifié | Lecteur vidéo |
+| `/sagas` | authentifié | Sagas |
+| `/musique` | authentifié | Musique et lecteur persistant |
+| `/personnes` | authentifié | Personnes associées aux contenus |
+| `/profile`, `/settings` | authentifié | Profil et préférences |
+| `/administration` | administrateur | Gestion de la plateforme |
+| `/nouvelle-video` | administrateur | Import vidéo |
+| `/nouvelle-musique` | administrateur | Import musical |
+
+La route `/register` est actuellement désactivée et renvoie vers l’écran de connexion.
+
+## Préfixes de l’API
+
+- `/api/users`
+- `/api/videos`
+- `/api/genres`
+- `/api/series`
+- `/api/import`
+- `/api/people`
+- `/api/logs`
+- `/api/admin-message`
+- `/api/admin-backup`
+- `/api/app-settings`
+- `/api/sagas`
+- `/api/universes`
+- `/api/music`
+
+## Tests
+
+Backend :
+
+```bash
+cd backend
+npm test
+```
+
+Frontend :
+
+```bash
+cd frontend
+npm test -- --watchAll=false
+```
+
+Build de vérification :
+
+```bash
+cd frontend
+npm run build
+```
+
+Les tests couvrent notamment la configuration Fastify, certaines routes, le calendrier, le pipeline vidéo, Preview Live, le parseur WebVTT et le lecteur personnalisé.
+
+## Tâches automatiques
+
+Au démarrage, le backend :
+
+- vérifie la connexion MySQL puis la maintient active périodiquement ;
+- planifie une sauvegarde selon `BACKUP_DAY_OF_WEEK` et `BACKUP_TIME` ;
+- renouvelle chaque lundi à 9 h les contenus mis en avant par genre ;
+- arrête proprement ses minuteries et tâches planifiées à la fermeture.
+
+## Données locales et fichiers sensibles
+
+Les éléments suivants ne doivent pas être publiés dans Git :
+
+- `node_modules/` ;
+- `frontend/build/` ;
+- `backend/uploads/` ;
+- les sauvegardes SQL de `backend/BDD/` ;
+- les fichiers `.env` ;
+- les clés privées et certificats réels ;
+- les journaux, caches et fichiers temporaires.
+
+Les exemples `.env.exemple` doivent rester exempts de secrets réels.
+
+## Licence
+
+Projet personnel. Aucune licence de redistribution spécifique n’est actuellement déclarée pour l’ensemble du dépôt.
