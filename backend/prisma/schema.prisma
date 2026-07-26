@@ -113,6 +113,7 @@ model Video {
   SagaContents         SagaContent[]
   UserVideoProgress    UserVideoProgress[]
   VideoSubtitles       VideoSubtitle[]
+  VideoAudioTracks     VideoAudioTrack[]
   GenreFeaturedContent GenreFeaturedContent[]
   UserFavoriteContent   UserFavoriteContent[]
 
@@ -142,6 +143,21 @@ model VideoSubtitle {
   Video           Video     @relation(fields: [VideoID], references: [VideoID])
 
   @@index([VideoID], map: "VideoSubtitle_VideoID_fkey")
+}
+
+model VideoAudioTrack {
+  VideoAudioTrackID Int       @id @default(autoincrement())
+  Label             String    @db.VarChar(100)
+  Language          String?   @db.VarChar(35)
+  CheminPlaylist    String    @db.VarChar(255)
+  IsDefault         Boolean   @default(false)
+  Ordre             Int
+  VideoID           Int
+  CreateDate        DateTime? @default(now())
+  Video             Video     @relation(fields: [VideoID], references: [VideoID])
+
+  @@unique([VideoID, Ordre])
+  @@index([VideoID], map: "VideoAudioTrack_VideoID_fkey")
 }
 
 model Saga {

@@ -79,7 +79,11 @@ const TaskHistory = ({ tasks }) => {
                         <dl className="mb-4 grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
                             <div>
                                 <dt className="font-bold text-slate-500 dark:text-slate-400">Audio</dt>
-                                <dd className="break-words font-semibold">{task.video?.audio || "Analyse en cours"}</dd>
+                                <dd className="break-words font-semibold">
+                                    {task.video?.audioTracks?.length > 0
+                                        ? renderListValue(task.video.audioTracks)
+                                        : task.video?.audio || "Analyse en cours"}
+                                </dd>
                             </div>
                             <div>
                                 <dt className="font-bold text-slate-500 dark:text-slate-400">Sous-titres</dt>

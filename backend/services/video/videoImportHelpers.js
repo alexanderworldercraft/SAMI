@@ -53,7 +53,7 @@ export const parseRequestedGenreIds = (value) => {
   );
 };
 
-const DEFAULT_AUDIO_PREFERENCES = [
+export const DEFAULT_AUDIO_PREFERENCES = [
   { languages: ["jap", "jpn", "ja"] },
   { languages: ["fra", "fre", "fr"], description: "vff" },
   { languages: ["fra", "fre", "fr"], description: "fre" },
@@ -61,13 +61,14 @@ const DEFAULT_AUDIO_PREFERENCES = [
   { languages: ["fra", "fre", "fr"] },
 ];
 
+export const getAudioStreams = (metadata) =>
+  (metadata?.streams || []).filter((stream) => stream.codec_type === "audio");
+
 export const selectPreferredAudioStream = (
   metadata,
   preferences = DEFAULT_AUDIO_PREFERENCES
 ) => {
-  const audioStreams = (metadata?.streams || []).filter(
-    (stream) => stream.codec_type === "audio"
-  );
+  const audioStreams = getAudioStreams(metadata);
 
   for (const preference of preferences) {
     const match = audioStreams.find((stream) => {
@@ -84,6 +85,82 @@ export const selectPreferredAudioStream = (
   }
 
   return audioStreams[0] || null;
+};
+
+const AUDIO_LANGUAGE_ALIASES = new Map([
+  ["jap", "ja"],
+  ["jpn", "ja"],
+  ["jp", "ja"],
+  ["fra", "fr"],
+  ["fre", "fr"],
+  ["frf", "fr"],
+  ["eng", "en"],
+  ["deu", "de"],
+  ["ger", "de"],
+  ["spa", "es"],
+  ["ita", "it"],
+  ["por", "pt"],
+  ["kor", "ko"],
+  ["zho", "zh"],
+  ["chi", "zh"],
+]);
+
+const AUDIO_LANGUAGE_LABELS = new Map([
+  ["ja", "Japonais"],
+  ["fr", "Français"],
+  ["en", "Anglais"],
+  ["de", "Allemand"],
+  ["es", "Espagnol"],
+  ["it", "Italien"],
+  ["pt", "Portugais"],
+  ["ko", "Coréen"],
+  ["zh", "Chinois"],
+]);
+
+const cleanAudioText = (value) =>
+  String(value || "")
+    .replace(/[\u0000-\u001f\u007f]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+export const normalizeAudioLanguage = (value) => {
+  const normalized = normalizeLangTag(value).replace(/_/g, "-");
+  if (!normalized || normalized === "und") return "und";
+  return (AUDIO_LANGUAGE_ALIASES.get(normalized) || normalized).slice(0, 35);
+};
+
+export const buildAudioTrackPlans = (audioStreams, preferredAudioStream) => {
+  const streams = Array.isArray(audioStreams) ? audioStreams : [];
+  const preferredIndex = preferredAudioStream?.index ?? streams[0]?.index;
+  const labelCounts = new Map();
+
+  return streams.map((stream, order) => {
+    const language = normalizeAudioLanguage(stream.tags?.language);
+    const languageLabel =
+      AUDIO_LANGUAGE_LABELS.get(language)
+      || (language !== "und" ? language.toUpperCase() : "");
+    const title = cleanAudioText(stream.tags?.title);
+    const baseLabel = cleanAudioText(
+      title && languageLabel && !title.toLowerCase().includes(languageLabel.toLowerCase())
+        ? `${languageLabel} — ${title}`
+        : title || languageLabel || `Audio ${order + 1}`
+    );
+    const count = (labelCounts.get(baseLabel) || 0) + 1;
+    labelCounts.set(baseLabel, count);
+    const suffix = count > 1 ? ` (${count})` : "";
+    const label = `${baseLabel.slice(0, Math.max(1, 100 - suffix.length))}${suffix}`;
+
+    return {
+      stream,
+      sourceIndex: stream.index,
+      order,
+      label,
+      language,
+      codec: stream.codec_name || null,
+      channels: Number(stream.channels) || null,
+      isDefault: stream.index === preferredIndex,
+    };
+  });
 };
 
 export const getVideoStream = (metadata) =>
@@ -146,6 +223,45 @@ export const buildMasterPlaylist = (playlists) => {
   return `#EXTM3U\n\n${variants.join("\n")}`;
 };
 
+const sanitizeM3u8Attribute = (value) =>
+  cleanAudioText(value).replace(/["\\]/g, "");
+
+export const buildMultiAudioMasterPlaylist = (
+  playlists,
+  audioTracks,
+  audioBitrate = 192
+) => {
+  const mediaEntries = audioTracks.map((track) => {
+    const playlistPath = String(track.relativePlaylist || "").replace(/\\/g, "/");
+    const attributes = [
+      "TYPE=AUDIO",
+      'GROUP-ID="sami-audio"',
+      `NAME="${sanitizeM3u8Attribute(track.label)}"`,
+      `LANGUAGE="${sanitizeM3u8Attribute(track.language || "und")}"`,
+      "AUTOSELECT=YES",
+      `DEFAULT=${track.isDefault ? "YES" : "NO"}`,
+      `CHANNELS="${track.outputChannels || 2}"`,
+      `URI="${playlistPath}"`,
+    ];
+    return `#EXT-X-MEDIA:${attributes.join(",")}`;
+  });
+
+  const variants = playlists.map(({ resolutionPlaylist, bitrate, width, height }) => {
+    const playlistPath = String(resolutionPlaylist).replace(/\\/g, "/");
+    const combinedBandwidth = (bitrate + audioBitrate) * 1000;
+    return `#EXT-X-STREAM-INF:BANDWIDTH=${combinedBandwidth},RESOLUTION=${width}x${height},AUDIO="sami-audio"\n${playlistPath}`;
+  });
+
+  return [
+    "#EXTM3U",
+    "#EXT-X-VERSION:3",
+    "",
+    ...mediaEntries,
+    "",
+    ...variants,
+  ].join("\n");
+};
+
 const buildAddVideoAudioLabel = (stream) => {
   if (!stream) return "Non detecte";
   const parts = [
@@ -157,10 +273,18 @@ const buildAddVideoAudioLabel = (stream) => {
   return parts.length > 0 ? parts.join(" - ") : `Flux ${stream.index}`;
 };
 
-export const buildAddVideoProcessingVideoInfo = ({ data, processingId, audioStream, subtitleInfos, saison }) => ({
+export const buildAddVideoProcessingVideoInfo = ({
+  data,
+  processingId,
+  audioStream,
+  audioTracks = [],
+  subtitleInfos,
+  saison,
+}) => ({
   processingId,
   titre: data.titre || data.videoOriginalName || "Video sans titre",
   audio: buildAddVideoAudioLabel(audioStream),
+  audioTracks: audioTracks.map((track) => track.label).filter(Boolean),
   subtitles:
     subtitleInfos.length > 0
       ? subtitleInfos.map((subtitle) => subtitle.label).filter(Boolean)
@@ -211,13 +335,18 @@ const getAudioLanguageGenre = (stream) => {
 const hasFrenchSubtitle = (subtitleStreams = []) =>
   subtitleStreams.some((stream) => FRENCH_LANG_CODES.has(getStreamLanguage(stream)));
 
-export const getAutoLanguageGenreNames = ({ audioStream, subtitleStreams }) => {
+export const getAutoLanguageGenreNames = ({
+  audioStream,
+  subtitleStreams,
+  multiAudio = false,
+}) => {
   const names = new Set();
   const audioGenre = getAudioLanguageGenre(audioStream);
   if (audioGenre) names.add(audioGenre);
   if (audioGenre && audioGenre !== "FR" && hasFrenchSubtitle(subtitleStreams)) {
     names.add("VOSTFR");
   }
+  if (multiAudio) names.add("MultiAudio");
   return Array.from(names);
 };
 

@@ -2,6 +2,74 @@ import React, { useEffect, useState } from "react";
 
 const updates = [
   {
+    version: "7.6.0",
+    title: "Pistes audio multiples experimentales",
+    date: "26 juillet 2026",
+    sections: [
+      {
+        title: "Fonctionnalite experimentale",
+        items: [
+          "Ajout du reglage multi_audio dans AppSetting, desactive par defaut et reserve aux prochains imports video.",
+          "La page Fonctionnalites experimentales propose un nouveau bouton Pistes audio multiples avec une description explicite de son comportement non retroactif.",
+          "Ajout des endpoints /api/app-settings/multi-audio pour lire et modifier l'etat global de la fonctionnalite.",
+          "Les changements d'etat sont journalises avec la nouvelle action multi_audio_toggle.",
+          "La migration initialise le reglage et l'action sans retraiter ni modifier les videos deja presentes.",
+        ],
+      },
+      {
+        title: "Import et conversion HLS",
+        items: [
+          "addVideo detecte maintenant toutes les pistes audio avec leurs vrais index FFprobe lorsque la fonctionnalite est active.",
+          "DEFAULT_AUDIO_PREFERENCES continue de choisir la piste principale, tandis que les autres pistes sont conservees dans leur ordre d'origine.",
+          "Chaque piste audio est convertie une seule fois en AAC et stockee dans sa propre playlist HLS.",
+          "Les variantes de resolution deviennent des flux video seuls et referencent un groupe audio commun avec les balises EXT-X-MEDIA.",
+          "La piste principale recoit DEFAULT=YES dans le manifest et reste automatiquement selectionnee au demarrage de la lecture.",
+          "Les timestamps et les segments de quatre secondes sont alignes afin de conserver la synchronisation pendant les changements de piste.",
+        ],
+      },
+      {
+        title: "Donnees et compatibilite historique",
+        items: [
+          "Ajout du modele Prisma VideoAudioTrack avec le libelle, la langue, la playlist, l'ordre et l'indicateur de piste par defaut.",
+          "Les pistes conservees sont enregistrees pendant la finalisation transactionnelle de la video puis exposees par l'API de detail.",
+          "La suppression definitive d'une video supprime egalement ses relations de pistes audio et son dossier HLS complet.",
+          "Les anciennes videos conservent leur manifest historique et ne recoivent aucune ligne VideoAudioTrack.",
+          "Quand l'option est desactivee ou que la source ne contient qu'une piste, le pipeline historique reste utilise sans modification.",
+          "Une video multi-audio deja importee reste lisible sur sa piste principale si la fonctionnalite est ensuite desactivee.",
+        ],
+      },
+      {
+        title: "Selection audio dans le lecteur",
+        items: [
+          "Le lecteur ecoute maintenant les evenements AUDIO_TRACKS_UPDATED et AUDIO_TRACK_SWITCHED de Hls.js.",
+          "Un menu Audio accessible permet de voir la piste active et de passer instantanement a une autre langue.",
+          "Le menu est affiche uniquement lorsque la fonctionnalite est active et que la video possede plusieurs pistes enregistrees.",
+          "Un fallback utilise la liste audio native du navigateur lorsque la lecture HLS native est employee.",
+          "Les controles de qualite, sous-titres, volume, progression, plein ecran et eclairage d'ambiance restent disponibles.",
+        ],
+      },
+      {
+        title: "Genres automatiques",
+        items: [
+          "Ajout du genre automatique MultiAudio pour les videos dont plusieurs pistes ont reellement ete converties et conservees.",
+          "Le genre MultiAudio est cree automatiquement s'il n'existe pas encore, comme JP, FR, VO et VOSTFR.",
+          "Une source possedant plusieurs pistes mais importee avec l'option desactivee ne recoit pas le genre MultiAudio.",
+          "La piste principale continue de determiner les genres de langue existants selon DEFAULT_AUDIO_PREFERENCES.",
+        ],
+      },
+      {
+        title: "Tests et verification",
+        items: [
+          "Ajout de tests backend pour la conservation de toutes les pistes, la piste par defaut, le manifest HLS et le genre MultiAudio.",
+          "Ajout de tests frontend pour la selection audio, les anciennes videos et le masquage du menu lorsque l'option est desactivee.",
+          "Le nouveau pipeline a ete valide avec un fichier MKV synthetique contenant des pistes japonaise et francaise.",
+          "Le pipeline historique a ete valide separement avec la fonctionnalite desactivee.",
+          "Le schema Prisma, les tests backend, les tests du lecteur et le build frontend de production ont ete verifies.",
+        ],
+      },
+    ],
+  },
+  {
     version: "7.5.0",
     title: "Preview Live et lecteur video personnalise",
     date: "25 juillet 2026",

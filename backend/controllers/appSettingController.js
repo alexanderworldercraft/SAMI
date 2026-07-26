@@ -4,6 +4,7 @@ import { ensureAdmin as ensureSharedAdmin } from "../services/authz.js";
 
 const CONTENT_PREVIEW_KEY = "content_preview_tooltip";
 const PREVIEW_LIVE_KEY = "preview_live";
+const MULTI_AUDIO_KEY = "multi_audio";
 
 const ensureAdmin = async (request, reply) => {
   const admin = await ensureSharedAdmin(request, reply, { unauthorizedError: "Unauthorized" });
@@ -183,5 +184,65 @@ export const updatePreviewLiveSetting = async (request, reply) => {
   } catch (error) {
     console.error("Erreur lors de la mise à jour du réglage Preview Live :", error);
     return reply.status(500).send({ error: "Erreur lors de la mise à jour du réglage Preview Live." });
+  }
+};
+
+export const isMultiAudioActive = async () => {
+  const setting = await getSettingOrCreate(MULTI_AUDIO_KEY);
+  return Boolean(setting?.Valeur?.active);
+};
+
+export const getMultiAudioSetting = async (_request, reply) => {
+  try {
+    const setting = await getSettingOrCreate(MULTI_AUDIO_KEY);
+    return reply.send(formatSetting(MULTI_AUDIO_KEY, setting));
+  } catch (error) {
+    console.error("Erreur lors de la récupération du réglage multi-audio :", error);
+    return reply.status(500).send({
+      error: "Erreur lors de la récupération du réglage multi-audio.",
+    });
+  }
+};
+
+export const updateMultiAudioSetting = async (request, reply) => {
+  const { active } = request.body || {};
+
+  if (typeof active !== "boolean") {
+    return reply.status(400).send({ error: "active doit être un booléen." });
+  }
+
+  try {
+    const userId = await ensureAdmin(request, reply);
+    if (!userId) return;
+
+    const currentSetting = await getSettingOrCreate(MULTI_AUDIO_KEY);
+    const previousActive = Boolean(currentSetting?.Valeur?.active);
+    const value = JSON.stringify({ active });
+
+    await prisma.$executeRaw`
+      UPDATE AppSetting
+      SET Valeur = ${value}
+      WHERE Cle = ${MULTI_AUDIO_KEY}
+    `;
+
+    const setting = await getSettingOrCreate(MULTI_AUDIO_KEY);
+    await createLog({
+      request,
+      UtilisateurID: userId,
+      ActionNom: "multi_audio_toggle",
+      Champ: MULTI_AUDIO_KEY,
+      AncienneValeur: String(previousActive),
+      NouvelleValeur: String(Boolean(setting?.Valeur?.active)),
+      Meta: {
+        key: MULTI_AUDIO_KEY,
+      },
+    });
+
+    return reply.send(formatSetting(MULTI_AUDIO_KEY, setting));
+  } catch (error) {
+    console.error("Erreur lors de la mise à jour du réglage multi-audio :", error);
+    return reply.status(500).send({
+      error: "Erreur lors de la mise à jour du réglage multi-audio.",
+    });
   }
 };

@@ -1315,6 +1315,9 @@ export const getVideoDetails = async (request, reply) => {
         VideoSubtitles: {
           orderBy: { Label: "asc" },
         },
+        VideoAudioTracks: {
+          orderBy: { Ordre: "asc" },
+        },
       },
     });
 
@@ -1443,6 +1446,14 @@ export const getVideoDetails = async (request, reply) => {
             Label: subtitle.Label,
             CheminSubtitle: subtitle.CheminSubtitle,
           })),
+          VideoAudioTracks: video.VideoAudioTracks.map((track) => ({
+            VideoAudioTrackID: track.VideoAudioTrackID,
+            Label: track.Label,
+            Language: track.Language,
+            CheminPlaylist: track.CheminPlaylist,
+            IsDefault: track.IsDefault,
+            Ordre: track.Ordre,
+          })),
           Acteurs: videoActeurs,
           Realisateurs: videoRealisateurs,
           IsFavorite: favoriteKeys.has(`video:${video.VideoID}`),
@@ -1474,6 +1485,14 @@ export const getVideoDetails = async (request, reply) => {
           VideoSubtitles: video.VideoSubtitles.map((subtitle) => ({
             Label: subtitle.Label,
             CheminSubtitle: subtitle.CheminSubtitle,
+          })),
+          VideoAudioTracks: video.VideoAudioTracks.map((track) => ({
+            VideoAudioTrackID: track.VideoAudioTrackID,
+            Label: track.Label,
+            Language: track.Language,
+            CheminPlaylist: track.CheminPlaylist,
+            IsDefault: track.IsDefault,
+            Ordre: track.Ordre,
           })),
           Acteurs: videoActeurs,
           Realisateurs: videoRealisateurs,
@@ -2400,6 +2419,7 @@ export const deleteVideo = async (request, reply) => {
       await tx.videoPersonne.deleteMany({ where: { VideoID: videoId } });
       await tx.userVideoProgress.deleteMany({ where: { VideoID: videoId } });
       await tx.videoSubtitle.deleteMany({ where: { VideoID: videoId } });
+      await tx.videoAudioTrack.deleteMany({ where: { VideoID: videoId } });
       await tx.video.delete({ where: { VideoID: videoId } });
     });
 

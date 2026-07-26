@@ -2,7 +2,7 @@
 
 SAMI (**Système d’Archivage Multimédia Intégré**) est une médiathèque web privée permettant d’organiser, diffuser et suivre des films, séries et musiques depuis une seule interface.
 
-La version actuelle est la **7.5.0**. Elle repose sur un backend Fastify, une interface React, Prisma avec MySQL, un pipeline vidéo FFmpeg/HLS et Socket.IO pour le retour en temps réel des traitements.
+La version actuelle est la **7.6.0**. Elle repose sur un backend Fastify, une interface React, Prisma avec MySQL, un pipeline vidéo FFmpeg/HLS et Socket.IO pour le retour en temps réel des traitements.
 
 ## Fonctionnalités
 
@@ -10,6 +10,7 @@ La version actuelle est la **7.5.0**. Elle repose sur un backend Fastify, une in
 
 - catalogue de films et de séries, saisons et épisodes ;
 - lecture HLS avec choix de la qualité, sous-titres et éclairage d’ambiance ;
+- pistes audio multiples expérimentales pour les nouvelles vidéos importées, avec choix dans le lecteur ;
 - lecteur personnalisé avec progression lue, buffer, volume et plein écran ;
 - **Preview Live** expérimentale : aperçu au survol de la barre de lecture à partir de spritesheets et d’un fichier WebVTT ;
 - import et transcodage FFmpeg avec suivi de progression via Socket.IO ;
@@ -34,17 +35,17 @@ La version actuelle est la **7.5.0**. Elle repose sur un backend Fastify, une in
 - journalisation des actions et sauvegardes manuelles ou planifiées de MySQL ;
 - limitations de requêtes, contrôle CORS et en-têtes de sécurité.
 
-## Nouveautés de la version 7.5.0
+## Nouveautés de la version 7.6.0
 
-- activation globale de Preview Live depuis les fonctionnalités expérimentales ;
-- génération automatique d’une vignette toutes les quatre secondes ;
-- spritesheets de 50 images maximum et index temporel WebVTT ;
-- génération à l’import ou à la première demande pour une vidéo existante ;
-- nouveau lecteur vidéo personnalisé ;
-- aperçu horodaté au survol de la progression ;
-- menu de sélection des sous-titres et conservation des contrôles HLS existants.
+- activation expérimentale des pistes audio multiples pour les nouvelles vidéos importées ;
+- conservation de toutes les pistes dans des renditions HLS audio séparées ;
+- sélection de la piste principale avec les préférences audio existantes ;
+- nouveau menu de choix audio dans le lecteur Hls.js ;
+- stockage des métadonnées dans `VideoAudioTrack`, sans rétrofit des anciennes vidéos ;
+- ajout automatique du genre `MultiAudio` après une conversion multi-audio réussie ;
+- maintien intégral du pipeline historique lorsque l’option est désactivée.
 
-L’historique complet des versions, de la 6.1.0 à la 7.5.0, est disponible dans l’application à l’adresse `/updates` et dans `frontend/src/components/UpdatesPage.js`.
+L’historique complet des versions, de la 6.1.0 à la 7.6.0, est disponible dans l’application à l’adresse `/updates` et dans `frontend/src/components/UpdatesPage.js`.
 
 ## Stack technique
 
@@ -89,7 +90,7 @@ sami/
 Le schéma Prisma décrit notamment :
 
 - les utilisateurs, grades, états et journaux d’actions ;
-- les vidéos, sous-titres, séries, saisons et progressions de lecture ;
+- les vidéos, pistes audio, sous-titres, séries, saisons et progressions de lecture ;
 - les genres, préférences utilisateur et contenus mis en avant ;
 - les favoris de films et de séries ;
 - les sagas, univers et leur ordre de lecture ;

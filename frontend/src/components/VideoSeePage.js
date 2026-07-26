@@ -58,6 +58,7 @@ const VideoSeePage = () => {
   const [videoElement, setVideoElement] = useState(null);
   const [isResettingSeries, setIsResettingSeries] = useState(false);
   const [skipFirstPlayLogKey, setSkipFirstPlayLogKey] = useState(0);
+  const [multiAudioEnabled, setMultiAudioEnabled] = useState(false);
   const [resumeChoicePulse, setResumeChoicePulse] = useState(false);
   const [contentSagas, setContentSagas] = useState([]);
   const [sagaPage, setSagaPage] = useState(1);
@@ -82,6 +83,30 @@ const VideoSeePage = () => {
       }
     };
     fetchUser();
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    api.get("/app-settings/multi-audio")
+      .then((response) => {
+        if (!cancelled) {
+          setMultiAudioEnabled(Boolean(response.data?.active));
+        }
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          setMultiAudioEnabled(false);
+          console.warn(
+            "Réglage multi-audio indisponible :",
+            error.response?.data?.error || error.message
+          );
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
 
@@ -219,6 +244,15 @@ const VideoSeePage = () => {
           data.video.VideoSubtitles?.map((sub) => ({
             label: sub.Label,
             url: `${apiUrl}/${sub.CheminSubtitle}`,
+          })) || [],
+        audioTracks:
+          data.video.VideoAudioTracks?.map((track) => ({
+            id: track.VideoAudioTrackID,
+            label: track.Label,
+            language: track.Language,
+            playlist: track.CheminPlaylist,
+            isDefault: Boolean(track.IsDefault),
+            order: track.Ordre,
           })) || [],
       });
       setCurrentEpisode(data.video);
@@ -643,6 +677,7 @@ const VideoSeePage = () => {
                 backgroundBlur={backgroundBlur}
                 onVideoElement={setVideoElement}
                 skipFirstPlayLogKey={skipFirstPlayLogKey}
+                multiAudioEnabled={multiAudioEnabled}
               />
             </div>
           </section>

@@ -13,6 +13,7 @@ import {
   VideoImportValidationError,
   buildAddVideoProcessingVideoInfo,
   buildMasterPlaylist,
+  buildMultiAudioMasterPlaylist,
   getHlsProfiles,
   normalizeLangTag,
   timemarkToSeconds,
@@ -20,6 +21,7 @@ import {
 
 const VIDEO_EXTENSIONS = new Set([".avi", ".mov", ".mkv", ".webm", ".flv", ".wmv", ".mp4"]);
 const IMAGE_EXTENSIONS = new Set([".jpg", ".jpeg", ".png", ".webp", ".gif"]);
+const HLS_AUDIO_BITRATE = 192;
 
 export class VideoTranscodingError extends Error {
   constructor(message, { errors = [], reference = null } = {}) {
@@ -224,6 +226,8 @@ export async function transcodeVideoToHls({
   metadata,
   videoStream,
   audioStream,
+  audioTracks = [],
+  multiAudioEnabled = false,
   outputDir,
   title,
   onProgress,
@@ -231,7 +235,9 @@ export async function transcodeVideoToHls({
   const duration = Number(metadata?.format?.duration) || 0;
   const profiles = getHlsProfiles(videoStream);
   const playlists = [];
+  const alternateAudioTracks = [];
   const errors = [];
+  const useAlternateAudio = multiAudioEnabled && audioTracks.length > 1;
 
   for (const profile of profiles) {
     const resolutionDir = path.join(outputDir, profile.label);
@@ -240,24 +246,41 @@ export async function transcodeVideoToHls({
 
     try {
       await new Promise((resolve, reject) => {
-        ffmpeg(videoPath)
-          .outputOptions([
-            `-map 0:${videoStream.index}`,
-            `-vf scale=w=${profile.width}:h=-2`,
-            "-crf 23",
-            `-maxrate ${profile.bitrate}k`,
-            "-bufsize 2M",
-            "-hls_time 4",
-            "-hls_playlist_type vod",
-            "-preset veryfast",
-            "-profile:v high",
-            "-pix_fmt yuv420p",
+        const outputOptions = [
+          `-map 0:${videoStream.index}`,
+          `-vf scale=w=${profile.width}:h=-2`,
+          "-crf 23",
+          `-maxrate ${profile.bitrate}k`,
+          "-bufsize 2M",
+          "-hls_time 4",
+          "-hls_playlist_type vod",
+          "-preset veryfast",
+          "-profile:v high",
+          "-pix_fmt yuv420p",
+        ];
+
+        if (useAlternateAudio) {
+          outputOptions.push(
+            "-an",
+            "-force_key_frames expr:gte(t,n_forced*4)"
+          );
+        } else {
+          outputOptions.push(
             `-map 0:${audioStream.index}`,
             "-c:a aac",
             "-ac 2",
             "-ar 48000",
-            "-b:a 192k",
-          ])
+            `-b:a ${HLS_AUDIO_BITRATE}k`
+          );
+        }
+
+        const command = ffmpeg(videoPath);
+        if (useAlternateAudio) {
+          command.inputOptions(["-copyts", "-start_at_zero"]);
+        }
+
+        command
+          .outputOptions(outputOptions)
           .output(playlistPath)
           .on("progress", (progress) => {
             const seconds = timemarkToSeconds(progress.timemark);
@@ -288,6 +311,63 @@ export async function transcodeVideoToHls({
     }
   }
 
+  if (useAlternateAudio && errors.length === 0) {
+    for (const track of audioTracks) {
+      const audioDir = path.join(outputDir, "audio", String(track.order));
+      const playlistPath = path.join(audioDir, "playlist.m3u8");
+      const segmentPath = path.join(audioDir, "segment_%05d.ts");
+      const profile = { label: `Audio ${track.label}` };
+      fs.mkdirSync(audioDir, { recursive: true });
+
+      try {
+        await new Promise((resolve, reject) => {
+          ffmpeg(videoPath)
+            .inputOptions(["-copyts", "-start_at_zero"])
+            .outputOptions([
+              `-map 0:${track.stream.index}`,
+              "-vn",
+              "-c:a aac",
+              "-ac 2",
+              "-ar 48000",
+              `-b:a ${HLS_AUDIO_BITRATE}k`,
+              "-hls_time 4",
+              "-hls_playlist_type vod",
+              `-hls_segment_filename ${segmentPath}`,
+            ])
+            .output(playlistPath)
+            .on("progress", (progress) => {
+              const seconds = timemarkToSeconds(progress.timemark);
+              const percent = duration > 0
+                ? Math.max(0, Math.min(99, Math.round((seconds / duration) * 100)))
+                : 0;
+              onProgress?.({ profile, progress: percent });
+            })
+            .on("end", resolve)
+            .on("error", reject)
+            .run();
+        });
+
+        alternateAudioTracks.push({
+          label: track.label,
+          language: track.language,
+          isDefault: track.isDefault,
+          order: track.order,
+          sourceIndex: track.sourceIndex,
+          outputChannels: 2,
+          relativePlaylist: path.relative(outputDir, playlistPath),
+        });
+        onProgress?.({ profile, progress: 100, completed: true });
+      } catch (error) {
+        errors.push({
+          resolution: profile.label,
+          message: error.message,
+          code: error.code,
+        });
+        onProgress?.({ profile, progress: 100, error });
+      }
+    }
+  }
+
   if (errors.length > 0 || playlists.length === 0) {
     const failureErrors = errors.length > 0
       ? errors
@@ -304,8 +384,20 @@ export async function transcodeVideoToHls({
   }
 
   const masterPlaylistPath = path.join(outputDir, "master.m3u8");
-  fs.writeFileSync(masterPlaylistPath, buildMasterPlaylist(playlists));
+  const masterPlaylist = useAlternateAudio
+    ? buildMultiAudioMasterPlaylist(
+        playlists,
+        alternateAudioTracks,
+        HLS_AUDIO_BITRATE
+      )
+    : buildMasterPlaylist(playlists);
+  fs.writeFileSync(masterPlaylistPath, masterPlaylist);
   fs.rmSync(videoPath, { force: true });
 
-  return { masterPlaylistPath, playlists };
+  return {
+    masterPlaylistPath,
+    playlists,
+    audioTracks: alternateAudioTracks,
+    multiAudio: useAlternateAudio,
+  };
 }

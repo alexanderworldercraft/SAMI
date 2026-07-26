@@ -1,7 +1,9 @@
 import {
   getContentPreviewSetting,
+  getMultiAudioSetting,
   getPreviewLiveSetting,
   updateContentPreviewSetting,
+  updateMultiAudioSetting,
   updatePreviewLiveSetting,
 } from "../controllers/appSettingController.js";
 import { authMiddleware } from "../middlewares/authMiddleware.js";
@@ -11,4 +13,6 @@ export default async function (fastify) {
   fastify.put("/content-preview", { preHandler: authMiddleware }, updateContentPreviewSetting);
   fastify.get("/preview-live", getPreviewLiveSetting);
   fastify.put("/preview-live", { preHandler: authMiddleware }, updatePreviewLiveSetting);
+  fastify.get("/multi-audio", getMultiAudioSetting);
+  fastify.put("/multi-audio", { preHandler: authMiddleware }, updateMultiAudioSetting);
 }

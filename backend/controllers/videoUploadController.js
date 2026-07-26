@@ -8,7 +8,9 @@ import {
   VideoImportValidationError,
   addVideoDedupeCache,
   buildAddVideoProcessingVideoInfo,
+  buildAudioTrackPlans,
   cleanupAddVideoTemp,
+  getAudioStreams,
   getAutoLanguageGenreNames,
   getVideoStream,
   isDuplicateAddVideo,
@@ -33,6 +35,7 @@ import {
 } from "../utils/multipartErrors.js";
 import {
   isContentPreviewActive,
+  isMultiAudioActive,
   isPreviewLiveActive,
 } from "./appSettingController.js";
 
@@ -85,6 +88,7 @@ export const addVideo = async (request, reply, fastify) => {
     const adminUserId = await ensureVideoAdmin(request, reply);
     if (!adminUserId) return;
 
+    const multiAudioEnabled = await isMultiAudioActive();
     const processingId = `addvideo-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
     workspace = createVideoUploadWorkspace();
 
@@ -139,6 +143,8 @@ export const addVideo = async (request, reply, fastify) => {
       outputDir: workspace.subtitlesDir,
     });
     const audioStream = selectPreferredAudioStream(metadata);
+    const audioStreams = getAudioStreams(metadata);
+    const audioTracks = buildAudioTrackPlans(audioStreams, audioStream);
     const videoStream = getVideoStream(metadata);
 
     if (!audioStream) {
@@ -148,24 +154,25 @@ export const addVideo = async (request, reply, fastify) => {
       throw new VideoImportValidationError("Aucun flux vidéo disponible dans le fichier.");
     }
 
-    const audioDuration = Number(audioStream.duration);
     const videoDuration = Number(videoStream.duration);
-    if (
-      Number.isFinite(audioDuration)
-      && Number.isFinite(videoDuration)
-      && Math.abs(audioDuration - videoDuration) > 2
-    ) {
-      console.warn("[addVideo] Désynchronisation potentielle entre les flux audio et vidéo.");
+    for (const track of audioTracks) {
+      const audioDuration = Number(track.stream.duration);
+      if (
+        Number.isFinite(audioDuration)
+        && Number.isFinite(videoDuration)
+        && Math.abs(audioDuration - videoDuration) > 2
+      ) {
+        console.warn(
+          `[addVideo] Désynchronisation potentielle pour la piste audio ${track.label}.`
+        );
+      }
     }
 
-    const autoLanguageGenreNames = getAutoLanguageGenreNames({
-      audioStream,
-      subtitleStreams,
-    });
     const processingVideoInfo = buildAddVideoProcessingVideoInfo({
       data,
       processingId,
       audioStream,
+      audioTracks: multiAudioEnabled ? audioTracks : [],
       subtitleInfos,
       saison: saisonInfo,
     });
@@ -178,11 +185,13 @@ export const addVideo = async (request, reply, fastify) => {
       progress: 100,
     });
 
-    await transcodeVideoToHls({
+    const transcodingResult = await transcodeVideoToHls({
       videoPath: videoTempPath,
       metadata,
       videoStream,
       audioStream,
+      audioTracks,
+      multiAudioEnabled,
       outputDir: workspace.hlsDir,
       title: data.titre,
       onProgress: ({ profile, progress, completed, error }) =>
@@ -196,6 +205,11 @@ export const addVideo = async (request, reply, fastify) => {
           error,
         }),
     });
+    const autoLanguageGenreNames = getAutoLanguageGenreNames({
+      audioStream,
+      subtitleStreams,
+      multiAudio: transcodingResult.multiAudio,
+    });
 
     const cachedSaisonId = addVideoDedupeCache.get(dedupeKey)?.saisonId;
     if (data.SaisonID == null && cachedSaisonId != null) {
@@ -208,6 +222,7 @@ export const addVideo = async (request, reply, fastify) => {
       adminUserId,
       hlsDir: workspace.hlsDir,
       subtitleInfos,
+      audioTrackInfos: transcodingResult.audioTracks,
       requestedGenreIds,
       autoLanguageGenreNames,
     });

@@ -14,6 +14,7 @@ const moveImportedFiles = ({
   imageTempPath,
   imageExtension,
   subtitleInfos,
+  audioTrackInfos,
 }) => {
   const finalVideoDir = path.join(VIDEO_ROOT, String(videoId));
   const finalHlsDir = path.join(finalVideoDir, "hls");
@@ -42,6 +43,17 @@ const moveImportedFiles = ({
     }
   }
 
+  const audioTracks = audioTrackInfos.map((track) => ({
+    ...track,
+    path: toStoragePath(
+      "uploads",
+      "video",
+      videoId,
+      "hls",
+      String(track.relativePlaylist).replace(/\\/g, "/")
+    ),
+  }));
+
   let posterPath = "";
   if (imageTempPath) {
     fs.mkdirSync(finalPosterDir, { recursive: true });
@@ -63,6 +75,7 @@ const moveImportedFiles = ({
     ),
     posterPath,
     subtitles,
+    audioTracks,
   };
 };
 
@@ -71,6 +84,7 @@ export async function persistImportedVideo({
   adminUserId,
   hlsDir,
   subtitleInfos,
+  audioTrackInfos = [],
   requestedGenreIds,
   autoLanguageGenreNames,
 }) {
@@ -99,6 +113,7 @@ export async function persistImportedVideo({
       imageTempPath: data.imageTempPath,
       imageExtension: data.imageTempExt,
       subtitleInfos,
+      audioTrackInfos,
     });
 
     const updatedVideo = await prisma.$transaction(async (transaction) => {
@@ -126,6 +141,19 @@ export async function persistImportedVideo({
           data: importedFiles.subtitles.map((subtitle, index) => ({
             Label: subtitle.label || `Subtitle ${index + 1}`,
             CheminSubtitle: subtitle.path,
+            VideoID: createdVideo.VideoID,
+          })),
+        });
+      }
+
+      if (importedFiles.audioTracks.length > 0) {
+        await transaction.videoAudioTrack.createMany({
+          data: importedFiles.audioTracks.map((track) => ({
+            Label: track.label,
+            Language: track.language === "und" ? null : track.language,
+            CheminPlaylist: track.path,
+            IsDefault: track.isDefault,
+            Ordre: track.order,
             VideoID: createdVideo.VideoID,
           })),
         });

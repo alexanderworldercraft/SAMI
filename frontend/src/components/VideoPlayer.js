@@ -32,7 +32,13 @@ const formatPlaybackTime = (seconds) => {
     : `${minutes}:${String(remainingSeconds).padStart(2, "0")}`;
 };
 
-const VideoPlayer = ({ video, backgroundBlur, onVideoElement, skipFirstPlayLogKey = 0 }) => {
+const VideoPlayer = ({
+  video,
+  backgroundBlur,
+  onVideoElement,
+  skipFirstPlayLogKey = 0,
+  multiAudioEnabled = false,
+}) => {
   const videoRef = useRef(null);
   const fitContainerRef = useRef(null);
   const playerContainerRef = useRef(null);
@@ -54,6 +60,9 @@ const VideoPlayer = ({ video, backgroundBlur, onVideoElement, skipFirstPlayLogKe
   const [captionsEnabled, setCaptionsEnabled] = useState(true);
   const [selectedSubtitleIndex, setSelectedSubtitleIndex] = useState(0);
   const [subtitleMenuOpen, setSubtitleMenuOpen] = useState(false);
+  const [availableAudioTracks, setAvailableAudioTracks] = useState([]);
+  const [selectedAudioTrackIndex, setSelectedAudioTrackIndex] = useState(-1);
+  const [audioMenuOpen, setAudioMenuOpen] = useState(false);
   const [previewCues, setPreviewCues] = useState([]);
   const [hoverPreview, setHoverPreview] = useState(null);
   const [ambientLightEnabled, setAmbientLightEnabled] = useState(() => {
@@ -88,6 +97,9 @@ const VideoPlayer = ({ video, backgroundBlur, onVideoElement, skipFirstPlayLogKe
     setCaptionsEnabled(true);
     setSelectedSubtitleIndex(0);
     setSubtitleMenuOpen(false);
+    setAvailableAudioTracks([]);
+    setSelectedAudioTrackIndex(-1);
+    setAudioMenuOpen(false);
     setPreviewCues([]);
     setHoverPreview(null);
 
@@ -190,6 +202,30 @@ const VideoPlayer = ({ video, backgroundBlur, onVideoElement, skipFirstPlayLogKe
         // debug: true,
       });
 
+      hls.on(Hls.Events.AUDIO_TRACKS_UPDATED, (_event, data) => {
+        const tracks = (data.audioTracks || []).map((track, index) => ({
+          index,
+          label:
+            track.name
+            || video.audioTracks?.[index]?.label
+            || track.lang
+            || `Audio ${index + 1}`,
+          language: track.lang || video.audioTracks?.[index]?.language || null,
+        }));
+        setAvailableAudioTracks(tracks);
+
+        const defaultIndex = tracks.findIndex(
+          (_track, index) => data.audioTracks?.[index]?.default
+        );
+        setSelectedAudioTrackIndex(
+          hls.audioTrack >= 0 ? hls.audioTrack : defaultIndex
+        );
+      });
+
+      hls.on(Hls.Events.AUDIO_TRACK_SWITCHED, (_event, data) => {
+        setSelectedAudioTrackIndex(data.id);
+      });
+
       hls.loadSource(sourceUrl);
       hls.attachMedia(videoElement);
 
@@ -236,6 +272,27 @@ const VideoPlayer = ({ video, backgroundBlur, onVideoElement, skipFirstPlayLogKe
     const handleLoadedMetadata = () => {
       setDuration(Number.isFinite(videoElement.duration) ? videoElement.duration : 0);
       setCurrentTime(videoElement.currentTime || 0);
+
+      if (!hlsRef.current && videoElement.audioTracks?.length > 0) {
+        const nativeTracks = Array.from(
+          { length: videoElement.audioTracks.length },
+          (_unused, index) => videoElement.audioTracks[index]
+        );
+        setAvailableAudioTracks(
+          nativeTracks.map((track, index) => ({
+            index,
+            label:
+              track.label
+              || video.audioTracks?.[index]?.label
+              || track.language
+              || `Audio ${index + 1}`,
+            language: track.language || video.audioTracks?.[index]?.language || null,
+          }))
+        );
+        const enabledIndex = nativeTracks.findIndex((track) => track.enabled);
+        setSelectedAudioTrackIndex(enabledIndex >= 0 ? enabledIndex : 0);
+      }
+
       if (!videoElement.videoWidth || !videoElement.videoHeight) return;
       setAspectRatio(videoElement.videoWidth / videoElement.videoHeight);
     };
@@ -379,6 +436,9 @@ const VideoPlayer = ({ video, backgroundBlur, onVideoElement, skipFirstPlayLogKe
       // Reset des levels au prochain mount
       setAvailableLevels([]);
       setSelectedLevel(-1);
+      setAvailableAudioTracks([]);
+      setSelectedAudioTrackIndex(-1);
+      setAudioMenuOpen(false);
 
       if (onVideoElement) {
         onVideoElement(null);
@@ -575,6 +635,36 @@ const VideoPlayer = ({ video, backgroundBlur, onVideoElement, skipFirstPlayLogKe
     const videoElement = videoRef.current;
     if (!videoElement) return;
     videoElement.muted = !videoElement.muted;
+  };
+
+  const selectAudioTrack = (audioTrackIndex) => {
+    if (!Number.isInteger(audioTrackIndex) || audioTrackIndex < 0) return;
+
+    if (hlsRef.current) {
+      hlsRef.current.audioTrack = audioTrackIndex;
+    } else {
+      const nativeTracks = videoRef.current?.audioTracks;
+      if (nativeTracks?.length) {
+        for (let index = 0; index < nativeTracks.length; index += 1) {
+          nativeTracks[index].enabled = index === audioTrackIndex;
+        }
+      }
+    }
+
+    setSelectedAudioTrackIndex(audioTrackIndex);
+    setAudioMenuOpen(false);
+  };
+
+  const handleAudioMenuBlur = (event) => {
+    if (!event.currentTarget.contains(event.relatedTarget)) {
+      setAudioMenuOpen(false);
+    }
+  };
+
+  const handleAudioMenuMouseLeave = (event) => {
+    if (!event.currentTarget.contains(document.activeElement)) {
+      setAudioMenuOpen(false);
+    }
   };
 
   const applySubtitleSelection = (subtitleIndex, enabled) => {
@@ -895,6 +985,65 @@ const VideoPlayer = ({ video, backgroundBlur, onVideoElement, skipFirstPlayLogKe
             </span>
 
             <span className="flex-1" />
+
+            {multiAudioEnabled
+              && video?.audioTracks?.length > 1
+              && availableAudioTracks.length > 1 && (
+              <div
+                className="relative"
+                onMouseEnter={() => setAudioMenuOpen(true)}
+                onMouseLeave={handleAudioMenuMouseLeave}
+                onFocusCapture={() => setAudioMenuOpen(true)}
+                onBlurCapture={handleAudioMenuBlur}
+              >
+                {audioMenuOpen && (
+                  <div
+                    role="menu"
+                    aria-label="Choisir la piste audio"
+                    className="absolute bottom-full right-0 z-50 min-w-48 overflow-hidden rounded-lg border border-white/20 bg-black/95 p-1.5 text-left shadow-2xl backdrop-blur"
+                  >
+                    <p className="px-2 py-1 text-[11px] font-bold uppercase tracking-wide text-white/55">
+                      Audio
+                    </p>
+                    <div className="max-h-48 overflow-y-auto">
+                      {availableAudioTracks.map((track) => {
+                        const isSelected = selectedAudioTrackIndex === track.index;
+                        return (
+                          <button
+                            type="button"
+                            role="menuitemradio"
+                            aria-checked={isSelected}
+                            key={`${track.label}-${track.index}`}
+                            onClick={() => selectAudioTrack(track.index)}
+                            className={`flex w-full items-center justify-between gap-3 rounded-md px-2 py-2 text-sm transition ${
+                              isSelected
+                                ? "bg-sky-500/25 font-bold text-sky-100"
+                                : "text-white/80 hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white"
+                            }`}
+                          >
+                            <span>{track.label}</span>
+                            <span className="w-4 text-center text-sky-300" aria-hidden="true">
+                              {isSelected ? "✓" : ""}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => setAudioMenuOpen(true)}
+                  aria-haspopup="menu"
+                  aria-expanded={audioMenuOpen}
+                  aria-label="Choisir la piste audio"
+                  className="rounded bg-white/15 px-2 py-1 text-xs font-black text-white/85 transition hover:bg-white/25"
+                >
+                  Audio
+                </button>
+              </div>
+            )}
 
             {video?.subtitles?.length > 0 && (
               <div

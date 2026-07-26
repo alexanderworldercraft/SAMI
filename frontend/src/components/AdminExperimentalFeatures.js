@@ -4,6 +4,7 @@ import api from "../services/api";
 const AdminExperimentalFeatures = () => {
   const [contentPreviewActive, setContentPreviewActive] = useState(false);
   const [previewLiveActive, setPreviewLiveActive] = useState(false);
+  const [multiAudioActive, setMultiAudioActive] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
@@ -12,12 +13,14 @@ const AdminExperimentalFeatures = () => {
   useEffect(() => {
     const fetchSettings = async () => {
       try {
-        const [contentPreviewResponse, previewLiveResponse] = await Promise.all([
+        const [contentPreviewResponse, previewLiveResponse, multiAudioResponse] = await Promise.all([
           api.get("/app-settings/content-preview"),
           api.get("/app-settings/preview-live"),
+          api.get("/app-settings/multi-audio"),
         ]);
         setContentPreviewActive(Boolean(contentPreviewResponse.data?.active));
         setPreviewLiveActive(Boolean(previewLiveResponse.data?.active));
+        setMultiAudioActive(Boolean(multiAudioResponse.data?.active));
       } catch (error) {
         console.error("Erreur lors du chargement des fonctionnalités expérimentales :", error);
         setErrorMessage(error.response?.data?.error || "Impossible de charger les fonctionnalités expérimentales.");
@@ -68,6 +71,34 @@ const AdminExperimentalFeatures = () => {
       console.error("Erreur lors de la mise à jour de Preview Live :", error);
       setPreviewLiveActive(!nextActive);
       setErrorMessage(error.response?.data?.error || "Impossible de mettre à jour Preview Live.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleToggleMultiAudio = async () => {
+    const nextActive = !multiAudioActive;
+    setMultiAudioActive(nextActive);
+    setSaving(true);
+    setMessage("");
+    setErrorMessage("");
+
+    try {
+      const response = await api.put("/app-settings/multi-audio", {
+        active: nextActive,
+      });
+      setMultiAudioActive(Boolean(response.data?.active));
+      setMessage(
+        response.data?.active
+          ? "Pistes audio multiples activées pour les prochains imports."
+          : "Pistes audio multiples désactivées pour les prochains imports."
+      );
+    } catch (error) {
+      console.error("Erreur lors de la mise à jour du multi-audio :", error);
+      setMultiAudioActive(!nextActive);
+      setErrorMessage(
+        error.response?.data?.error || "Impossible de mettre à jour le multi-audio."
+      );
     } finally {
       setSaving(false);
     }
@@ -147,6 +178,36 @@ const AdminExperimentalFeatures = () => {
               <span
                 className={`inline-block size-6 rounded-full bg-white shadow transition duration-200 ${
                   previewLiveActive ? "translate-x-9" : "translate-x-1"
+                }`}
+              />
+            </button>
+          </div>
+
+          <div className="mt-4 flex flex-col gap-4 rounded-xl border border-sky-500/10 bg-white/70 p-5 dark:bg-slate-950/45 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h3 className="text-base font-black text-slate-950 dark:text-white">
+                Pistes audio multiples
+              </h3>
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-300">
+                Conserve toutes les pistes audio des prochaines vidéos importées et permet de les
+                choisir dans le lecteur. Les vidéos déjà présentes ne sont pas retraitées.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleToggleMultiAudio}
+              disabled={loading || saving}
+              className={`relative inline-flex h-8 w-16 shrink-0 items-center rounded-full border transition duration-200 ${
+                multiAudioActive
+                  ? "border-emerald-300/70 bg-emerald-500/80"
+                  : "border-slate-300/70 bg-slate-300/70 dark:border-slate-700 dark:bg-slate-800"
+              } disabled:cursor-not-allowed disabled:opacity-60`}
+            >
+              <span className="sr-only">Activer les pistes audio multiples</span>
+              <span
+                className={`inline-block size-6 rounded-full bg-white shadow transition duration-200 ${
+                  multiAudioActive ? "translate-x-9" : "translate-x-1"
                 }`}
               />
             </button>

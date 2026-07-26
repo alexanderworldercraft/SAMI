@@ -31,7 +31,9 @@ const GeneralMessageBanner = () => {
       <div className="flex items-start justify-between gap-4 rounded-xl border border-sky-300/30 bg-sky-500/15 px-5 py-4 shadow-xl shadow-slate-950/5 backdrop-blur dark:bg-sky-400/10 dark:shadow-sky-950/20">
         <div>
           <p className="text-sm font-black text-slate-950 dark:text-white">{message.Titre}</p>
-          <p className="mt-1 text-sm leading-6 text-slate-700 dark:text-slate-200">{message.Description}</p>
+          <p className="mt-1 whitespace-pre-line text-sm leading-6 text-slate-700 dark:text-slate-200">
+            {message.Description}
+          </p>
         </div>
         <button type="button" className="-m-1.5 flex-none p-1.5" onClick={() => setIsVisible(false)}>
           <span className="sr-only">Masquer</span>

@@ -9,15 +9,15 @@ describe("UpdatesPage", () => {
     const navigation = screen.getByRole("navigation", {
       name: "Navigation des mises a jour",
     });
-    const latestVersionLink = screen.getByRole("link", { name: /Version 7\.5\.0/ });
+    const latestVersionLink = screen.getByRole("link", { name: /Version 7\.6\.0/ });
 
     expect(navigation).toContainElement(latestVersionLink);
-    expect(latestVersionLink).toHaveAttribute("href", "#version-7-5-0");
+    expect(latestVersionLink).toHaveAttribute("href", "#version-7-6-0");
     expect(
       screen.getByRole("article", {
-        name: /Preview Live et lecteur video personnalise/,
+        name: /Pistes audio multiples experimentales/,
       })
-    ).toHaveAttribute("data-version", "7.5.0");
+    ).toHaveAttribute("data-version", "7.6.0");
     expect(latestVersionLink).toHaveAttribute("aria-current", "location");
   });
 });

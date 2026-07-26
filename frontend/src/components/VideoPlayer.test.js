@@ -1,11 +1,44 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 
+import Hls from "hls.js";
 import VideoPlayer from "./VideoPlayer";
 
 jest.mock("hls.js", () => ({
   __esModule: true,
-  default: {
-    isSupported: () => false,
+  default: class MockHls {
+    static instances = [];
+
+    static Events = {
+      AUDIO_TRACKS_UPDATED: "audio-tracks-updated",
+      AUDIO_TRACK_SWITCHED: "audio-track-switched",
+      MANIFEST_PARSED: "manifest-parsed",
+      ERROR: "error",
+    };
+
+    static isSupported() {
+      return true;
+    }
+
+    constructor() {
+      this.audioTrack = -1;
+      this.levels = [];
+      this.listeners = new Map();
+      MockHls.instances.push(this);
+    }
+
+    loadSource() {}
+
+    attachMedia() {}
+
+    destroy() {}
+
+    on(event, listener) {
+      this.listeners.set(event, listener);
+    }
+
+    emit(event, data) {
+      this.listeners.get(event)?.(event, data);
+    }
   },
 }));
 
@@ -23,6 +56,10 @@ beforeAll(() => {
 
     disconnect() {}
   };
+});
+
+beforeEach(() => {
+  Hls.instances.length = 0;
 });
 
 const renderPlayer = () => render(
@@ -109,6 +146,96 @@ it("active la première piste par défaut et permet de sélectionner un autre so
 
   fireEvent.click(captionsButton);
   expect(captionsButton).toHaveAttribute("aria-pressed", "false");
+});
+
+it("affiche et change les pistes audio uniquement pour une vidéo multi-audio expérimentale", () => {
+  render(
+    <VideoPlayer
+      video={{
+        VideoID: 15,
+        CheminAcces: "uploads/video/15/hls/master.m3u8",
+        subtitles: [],
+        audioTracks: [
+          { label: "Japonais", language: "ja", isDefault: true },
+          { label: "Français", language: "fr", isDefault: false },
+        ],
+      }}
+      backgroundBlur={{ current: null }}
+      multiAudioEnabled
+    />
+  );
+
+  const hls = Hls.instances.at(-1);
+  act(() => {
+    hls.emit(Hls.Events.AUDIO_TRACKS_UPDATED, {
+      audioTracks: [
+        { name: "Japonais", lang: "ja", default: true },
+        { name: "Français", lang: "fr", default: false },
+      ],
+    });
+  });
+
+  const audioButton = screen.getByRole("button", { name: "Choisir la piste audio" });
+  fireEvent.focus(audioButton);
+
+  expect(screen.getByRole("menu", { name: "Choisir la piste audio" })).toBeInTheDocument();
+  expect(screen.getByRole("menuitemradio", { name: "Japonais" })).toHaveAttribute(
+    "aria-checked",
+    "true"
+  );
+
+  fireEvent.click(screen.getByRole("menuitemradio", { name: "Français" }));
+  expect(hls.audioTrack).toBe(1);
+});
+
+it("ne propose pas de sélecteur audio aux anciennes vidéos", () => {
+  render(
+    <VideoPlayer
+      video={{
+        VideoID: 16,
+        CheminAcces: "uploads/video/16/hls/master.m3u8",
+        subtitles: [],
+        audioTracks: [],
+      }}
+      backgroundBlur={{ current: null }}
+      multiAudioEnabled
+    />
+  );
+
+  expect(
+    screen.queryByRole("button", { name: "Choisir la piste audio" })
+  ).not.toBeInTheDocument();
+});
+
+it("masque le sélecteur lorsque la fonctionnalité expérimentale est désactivée", () => {
+  render(
+    <VideoPlayer
+      video={{
+        VideoID: 17,
+        CheminAcces: "uploads/video/17/hls/master.m3u8",
+        subtitles: [],
+        audioTracks: [
+          { label: "Japonais", language: "ja", isDefault: true },
+          { label: "Français", language: "fr", isDefault: false },
+        ],
+      }}
+      backgroundBlur={{ current: null }}
+    />
+  );
+
+  const hls = Hls.instances.at(-1);
+  act(() => {
+    hls.emit(Hls.Events.AUDIO_TRACKS_UPDATED, {
+      audioTracks: [
+        { name: "Japonais", lang: "ja", default: true },
+        { name: "Français", lang: "fr", default: false },
+      ],
+    });
+  });
+
+  expect(
+    screen.queryByRole("button", { name: "Choisir la piste audio" })
+  ).not.toBeInTheDocument();
 });
 
 describe("zones de clic du lecteur", () => {
