@@ -9,6 +9,17 @@ import {
 const AMBIENT_LIGHT_STORAGE_KEY = "sami-ambient-light-enabled";
 const AMBIENT_LIGHT_DEFAULT_COLOR = "rgb(3, 3, 3)";
 const AMBIENT_LIGHT_REFRESH_MS = 200;
+const PLAYER_SEEK_SECONDS = 15;
+const PLAYER_SINGLE_CLICK_DELAY_MS = 300;
+const PLAYER_CONTROLS_HIDE_DELAY_MS = 3000;
+const PLAYER_CENTER_TARGET = {
+  widthRatio: 0.24,
+  minWidth: 120,
+  maxWidth: 320,
+  heightRatio: 0.34,
+  minHeight: 96,
+  maxHeight: 220,
+};
 
 const formatPlaybackTime = (seconds) => {
   const safeSeconds = Number.isFinite(seconds) ? Math.max(0, Math.floor(seconds)) : 0;
@@ -35,6 +46,8 @@ const VideoPlayer = ({ video, backgroundBlur, onVideoElement, skipFirstPlayLogKe
   const [currentTime, setCurrentTime] = useState(0);
   const [bufferedTime, setBufferedTime] = useState(0);
   const [playing, setPlaying] = useState(false);
+  const [controlsVisible, setControlsVisible] = useState(false);
+  const [controlsDismissed, setControlsDismissed] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [volume, setVolume] = useState(1);
   const [muted, setMuted] = useState(false);
@@ -57,6 +70,8 @@ const VideoPlayer = ({ video, backgroundBlur, onVideoElement, skipFirstPlayLogKe
   const ambientLightEnabledRef = useRef(ambientLightEnabled);
   const isFullscreenRef = useRef(false);
   const isPictureInPictureRef = useRef(false);
+  const pendingCenterClickRef = useRef(null);
+  const controlsHideTimeoutRef = useRef(null);
 
   // ✅ 1 seule fois par chargement de page (par vidéo affichée)
   const hasLoggedFirstPlayRef = useRef(false);
@@ -68,12 +83,32 @@ const VideoPlayer = ({ video, backgroundBlur, onVideoElement, skipFirstPlayLogKe
     setCurrentTime(0);
     setBufferedTime(0);
     setPlaying(false);
+    setControlsVisible(false);
+    setControlsDismissed(false);
     setCaptionsEnabled(true);
     setSelectedSubtitleIndex(0);
     setSubtitleMenuOpen(false);
     setPreviewCues([]);
     setHoverPreview(null);
+
+    if (pendingCenterClickRef.current) {
+      clearTimeout(pendingCenterClickRef.current);
+      pendingCenterClickRef.current = null;
+    }
+    if (controlsHideTimeoutRef.current) {
+      clearTimeout(controlsHideTimeoutRef.current);
+      controlsHideTimeoutRef.current = null;
+    }
   }, [video?.VideoID]);
+
+  useEffect(() => () => {
+    if (pendingCenterClickRef.current) {
+      clearTimeout(pendingCenterClickRef.current);
+    }
+    if (controlsHideTimeoutRef.current) {
+      clearTimeout(controlsHideTimeoutRef.current);
+    }
+  }, []);
 
   useEffect(() => {
     if (!video?.VideoID) return undefined;
@@ -494,6 +529,21 @@ const VideoPlayer = ({ video, backgroundBlur, onVideoElement, skipFirstPlayLogKe
     setCurrentTime(videoElement.currentTime);
   };
 
+  const seekBy = (seconds) => {
+    const videoElement = videoRef.current;
+    if (!videoElement || !Number.isFinite(seconds)) return;
+
+    const mediaDuration = Number.isFinite(videoElement.duration) && videoElement.duration > 0
+      ? videoElement.duration
+      : duration;
+    const nextTime = (videoElement.currentTime || 0) + seconds;
+    videoElement.currentTime = Math.max(
+      0,
+      mediaDuration > 0 ? Math.min(nextTime, mediaDuration) : nextTime
+    );
+    setCurrentTime(videoElement.currentTime);
+  };
+
   const handleProgressHover = (event) => {
     if (!duration || previewCues.length === 0) {
       setHoverPreview(null);
@@ -573,8 +623,114 @@ const VideoPlayer = ({ video, backgroundBlur, onVideoElement, skipFirstPlayLogKe
     }
   };
 
+  const showControls = () => {
+    setControlsVisible(true);
+    setControlsDismissed(false);
+    if (controlsHideTimeoutRef.current) {
+      clearTimeout(controlsHideTimeoutRef.current);
+    }
+    controlsHideTimeoutRef.current = setTimeout(() => {
+      setControlsVisible(false);
+      controlsHideTimeoutRef.current = null;
+    }, PLAYER_CONTROLS_HIDE_DELAY_MS);
+  };
+
+  const hideControls = () => {
+    setControlsVisible(false);
+    setControlsDismissed(true);
+    if (controlsHideTimeoutRef.current) {
+      clearTimeout(controlsHideTimeoutRef.current);
+      controlsHideTimeoutRef.current = null;
+    }
+  };
+
+  const toggleControls = () => {
+    if (controlsVisible) {
+      hideControls();
+    } else {
+      showControls();
+    }
+  };
+
+  const getInteractionPosition = (event) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    if (!rect.width || !rect.height) return null;
+
+    return {
+      x: Math.max(0, Math.min(event.clientX - rect.left, rect.width)),
+      y: Math.max(0, Math.min(event.clientY - rect.top, rect.height)),
+      width: rect.width,
+      height: rect.height,
+    };
+  };
+
+  const isCenterPlayTarget = ({ x, y, width, height }) => {
+    const targetWidth = Math.min(
+      width / 2,
+      PLAYER_CENTER_TARGET.maxWidth,
+      Math.max(PLAYER_CENTER_TARGET.minWidth, width * PLAYER_CENTER_TARGET.widthRatio)
+    );
+    const targetHeight = Math.min(
+      PLAYER_CENTER_TARGET.maxHeight,
+      Math.max(PLAYER_CENTER_TARGET.minHeight, height * PLAYER_CENTER_TARGET.heightRatio)
+    );
+
+    return (
+      Math.abs(x - width / 2) <= targetWidth / 2
+      && Math.abs(y - height / 2) <= targetHeight / 2
+    );
+  };
+
+  const handlePlayerClick = (event) => {
+    // Le second clic d'un double-clic ne doit ni basculer les contrôles,
+    // ni programmer l'action centrale.
+    if (event.detail > 1) return;
+
+    toggleControls();
+
+    const position = getInteractionPosition(event);
+    if (!position || !isCenterPlayTarget(position)) return;
+
+    if (pendingCenterClickRef.current) {
+      clearTimeout(pendingCenterClickRef.current);
+    }
+    pendingCenterClickRef.current = setTimeout(() => {
+      togglePlayback();
+      pendingCenterClickRef.current = null;
+    }, PLAYER_SINGLE_CLICK_DELAY_MS);
+  };
+
+  const handlePlayerDoubleClick = (event) => {
+    event.preventDefault();
+    showControls();
+
+    if (pendingCenterClickRef.current) {
+      clearTimeout(pendingCenterClickRef.current);
+      pendingCenterClickRef.current = null;
+    }
+
+    const position = getInteractionPosition(event);
+    if (!position) return;
+
+    if (position.x < position.width / 4) {
+      seekBy(-PLAYER_SEEK_SECONDS);
+    } else if (position.x >= position.width * 3 / 4) {
+      seekBy(PLAYER_SEEK_SECONDS);
+    } else {
+      toggleFullscreen();
+    }
+  };
+
   const playedPercent = duration > 0 ? Math.min(100, (currentTime / duration) * 100) : 0;
   const bufferedPercent = duration > 0 ? Math.min(100, (bufferedTime / duration) * 100) : 0;
+  const playerChromeVisibilityClass = controlsDismissed
+    ? "opacity-0"
+    : playing && !controlsVisible
+      ? "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100"
+      : "opacity-100";
+  const topControlsVisibilityClass = controlsDismissed
+    ? `${playerChromeVisibilityClass} pointer-events-none`
+    : playerChromeVisibilityClass;
 
   return (
     <div ref={fitContainerRef} className="relative w-full h-full flex items-center justify-center">
@@ -590,16 +746,25 @@ const VideoPlayer = ({ video, backgroundBlur, onVideoElement, skipFirstPlayLogKe
           ref={videoRef}
           className="relative z-10 w-full h-full rounded-xl xl:rounded-2xl object-contain block"
           preload="auto"
-          onClick={togglePlayback}
-          onDoubleClick={toggleFullscreen}
+        />
+
+        <div
+          data-testid="player-interaction-layer"
+          className="absolute inset-0 z-20 cursor-pointer select-none"
+          style={{ touchAction: "manipulation" }}
+          onClick={handlePlayerClick}
+          onDoubleClick={handlePlayerDoubleClick}
+          aria-hidden="true"
         />
 
         {availableLevels.length > 0 && (
-          <div className="resolution-selector absolute top-0 left-0 z-50">
+          <div
+            className={`resolution-selector absolute top-0 left-0 z-50 transition-opacity duration-200 ${topControlsVisibilityClass}`}
+          >
             <select
               value={selectedLevel}
               onChange={(e) => changeResolution(parseInt(e.target.value))}
-              className="p-2 opacity-0 duration-700 group-hover:opacity-100 rounded-br-lg shadow-md backdrop-blur bg-black/40 text-neutral-200 font-semibold border-b border-r border-neutral-500"
+              className="p-2 rounded-br-lg shadow-md backdrop-blur bg-black/40 text-neutral-200 font-semibold border-b border-r border-neutral-500"
             >
               <option value="-1">Auto</option>
               {availableLevels.map((level) => (
@@ -611,13 +776,16 @@ const VideoPlayer = ({ video, backgroundBlur, onVideoElement, skipFirstPlayLogKe
           </div>
         )}
 
-        <div className="ambient-light-selector absolute top-0 right-0 z-50">
+        <div
+          data-testid="ambient-light-selector"
+          className={`ambient-light-selector absolute top-0 right-0 z-50 transition-opacity duration-200 ${topControlsVisibilityClass}`}
+        >
           <button
             type="button"
             onClick={toggleAmbientLight}
             aria-pressed={ambientLightEnabled}
             title={ambientLightEnabled ? "Désactiver les lumières d'ambiance" : "Activer les lumières d'ambiance"}
-            className="flex items-center gap-2 p-2 opacity-0 duration-700 group-hover:opacity-100 shadow-md backdrop-blur bg-black/40 text-neutral-200 font-semibold border-b border-l border-neutral-500"
+            className="flex items-center gap-2 p-2 shadow-md backdrop-blur bg-black/40 text-neutral-200 font-semibold border-b border-l border-neutral-500"
             style={{ borderBottomLeftRadius: "0.5rem" }}
           >
             <span
@@ -636,9 +804,8 @@ const VideoPlayer = ({ video, backgroundBlur, onVideoElement, skipFirstPlayLogKe
         </div>
 
         <div
-          className={`absolute inset-x-0 bottom-0 z-40 bg-gradient-to-t from-black/95 via-black/65 to-transparent px-3 pb-3 pt-10 text-white transition-opacity duration-200 ${
-            playing ? "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100" : "opacity-100"
-          }`}
+          data-testid="player-controls"
+          className={`absolute inset-x-0 bottom-0 z-40 bg-gradient-to-t from-black/95 via-black/65 to-transparent px-3 pb-3 pt-10 text-white transition-opacity duration-200 ${playerChromeVisibilityClass}`}
         >
           <div
             className="relative mb-2 flex h-5 items-center"

@@ -5625,11 +5625,6 @@
     transition-duration: .5s;
   }
 
-  .duration-700 {
-    --tw-duration: .7s;
-    transition-duration: .7s;
-  }
-
   .ease-in {
     --tw-ease: var(--ease-in);
     transition-timing-function: var(--ease-in);
