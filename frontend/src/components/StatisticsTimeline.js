@@ -1,5 +1,7 @@
 import React, { useId, useMemo, useRef, useState, useEffect } from 'react'
 import {
+  ArrowTrendingUpIcon,
+  ChartBarIcon,
   EyeIcon,
   FilmIcon,
   MusicalNoteIcon,
@@ -125,10 +127,12 @@ function getTickIndexes(length, maximum = 6) {
   )]
 }
 
-export function StatisticsLineChart({ timeline, label }) {
+export function StatisticsLineChart({ timeline, label, displayMode = 'cumulative' }) {
   const gradientId = useId().replace(/:/g, '')
   const [hoveredIndex, setHoveredIndex] = useState(null)
   const points = timeline?.points || EMPTY_POINTS
+  const valueKey = displayMode === 'period' ? 'count' : 'total'
+  const periodUnit = timeline?.granularity === 'month' ? 'mois' : 'jour'
   const activeIndex = hoveredIndex ?? Math.max(points.length - 1, 0)
   const activePoint = points[activeIndex]
 
@@ -138,7 +142,7 @@ export function StatisticsLineChart({ timeline, label }) {
     const margin = { top: 24, right: 24, bottom: 52, left: 68 }
     const plotWidth = width - margin.left - margin.right
     const plotHeight = height - margin.top - margin.bottom
-    const maximum = Math.max(...points.map((point) => point.total), 0)
+    const maximum = Math.max(...points.map((point) => point[valueKey]), 0)
     const step = niceStep(maximum / 4)
     const axisMaximum = Math.max(step * 4, 4)
     const bottom = margin.top + plotHeight
@@ -146,7 +150,7 @@ export function StatisticsLineChart({ timeline, label }) {
       x: points.length === 1
         ? margin.left + plotWidth / 2
         : margin.left + (index / (points.length - 1)) * plotWidth,
-      y: margin.top + plotHeight - (point.total / axisMaximum) * plotHeight,
+      y: margin.top + plotHeight - (point[valueKey] / axisMaximum) * plotHeight,
     }))
     const linePath = positions
       .map((position, index) => `${index === 0 ? 'M' : 'L'} ${position.x} ${position.y}`)
@@ -168,7 +172,7 @@ export function StatisticsLineChart({ timeline, label }) {
       areaPath,
       xTickIndexes: getTickIndexes(points.length),
     }
-  }, [points])
+  }, [points, valueKey])
 
   if (points.length === 0) {
     return (
@@ -191,15 +195,15 @@ export function StatisticsLineChart({ timeline, label }) {
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-sky-400/10 px-5 py-4">
         <div className="flex items-center gap-2 text-sm font-bold text-slate-300">
           <span className="size-3 rounded-full bg-sky-400 shadow-[0_0_18px_rgba(56,189,248,0.8)]" />
-          {label}
+          {label} · {displayMode === 'cumulative' ? 'Cumulé' : `Par ${periodUnit}`}
         </div>
         <p className="text-sm font-semibold text-slate-400" aria-live="polite">
           {activePoint && (
             <>
-              <span className="text-white">{integerNumber.format(activePoint.total)}</span>
-              {' au '}
+              <span className="text-white">{integerNumber.format(activePoint[valueKey])}</span>
+              {displayMode === 'cumulative' ? ' au ' : timeline.granularity === 'month' ? ' en ' : ' le '}
               {formatPointDate(activePoint, timeline.granularity)}
-              {activePoint.count > 0 && (
+              {displayMode === 'cumulative' && activePoint.count > 0 && (
                 <span className="ml-2 text-sky-300">
                   +{integerNumber.format(activePoint.count)}
                 </span>
@@ -214,7 +218,11 @@ export function StatisticsLineChart({ timeline, label }) {
           viewBox={`0 0 ${chart.width} ${chart.height}`}
           className="h-auto min-w-[680px] w-full"
           role="img"
-          aria-label={`Évolution cumulative : ${label}`}
+          aria-label={
+            displayMode === 'cumulative'
+              ? `Évolution cumulative : ${label}`
+              : `Valeur par ${periodUnit} : ${label}`
+          }
           onMouseLeave={() => setHoveredIndex(null)}
         >
           <defs>
@@ -306,7 +314,7 @@ export function StatisticsLineChart({ timeline, label }) {
               onBlur={() => setHoveredIndex(null)}
             >
               <title>
-                {`${formatPointDate(points[index], timeline.granularity)} : ${points[index].total}`}
+                {`${formatPointDate(points[index], timeline.granularity)} : ${points[index][valueKey]}`}
               </title>
             </circle>
           ))}
@@ -320,6 +328,7 @@ export default function StatisticsTimeline() {
   const [categoryId, setCategoryId] = useState(CATEGORIES[0].id)
   const [metricId, setMetricId] = useState(CATEGORIES[0].options[0].id)
   const [period, setPeriod] = useState('30')
+  const [displayMode, setDisplayMode] = useState('cumulative')
   const [timeline, setTimeline] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -474,30 +483,67 @@ export default function StatisticsTimeline() {
           </div>
         )}
 
-        <div
-          className={classNames(
-            category.options.length === 1 && 'sm:ml-auto',
-            'inline-flex w-fit rounded-xl border border-sky-500/20 bg-slate-100/80 p-1 dark:bg-slate-950/80',
-          )}
-          role="group"
-          aria-label="Période du graphique"
-        >
-          {PERIODS.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              aria-pressed={period === item.id}
-              onClick={() => setPeriod(item.id)}
-              className={classNames(
-                period === item.id
-                  ? 'bg-sky-500 text-white shadow-md shadow-sky-500/20'
-                  : 'text-slate-500 hover:text-sky-600 dark:text-slate-400 dark:hover:text-sky-300',
-                'rounded-lg px-3 py-2 text-xs font-black transition duration-200 sm:px-4',
-              )}
-            >
-              {item.label}
-            </button>
-          ))}
+        <div className={classNames(
+          category.options.length === 1 && 'sm:ml-auto',
+          'flex flex-wrap items-center gap-2',
+        )}>
+          <div
+            className="inline-flex w-fit rounded-xl border border-sky-500/20 bg-slate-100/80 p-1 dark:bg-slate-950/80"
+            role="group"
+            aria-label="Mode d'affichage du graphique"
+          >
+            {[
+              { id: 'cumulative', label: 'Cumulé', icon: ArrowTrendingUpIcon },
+              {
+                id: 'period',
+                label: period === 'all' ? 'Par mois' : 'Par jour',
+                icon: ChartBarIcon,
+              },
+            ].map((item) => {
+              const Icon = item.icon
+
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  aria-pressed={displayMode === item.id}
+                  onClick={() => setDisplayMode(item.id)}
+                  className={classNames(
+                    displayMode === item.id
+                      ? 'bg-violet-500 text-white shadow-md shadow-violet-500/20'
+                      : 'text-slate-500 hover:text-violet-600 dark:text-slate-400 dark:hover:text-violet-300',
+                    'inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-black transition duration-200',
+                  )}
+                >
+                  <Icon className="size-3.5" aria-hidden="true" />
+                  {item.label}
+                </button>
+              )
+            })}
+          </div>
+
+          <div
+            className="inline-flex w-fit rounded-xl border border-sky-500/20 bg-slate-100/80 p-1 dark:bg-slate-950/80"
+            role="group"
+            aria-label="Période du graphique"
+          >
+            {PERIODS.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                aria-pressed={period === item.id}
+                onClick={() => setPeriod(item.id)}
+                className={classNames(
+                  period === item.id
+                    ? 'bg-sky-500 text-white shadow-md shadow-sky-500/20'
+                    : 'text-slate-500 hover:text-sky-600 dark:text-slate-400 dark:hover:text-sky-300',
+                  'rounded-lg px-3 py-2 text-xs font-black transition duration-200 sm:px-4',
+                )}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -521,7 +567,11 @@ export default function StatisticsTimeline() {
             <div className="mt-12 h-52 rounded-xl bg-[linear-gradient(180deg,rgba(56,189,248,0.12),transparent)]" />
           </div>
         ) : (
-          <StatisticsLineChart timeline={timeline} label={metric.chartLabel} />
+          <StatisticsLineChart
+            timeline={timeline}
+            label={metric.chartLabel}
+            displayMode={displayMode}
+          />
         )}
       </div>
     </section>

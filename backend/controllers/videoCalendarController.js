@@ -66,6 +66,83 @@ export function parseCalendarDate(value) {
   return date;
 }
 
+export function formatCalendarDateKey(value) {
+  if (!(value instanceof Date) || Number.isNaN(value.getTime())) {
+    return null;
+  }
+
+  return format(value, "yyyy-MM-dd");
+}
+
+export function mergeCalendarAdditionCounts(...groups) {
+  const combined = {};
+
+  groups.flat().forEach((entry) => {
+    const dateKey = formatCalendarDateKey(entry?.CreateDate);
+    const rawCount = typeof entry?._count === "number"
+      ? entry._count
+      : entry?._count?._all;
+    const count = Number(rawCount || 0);
+
+    if (!dateKey || count <= 0) return;
+    combined[dateKey] = (combined[dateKey] || 0) + count;
+  });
+
+  return combined;
+}
+
+export function buildCalendarItems({
+  videos = [],
+  series = [],
+  people = [],
+  music = [],
+  albums = [],
+}) {
+  return [
+    ...videos.map((video) => ({
+      id: video.VideoID,
+      Titre: video.Titre,
+      CheminImage: video.CheminImage,
+      CreateDate: video.CreateDate,
+      type: "video",
+      SaisonID: video.SaisonID,
+      SerieTitre: video.Saison?.Series?.Titre || null,
+    })),
+    ...series.map((item) => ({
+      id: item.SeriesID,
+      Titre: item.Titre,
+      CheminImage: item.CheminImage,
+      CreateDate: item.CreateDate,
+      type: "series",
+    })),
+    ...people.map((item) => ({
+      id: item.PersonneID,
+      Titre: [item.Prenom, item.Nom].filter(Boolean).join(" ")
+        || item.Surnom
+        || "Personne sans nom",
+      CheminImage: item.CheminImage,
+      CreateDate: item.CreateDate,
+      type: "person",
+    })),
+    ...music.map((item) => ({
+      id: item.MusiqueID,
+      Titre: item.Titre,
+      CheminImage: item.CheminImage,
+      CreateDate: item.CreateDate,
+      type: "music",
+    })),
+    ...albums.map((item) => ({
+      id: item.AlbumID,
+      Titre: item.Titre,
+      CheminImage: item.CheminImage,
+      CreateDate: item.CreateDate,
+      type: "album",
+    })),
+  ].sort((first, second) => (
+    new Date(first.CreateDate).getTime() - new Date(second.CreateDate).getTime()
+  ));
+}
+
 export function parseStatisticsRange(fromValue, toValue) {
   const fromDate = parseCalendarDate(fromValue);
   const toDate = parseCalendarDate(toValue);
@@ -421,10 +498,10 @@ export const getAdditionsByDate = async (request, reply) => {
   const to = endOfMonth(referenceDate);
 
   try {
-    const [videoCounts, seriesCounts] = await Promise.all([
+    const [videoCounts, seriesCounts, peopleCounts, musicCounts, albumCounts] = await Promise.all([
       prisma.video.groupBy({
         by: ["CreateDate"],
-        _count: true,
+        _count: { _all: true },
         where: {
           EtatID: ACTIVE_ETAT_ID,
           CreateDate: {
@@ -436,8 +513,44 @@ export const getAdditionsByDate = async (request, reply) => {
       }),
       prisma.series.groupBy({
         by: ["CreateDate"],
-        _count: true,
+        _count: { _all: true },
         where: {
+          EtatID: ACTIVE_ETAT_ID,
+          CreateDate: {
+            not: null,
+            gte: from,
+            lte: to,
+          },
+        },
+      }),
+      prisma.personne.groupBy({
+        by: ["CreateDate"],
+        _count: { _all: true },
+        where: {
+          CreateDate: {
+            not: null,
+            gte: from,
+            lte: to,
+          },
+        },
+      }),
+      prisma.musique.groupBy({
+        by: ["CreateDate"],
+        _count: { _all: true },
+        where: {
+          EtatID: ACTIVE_ETAT_ID,
+          CreateDate: {
+            not: null,
+            gte: from,
+            lte: to,
+          },
+        },
+      }),
+      prisma.album.groupBy({
+        by: ["CreateDate"],
+        _count: { _all: true },
+        where: {
+          EtatID: ACTIVE_ETAT_ID,
           CreateDate: {
             not: null,
             gte: from,
@@ -447,11 +560,13 @@ export const getAdditionsByDate = async (request, reply) => {
       }),
     ]);
 
-    const combined = {};
-    for (const entry of [...videoCounts, ...seriesCounts]) {
-      const dateKey = entry.CreateDate.toISOString().split("T")[0];
-      combined[dateKey] = (combined[dateKey] || 0) + entry._count;
-    }
+    const combined = mergeCalendarAdditionCounts(
+      videoCounts,
+      seriesCounts,
+      peopleCounts,
+      musicCounts,
+      albumCounts,
+    );
 
     return reply.send(combined);
   } catch (error) {
@@ -471,7 +586,7 @@ export const getAdditionsForDate = async (request, reply) => {
   const to = endOfDay(date);
 
   try {
-    const [videos, series] = await Promise.all([
+    const [videos, series, people, music, albums] = await Promise.all([
       prisma.video.findMany({
         where: {
           EtatID: ACTIVE_ETAT_ID,
@@ -486,6 +601,7 @@ export const getAdditionsForDate = async (request, reply) => {
           Titre: true,
           CheminImage: true,
           SaisonID: true,
+          CreateDate: true,
           Saison: {
             select: {
               Series: {
@@ -494,9 +610,11 @@ export const getAdditionsForDate = async (request, reply) => {
             },
           },
         },
+        orderBy: { CreateDate: "asc" },
       }),
       prisma.series.findMany({
         where: {
+          EtatID: ACTIVE_ETAT_ID,
           CreateDate: {
             not: null,
             gte: from,
@@ -507,26 +625,71 @@ export const getAdditionsForDate = async (request, reply) => {
           SeriesID: true,
           Titre: true,
           CheminImage: true,
+          CreateDate: true,
         },
+        orderBy: { CreateDate: "asc" },
+      }),
+      prisma.personne.findMany({
+        where: {
+          CreateDate: {
+            not: null,
+            gte: from,
+            lte: to,
+          },
+        },
+        select: {
+          PersonneID: true,
+          Prenom: true,
+          Nom: true,
+          Surnom: true,
+          CheminImage: true,
+          CreateDate: true,
+        },
+        orderBy: { CreateDate: "asc" },
+      }),
+      prisma.musique.findMany({
+        where: {
+          EtatID: ACTIVE_ETAT_ID,
+          CreateDate: {
+            not: null,
+            gte: from,
+            lte: to,
+          },
+        },
+        select: {
+          MusiqueID: true,
+          Titre: true,
+          CheminImage: true,
+          CreateDate: true,
+        },
+        orderBy: { CreateDate: "asc" },
+      }),
+      prisma.album.findMany({
+        where: {
+          EtatID: ACTIVE_ETAT_ID,
+          CreateDate: {
+            not: null,
+            gte: from,
+            lte: to,
+          },
+        },
+        select: {
+          AlbumID: true,
+          Titre: true,
+          CheminImage: true,
+          CreateDate: true,
+        },
+        orderBy: { CreateDate: "asc" },
       }),
     ]);
 
-    const items = [
-      ...videos.map((video) => ({
-        id: video.VideoID,
-        Titre: video.Titre,
-        CheminImage: video.CheminImage,
-        type: "video",
-        SaisonID: video.SaisonID,
-        SerieTitre: video.Saison?.Series?.Titre || null,
-      })),
-      ...series.map((item) => ({
-        id: item.SeriesID,
-        Titre: item.Titre,
-        CheminImage: item.CheminImage,
-        type: "series",
-      })),
-    ];
+    const items = buildCalendarItems({
+      videos,
+      series,
+      people,
+      music,
+      albums,
+    });
 
     return reply.send({ items });
   } catch (error) {

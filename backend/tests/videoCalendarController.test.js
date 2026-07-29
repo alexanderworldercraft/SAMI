@@ -1,9 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  buildCalendarItems,
   buildTimelineSeries,
   countStatisticsForPeriod,
   findTimelineDates,
+  formatCalendarDateKey,
+  mergeCalendarAdditionCounts,
   parseCalendarDate,
   parseCalendarMonth,
   parseStatisticsRange,
@@ -27,6 +30,53 @@ describe("videoCalendarController", () => {
 
     expect(parseCalendarDate("2025-02-29")).toBeNull();
     expect(parseCalendarDate("22/07/2026")).toBeNull();
+  });
+
+  it("regroupe tous les ajouts sur leur journée locale", () => {
+    const afterMidnight = new Date(2026, 6, 30, 0, 30);
+    const inTheMorning = new Date(2026, 6, 30, 9, 15);
+
+    expect(formatCalendarDateKey(afterMidnight)).toBe("2026-07-30");
+    expect(mergeCalendarAdditionCounts(
+      [{ CreateDate: afterMidnight, _count: { _all: 2 } }],
+      [{ CreateDate: inTheMorning, _count: { _all: 1 } }],
+      [{ CreateDate: inTheMorning, _count: 3 }],
+    )).toEqual({
+      "2026-07-30": 6,
+    });
+  });
+
+  it("normalise les cinq familles de contenu du drawer", () => {
+    const early = new Date(2026, 6, 29, 8);
+    const late = new Date(2026, 6, 29, 20);
+    const items = buildCalendarItems({
+      videos: [{
+        VideoID: 1,
+        Titre: "Film",
+        CreateDate: late,
+        SaisonID: null,
+        Saison: null,
+      }],
+      series: [{ SeriesID: 2, Titre: "Série", CreateDate: early }],
+      people: [{
+        PersonneID: 3,
+        Prenom: "Ada",
+        Nom: "Lovelace",
+        CreateDate: early,
+      }],
+      music: [{ MusiqueID: 4, Titre: "Titre musical", CreateDate: late }],
+      albums: [{ AlbumID: 5, Titre: "Album", CreateDate: late }],
+    });
+
+    expect(items).toHaveLength(5);
+    expect(items.map((item) => item.type)).toEqual([
+      "series",
+      "person",
+      "video",
+      "music",
+      "album",
+    ]);
+    expect(items.find((item) => item.type === "person").Titre).toBe("Ada Lovelace");
   });
 
   it("valide et normalise une période statistique", () => {

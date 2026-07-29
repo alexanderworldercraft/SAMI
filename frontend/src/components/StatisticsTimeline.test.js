@@ -7,18 +7,19 @@ const makeTimeline = (url) => {
   const params = new URL(url).searchParams
   const period = params.get('period')
   const total = period === '7' ? 7 : 3
+  const isAll = period === 'all'
 
   return {
     metric: params.get('metric'),
     period,
     points: [
-      { date: '2026-07-28', count: 2, total: 2 },
-      { date: '2026-07-29', count: total - 2, total },
+      { date: isAll ? '2026-06' : '2026-07-28', count: 2, total: 2 },
+      { date: isAll ? '2026-07' : '2026-07-29', count: total - 2, total },
     ],
     total,
     average: total / 2,
     peak: total - 2,
-    granularity: 'day',
+    granularity: isAll ? 'month' : 'day',
   }
 }
 
@@ -44,6 +45,43 @@ describe('StatisticsTimeline', () => {
     expect(await screen.findByRole('img', {
       name: 'Évolution cumulative : Vidéos',
     })).toBeInTheDocument()
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Par jour' }))
+    })
+    expect(screen.getByRole('button', { name: 'Par jour' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    )
+    expect(screen.getByRole('img', {
+      name: 'Valeur par jour : Vidéos',
+    })).toBeInTheDocument()
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Tout' }))
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+    expect(await screen.findByRole('img', {
+      name: 'Valeur par mois : Vidéos',
+    })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Par mois' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    )
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: '30 jours' }))
+      await Promise.resolve()
+      await Promise.resolve()
+    })
+    expect(await screen.findByRole('img', {
+      name: 'Valeur par jour : Vidéos',
+    })).toBeInTheDocument()
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Cumulé' }))
+    })
 
     await act(async () => {
       fireEvent.click(screen.getByRole('tab', { name: 'Vue' }))

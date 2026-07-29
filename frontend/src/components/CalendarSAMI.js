@@ -1,9 +1,35 @@
 // CalendarSAMI.js
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
-import { ChevronLeftIcon, ChevronRightIcon, XMarkIcon } from '@heroicons/react/20/solid';
+import {
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  FilmIcon,
+  MusicalNoteIcon,
+  RectangleStackIcon,
+  UserIcon,
+  XMarkIcon,
+} from '@heroicons/react/20/solid';
 import { Dialog, DialogPanel, DialogTitle } from '@headlessui/react';
-import { format, startOfWeek, addDays, isSameDay, isSameMonth, startOfMonth } from 'date-fns';
+import {
+  addDays,
+  addMonths,
+  format,
+  isSameDay,
+  isSameMonth,
+  startOfMonth,
+  startOfWeek,
+} from 'date-fns';
+
+const API = process.env.REACT_APP_URL_LOCAL;
+
+const calendarItemMeta = {
+  video: { label: 'Film', icon: FilmIcon },
+  series: { label: 'Série', icon: RectangleStackIcon },
+  person: { label: 'Personne', icon: UserIcon },
+  music: { label: 'Musique', icon: MusicalNoteIcon },
+  album: { label: 'Album', icon: RectangleStackIcon },
+};
 
 function classNames(...classes) {
   return classes.filter(Boolean).join(' ');
@@ -26,48 +52,127 @@ function getCalendarDays(currentDate) {
   return days;
 }
 
-export default function CalendarSAMI() {
-  const [currentDate, setCurrentDate] = useState(new Date());
+export function parseLocalCalendarDate(value) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value || ''));
+  if (!match) return null;
+
+  const date = new Date(
+    Number(match[1]),
+    Number(match[2]) - 1,
+    Number(match[3]),
+  );
+
+  if (
+    date.getFullYear() !== Number(match[1])
+    || date.getMonth() !== Number(match[2]) - 1
+    || date.getDate() !== Number(match[3])
+  ) {
+    return null;
+  }
+
+  return date;
+}
+
+export function formatCalendarDisplayDate(value) {
+  const date = parseLocalCalendarDate(value);
+  return date
+    ? date.toLocaleDateString('fr-FR', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+      })
+    : '';
+}
+
+function getImageSource(path) {
+  if (!path) return null;
+  if (/^https?:\/\//i.test(path)) return path;
+  return `${API}/${String(path).replace(/^\/+/, '')}`;
+}
+
+function getItemTypeLabel(item) {
+  if (item.type === 'video' && item.SaisonID) {
+    return `Épisode de la série "${item.SerieTitre || 'Inconnue'}"`;
+  }
+
+  return calendarItemMeta[item.type]?.label || 'Contenu';
+}
+
+export default function CalendarSAMI({ initialDate = new Date() }) {
+  const [currentDate, setCurrentDate] = useState(initialDate);
   const [days, setDays] = useState([]);
   const [itemsByDate, setItemsByDate] = useState({});
   const [selectedDate, setSelectedDate] = useState(null);
   const [items, setItems] = useState([]);
+  const [itemsLoading, setItemsLoading] = useState(false);
+  const [itemsError, setItemsError] = useState('');
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const detailRequestRef = useRef(null);
+
+  useEffect(() => () => detailRequestRef.current?.abort(), []);
 
   useEffect(() => {
+    const controller = new AbortController();
     setDays(getCalendarDays(currentDate));
+    setItemsByDate({});
     const year = currentDate.getFullYear();
     const month = currentDate.getMonth() + 1;
 
-    fetch(`${process.env.REACT_APP_URL_LOCAL}/api/videos/calendar/added-by-date?year=${year}&month=${month}`)
-      .then(res => res.json())
-      .then(setItemsByDate)
-      .catch(console.error);
+    fetch(
+      `${API}/api/videos/calendar/added-by-date?year=${year}&month=${month}`,
+      { signal: controller.signal },
+    )
+      .then((response) => {
+        if (!response.ok) throw new Error('Impossible de charger le calendrier.');
+        return response.json();
+      })
+      .then((data) => setItemsByDate(data))
+      .catch((error) => {
+        if (error.name !== 'AbortError') console.error(error);
+      });
+
+    return () => controller.abort();
   }, [currentDate]);
 
   const handleDateClick = async (date) => {
+    detailRequestRef.current?.abort();
+    const controller = new AbortController();
+    detailRequestRef.current = controller;
+
     setSelectedDate(date);
     setDrawerOpen(true);
+    setItems([]);
+    setItemsError('');
+    setItemsLoading(true);
+
     try {
-      const res = await fetch(`${process.env.REACT_APP_URL_LOCAL}/api/videos/calendar/items-by-day?date=${date}`);
+      const res = await fetch(
+        `${API}/api/videos/calendar/items-by-day?date=${date}`,
+        { signal: controller.signal },
+      );
+      if (!res.ok) throw new Error('Impossible de charger les ajouts de cette journée.');
+
       const data = await res.json();
-      setItems(data.items);
+      if (!controller.signal.aborted) {
+        setItems(Array.isArray(data.items) ? data.items : []);
+      }
     } catch (e) {
-      console.error("Erreur lors du fetch des items:", e);
-      setItems([]);
+      if (e.name !== 'AbortError') {
+        console.error("Erreur lors du fetch des items:", e);
+        setItems([]);
+        setItemsError(e.message || 'Impossible de charger les ajouts.');
+      }
+    } finally {
+      if (!controller.signal.aborted) setItemsLoading(false);
     }
   };
 
   const prevMonth = () => {
-    const prev = new Date(currentDate);
-    prev.setMonth(currentDate.getMonth() - 1);
-    setCurrentDate(prev);
+    setCurrentDate((previous) => addMonths(startOfMonth(previous), -1));
   };
 
   const nextMonth = () => {
-    const next = new Date(currentDate);
-    next.setMonth(currentDate.getMonth() + 1);
-    setCurrentDate(next);
+    setCurrentDate((previous) => addMonths(startOfMonth(previous), 1));
   };
 
   const monthName = currentDate.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
@@ -79,6 +184,9 @@ export default function CalendarSAMI() {
     if (item.type === 'series' && item.FirstVideoID) {
       return `/lecture/${item.FirstVideoID}`;
     }
+    if (item.type === 'series') return '/videos';
+    if (item.type === 'person') return `/personnes/${item.id}`;
+    if (item.type === 'music' || item.type === 'album') return '/musique';
     return null;
   };
 
@@ -146,7 +254,10 @@ export default function CalendarSAMI() {
                     {parseInt(day.date.split('-')[2], 10)}
                   </time>
                   {count && (
-                    <span className="absolute bottom-2 right-2 rounded-md bg-sky-500 px-2 py-1 text-[10px] font-black text-white shadow-lg">
+                    <span
+                      className="absolute bottom-2 right-2 rounded-md bg-sky-500 px-2 py-1 text-[10px] font-black text-white shadow-lg"
+                      aria-label={`${count} ajout${count > 1 ? 's' : ''}`}
+                    >
                       {count}
                     </span>
                   )}
@@ -167,7 +278,7 @@ export default function CalendarSAMI() {
                   <div className="border-b border-sky-500/10 bg-gradient-to-r from-sky-500/15 via-blue-500/10 to-transparent p-6">
                     <div className="flex items-start justify-between gap-4">
                     <DialogTitle className="text-base font-black text-slate-950 dark:text-white">
-                      Ajouts du {selectedDate && new Date(selectedDate).toLocaleDateString('fr-FR')}
+                      Ajouts du {formatCalendarDisplayDate(selectedDate)}
                     </DialogTitle>
                     <button
                       type="button"
@@ -180,16 +291,38 @@ export default function CalendarSAMI() {
                     </div>
                   </div>
                   <ul className="divide-y divide-sky-500/10">
-                    {items.length > 0 ? items.map((item) => {
+                    {itemsLoading ? (
+                      <li className="p-6">
+                        <div className="h-16 animate-pulse rounded-xl bg-slate-200 dark:bg-white/10" />
+                      </li>
+                    ) : itemsError ? (
+                      <li className="p-4 text-sm font-semibold text-red-600 dark:text-red-300">
+                        {itemsError}
+                      </li>
+                    ) : items.length > 0 ? items.map((item) => {
                       const link = getLinkForItem(item);
+                      const imageSource = getImageSource(item.CheminImage);
+                      const ItemIcon = calendarItemMeta[item.type]?.icon || RectangleStackIcon;
+
                       return (
-                        <li key={item.id} className="flex flex-col gap-2 p-4 transition duration-150 hover:bg-sky-500/5">
+                        <li key={`${item.type}-${item.id}`} className="flex flex-col gap-2 p-4 transition duration-150 hover:bg-sky-500/5">
                           <div className="flex items-center gap-4">
-                            <img src={`${process.env.REACT_APP_URL_LOCAL}/${item.CheminImage}`} alt={item.Titre} className="h-16 w-12 rounded-lg object-cover shadow-md" />
+                            {imageSource ? (
+                              <img
+                                src={imageSource}
+                                alt=""
+                                className="h-16 w-12 shrink-0 rounded-lg object-cover shadow-md"
+                              />
+                            ) : (
+                              <div className="grid h-16 w-12 shrink-0 place-items-center rounded-lg border border-sky-400/20 bg-sky-500/10 text-sky-600 dark:text-sky-300">
+                                <ItemIcon className="size-6" aria-hidden="true" />
+                              </div>
+                            )}
                             <div className="min-w-0">
                               {link ? (
                                 <Link
                                   to={link}
+                                  onClick={() => setDrawerOpen(false)}
                                   className="line-clamp-2 text-sm font-bold text-slate-950 hover:text-sky-600 dark:text-white dark:hover:text-sky-300"
                                 >
                                   {item.Titre}
@@ -200,11 +333,7 @@ export default function CalendarSAMI() {
                                 </span>
                               )}
                               <div className="mt-1 text-xs font-semibold text-slate-500 dark:text-slate-400">
-                                {item.type === 'video' && item.SaisonID ? `Épisode de la série "${item.SerieTitre || 'Inconnue'}"` :
-                                 item.type === 'video' ? 'Film' :
-                                 item.type === 'series' ? 'Série' :
-                                 item.type === 'saison' ? `Saison de "${item.SerieTitre || 'Série inconnue'}"` :
-                                 item.type === 'genre' ? 'Genre ajouté' : 'Type inconnu'}
+                                {getItemTypeLabel(item)}
                               </div>
                             </div>
                           </div>
