@@ -444,6 +444,7 @@ model AdminMessage {
   Titre          String    @db.VarChar(150)
   Description    String    @db.Text
   Actif          Boolean   @default(false)
+  ExpiresAt      DateTime?
   UpdatedAt      DateTime  @default(now()) @updatedAt
   CreateDate     DateTime? @default(now())
 }

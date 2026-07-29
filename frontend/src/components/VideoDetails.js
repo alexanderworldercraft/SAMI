@@ -1,10 +1,22 @@
 import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
+import {
+  CheckIcon,
+  PencilIcon,
+  XMarkIcon,
+} from "@heroicons/react/24/outline";
 import api from '../services/api';
 import ImageUploader from "./ImageUploader"; // ⬅️ nouveau
 import VideoList from "./VideoList";
 import GenreList from "./GenreList";
 import FavoriteButton from "./FavoriteButton";
+import {
+  cancelButtonClass,
+  detailFieldClass,
+  detailLabelClass,
+  editButtonClass,
+  saveButtonClass,
+} from "./contentDetailStyles";
 
 const apiUrl = process.env.REACT_APP_URL_LOCAL;
 
@@ -268,11 +280,13 @@ const VideoDetails = ({
               )}
               {canEdit && (
                 <button
+                  type="button"
                   onClick={handleEditImageClick}
-                  className="absolute right-2 bottom-16 rounded-lg border border-white/15 bg-slate-950/80 px-2 py-1 text-xs text-white backdrop-blur transition hover:border-sky-300/60 hover:bg-sky-500/20"
+                  className="absolute right-2 bottom-16 inline-flex size-9 items-center justify-center rounded-lg border border-white/15 bg-slate-950/80 text-white backdrop-blur transition hover:border-sky-300/60 hover:bg-sky-500/20 focus:outline-none focus:ring-2 focus:ring-sky-300"
                   title="Modifier l'image"
                 >
-                  ✏️
+                  <PencilIcon className="size-4" />
+                  <span className="sr-only">Modifier l'image</span>
                 </button>
               )}
               <FavoriteButton
@@ -285,21 +299,25 @@ const VideoDetails = ({
               />
             </div>
           ) : (
-            <div className="mb-4">
+            <div className="mb-4 rounded-xl border border-sky-500/15 bg-white/60 p-4 shadow-sm dark:bg-slate-950/40">
               {/* Uploader au format affiche (200x300 par défaut) */}
               <ImageUploader setImage={setNewImageFile} />
-              <div className="mt-3 flex gap-2">
+              <div className="mt-4 flex flex-col-reverse gap-3 sm:flex-row">
                 <button
+                  type="button"
                   onClick={handleSaveImageClick}
                   disabled={isSavingImage || !newImageFile}
-                  className="px-4 py-2 bg-sky-600 hover:bg-sky-700 disabled:opacity-50 rounded-lg dark:text-white"
+                  className={saveButtonClass}
                 >
+                  <CheckIcon className="size-5" />
                   {isSavingImage ? "Enregistrement..." : "Enregistrer"}
                 </button>
                 <button
+                  type="button"
                   onClick={() => { setIsEditingImage(false); setNewImageFile(null); }}
-                  className="px-4 py-2 bg-neutral-700 hover:bg-neutral-800 rounded-lg dark:text-white"
+                  className={cancelButtonClass}
                 >
+                  <XMarkIcon className="size-5" />
                   Annuler
                 </button>
               </div>
@@ -310,68 +328,81 @@ const VideoDetails = ({
           <div className="relative z-30 md:col-span-2 xl:col-span-6">
           {/* --- Titre --- */}
           {isEditingTitle ? (
-  <div className="flex items-center gap-2">
-    <input
-      type="text"
-      value={newTitle}
-      onChange={handleTitleChange}
-      onKeyDown={(e) => {
-        // ✅ Enter = sauvegarde, sans submit global
-        if (e.key === "Enter") {
-          e.preventDefault();
-          handleUpdateTitleClick();
-        }
-        // ✅ Escape = annule
-        if (e.key === "Escape") {
-          e.preventDefault();
-          setIsEditingTitle(false);
-          setNewTitle(video.Titre);
-        }
-      }}
-      className="text-3xl text-black font-bold italic px-2 py-1 rounded"
-    />
-
-    <button
-  type="button"
-  onClick={(e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    handleUpdateTitleClick();
-  }}
-  disabled={isSavingTitle}
-  className="text-green-500 text-2xl disabled:opacity-50"
-  title="Valider"
->
-  ✔️
-</button>
-
-    <button
-      type="button"
-      onClick={() => { setIsEditingTitle(false); setNewTitle(video.Titre); }}
-      className="text-neutral-400 text-2xl"
-      title="Annuler"
-    >
-      ✖️
-    </button>
-  </div>
-) : (
-  <div className="flex items-center gap-2">
-    <h1 className="text-3xl dark:text-white underline font-bold italic mb-3">{video.Titre}</h1>
-    {canEdit && (
-      <button
-  type="button"
-  onClick={(e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    handleEditTitleClick();
-  }}
-  className="text-gray-400 text-2xl"
->
-  ✏️
-</button>
-    )}
-  </div>
-)}
+            <div className="rounded-xl border border-sky-500/15 bg-white/60 p-4 shadow-sm dark:bg-slate-950/40">
+              <label htmlFor={`video-title-${video.VideoID}`} className={detailLabelClass}>
+                Titre du film
+              </label>
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+                <input
+                  id={`video-title-${video.VideoID}`}
+                  type="text"
+                  value={newTitle}
+                  onChange={handleTitleChange}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      handleUpdateTitleClick();
+                    }
+                    if (event.key === "Escape") {
+                      event.preventDefault();
+                      setIsEditingTitle(false);
+                      setNewTitle(video.Titre);
+                    }
+                  }}
+                  className={`${detailFieldClass} min-w-0 flex-1`}
+                  maxLength={100}
+                  autoFocus
+                />
+                <div className="flex flex-col-reverse gap-2 sm:flex-row">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsEditingTitle(false);
+                      setNewTitle(video.Titre);
+                    }}
+                    className={cancelButtonClass}
+                  >
+                    <XMarkIcon className="size-5" />
+                    Annuler
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      handleUpdateTitleClick();
+                    }}
+                    disabled={isSavingTitle || !newTitle?.trim()}
+                    className={saveButtonClass}
+                  >
+                    <CheckIcon className="size-5" />
+                    {isSavingTitle ? "Enregistrement..." : "Enregistrer"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-start gap-3">
+              <h1 className="mb-3 min-w-0 flex-1 text-3xl font-black text-slate-950 dark:text-white">
+                {video.Titre}
+              </h1>
+              {canEdit && (
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    handleEditTitleClick();
+                  }}
+                  className={editButtonClass}
+                  title="Modifier le titre"
+                >
+                  <PencilIcon className="size-4" />
+                  <span className="sr-only">Modifier le titre</span>
+                </button>
+              )}
+            </div>
+          )}
 
           {/* Premium */}
           {isPremium && (
@@ -403,19 +434,60 @@ const VideoDetails = ({
 
           {/* --- Résumé --- */}
           {isEditingResumer ? (
-            <div className="flex items-center gap-2">
+            <div className="mt-5 rounded-xl border border-sky-500/15 bg-white/60 p-4 shadow-sm dark:bg-slate-950/40">
+              <label htmlFor={`video-summary-${video.VideoID}`} className={detailLabelClass}>
+                Résumé
+              </label>
               <textarea
+                id={`video-summary-${video.VideoID}`}
                 value={newResumer}
                 onChange={handleResumerChange}
-                className="text-base lg:text-lg text-black px-2 py-1 rounded w-full"
+                onKeyDown={(event) => {
+                  if (event.key === "Escape") {
+                    event.preventDefault();
+                    setIsEditingResumer(false);
+                    setNewResumer(video.Resumer);
+                  }
+                }}
+                className={`${detailFieldClass} min-h-36 resize-y leading-6`}
+                autoFocus
               />
-              <button onClick={handleUpdateResumerClick} className="text-green-500 text-2xl">✔️</button>
+              <div className="mt-3 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsEditingResumer(false);
+                    setNewResumer(video.Resumer);
+                  }}
+                  className={cancelButtonClass}
+                >
+                  <XMarkIcon className="size-5" />
+                  Annuler
+                </button>
+                <button
+                  type="button"
+                  onClick={handleUpdateResumerClick}
+                  disabled={!newResumer?.trim()}
+                  className={saveButtonClass}
+                >
+                  <CheckIcon className="size-5" />
+                  Enregistrer
+                </button>
+              </div>
             </div>
           ) : (
-            <div className="flex items-center gap-2">
-              <p className="text-base lg:text-lg text-neutral-800 dark:text-neutral-200 whitespace-pre-line">{video.Resumer}</p>
+            <div className="mt-2 flex items-start gap-3">
+              <p className="min-w-0 flex-1 whitespace-pre-line text-base leading-7 text-slate-700 dark:text-slate-200 lg:text-lg">{video.Resumer}</p>
               {canEdit && (
-                <button onClick={handleEditResumerClick} className="text-gray-400 text-2xl">✏️</button>
+                <button
+                  type="button"
+                  onClick={handleEditResumerClick}
+                  className={editButtonClass}
+                  title="Modifier le résumé"
+                >
+                  <PencilIcon className="size-4" />
+                  <span className="sr-only">Modifier le résumé</span>
+                </button>
               )}
             </div>
           )}
@@ -428,10 +500,16 @@ const VideoDetails = ({
 
                 {canEdit && (
                   <button
+                    type="button"
                     onClick={() => setIsEditingGenres((v) => !v)}
-                    className="rounded bg-white px-2 py-1 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 dark:bg-white/10 dark:text-white dark:shadow-none dark:ring-white/5 dark:hover:bg-white/20"
+                    className={isEditingGenres ? cancelButtonClass : saveButtonClass}
                     title={isEditingGenres ? "Annuler l’édition" : "Modifier les genres"}
                   >
+                    {isEditingGenres ? (
+                      <XMarkIcon className="size-5" />
+                    ) : (
+                      <PencilIcon className="size-4" />
+                    )}
                     {isEditingGenres ? "Annuler" : "Modifier"}
                   </button>
                 )}
@@ -478,6 +556,7 @@ const VideoDetails = ({
                   />
 
                   <button
+                    type="button"
                     onClick={async () => {
                       try {
                         const resp = await api.put(`/videos/${video.VideoID}/genres`, {
@@ -495,8 +574,9 @@ const VideoDetails = ({
                         alert(msg);
                       }
                     }}
-                    className="px-3 py-2 rounded-md bg-sky-600 hover:bg-sky-700 text-white"
+                    className={saveButtonClass}
                   >
+                    <CheckIcon className="size-5" />
                     Enregistrer
                   </button>
                 </div>

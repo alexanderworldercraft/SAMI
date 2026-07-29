@@ -1,12 +1,18 @@
 import { prisma } from "../services/db.js";
 import { createLog } from "./logController.js";
 import { ensureAdmin as ensureSharedAdmin } from "../services/authz.js";
+import {
+  deactivateExpiredAdminMessages,
+  resolveAdminMessageExpiration,
+} from "../services/adminMessageService.js";
 
 const ensureAdmin = async (request, reply) => {
   return Boolean(await ensureSharedAdmin(request, reply, { unauthorizedError: "Unauthorized" }));
 };
 
 const getAdminMessageOrCreate = async () => {
+  await deactivateExpiredAdminMessages();
+
   const message = await prisma.adminMessage.findFirst({
     orderBy: { AdminMessageID: "asc" },
   });
@@ -46,9 +52,13 @@ export const getAdminMessage = async (request, reply) => {
 
 export const getActiveAdminMessage = async (request, reply) => {
   try {
+    const now = new Date();
+    await deactivateExpiredAdminMessages({ now });
+
     const message = await prisma.adminMessage.findFirst({
       where: {
         Actif: true,
+        ExpiresAt: { gt: now },
         Titre: { not: "" },
         Description: { not: "" },
       },
@@ -63,7 +73,7 @@ export const getActiveAdminMessage = async (request, reply) => {
 };
 
 export const updateAdminMessage = async (request, reply) => {
-  const { Titre, Description } = request.body || {};
+  const { Titre, Description, ExpiresAt } = request.body || {};
   const userId = Number(request.user?.userId);
   const titre = String(Titre || "").trim();
   const description = String(Description || "").trim();
@@ -77,11 +87,28 @@ export const updateAdminMessage = async (request, reply) => {
     if (!isAdmin) return;
 
     const currentMessage = await getAdminMessageOrCreate();
+    const expirationWasProvided = Object.prototype.hasOwnProperty.call(
+      request.body || {},
+      "ExpiresAt"
+    );
+    let expirationDate = currentMessage.ExpiresAt;
+
+    if (currentMessage.Actif && expirationWasProvided) {
+      try {
+        expirationDate = resolveAdminMessageExpiration(ExpiresAt);
+      } catch (error) {
+        return reply.status(400).send({ error: error.message });
+      }
+    }
+
     const message = await prisma.adminMessage.update({
       where: { AdminMessageID: currentMessage.AdminMessageID },
       data: {
         Titre: titre,
         Description: description,
+        ...(currentMessage.Actif && expirationWasProvided
+          ? { ExpiresAt: expirationDate }
+          : {}),
       },
     });
 
@@ -93,10 +120,12 @@ export const updateAdminMessage = async (request, reply) => {
       AncienneValeur: JSON.stringify({
         Titre: currentMessage.Titre,
         Description: currentMessage.Description,
+        ExpiresAt: currentMessage.ExpiresAt,
       }),
       NouvelleValeur: JSON.stringify({
         Titre: message.Titre,
         Description: message.Description,
+        ExpiresAt: message.ExpiresAt,
       }),
     });
 
@@ -108,7 +137,7 @@ export const updateAdminMessage = async (request, reply) => {
 };
 
 export const toggleAdminMessage = async (request, reply) => {
-  const { Actif } = request.body || {};
+  const { Actif, ExpiresAt } = request.body || {};
   const userId = Number(request.user?.userId);
 
   if (typeof Actif !== "boolean") {
@@ -120,9 +149,22 @@ export const toggleAdminMessage = async (request, reply) => {
     if (!isAdmin) return;
 
     const currentMessage = await getAdminMessageOrCreate();
+    let expirationDate = null;
+
+    if (Actif) {
+      try {
+        expirationDate = resolveAdminMessageExpiration(ExpiresAt);
+      } catch (error) {
+        return reply.status(400).send({ error: error.message });
+      }
+    }
+
     const message = await prisma.adminMessage.update({
       where: { AdminMessageID: currentMessage.AdminMessageID },
-      data: { Actif },
+      data: {
+        Actif,
+        ExpiresAt: expirationDate,
+      },
     });
 
     await createLog({
@@ -130,8 +172,14 @@ export const toggleAdminMessage = async (request, reply) => {
       UtilisateurID: userId,
       ActionNom: "admin_message_toggle",
       Champ: "Actif",
-      AncienneValeur: String(currentMessage.Actif),
-      NouvelleValeur: String(message.Actif),
+      AncienneValeur: JSON.stringify({
+        Actif: currentMessage.Actif,
+        ExpiresAt: currentMessage.ExpiresAt,
+      }),
+      NouvelleValeur: JSON.stringify({
+        Actif: message.Actif,
+        ExpiresAt: message.ExpiresAt,
+      }),
     });
 
     return reply.send(formatAdminMessage(message));

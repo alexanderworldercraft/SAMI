@@ -91,13 +91,13 @@ const TaskHistory = ({ tasks }) => {
                             </div>
                             {task.video?.saisonNumero !== null && task.video?.saisonNumero !== undefined && (
                                 <div>
-                                    <dt className="font-bold text-slate-500 dark:text-slate-400">Saison.Numero</dt>
+                                    <dt className="font-bold text-slate-500 dark:text-slate-400">Saison n°</dt>
                                     <dd className="font-semibold">{task.video.saisonNumero}</dd>
                                 </div>
                             )}
                             {task.video?.seriesTitre && (
                                 <div>
-                                    <dt className="font-bold text-slate-500 dark:text-slate-400">Series.Titre</dt>
+                                    <dt className="font-bold text-slate-500 dark:text-slate-400">Series</dt>
                                     <dd className="break-words font-semibold">{task.video.seriesTitre}</dd>
                                 </div>
                             )}

@@ -4,6 +4,7 @@ import { fileURLToPath } from "url";
 import cron from "node-cron";
 
 import { prisma } from "../services/db.js";
+import { deactivateExpiredAdminMessages } from "../services/adminMessageService.js";
 import { createDatabaseBackup } from "../services/databaseBackupService.js";
 import { rotateGenreFeaturedContent } from "../services/genreFeaturedContentService.js";
 import { createServer } from "./createServer.js";
@@ -58,6 +59,16 @@ function registerBackgroundJobs(server) {
   keepAliveTimer.unref?.();
 
   const scheduledTasks = [
+    cron.schedule("* * * * *", async () => {
+      try {
+        const result = await deactivateExpiredAdminMessages();
+        if (result.count > 0) {
+          console.info(`${result.count} message général expiré automatiquement.`);
+        }
+      } catch (error) {
+        console.error("Erreur lors de l'expiration du message général :", error);
+      }
+    }),
     cron.schedule(backupCronExpression, backupDatabase),
     cron.schedule("0 9 * * 1", async () => {
       console.info("Démarrage de la rotation hebdomadaire des contenus à la une");

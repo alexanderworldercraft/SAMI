@@ -1309,6 +1309,10 @@
     min-height: calc(var(--spacing) * 32);
   }
 
+  .min-h-36 {
+    min-height: calc(var(--spacing) * 36);
+  }
+
   .min-h-\[116px\] {
     min-height: 116px;
   }
@@ -1684,6 +1688,10 @@
 
   .resize {
     resize: both;
+  }
+
+  .resize-y {
+    resize: vertical;
   }
 
   .scroll-mt-28 {
@@ -4660,10 +4668,6 @@
     color: var(--color-neutral-700);
   }
 
-  .text-neutral-800 {
-    color: var(--color-neutral-800);
-  }
-
   .text-pink-400 {
     color: var(--color-pink-400);
   }
@@ -4873,6 +4877,10 @@
 
   .accent-sky-500 {
     accent-color: var(--color-sky-500);
+  }
+
+  .\[color-scheme\:light\] {
+    color-scheme: light;
   }
 
   .opacity-0 {
@@ -6447,6 +6455,10 @@
     --tw-ring-color: var(--color-indigo-600);
   }
 
+  .focus\:ring-sky-300:focus {
+    --tw-ring-color: var(--color-sky-300);
+  }
+
   .focus\:ring-sky-400:focus {
     --tw-ring-color: var(--color-sky-400);
   }
@@ -7225,6 +7237,10 @@
       flex-direction: column;
     }
 
+    .lg\:flex-row {
+      flex-direction: row;
+    }
+
     .lg\:items-center {
       align-items: center;
     }
@@ -7981,6 +7997,10 @@
     color: var(--color-yellow-400);
   }
 
+  .dark\:\[color-scheme\:dark\]:is(.dark *) {
+    color-scheme: dark;
+  }
+
   .dark\:shadow-none:is(.dark *) {
     --tw-shadow: 0 0 #0000;
     box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow);
@@ -8097,16 +8117,6 @@
 
   .dark\:ring-slate-900:is(.dark *) {
     --tw-ring-color: var(--color-slate-900);
-  }
-
-  .dark\:ring-white\/5:is(.dark *) {
-    --tw-ring-color: #ffffff0d;
-  }
-
-  @supports (color: color-mix(in lab, red, red)) {
-    .dark\:ring-white\/5:is(.dark *) {
-      --tw-ring-color: color-mix(in oklab, var(--color-white) 5%, transparent);
-    }
   }
 
   .dark\:ring-white\/10:is(.dark *) {
@@ -8233,16 +8243,6 @@
     @supports (color: color-mix(in lab, red, red)) {
       .dark\:hover\:bg-white\/10:is(.dark *):hover {
         background-color: color-mix(in oklab, var(--color-white) 10%, transparent);
-      }
-    }
-
-    .dark\:hover\:bg-white\/20:is(.dark *):hover {
-      background-color: #fff3;
-    }
-
-    @supports (color: color-mix(in lab, red, red)) {
-      .dark\:hover\:bg-white\/20:is(.dark *):hover {
-        background-color: color-mix(in oklab, var(--color-white) 20%, transparent);
       }
     }
 

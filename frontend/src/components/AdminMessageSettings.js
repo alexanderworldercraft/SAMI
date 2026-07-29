@@ -1,10 +1,32 @@
 import React, { useEffect, useState } from "react";
 import api from "../services/api";
 
+export const toDateTimeLocalValue = (value) => {
+  if (!value) return "";
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+
+  const localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60 * 1000);
+  return localDate.toISOString().slice(0, 19);
+};
+
+const getExpirationForApi = (value) => {
+  if (!value) return null;
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime()) || date <= new Date()) {
+    throw new Error("La date de désactivation doit être dans le futur.");
+  }
+
+  return date.toISOString();
+};
+
 const AdminMessageSettings = () => {
   const [titre, setTitre] = useState("");
   const [description, setDescription] = useState("");
   const [actif, setActif] = useState(false);
+  const [expiresAt, setExpiresAt] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
@@ -17,6 +39,9 @@ const AdminMessageSettings = () => {
         setTitre(response.data?.Titre || "");
         setDescription(response.data?.Description || "");
         setActif(Boolean(response.data?.Actif));
+        setExpiresAt(
+          response.data?.Actif ? toDateTimeLocalValue(response.data?.ExpiresAt) : ""
+        );
       } catch (error) {
         console.error("Erreur lors de la récupération du message admin :", error);
         setErrorMessage(error.response?.data?.error || "Impossible de récupérer le message admin.");
@@ -35,18 +60,31 @@ const AdminMessageSettings = () => {
     setErrorMessage("");
 
     try {
-      const response = await api.put("/admin-message", {
+      const payload = {
         Titre: titre,
         Description: description,
-      });
+      };
+
+      if (actif && expiresAt) {
+        payload.ExpiresAt = getExpirationForApi(expiresAt);
+      }
+
+      const response = await api.put("/admin-message", payload);
 
       setTitre(response.data?.Titre || "");
       setDescription(response.data?.Description || "");
       setActif(Boolean(response.data?.Actif));
+      setExpiresAt(
+        response.data?.Actif ? toDateTimeLocalValue(response.data?.ExpiresAt) : ""
+      );
       setMessage("Message mis à jour.");
     } catch (error) {
       console.error("Erreur lors de la maj du message admin :", error);
-      setErrorMessage(error.response?.data?.error || "Impossible de mettre à jour le message admin.");
+      setErrorMessage(
+        error.response?.data?.error ||
+          error.message ||
+          "Impossible de mettre à jour le message admin."
+      );
     } finally {
       setSaving(false);
     }
@@ -59,16 +97,29 @@ const AdminMessageSettings = () => {
     setErrorMessage("");
 
     try {
-      const response = await api.put("/admin-message/toggle", {
+      const payload = {
         Actif: nextActif,
-      });
+      };
+
+      if (nextActif && expiresAt) {
+        payload.ExpiresAt = getExpirationForApi(expiresAt);
+      }
+
+      const response = await api.put("/admin-message/toggle", payload);
 
       setActif(Boolean(response.data?.Actif));
+      setExpiresAt(
+        response.data?.Actif ? toDateTimeLocalValue(response.data?.ExpiresAt) : ""
+      );
       setMessage(response.data?.Actif ? "Message activé." : "Message désactivé.");
     } catch (error) {
       console.error("Erreur lors du changement d'état du message admin :", error);
       setActif(!nextActif);
-      setErrorMessage(error.response?.data?.error || "Impossible de changer l'état du message admin.");
+      setErrorMessage(
+        error.response?.data?.error ||
+          error.message ||
+          "Impossible de changer l'état du message admin."
+      );
     }
   };
 
@@ -93,7 +144,9 @@ const AdminMessageSettings = () => {
               : "border-slate-300/70 bg-slate-300/70 dark:border-slate-700 dark:bg-slate-800"
           } disabled:cursor-not-allowed disabled:opacity-60`}
         >
-          <span className="sr-only">Activer le message général</span>
+          <span className="sr-only">
+            {actif ? "Désactiver le message général" : "Activer le message général"}
+          </span>
           <span
             className={`inline-block size-6 rounded-full bg-white shadow transition duration-200 ${
               actif ? "translate-x-9" : "translate-x-1"
@@ -137,6 +190,28 @@ const AdminMessageSettings = () => {
                 onChange={(event) => setDescription(event.target.value)}
                 required
               />
+            </div>
+
+            <div>
+              <label
+                htmlFor="admin-message-expires-at"
+                className="mb-2 block text-sm font-bold text-slate-700 dark:text-slate-200"
+              >
+                Date de désactivation (optionnelle)
+              </label>
+              <input
+                id="admin-message-expires-at"
+                type="datetime-local"
+                step="1"
+                className="[color-scheme:light] dark:[color-scheme:dark] w-full rounded-xl border border-sky-500/20 bg-white/85 px-4 py-3 text-sm font-semibold text-slate-900 shadow-sm transition duration-200 hover:border-sky-400/60 focus:outline-none focus:ring-2 focus:ring-sky-400 dark:bg-slate-950/65 dark:text-white"
+                value={expiresAt}
+                min={toDateTimeLocalValue(new Date())}
+                onChange={(event) => setExpiresAt(event.target.value)}
+              />
+              <p className="mt-2 text-xs leading-5 text-slate-500 dark:text-slate-400">
+                Si ce champ reste vide à l'activation, le message sera désactivé
+                automatiquement 7 jours plus tard.
+              </p>
             </div>
 
             <button
