@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { ArrowDownIcon, ArrowUpIcon } from '@heroicons/react/20/solid'
-import { format, addDays, subDays, startOfMonth } from 'date-fns'
+import { format, subDays } from 'date-fns'
+import StatisticsTimeline from './StatisticsTimeline'
 
 const API = process.env.REACT_APP_URL_LOCAL
 
@@ -8,25 +9,8 @@ function classNames(...classes) {
   return classes.filter(Boolean).join(' ')
 }
 
-// Utilitaires dates
 function toYMD(d) {
   return format(d, 'yyyy-MM-dd')
-}
-function monthKey(d) {
-  const m0 = startOfMonth(d)
-  return `${m0.getFullYear()}-${m0.getMonth() + 1}`
-}
-function rangeDays(fromDate, toDateInclusive) {
-  const days = []
-  let cur = fromDate
-  while (cur <= toDateInclusive) {
-    days.push(toYMD(cur))
-    cur = addDays(cur, 1)
-  }
-  return days
-}
-function unique(arr) {
-  return [...new Set(arr)]
 }
 
 // Calcule % de variation
@@ -49,6 +33,9 @@ export default function StatsSAMI() {
     total: { cur: 0, prev: 0 },
     films: { cur: 0, prev: 0 },
     episodes: { cur: 0, prev: 0 },
+    series: { cur: 0, prev: 0 },
+    music: { cur: 0, prev: 0 },
+    watched: { cur: 0, prev: 0 },
   })
 
   // Fenêtres de calcul : aujourd’hui inclus
@@ -66,89 +53,26 @@ export default function StatsSAMI() {
         setLoading(true)
         setError(null)
 
-        // 1) Jours des deux fenêtres
-        const curDays = rangeDays(curStart, curEnd)
-        const prevDays = rangeDays(prevStart, prevEnd)
+        const params = new URLSearchParams({
+          currentFrom: toYMD(curStart),
+          currentTo: toYMD(curEnd),
+          previousFrom: toYMD(prevStart),
+          previousTo: toYMD(prevEnd),
+        })
+        const response = await fetch(`${API}/api/videos/stats/overview?${params}`)
+        if (!response.ok) throw new Error('Erreur lors du chargement des statistiques')
 
-        // 2) Mois à couvrir pour /added-by-date (max 3 mois)
-        const monthsNeeded = unique([
-          monthKey(curStart),
-          monthKey(curEnd),
-          monthKey(prevStart),
-          monthKey(prevEnd),
-        ])
-
-        // 3) Récupère les cartes "date → nbAjouts" pour chaque mois
-        const monthMaps = await Promise.all(
-          monthsNeeded.map(async (mk) => {
-            const [y, m] = mk.split('-').map(Number)
-            const res = await fetch(`${API}/api/videos/calendar/added-by-date?year=${y}&month=${m}`)
-            if (!res.ok) throw new Error('Erreur fetch added-by-date')
-            const data = await res.json() // objet { 'YYYY-MM-DD': count, ... }
-            return { mk, data }
-          })
-        )
-
-        // 4) Merge en une map globale
-        const byDate = {}
-        for (const { data } of monthMaps) {
-          for (const [d, count] of Object.entries(data)) {
-            byDate[d] = (byDate[d] || 0) + Number(count || 0)
-          }
-        }
-
-        // 5) Conserve seulement les jours non-nuls des fenêtres
-        const curNonZeroDays = curDays.filter((d) => (byDate[d] || 0) > 0)
-        const prevNonZeroDays = prevDays.filter((d) => (byDate[d] || 0) > 0)
-
-        // Helper: compte films/épisodes via /items-by-day pour une liste de dates
-        async function countDetails(daysList) {
-          let total = 0
-          let films = 0
-          let episodes = 0
-
-          // On parallélise raisonnablement
-          const chunks = []
-          const batchSize = 8
-          for (let i = 0; i < daysList.length; i += batchSize) {
-            chunks.push(daysList.slice(i, i + batchSize))
-          }
-
-          for (const chunk of chunks) {
-            const results = await Promise.all(
-              chunk.map(async (d) => {
-                const r = await fetch(`${API}/api/videos/calendar/items-by-day?date=${d}`)
-                if (!r.ok) return null
-                const data = await r.json()
-                return { d, items: Array.isArray(data.items) ? data.items : [] }
-              })
-            )
-            for (const res of results) {
-              if (!res) continue
-              for (const item of res.items) {
-                // On ne compte que les "vidéos" pour total
-                if (item.type === 'video') {
-                  total += 1
-                  if (item.SaisonID) episodes += 1
-                  else films += 1
-                }
-              }
-            }
-          }
-          return { total, films, episodes }
-        }
-
-        // 6) Détails pour chaque fenêtre (ne fetch que les jours non-nuls)
-        const [{ total: curTotal, films: curFilms, episodes: curEpisodes },
-               { total: prevTotal, films: prevFilms, episodes: prevEpisodes }] =
-          await Promise.all([countDetails(curNonZeroDays), countDetails(prevNonZeroDays)])
+        const data = await response.json()
 
         if (cancelled) return
 
         setStats({
-          total: { cur: curTotal, prev: prevTotal },
-          films: { cur: curFilms, prev: prevFilms },
-          episodes: { cur: curEpisodes, prev: prevEpisodes },
+          total: { cur: data.current.totalVideos, prev: data.previous.totalVideos },
+          films: { cur: data.current.films, prev: data.previous.films },
+          episodes: { cur: data.current.episodes, prev: data.previous.episodes },
+          series: { cur: data.current.series, prev: data.previous.series },
+          music: { cur: data.current.music, prev: data.previous.music },
+          watched: { cur: data.current.watchedVideos, prev: data.previous.watchedVideos },
         })
       } catch (e) {
         console.error(e)
@@ -160,37 +84,29 @@ export default function StatsSAMI() {
 
     run()
     return () => { cancelled = true }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [API])
+  }, [curEnd, curStart, prevEnd, prevStart])
 
   const cards = useMemo(() => {
-    const totalChange = computeChange(stats.total.cur, stats.total.prev)
-    const filmsChange = computeChange(stats.films.cur, stats.films.prev)
-    const episodesChange = computeChange(stats.episodes.cur, stats.episodes.prev)
-
-    return [
-      {
-        name: 'Total vidéos ajoutées',
-        stat: `${stats.total.cur}`,
-        previousStat: `${stats.total.prev}`,
-        change: totalChange.label,
-        changeType: totalChange.type, // 'increase' | 'decrease'
-      },
-      {
-        name: 'Films ajoutés',
-        stat: `${stats.films.cur}`,
-        previousStat: `${stats.films.prev}`,
-        change: filmsChange.label,
-        changeType: filmsChange.type,
-      },
-      {
-        name: 'Épisodes ajoutés',
-        stat: `${stats.episodes.cur}`,
-        previousStat: `${stats.episodes.prev}`,
-        change: episodesChange.label,
-        changeType: episodesChange.type,
-      },
+    const definitions = [
+      ['Total vidéos ajoutées', stats.total],
+      ['Films ajoutés', stats.films],
+      ['Épisodes ajoutés', stats.episodes],
+      ['Séries ajoutées', stats.series],
+      ['Musiques ajoutées', stats.music],
+      ['Vidéos regardées', stats.watched],
     ]
+
+    return definitions.map(([name, values]) => {
+      const change = computeChange(values.cur, values.prev)
+
+      return {
+        name,
+        stat: `${values.cur}`,
+        previousStat: `${values.prev}`,
+        change: change.label,
+        changeType: change.type,
+      }
+    })
   }, [stats])
 
   if (error) {
@@ -210,8 +126,8 @@ export default function StatsSAMI() {
       </p>
       <h3 className="mt-2 text-2xl font-black text-slate-950 dark:text-white">30 derniers jours</h3>
 
-      <dl className="mt-5 grid grid-cols-1 gap-5">
-        {(loading ? [1,2,3] : cards).map((item, idx) => (
+      <dl className="mt-5 grid grid-cols-1 gap-5 sm:grid-cols-2">
+        {(loading ? [1, 2, 3, 4, 5, 6] : cards).map((item, idx) => (
           <div key={item?.name || idx} className="overflow-hidden rounded-xl border border-sky-500/10 bg-white/85 px-4 py-5 shadow-sm sm:p-6 dark:bg-slate-950/65 dark:shadow-sky-950/20">
             <dt className="truncate text-sm font-bold text-slate-500 dark:text-slate-400">
               {loading ? <span className="inline-block h-4 w-40 animate-pulse rounded bg-slate-200 dark:bg-white/10" /> : item.name}
@@ -261,6 +177,7 @@ export default function StatsSAMI() {
           </div>
         ))}
       </dl>
+      <StatisticsTimeline />
       </div>
     </section>
   )

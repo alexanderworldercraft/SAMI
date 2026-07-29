@@ -42,6 +42,8 @@ import {
 export {
   getAdditionsByDate,
   getAdditionsForDate,
+  getStatisticsOverview,
+  getStatisticsTimeline,
 } from "./videoCalendarController.js";
 export {
   deleteVideoProgress,

@@ -2,6 +2,67 @@ import React, { useEffect, useState } from "react";
 
 const updates = [
   {
+    version: "7.7.0",
+    title: "Message general, details et statistiques avancees",
+    date: "29 juillet 2026",
+    sections: [
+      {
+        title: "Expiration automatique du message general",
+        items: [
+          "L'activation du message general programme maintenant sa desactivation automatique sept jours plus tard par defaut.",
+          "Un champ date et heure optionnel permet de choisir une echeance plus courte ou plus longue avant l'activation.",
+          "Le serveur valide que l'echeance personnalisee est dans le futur et conserve la date dans le nouveau champ ExpiresAt.",
+          "Une tache planifiee controle chaque minute les messages expires et les repasse automatiquement a l'etat inactif.",
+          "La migration attribue egalement une echeance de sept jours aux messages deja actifs lors de la mise a jour.",
+          "L'icone native du selecteur de date suit maintenant le theme clair ou sombre grace au color-scheme du champ.",
+        ],
+      },
+      {
+        title: "Modernisation des details films et series",
+        items: [
+          "Les anciens champs d'edition des titres, resumes et informations de contenu sont remplaces par des inputs harmonises avec l'interface SAMI.",
+          "Les labels, bordures, fonds, ombres, focus et placeholders utilisent maintenant les memes couleurs sky et slate que le reste de l'application.",
+          "Les boutons d'edition, de validation et d'annulation partagent des styles communs pour conserver une presentation coherente.",
+          "Les formulaires restent lisibles en theme clair et sombre et leur disposition s'adapte aux petits ecrans.",
+          "Les styles reutilisables sont centralises afin que les pages film et serie conservent exactement le meme comportement visuel.",
+        ],
+      },
+      {
+        title: "Nouveaux compteurs de statistiques",
+        items: [
+          "La card Statistiques affiche maintenant les series ajoutees, les musiques ajoutees et les videos regardees en plus des compteurs existants.",
+          "Les vues correspondent aux premieres lectures video journalisees avec l'action video_first_play.",
+          "Les six indicateurs comparent les trente derniers jours aux trente jours precedents avec leur variation en pourcentage.",
+          "Un nouvel endpoint agrege les deux periodes en une seule requete frontend et remplace les nombreux appels calendrier effectues jour par jour.",
+          "Les compteurs de films, episodes, series et musiques ignorent les contenus places dans l'etat supprime.",
+        ],
+      },
+      {
+        title: "Explorateur graphique",
+        items: [
+          "Ajout d'une section Evolution de la mediatheque avec les tabs Videos, Personne, Sagas, Vue et Musique.",
+          "Les sous-tabs permettent d'afficher le general, les films, les episodes, les sagas, les univers, les vues de films, les vues d'episodes, les albums ou les musiques.",
+          "Un groupe de boutons permet de basculer entre les periodes de sept jours, trente jours et l'historique complet.",
+          "La courbe cumulative utilise des points quotidiens pour les periodes courtes et un regroupement mensuel pour la vue Tout.",
+          "Le resume du graphique affiche le total, la moyenne par jour ou par mois et le pic d'activite de la periode.",
+          "Le graphique reprend le style bleu nuit et cyan de l'application avec une grille discrete, une zone en degrade et des points consultables au survol ou au clavier.",
+          "Les donnees deja consultees sont mises en cache cote client et des etats dedies couvrent le chargement, l'absence de donnees et les erreurs reseau.",
+          "La section Statistiques utilise maintenant toute la largeur disponible afin de conserver une courbe lisible sur ordinateur et reste navigable horizontalement sur mobile.",
+        ],
+      },
+      {
+        title: "Donnees, tests et verification",
+        items: [
+          "La nouvelle API de serie temporelle couvre les videos, films, episodes, personnes, sagas, univers, vues, albums et musiques.",
+          "Les vues de films et d'episodes sont distinguees grace au contexte de saison conserve dans les logs de premiere lecture.",
+          "Ajout de tests backend pour les echeances du message general, les periodes statistiques, les filtres de vues et les courbes cumulatives.",
+          "Ajout de tests frontend pour le formulaire du message general, les details modernises, les six compteurs et la navigation entre les tabs et periodes.",
+          "Les routes Fastify, les tests backend, les tests frontend cibles et le build de production ont ete verifies.",
+        ],
+      },
+    ],
+  },
+  {
     version: "7.6.0",
     title: "Pistes audio multiples experimentales",
     date: "26 juillet 2026",

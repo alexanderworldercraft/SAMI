@@ -24,5 +24,13 @@ describe("createServer", () => {
 
     expect(response.statusCode).toBe(400);
     expect(response.json()).toEqual({ error: "Paramètres année ou mois invalides" });
+
+    const timelineResponse = await server.inject({
+      method: "GET",
+      url: "/api/videos/stats/timeline?metric=inconnue&period=7",
+    });
+
+    expect(timelineResponse.statusCode).toBe(400);
+    expect(timelineResponse.json()).toEqual({ error: "Métrique ou période invalide." });
   });
 });

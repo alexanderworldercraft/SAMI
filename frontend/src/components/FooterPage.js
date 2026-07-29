@@ -8,7 +8,7 @@ const FooterPage = () => {
 
   return (
     <div className="py-6 lg:px-8 grid grid-cols-1 gap-8">
-      <div className="container border-t border-slate-800 pt-6 grid grid-cols-1 md:grid-cols-2 gap-4 mx-auto">
+      <div className="container border-t border-slate-800 pt-6 grid grid-cols-1 gap-4 mx-auto">
         <StatsSAMI />
         <CalendarSAMI />
       </div>

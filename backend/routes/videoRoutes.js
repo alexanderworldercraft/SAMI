@@ -16,6 +16,8 @@ import {
   getRecommandation1,
   moveVideoToSeason,
   getAdditionsByDate,
+  getStatisticsOverview,
+  getStatisticsTimeline,
   updateVideoImage,
   deleteVideoImage,
   getAdditionsForDate,
@@ -66,6 +68,8 @@ export default async function (fastify) {
   fastify.get("/recommandation/5/:genre", getRecommandation1);
   fastify.get("/calendar/added-by-date", getAdditionsByDate); // ?year=2025&month=6
   fastify.get("/calendar/items-by-day", getAdditionsForDate); // ?date=2025-06-14
+  fastify.get("/stats/overview", getStatisticsOverview);
+  fastify.get("/stats/timeline", getStatisticsTimeline);
   fastify.get("/search", quickSearchVideos); // ⬅️ nouveau endpoint de recherche films
   fastify.get("/popular-30-days", getMostWatchedLast30Days);
   fastify.get("/progress/resume", { preHandler: authMiddleware }, getResumeProgressOverview);
