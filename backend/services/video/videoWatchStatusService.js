@@ -1,6 +1,7 @@
 import jwt from "jsonwebtoken";
 import { prisma } from "../db.js";
 import { getJwtFromRequest } from "../../middlewares/authMiddleware.js";
+import { ETAT } from "../../constants.js";
 
 export const getUserIdFromRequest = (request) => {
   const token = getJwtFromRequest(request);
@@ -92,7 +93,11 @@ export const attachWatchStatus = async (items, userId) => {
           where: { SeriesID: { in: seriesIds } },
           select: {
             SeriesID: true,
-            _count: { select: { Episodes: true } },
+            _count: {
+              select: {
+                Episodes: { where: { EtatID: ETAT.ACTIVE } },
+              },
+            },
           },
         })
       : [],

@@ -27,8 +27,18 @@ export const getFavoriteKeysForItems = async (userId, items = []) => {
     where: {
       UserID: userId,
       OR: [
-        videoIds.length ? { VideoID: { in: videoIds } } : null,
-        seriesIds.length ? { SeriesID: { in: seriesIds } } : null,
+        videoIds.length
+          ? {
+              VideoID: { in: videoIds },
+              Video: { EtatID: ETAT.ACTIVE },
+            }
+          : null,
+        seriesIds.length
+          ? {
+              SeriesID: { in: seriesIds },
+              Series: { EtatID: ETAT.ACTIVE },
+            }
+          : null,
       ].filter(Boolean),
     },
     select: {
@@ -82,18 +92,6 @@ export const toggleFavoriteContent = async ({ userId, type, id }) => {
     ? { UserID: userId, VideoID: item.id }
     : { UserID: userId, SeriesID: item.id };
 
-  const existing = await prisma.userFavoriteContent.findFirst({
-    where,
-    select: { UserFavoriteContentID: true },
-  });
-
-  if (existing) {
-    await prisma.userFavoriteContent.delete({
-      where: { UserFavoriteContentID: existing.UserFavoriteContentID },
-    });
-    return { IsFavorite: false };
-  }
-
   const contentExists = item.type === "video"
     ? await prisma.video.findFirst({
         where: { VideoID: item.id, EtatID: ETAT.ACTIVE },
@@ -108,6 +106,18 @@ export const toggleFavoriteContent = async ({ userId, type, id }) => {
     const error = new Error("Contenu introuvable.");
     error.statusCode = 404;
     throw error;
+  }
+
+  const existing = await prisma.userFavoriteContent.findFirst({
+    where,
+    select: { UserFavoriteContentID: true },
+  });
+
+  if (existing) {
+    await prisma.userFavoriteContent.delete({
+      where: { UserFavoriteContentID: existing.UserFavoriteContentID },
+    });
+    return { IsFavorite: false };
   }
 
   await prisma.userFavoriteContent.create({

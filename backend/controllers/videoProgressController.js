@@ -3,6 +3,7 @@ import { updateLatestVideoPlayLogProgress } from "./logController.js";
 import { parsePositiveInt } from "../utils/requestParsing.js";
 import { normalizeProgress } from "../services/video/videoAccess.js";
 import { getSeriesResetMap } from "../services/video/videoWatchStatusService.js";
+import { ETAT } from "../constants.js";
 
 export const getVideoProgress = async (request, reply) => {
   const userId = parsePositiveInt(request.user?.userId);
@@ -17,12 +18,11 @@ export const getVideoProgress = async (request, reply) => {
   }
 
   try {
-    const progress = await prisma.userVideoProgress.findUnique({
+    const progress = await prisma.userVideoProgress.findFirst({
       where: {
-        UserID_VideoID: {
-          UserID: userId,
-          VideoID: videoId,
-        },
+        UserID: userId,
+        VideoID: videoId,
+        Video: { EtatID: ETAT.ACTIVE },
       },
     });
 
@@ -55,8 +55,8 @@ export const upsertVideoProgress = async (request, reply) => {
   }
 
   try {
-    const videoExists = await prisma.video.findUnique({
-      where: { VideoID: videoId },
+    const videoExists = await prisma.video.findFirst({
+      where: { VideoID: videoId, EtatID: ETAT.ACTIVE },
       select: { VideoID: true },
     });
 
@@ -272,6 +272,7 @@ const findNextSeriesEpisodesForUser = async (userId, limit = 10) => {
             select: {
               Numero: true,
               Episodes: {
+                where: { EtatID: ETAT.ACTIVE },
                 select: {
                   VideoID: true,
                   Titre: true,
@@ -361,19 +362,28 @@ export const getResumeProgressOverview = async (request, reply) => {
   try {
     const [latest, total] = await Promise.all([
       prisma.userVideoProgress.findFirst({
-        where: { UserID: userId },
+        where: {
+          UserID: userId,
+          Video: { EtatID: ETAT.ACTIVE },
+        },
         orderBy: { UpdatedAt: "desc" },
         include,
       }),
       prisma.userVideoProgress.count({
-        where: { UserID: userId },
+        where: {
+          UserID: userId,
+          Video: { EtatID: ETAT.ACTIVE },
+        },
       }),
     ]);
 
     const random =
       total > 0
         ? await prisma.userVideoProgress.findFirst({
-            where: { UserID: userId },
+            where: {
+              UserID: userId,
+              Video: { EtatID: ETAT.ACTIVE },
+            },
             orderBy: { UpdatedAt: "desc" },
             skip: Math.floor(Math.random() * total),
             include,

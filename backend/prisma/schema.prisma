@@ -60,7 +60,7 @@ model Series {
   SagaContents         SagaContent[]
   UserSeriesWatchReset UserSeriesWatchReset[]
   GenreFeaturedContent GenreFeaturedContent[]
-  UserFavoriteContent   UserFavoriteContent[]
+  UserFavoriteContent  UserFavoriteContent[]
 
   @@index([EtatID], map: "Series_EtatID_fkey")
   @@index([UtilisateurID], map: "Series_UtilisateurID_fkey")
@@ -115,7 +115,7 @@ model Video {
   VideoSubtitles       VideoSubtitle[]
   VideoAudioTracks     VideoAudioTrack[]
   GenreFeaturedContent GenreFeaturedContent[]
-  UserFavoriteContent   UserFavoriteContent[]
+  UserFavoriteContent  UserFavoriteContent[]
 
   @@index([EtatID], map: "Video_EtatID_fkey")
   @@index([SaisonID], map: "Video_SaisonID_fkey")
@@ -160,16 +160,87 @@ model VideoAudioTrack {
   @@index([VideoID], map: "VideoAudioTrack_VideoID_fkey")
 }
 
+model VideoTransfer {
+  VideoTransferID     String              @id @db.VarChar(36)
+  Direction           String              @db.VarChar(16)
+  SourceInstanceID    String              @db.VarChar(100)
+  SourceVideoID       Int
+  DestinationVideoID  Int?
+  DestinationSeasonID Int?
+  InitiatedByUserID   Int?
+  InitiatedByNickname String?             @db.VarChar(191)
+  RemoteTransferID    String?             @db.VarChar(36)
+  ManifestHash        String?             @db.Char(64)
+  Manifest            Json?
+  Receipt             Json?
+  Warnings            Json?
+  Status              String              @db.VarChar(32)
+  CurrentStep         String?             @db.VarChar(64)
+  Progress            Int                 @default(0)
+  TotalFiles          Int                 @default(0)
+  TransferredFiles    Int                 @default(0)
+  TotalBytes          BigInt              @default(0)
+  TransferredBytes    BigInt              @default(0)
+  CancelRequested     Boolean             @default(false)
+  ResumeCount         Int                 @default(0)
+  ErrorMessage        String?             @db.Text
+  StartedAt           DateTime?
+  CompletedAt         DateTime?
+  CreatedAt           DateTime            @default(now())
+  UpdatedAt           DateTime            @default(now()) @updatedAt
+  Files               VideoTransferFile[]
+  Steps               VideoTransferStep[]
+
+  @@unique([Direction, SourceInstanceID, SourceVideoID], name: "Direction_SourceInstanceID_SourceVideoID", map: "uniq_video_transfer_source")
+  @@index([Status, UpdatedAt], map: "idx_video_transfer_status_updated")
+  @@index([RemoteTransferID], map: "idx_video_transfer_remote")
+}
+
+model VideoTransferFile {
+  VideoTransferFileID String        @id @db.VarChar(36)
+  VideoTransferID     String        @db.VarChar(36)
+  RelativePath        String        @db.VarChar(512)
+  Size                BigInt
+  Sha256              String        @db.Char(64)
+  Status              String        @db.VarChar(24)
+  BytesReceived       BigInt        @default(0)
+  CreatedAt           DateTime      @default(now())
+  UpdatedAt           DateTime      @default(now()) @updatedAt
+  Transfer            VideoTransfer @relation(fields: [VideoTransferID], references: [VideoTransferID], onDelete: Cascade)
+
+  @@unique([VideoTransferID, RelativePath], name: "VideoTransferID_RelativePath", map: "uniq_video_transfer_file_path")
+  @@index([VideoTransferID, Status], map: "idx_video_transfer_file_status")
+}
+
+model VideoTransferStep {
+  VideoTransferStepID BigInt        @id @default(autoincrement())
+  VideoTransferID     String        @db.VarChar(36)
+  StepKey             String        @db.VarChar(64)
+  Label               String        @db.VarChar(191)
+  StatusLabel         String        @db.VarChar(191)
+  Progress            Int           @default(0)
+  Status              String        @db.VarChar(24)
+  ErrorMessage        String?       @db.Text
+  StartedAt           DateTime?
+  CompletedAt         DateTime?
+  CreatedAt           DateTime      @default(now())
+  UpdatedAt           DateTime      @default(now()) @updatedAt
+  Transfer            VideoTransfer @relation(fields: [VideoTransferID], references: [VideoTransferID], onDelete: Cascade)
+
+  @@unique([VideoTransferID, StepKey], name: "VideoTransferID_StepKey", map: "uniq_video_transfer_step")
+  @@index([VideoTransferID, Status], map: "idx_video_transfer_step_status")
+}
+
 model Saga {
-  SagaID       Int           @id @default(autoincrement())
-  Titre        String        @db.VarChar(100)
-  Resumer      String?       @db.Text
-  CheminImage  String?       @db.VarChar(255)
-  EtatID       Int
-  Premium      Boolean       @default(false)
-  CreateDate   DateTime?     @default(now())
-  Etat         Etat          @relation(fields: [EtatID], references: [EtatID])
-  SagaContents SagaContent[]
+  SagaID        Int            @id @default(autoincrement())
+  Titre         String         @db.VarChar(100)
+  Resumer       String?        @db.Text
+  CheminImage   String?        @db.VarChar(255)
+  EtatID        Int
+  Premium       Boolean        @default(false)
+  CreateDate    DateTime?      @default(now())
+  Etat          Etat           @relation(fields: [EtatID], references: [EtatID])
+  SagaContents  SagaContent[]
   UniverseSagas UniverseSaga[]
 
   @@index([EtatID], map: "Saga_EtatID_fkey")
@@ -258,7 +329,7 @@ model Utilisateur {
   Videos               Video[]
   UserVideoProgress    UserVideoProgress[]
   UserSeriesWatchReset UserSeriesWatchReset[]
-  UserFavoriteContent   UserFavoriteContent[]
+  UserFavoriteContent  UserFavoriteContent[]
 
   @@index([GradeID], map: "Utilisateur_GradeID_fkey")
   @@index([EtatID], map: "Utilisateur_EtatID_fkey")
@@ -282,16 +353,16 @@ model UserFavoriteContent {
 }
 
 model Musique {
-  MusiqueID            Int                    @id @default(autoincrement())
-  Titre                String                 @db.VarChar(100)
-  CheminAcces          String                 @db.VarChar(255)
-  CheminImage          String?                @db.VarChar(255)
-  Premium              Boolean                @default(false)
+  MusiqueID            Int                   @id @default(autoincrement())
+  Titre                String                @db.VarChar(100)
+  CheminAcces          String                @db.VarChar(255)
+  CheminImage          String?               @db.VarChar(255)
+  Premium              Boolean               @default(false)
   EtatID               Int
   UtilisateurID        Int?
-  CreateDate           DateTime?              @default(now())
-  Etat                 Etat                   @relation(fields: [EtatID], references: [EtatID])
-  Utilisateur          Utilisateur?           @relation(fields: [UtilisateurID], references: [UtilisateurID])
+  CreateDate           DateTime?             @default(now())
+  Etat                 Etat                  @relation(fields: [EtatID], references: [EtatID])
+  Utilisateur          Utilisateur?          @relation(fields: [UtilisateurID], references: [UtilisateurID])
   AlbumMusiques        AlbumMusique[]
   Log                  Log[]
   MusiqueGenreMusiques MusiqueGenreMusique[]
@@ -301,11 +372,11 @@ model Musique {
 }
 
 model MusiqueGenre {
-  MusiqueGenreID       Int                    @id @default(autoincrement())
-  Nom                  String                 @db.VarChar(100)
+  MusiqueGenreID       Int                   @id @default(autoincrement())
+  Nom                  String                @db.VarChar(100)
   UtilisateurID        Int?
-  CreateDate           DateTime?              @default(now())
-  Utilisateur          Utilisateur?           @relation(fields: [UtilisateurID], references: [UtilisateurID])
+  CreateDate           DateTime?             @default(now())
+  Utilisateur          Utilisateur?          @relation(fields: [UtilisateurID], references: [UtilisateurID])
   MusiqueGenreAlbums   MusiqueGenreAlbum[]
   MusiqueGenreMusiques MusiqueGenreMusique[]
 
@@ -329,17 +400,17 @@ model MusiqueGenreMusique {
 }
 
 model Album {
-  AlbumID             Int                  @id @default(autoincrement())
-  Titre               String               @db.VarChar(100)
-  CheminImage         String?              @db.VarChar(255)
-  EtatID              Int
-  UtilisateurID       Int?
-  CreateDate          DateTime?            @default(now())
-  Etat                Etat                 @relation(fields: [EtatID], references: [EtatID])
-  Utilisateur         Utilisateur?         @relation(fields: [UtilisateurID], references: [UtilisateurID])
-  AlbumMusiques       AlbumMusique[]
-  Log                 Log[]
-  MusiqueGenreAlbums  MusiqueGenreAlbum[]
+  AlbumID            Int                 @id @default(autoincrement())
+  Titre              String              @db.VarChar(100)
+  CheminImage        String?             @db.VarChar(255)
+  EtatID             Int
+  UtilisateurID      Int?
+  CreateDate         DateTime?           @default(now())
+  Etat               Etat                @relation(fields: [EtatID], references: [EtatID])
+  Utilisateur        Utilisateur?        @relation(fields: [UtilisateurID], references: [UtilisateurID])
+  AlbumMusiques      AlbumMusique[]
+  Log                Log[]
+  MusiqueGenreAlbums MusiqueGenreAlbum[]
 
   @@index([EtatID], map: "Album_EtatID_fkey")
   @@index([UtilisateurID], map: "Album_UtilisateurID_fkey")

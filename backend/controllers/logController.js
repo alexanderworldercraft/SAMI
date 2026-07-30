@@ -1,6 +1,7 @@
 // controllers/logController.js
 
 import { prisma } from "../services/db.js";
+import { ETAT } from "../constants.js";
 
 /**
  * Cache en mémoire pour éviter de faire un SELECT sur Action à chaque log.
@@ -356,8 +357,11 @@ export const logVideoFirstPlay = async (request, reply) => {
     }
 
     // (Optionnel) Vérifie que la vidéo existe + contexte épisode/série
-    const exists = await prisma.video.findUnique({
-      where: { VideoID: videoId },
+    const exists = await prisma.video.findFirst({
+      where: {
+        VideoID: videoId,
+        EtatID: ETAT.ACTIVE,
+      },
       select: {
         VideoID: true,
         SaisonID: true,
@@ -429,8 +433,11 @@ export const logVideoResumePlay = async (request, reply) => {
       return reply.code(401).send({ error: "Non authentifié." });
     }
 
-    const exists = await prisma.video.findUnique({
-      where: { VideoID: videoId },
+    const exists = await prisma.video.findFirst({
+      where: {
+        VideoID: videoId,
+        EtatID: ETAT.ACTIVE,
+      },
       select: {
         VideoID: true,
         SaisonID: true,

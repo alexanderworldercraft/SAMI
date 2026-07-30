@@ -2,7 +2,7 @@
 
 SAMI (**Système d’Archivage Multimédia Intégré**) est une médiathèque web privée permettant d’organiser, diffuser et suivre des films, séries et musiques depuis une seule interface.
 
-La version actuelle est la **7.6.0**. Elle repose sur un backend Fastify, une interface React, Prisma avec MySQL, un pipeline vidéo FFmpeg/HLS et Socket.IO pour le retour en temps réel des traitements.
+La version actuelle est la **7.8.0**. Elle repose sur un backend Fastify, une interface React, Prisma avec MySQL, un pipeline vidéo FFmpeg/HLS et Socket.IO pour le retour en temps réel des traitements.
 
 ## Fonctionnalités
 
@@ -14,6 +14,7 @@ La version actuelle est la **7.6.0**. Elle repose sur un backend Fastify, une in
 - lecteur personnalisé avec progression lue, buffer, volume et plein écran ;
 - **Preview Live** expérimentale : aperçu au survol de la barre de lecture à partir de spritesheets et d’un fichier WebVTT ;
 - import et transcodage FFmpeg avec suivi de progression via Socket.IO ;
+- export sécurisé et reprenable d’une vidéo traitée depuis un clone vers l’instance principale ;
 - historique de lecture, reprise intelligente et remise à zéro d’une série ;
 - tendances, calendrier des ajouts et contenus mis en avant par genre ;
 - favoris, sagas et univers.
@@ -35,17 +36,17 @@ La version actuelle est la **7.6.0**. Elle repose sur un backend Fastify, une in
 - journalisation des actions et sauvegardes manuelles ou planifiées de MySQL ;
 - limitations de requêtes, contrôle CORS et en-têtes de sécurité.
 
-## Nouveautés de la version 7.6.0
+## Nouveautés de la version 7.8.0
 
-- activation expérimentale des pistes audio multiples pour les nouvelles vidéos importées ;
-- conservation de toutes les pistes dans des renditions HLS audio séparées ;
-- sélection de la piste principale avec les préférences audio existantes ;
-- nouveau menu de choix audio dans le lecteur Hls.js ;
-- stockage des métadonnées dans `VideoAudioTrack`, sans rétrofit des anciennes vidéos ;
-- ajout automatique du genre `MultiAudio` après une conversion multi-audio réussie ;
-- maintien intégral du pipeline historique lorsque l’option est désactivée.
+- export sécurisé et reprenable d’une vidéo traitée depuis un clone vers le serveur principal ;
+- accès réservé au super administrateur depuis la page de lecture, avec confirmation locale du mot de passe ;
+- sélection des genres et d’une éventuelle saison existante directement depuis le catalogue principal ;
+- échanges inter-serveurs signés par HMAC-SHA-256 et vérification SHA-256 de chaque fichier ;
+- réception atomique dans un stockage temporaire avec vidéo bloquée jusqu’à la validation complète du HLS ;
+- progression persistante, reprise, annulation et journalisation des étapes sur les deux instances ;
+- migration corrective du modèle `Log` pour les clones dont l’historique Prisma était incomplet.
 
-L’historique complet des versions, de la 6.1.0 à la 7.6.0, est disponible dans l’application à l’adresse `/updates` et dans `frontend/src/components/UpdatesPage.js`.
+L’historique complet des versions, de la 6.1.0 à la 7.8.0, est disponible dans l’application à l’adresse `/updates` et dans `frontend/src/components/UpdatesPage.js`.
 
 ## Stack technique
 
@@ -141,9 +142,17 @@ Les principales variables du backend sont :
 | `DATABASE_URL` | URL de connexion Prisma à MySQL |
 | `DB_HOST`, `DB_USER`, `DB_PASSWORD`, `DB_NAME` | Connexion utilisée notamment par les sauvegardes |
 | `JWT_SECRET` | Signature des jetons d’authentification |
+| `NODE_ENV` | Environnement d’exécution ; doit valoir `production` sur les serveurs déployés |
 | `APP_NAME` | Nom affiché au démarrage |
 | `PORTS` | Port d’écoute du backend |
 | `PUBLIC_URL`, `PUBLIC_HOST` | URL et hôte publics, utilisés par CORS, Socket.IO et Swagger |
+| `SAMI_INSTANCE_ROLE` | Rôle de l’installation : `clone` pour exporter ou `primary` pour recevoir |
+| `SAMI_INSTANCE_ID` | Identifiant stable et unique de l’installation, utilisé pour l’idempotence |
+| `SAMI_PRIMARY_BASE_URL` | URL configurable de l’instance principale ; l’exemple utilise `https://sami.worldercraft.fr` |
+| `SAMI_TRANSFER_SHARED_SECRET` | Secret partagé servant à signer les échanges inter-serveurs avec HMAC-SHA-256 |
+| `SAMI_TRANSFER_REQUEST_TIMEOUT_MS` | Délai maximal d’une requête de transfert |
+| `SAMI_TRANSFER_SESSION_TTL_HOURS` | Durée de conservation d’une réception incomplète avant nettoyage |
+| `SAMI_TRANSFER_CONCURRENCY` | Nombre maximal de fichiers envoyés simultanément par un clone |
 | `BACKUP_DAY_OF_WEEK`, `BACKUP_TIME` | Planification de la sauvegarde MySQL |
 | `SMTP_*` | Envoi d’e-mails |
 | `USERNAMESUPERADMIN`, `PASSWORDSUPERADMIN`, `EMAILSUPERADMIN` | Compte super administrateur créé par le seed |
@@ -152,7 +161,92 @@ Le frontend utilise principalement `REACT_APP_URL_LOCAL`, `REACT_APP_NAME` et `R
 
 Ne versionnez jamais les fichiers `.env`, les secrets, les certificats privés ou les sauvegardes de production.
 
-## Initialisation de la base
+### Transfert d’une vidéo depuis un clone
+
+Le même code est déployé sur chaque installation. L’instance principale utilise
+`SAMI_INSTANCE_ROLE=primary`; chaque clone utilise `SAMI_INSTANCE_ROLE=clone`, un
+`SAMI_INSTANCE_ID` distinct et `SAMI_PRIMARY_BASE_URL` pour joindre le principal.
+Les deux côtés doivent partager un secret aléatoire d’au moins 32 octets dans
+`SAMI_TRANSFER_SHARED_SECRET`.
+
+Configuration minimale du clone :
+
+```dotenv
+NODE_ENV="production"
+SAMI_INSTANCE_ROLE="clone"
+SAMI_INSTANCE_ID="sami-clone-01"
+SAMI_PRIMARY_BASE_URL="https://sami.worldercraft.fr"
+SAMI_TRANSFER_SHARED_SECRET="<même-secret-fort-sur-les-deux-serveurs>"
+```
+
+Configuration minimale du principal :
+
+```dotenv
+NODE_ENV="production"
+SAMI_INSTANCE_ROLE="primary"
+SAMI_INSTANCE_ID="sami-primary"
+SAMI_PRIMARY_BASE_URL="https://sami.worldercraft.fr"
+SAMI_TRANSFER_SHARED_SECRET="<même-secret-fort-sur-les-deux-serveurs>"
+```
+
+Exemple de génération du secret, à copier ensuite dans les deux environnements :
+
+```bash
+openssl rand -hex 32
+```
+
+Avant d’activer la fonctionnalité, sauvegardez les deux bases. Déployez et
+redémarrez d’abord le principal, puis le clone afin que l’API de réception soit
+disponible lorsque le clone démarre. Dans chaque copie du backend :
+
+```bash
+cd backend
+npm ci
+npx prisma generate --generator client
+npx prisma migrate deploy
+npx prisma migrate status
+```
+
+La commande `migrate status` doit confirmer que toutes les migrations sont
+appliquées avant le redémarrage du processus. `prisma generate` régénère
+uniquement le client JavaScript et ne modifie jamais MySQL. `migrate deploy`
+conserve les données et applique seulement les migrations versionnées qui ne
+figurent pas encore dans `_prisma_migrations` ; il ne recrée pas une base
+existante.
+
+Depuis `/lecture/:id`, le super administrateur du clone peut confirmer son mot de
+passe local, choisir les genres et éventuellement une saison existant sur le
+principal, puis lancer l’export. Le mot de passe ne quitte jamais le clone. Les
+fichiers sont reçus dans un espace non public, vérifiés par taille et SHA-256,
+puis publiés sous `uploads/video/<VideoID>` uniquement lorsque le manifeste HLS
+est complet. La vidéo principale reste bloquée et invisible jusqu’à cette
+validation. Les tâches sont persistées afin de permettre le suivi, l’annulation
+et la reprise après une interruption.
+
+Le reverse proxy du principal doit autoriser les requêtes `PUT` vers
+`/api/internal/video-transfers/`, désactiver leur mise en mémoire complète et
+accorder un délai et une taille de corps suffisants aux segments HLS. Exemple
+de directives Nginx à intégrer dans la location correspondante :
+
+```nginx
+client_max_body_size 0;
+proxy_request_buffering off;
+proxy_read_timeout 900s;
+proxy_send_timeout 900s;
+```
+
+Une limite explicite supérieure à la taille maximale de vos segments peut
+remplacer `0`. Ces routes restent protégées par la signature HMAC,
+l’horodatage et un nonce anti-rejeu ; elles ne doivent jamais être remplacées
+par une route publique d’import de métadonnées.
+
+Les verrous de job et le cache anti-rejeu sont locaux au processus Node. Chaque
+installation SAMI doit donc exécuter un seul processus backend pour cette
+version (pas de cluster PM2 ni de réplicas parallèles) ; un déploiement
+multi-process nécessiterait des verrous et un cache de nonces partagés via la
+base ou Redis.
+
+## Initialisation locale ou d’une base neuve
 
 Après avoir configuré `DATABASE_URL` :
 
@@ -163,6 +257,9 @@ npm run seed
 ```
 
 `prisma db push` synchronise directement le schéma avec la base. Pour un environnement géré par migrations, utilisez plutôt le workflow Prisma adapté à votre déploiement.
+
+N’utilisez jamais `prisma db push` sur les bases du clone ou du principal en
+production. Utilisez la procédure `prisma migrate deploy` décrite ci-dessus.
 
 ## Développement
 
@@ -190,6 +287,9 @@ backend/ssl/certificate.crt
 L’interface de développement React utilise `REACT_APP_URL_LOCAL` pour joindre l’API.
 
 ## Production
+
+Vérifiez que `NODE_ENV=production` est défini sur le principal et sur chaque
+clone avant de démarrer les processus.
 
 Construisez d’abord l’interface :
 
@@ -236,9 +336,10 @@ La route `/register` est actuellement désactivée et renvoie vers l’écran de
 
 - `/api/users`
 - `/api/videos`
+- `/api/video-exports`
+- `/api/internal/video-transfers` (échanges HMAC entre instances)
 - `/api/genres`
 - `/api/series`
-- `/api/import`
 - `/api/people`
 - `/api/logs`
 - `/api/admin-message`

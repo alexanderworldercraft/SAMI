@@ -316,7 +316,9 @@ export const getSeriesById = async (request, reply) => {
             SaisonID: true,
             Numero: true,
             _count: {
-              select: { Episodes: true },
+              select: {
+                Episodes: { where: { EtatID: ETAT.ACTIVE } },
+              },
             },
           },
           orderBy: { Numero: "asc" },

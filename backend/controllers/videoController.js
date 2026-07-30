@@ -68,6 +68,22 @@ const ensureVideoSuperAdmin = async (request, reply) => {
   return admin?.userId || null;
 };
 
+const rejectTransferBlockedVideoMutation = async (videoId, reply) => {
+  const video = await prisma.video.findUnique({
+    where: { VideoID: videoId },
+    select: { EtatID: true },
+  });
+
+  if (video?.EtatID !== ETAT.BLOCKED) return false;
+
+  reply.status(409).send({
+    error:
+      "Cette vidéo est verrouillée pendant son transfert depuis une autre instance.",
+    code: "VIDEO_TRANSFER_IN_PROGRESS",
+  });
+  return true;
+};
+
 const mapLinkedPeople = (links, roleField) =>
   links
     .filter((link) => link[roleField])
@@ -192,6 +208,8 @@ export const moveVideoToSeason = async (request, reply) => {
   }
 
   try {
+    if (await rejectTransferBlockedVideoMutation(parsedVideoId, reply)) return;
+
     const updatedVideo = await prisma.video.update({
       where: { VideoID: parsedVideoId },
       data: { SaisonID: parsedSeasonId },
@@ -307,8 +325,11 @@ export const getRecommandationsParGenres = async (request, reply) => {
 
   try {
     // Récupérer les détails du film/série actuel
-    const currentVideo = await prisma.video.findUnique({
-      where: { VideoID: Number(id) },
+    const currentVideo = await prisma.video.findFirst({
+      where: {
+        VideoID: Number(id),
+        EtatID: ACTIVE_ETAT_ID,
+      },
       include: { VideoGenres: { include: { Genre: true } } },
     });
     //console.log(`Détails du film/série actuel récupérés :`, currentVideo);
@@ -515,8 +536,11 @@ export const getPersonalizedRecommendations = async (request, reply) => {
       serie.SeriesGenres?.forEach((sg) => watchedGenres.add(sg.Genre.Nom));
     });
 
-    const currentVideo = await prisma.video.findUnique({
-      where: { VideoID: Number(id) },
+    const currentVideo = await prisma.video.findFirst({
+      where: {
+        VideoID: Number(id),
+        EtatID: ACTIVE_ETAT_ID,
+      },
       select: {
         VideoID: true,
         Saison: { select: { Series: { select: { SeriesID: true } } } },
@@ -541,7 +565,9 @@ export const getPersonalizedRecommendations = async (request, reply) => {
               orderBy: { Titre: "asc" },
             },
             _count: {
-              select: { Episodes: true },
+              select: {
+                Episodes: { where: { EtatID: ACTIVE_ETAT_ID } },
+              },
             },
           },
           orderBy: { Numero: "asc" },
@@ -894,7 +920,11 @@ export const getVideosAndSeries = async (request, reply) => {
                 where: { SeriesID: { in: seriesIds } },
                 select: {
                   SeriesID: true,
-                  _count: { select: { Episodes: true } },
+                  _count: {
+                    select: {
+                      Episodes: { where: { EtatID: ACTIVE_ETAT_ID } },
+                    },
+                  },
                 },
               })
             : [],
@@ -957,7 +987,11 @@ export const getVideosAndSeries = async (request, reply) => {
           where: { SeriesID: { in: seriesIds } },
           select: {
             SeriesID: true,
-            _count: { select: { Episodes: true } },
+            _count: {
+              select: {
+                Episodes: { where: { EtatID: ACTIVE_ETAT_ID } },
+              },
+            },
           },
         }),
         prisma.log.findMany({
@@ -1235,7 +1269,11 @@ export const getMostWatchedLast30Days = async (request, reply) => {
             where: { SeriesID: { in: seriesIds } },
             select: {
               SeriesID: true,
-              _count: { select: { Episodes: true } },
+              _count: {
+                select: {
+                  Episodes: { where: { EtatID: ACTIVE_ETAT_ID } },
+                },
+              },
             },
           })
         : [],
@@ -1299,9 +1337,10 @@ export const getVideoDetails = async (request, reply) => {
           include: {
             Series: {
               include: {
-                Saisons: {
+                  Saisons: {
                   include: {
                     Episodes: {
+                      where: { EtatID: ACTIVE_ETAT_ID },
                       orderBy: { Titre: "asc" },
                     },
                   },
@@ -1327,7 +1366,7 @@ export const getVideoDetails = async (request, reply) => {
       return reply.status(404).send({ error: "Vidéo non trouvée." });
     }
 
-    if (video.EtatID === DELETED_ETAT_ID) {
+    if (video.EtatID !== ACTIVE_ETAT_ID) {
       return reply.status(404).send({ error: "Vidéo non trouvée." });
     }
 
@@ -1518,6 +1557,16 @@ export const updateVideoImage = async (request, reply) => {
 
     const videoId = parseInt(id, 10);
     console.log("[video:image] start", { videoId, userId });
+    if (
+      !Number.isInteger(videoId)
+      || videoId <= 0
+      || await rejectTransferBlockedVideoMutation(videoId, reply)
+    ) {
+      if (!Number.isInteger(videoId) || videoId <= 0) {
+        return reply.status(400).send({ error: "VideoID invalide." });
+      }
+      return;
+    }
     const allowedExts = new Set([
       ".jpg",
       ".jpeg",
@@ -1658,6 +1707,8 @@ export const deleteVideoImage = async (request, reply) => {
   }
 
   try {
+    if (await rejectTransferBlockedVideoMutation(videoId, reply)) return;
+
     const oldVideo = await prisma.video.findUnique({
       where: { VideoID: videoId },
       select: {
@@ -1701,12 +1752,15 @@ export const deleteVideoImage = async (request, reply) => {
 
 // Récupérer les informations de navigation (précédent/suivant)
 export const getNavigationInfo = async (request, reply) => {
-  const { id } = request.params;
+  const videoId = parsePositiveInt(request.params?.id);
+  if (!videoId) {
+    return reply.status(400).send({ error: "VideoID invalide." });
+  }
 
   try {
     // Obtenez les détails de la vidéo actuelle
-    const currentVideo = await prisma.video.findUnique({
-      where: { VideoID: parseInt(id) },
+    const currentVideo = await prisma.video.findFirst({
+      where: { VideoID: videoId, EtatID: ACTIVE_ETAT_ID },
       select: { Titre: true }
     });
 
@@ -1718,14 +1772,20 @@ export const getNavigationInfo = async (request, reply) => {
 
     // Vidéo précédente par titre (ordre ASC)
     const prevVideo = await prisma.video.findFirst({
-      where: { Titre: { lt: currentTitle } },
+      where: {
+        EtatID: ACTIVE_ETAT_ID,
+        Titre: { lt: currentTitle },
+      },
       orderBy: { Titre: "desc" }, // Récupère le titre le plus proche avant l'actuel
       select: { VideoID: true, Titre: true }
     });
 
     // Vidéo suivante par titre (ordre ASC)
     const nextVideo = await prisma.video.findFirst({
-      where: { Titre: { gt: currentTitle } },
+      where: {
+        EtatID: ACTIVE_ETAT_ID,
+        Titre: { gt: currentTitle },
+      },
       orderBy: { Titre: "asc" }, // Récupère le titre le plus proche après l'actuel
       select: { VideoID: true, Titre: true }
     });
@@ -1872,6 +1932,16 @@ export const updateVideoTitle = async (request, reply) => {
   try {
     const userId = await ensureVideoAdmin(request, reply);
     if (!userId) return;
+    if (
+      !Number.isInteger(videoId)
+      || videoId <= 0
+      || await rejectTransferBlockedVideoMutation(videoId, reply)
+    ) {
+      if (!Number.isInteger(videoId) || videoId <= 0) {
+        return reply.status(400).send({ error: "VideoID invalide." });
+      }
+      return;
+    }
 
     const before = await prisma.video.findUnique({
       where: { VideoID: videoId },
@@ -1931,6 +2001,16 @@ export const updateVideoResumer = async (request, reply) => {
 
     const userId = await ensureVideoAdmin(request, reply);
     if (!userId) return;
+    if (
+      !Number.isInteger(videoId)
+      || videoId <= 0
+      || await rejectTransferBlockedVideoMutation(videoId, reply)
+    ) {
+      if (!Number.isInteger(videoId) || videoId <= 0) {
+        return reply.status(400).send({ error: "VideoID invalide." });
+      }
+      return;
+    }
 
     const before = await prisma.video.findUnique({
       where: { VideoID: videoId },
@@ -2013,10 +2093,22 @@ export const quickSearchVideos = async (request, reply) => {
 
 // GET /api/videos/:id/genres
 export const getVideoGenres = async (request, reply) => {
-  const { id } = request.params;
+  const videoId = parsePositiveInt(request.params?.id);
+  if (!videoId) {
+    return reply.status(400).send({ error: "VideoID invalide." });
+  }
+
   try {
+    const video = await prisma.video.findFirst({
+      where: { VideoID: videoId, EtatID: ACTIVE_ETAT_ID },
+      select: { VideoID: true },
+    });
+    if (!video) {
+      return reply.status(404).send({ error: "Vidéo introuvable." });
+    }
+
     const links = await prisma.videoGenre.findMany({
-      where: { VideoID: parseInt(id, 10) },
+      where: { VideoID: videoId },
       include: { Genre: true },
       orderBy: { VideoGenreID: "asc" },
     });
@@ -2043,6 +2135,16 @@ export const updateVideoGenres = async (request, reply) => {
 
     const userId = await ensureVideoAdmin(request, reply);
     if (!userId) return;
+    if (
+      !Number.isInteger(videoId)
+      || videoId <= 0
+      || await rejectTransferBlockedVideoMutation(videoId, reply)
+    ) {
+      if (!Number.isInteger(videoId) || videoId <= 0) {
+        return reply.status(400).send({ error: "VideoID invalide." });
+      }
+      return;
+    }
 
     const existing = await prisma.video.findUnique({
       where: { VideoID: videoId },
@@ -2116,6 +2218,7 @@ export const updateVideoPremium = async (request, reply) => {
     if (Number.isNaN(videoId)) {
       return reply.code(400).send({ error: "ID de vidéo invalide." });
     }
+    if (await rejectTransferBlockedVideoMutation(videoId, reply)) return;
 
     const before = await prisma.video.findUnique({
       where: { VideoID: videoId },
@@ -2186,6 +2289,13 @@ export const softDeleteVideo = async (request, reply) => {
 
     if (!video) {
       return reply.status(404).send({ error: "Vidéo introuvable." });
+    }
+    if (video.EtatID === ETAT.BLOCKED) {
+      return reply.status(409).send({
+        error:
+          "Cette vidéo est verrouillée pendant son transfert depuis une autre instance.",
+        code: "VIDEO_TRANSFER_IN_PROGRESS",
+      });
     }
 
     if (video.EtatID === DELETED_ETAT_ID) {
@@ -2263,6 +2373,19 @@ export const restoreVideo = async (request, reply) => {
 
     if (video.EtatID === ACTIVE_ETAT_ID) {
       return reply.send({ ok: true, unchanged: true, video });
+    }
+    if (video.EtatID === ETAT.BLOCKED) {
+      return reply.status(409).send({
+        error:
+          "Cette vidéo est verrouillée pendant son transfert depuis une autre instance.",
+        code: "VIDEO_TRANSFER_IN_PROGRESS",
+      });
+    }
+    if (video.EtatID !== DELETED_ETAT_ID) {
+      return reply.status(409).send({
+        error: "Seule une vidéo supprimée peut être restaurée.",
+        code: "VIDEO_NOT_DELETED",
+      });
     }
 
     const restored = await prisma.video.update({
@@ -2373,6 +2496,13 @@ export const deleteVideo = async (request, reply) => {
 
     if (!video) {
       return reply.status(404).send({ error: "Vidéo introuvable." });
+    }
+    if (video.EtatID === ETAT.BLOCKED) {
+      return reply.status(409).send({
+        error:
+          "Cette vidéo est verrouillée pendant son transfert depuis une autre instance.",
+        code: "VIDEO_TRANSFER_IN_PROGRESS",
+      });
     }
 
     await prisma.$transaction(async (tx) => {

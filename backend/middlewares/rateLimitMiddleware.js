@@ -57,7 +57,14 @@ export const globalRateLimit = createRateLimit({
   keyPrefix: "global",
   windowMs: 60_000,
   max: 1200,
-  skip: (request) => request.method === "OPTIONS" || !request.url.startsWith("/api/"),
+  skip: (request) =>
+    request.method === "OPTIONS"
+    || !request.url.startsWith("/api/")
+    || (
+      request.method === "PUT"
+      && request.url.startsWith("/api/internal/video-transfers/sessions/")
+      && request.url.includes("/files/")
+    ),
 });
 
 export const authRateLimit = createRateLimit({
@@ -83,4 +90,15 @@ export const passwordResetRateLimit = createRateLimit({
   keyPrefix: "password-reset",
   windowMs: 60 * 60_000,
   max: 5,
+});
+
+export const videoExportAuthorizationRateLimit = createRateLimit({
+  keyPrefix: "video-export-authorization",
+  windowMs: 15 * 60_000,
+  max: 5,
+  keyGenerator: (request) => {
+    const ip = getClientIp(request) || request.ip || "unknown";
+    const userId = Number(request.user?.userId);
+    return Number.isInteger(userId) ? `${ip}:user:${userId}` : `ip:${ip}`;
+  },
 });

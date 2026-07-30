@@ -2,6 +2,78 @@ import React, { useEffect, useState } from "react";
 
 const updates = [
   {
+    version: "7.8.0",
+    title: "Export video securise entre instances",
+    date: "30 juillet 2026",
+    sections: [
+      {
+        title: "Nouvel export reserve au super administrateur",
+        items: [
+          "L'ancien drawer d'import de metadonnees est retire de la page Nouvelle video et remplace par un export complet depuis la page de lecture.",
+          "Le bouton d'export apparait uniquement sur /lecture/:id pour un super administrateur actif confirme par la base de donnees.",
+          "Le mot de passe du super administrateur est demande avant chaque autorisation sensible, verifie localement sur le clone et n'est jamais transmis au serveur principal.",
+          "Un precontrole verifie la configuration du clone, la disponibilite du principal et la validite de la session avant d'afficher les choix de destination.",
+          "Les tentatives de mot de passe sont limitees et les erreurs de configuration, d'autorisation ou de connexion sont affichees directement dans le drawer.",
+        ],
+      },
+      {
+        title: "Destination et correspondance des catalogues",
+        items: [
+          "Le meme code SAMI peut maintenant fonctionner comme clone ou comme principal grace aux variables SAMI_INSTANCE_ROLE et SAMI_INSTANCE_ID.",
+          "L'adresse du principal est configurable avec SAMI_PRIMARY_BASE_URL et utilise https://sami.worldercraft.fr dans la configuration recommandee.",
+          "Le clone charge les genres depuis la base principale et preselectionne ceux qui correspondent aux genres de la video source.",
+          "Les genres introuvables sur le principal sont signales par un avertissement jaune sans bloquer l'export et sans creer automatiquement de nouveau genre.",
+          "Le super administrateur choisit explicitement entre un film independant et un episode rattache a une serie et une saison deja presentes sur le principal.",
+        ],
+      },
+      {
+        title: "Transfert atomique et controle des fichiers",
+        items: [
+          "L'export copie le titre, le resume, le statut Premium, les genres, le HLS, l'affiche, les sous-titres et les pistes audio du stockage moderne uploads/video/VideoID.",
+          "Les acteurs, realisateurs, sagas, favoris, progressions, historiques et anciennes dates ne sont pas transferes ; la date de creation correspond au nouvel import.",
+          "Le principal reserve les donnees avec une video invisible dans l'etat bloque et recoit les fichiers dans un dossier temporaire non public.",
+          "Chaque fichier est controle par sa taille et son empreinte SHA-256, puis les playlists et references HLS sont validees une seconde fois avant publication.",
+          "Les chemins, extensions, liens symboliques et fichiers speciaux sont controles afin d'interdire les sorties du stockage video autorise.",
+          "La video devient active uniquement apres le deplacement atomique des fichiers verifies ; les apercus sont ensuite regeneres sur le principal.",
+          "La video et tous ses fichiers d'origine restent conserves sur le clone apres un export reussi.",
+        ],
+      },
+      {
+        title: "Progression, reprise et annulation",
+        items: [
+          "Les exports sont enregistres dans les nouveaux modeles VideoTransfer, VideoTransferFile et VideoTransferStep afin de survivre aux rechargements et redemarrages.",
+          "Le drawer reprend la presentation de TaskHistory avec une progression globale, le detail des etapes, les fichiers, les octets transferes, les avertissements et le recu final.",
+          "Un transfert interrompu peut etre repris sans recreer la video ni dupliquer les fichiers deja valides.",
+          "La reprise reconcilie egalement les sessions dont la reponse finale a ete perdue apres une creation ou une activation reussie sur le principal.",
+          "L'annulation interrompt les flux actifs, nettoie les fichiers temporaires et retire les donnees bloquees tant que la publication finale n'a pas commence.",
+          "Une maintenance au demarrage puis periodique reprend les jobs recuperables, nettoie les sessions expirees et restaure les reservations bloquees.",
+        ],
+      },
+      {
+        title: "Securite et journalisation inter-serveurs",
+        items: [
+          "Les echanges internes utilisent une signature HMAC-SHA-256 avec un secret partage identique sur le principal et les clones autorises.",
+          "La methode HTTP, le chemin, l'horodatage, le nonce, l'instance source et l'empreinte du corps sont signes avant toute lecture de la requete.",
+          "Les signatures perimees, les rejeux de nonce, les redirections, les origines inattendues et les requetes non HTTPS en production sont refuses.",
+          "Les videos bloquees restent invisibles dans les listes, recherches, favoris, statistiques, historiques, recommandations et relations de contenu.",
+          "Les actions de debut d'export, debut d'import, creation en base, transfert en cours, fin, echec et annulation sont journalisees sur les deux serveurs.",
+          "Une reconciliation persistante repare les journaux manquants apres un redemarrage ou une interruption entre deux ecritures.",
+        ],
+      },
+      {
+        title: "Base de donnees, deploiement et verification",
+        items: [
+          "Une migration ajoute les tables de transfert persistantes, leurs index et les nouvelles actions de journalisation sans supprimer les donnees existantes.",
+          "Une migration corrective aligne le modele Log avec son schema Prisma historique en ajoutant VideoID, SeriesID, SaisonID, les metadonnees d'audit, les index et les cles etrangeres manquantes.",
+          "Cette correction est conditionnelle afin de fonctionner sur un clone incomplet comme sur un principal deja synchronise par une ancienne modification manuelle ou un db push.",
+          "Le fichier d'environnement d'exemple et le README documentent les roles, l'URL du principal, le secret partage, les delais, la concurrence, Nginx et l'ordre de deploiement.",
+          "Cette version utilise un seul processus backend par instance afin de conserver des verrous de job et une protection anti-rejeu coherents.",
+          "Le schema Prisma, les tests backend, les tests d'autorisation et de securite, les tests du drawer et le build frontend de production ont ete verifies.",
+        ],
+      },
+    ],
+  },
+  {
     version: "7.7.0",
     title: "Message general, details et statistiques avancees",
     date: "29 juillet 2026",

@@ -274,6 +274,41 @@ async function main() {
         Description: "Utilisateur retire un contenu de ses favoris.",
         Criticite: 0,
       },
+      {
+        Nom: "video_export_started",
+        Description: "Le super administrateur commence l'export d'une vidéo vers le serveur principal.",
+        Criticite: 2,
+      },
+      {
+        Nom: "video_import_started",
+        Description: "Le serveur principal commence l'import d'une vidéo depuis un clone.",
+        Criticite: 2,
+      },
+      {
+        Nom: "video_import_database_created",
+        Description: "Les données bloquées de la vidéo importée sont ajoutées à la base principale.",
+        Criticite: 2,
+      },
+      {
+        Nom: "video_transfer_in_progress",
+        Description: "Le transfert inter-serveurs des fichiers vidéo est en cours.",
+        Criticite: 1,
+      },
+      {
+        Nom: "video_transfer_completed",
+        Description: "Le transfert inter-serveurs des fichiers vidéo est terminé et vérifié.",
+        Criticite: 2,
+      },
+      {
+        Nom: "video_transfer_failed",
+        Description: "Le transfert inter-serveurs d'une vidéo a échoué.",
+        Criticite: 3,
+      },
+      {
+        Nom: "video_transfer_cancelled",
+        Description: "Le transfert inter-serveurs d'une vidéo a été annulé.",
+        Criticite: 2,
+      },
     ]),
     skipDuplicates: true, // Évite les erreurs si les grades existent déjà
   });

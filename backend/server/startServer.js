@@ -7,6 +7,14 @@ import { prisma } from "../services/db.js";
 import { deactivateExpiredAdminMessages } from "../services/adminMessageService.js";
 import { createDatabaseBackup } from "../services/databaseBackupService.js";
 import { rotateGenreFeaturedContent } from "../services/genreFeaturedContentService.js";
+import { recoverInterruptedExportJobs } from "../services/videoExportJobService.js";
+import {
+  cleanupExpiredVideoTransferStaging,
+  recoverInterruptedImports,
+  restoreVideoTransferBlockReservations,
+} from "../services/videoImportTransferService.js";
+import { getInstanceRole } from "../services/videoTransferConfig.js";
+import { reconcileVideoTransferLogs } from "../services/videoTransferLogReconciliation.js";
 import { createServer } from "./createServer.js";
 import {
   buildBackupCronExpression,
@@ -17,6 +25,78 @@ import {
 
 const backendRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const DATABASE_KEEP_ALIVE_MS = 7 * 60 * 60 * 1000;
+let videoTransferMaintenancePromise = null;
+
+async function runVideoTransferMaintenance({ startup = false } = {}) {
+  const role = getInstanceRole();
+  if (!["clone", "primary"].includes(role)) return null;
+
+  try {
+    if (role === "clone") {
+      const recovered = await recoverInterruptedExportJobs();
+      const logs = await reconcileVideoTransferLogs();
+      if (recovered > 0) {
+        console.info(
+          `${recovered} export(s) vidéo interrompu(s) replacé(s) dans la file.`
+        );
+      }
+      if (logs.created > 0 || logs.failed > 0) {
+        console.info("Réconciliation des Actions de transfert terminée.", logs);
+      }
+      return { role, recovered, logs };
+    }
+
+    const reservations = startup
+      ? await restoreVideoTransferBlockReservations()
+      : { restored: 0, removed: 0 };
+    const recovery = startup
+      ? await recoverInterruptedImports()
+      : { recovered: 0, failed: 0 };
+    const cleanup = await cleanupExpiredVideoTransferStaging();
+    const logs = await reconcileVideoTransferLogs();
+    if (
+      reservations.restored > 0
+      || reservations.removed > 0
+      || recovery.recovered > 0
+      || recovery.failed > 0
+      || cleanup.cancelled > 0
+      || cleanup.stagingRemoved > 0
+      || logs.created > 0
+      || logs.failed > 0
+    ) {
+      console.info("Maintenance des transferts vidéo terminée.", {
+        recovery,
+        reservations,
+        cleanup,
+        logs,
+      });
+    }
+    return { role, reservations, recovery, cleanup, logs };
+  } catch (error) {
+    console.error(
+      `[video-transfer-maintenance:${role}]`,
+      error?.message || error
+    );
+    if (startup && role === "primary") throw error;
+    return { role, error };
+  }
+}
+
+async function maintainVideoTransfers(options = {}) {
+  if (videoTransferMaintenancePromise) {
+    return videoTransferMaintenancePromise;
+  }
+
+  const maintenance = runVideoTransferMaintenance(options);
+  videoTransferMaintenancePromise = maintenance;
+  try {
+    return await maintenance;
+  } finally {
+    if (videoTransferMaintenancePromise === maintenance) {
+      videoTransferMaintenancePromise = null;
+    }
+  }
+}
 
 export function loadTlsCredentials() {
   console.info("Lecture des certificats SSL...");
@@ -29,22 +109,22 @@ export function loadTlsCredentials() {
   return credentials;
 }
 
+async function pingDatabase() {
+  try {
+    await prisma.$queryRaw`SELECT 1`;
+    console.info("Ping base de données réussi.");
+    return true;
+  } catch (error) {
+    console.error("Échec du ping base de données :", error.message);
+    return false;
+  }
+}
+
 function registerBackgroundJobs(server) {
   const backupCronExpression = buildBackupCronExpression(
     process.env.BACKUP_DAY_OF_WEEK || "0",
     process.env.BACKUP_TIME || "00:00"
   );
-
-  const keepDatabaseAlive = async () => {
-    try {
-      await prisma.$queryRaw`SELECT 1`;
-      console.info("Ping base de données réussi.");
-      return true;
-    } catch (error) {
-      console.error("Échec du ping base de données :", error.message);
-      return false;
-    }
-  };
 
   const backupDatabase = async () => {
     try {
@@ -55,40 +135,49 @@ function registerBackgroundJobs(server) {
     }
   };
 
-  const keepAliveTimer = setInterval(keepDatabaseAlive, DATABASE_KEEP_ALIVE_MS);
-  keepAliveTimer.unref?.();
-
-  const scheduledTasks = [
-    cron.schedule("* * * * *", async () => {
-      try {
-        const result = await deactivateExpiredAdminMessages();
-        if (result.count > 0) {
-          console.info(`${result.count} message général expiré automatiquement.`);
-        }
-      } catch (error) {
-        console.error("Erreur lors de l'expiration du message général :", error);
-      }
-    }),
-    cron.schedule(backupCronExpression, backupDatabase),
-    cron.schedule("0 9 * * 1", async () => {
-      console.info("Démarrage de la rotation hebdomadaire des contenus à la une");
-      try {
-        const result = await rotateGenreFeaturedContent();
-        console.info(
-          `Rotation des contenus à la une terminée pour ${result.genres.length} genres.`
-        );
-      } catch (error) {
-        console.error("Erreur lors de la rotation des contenus à la une :", error);
-      }
-    }),
-  ];
+  let keepAliveTimer = null;
+  let scheduledTasks = [];
 
   server.addHook("onClose", async () => {
-    clearInterval(keepAliveTimer);
+    if (keepAliveTimer) clearInterval(keepAliveTimer);
     scheduledTasks.forEach((task) => task.stop());
   });
 
-  return { pingDatabase: keepDatabaseAlive };
+  return function startBackgroundJobs() {
+    if (keepAliveTimer) return;
+
+    keepAliveTimer = setInterval(pingDatabase, DATABASE_KEEP_ALIVE_MS);
+    keepAliveTimer.unref?.();
+    scheduledTasks = [
+      cron.schedule("* * * * *", async () => {
+        try {
+          const result = await deactivateExpiredAdminMessages();
+          if (result.count > 0) {
+            console.info(`${result.count} message général expiré automatiquement.`);
+          }
+        } catch (error) {
+          console.error("Erreur lors de l'expiration du message général :", error);
+        }
+      }),
+      cron.schedule(backupCronExpression, backupDatabase),
+      cron.schedule("0 9 * * 1", async () => {
+        console.info("Démarrage de la rotation hebdomadaire des contenus à la une");
+        try {
+          const result = await rotateGenreFeaturedContent();
+          console.info(
+            `Rotation des contenus à la une terminée pour ${result.genres.length} genres.`
+          );
+        } catch (error) {
+          console.error("Erreur lors de la rotation des contenus à la une :", error);
+        }
+      }),
+    ];
+    if (["clone", "primary"].includes(getInstanceRole())) {
+      scheduledTasks.push(
+        cron.schedule("17 * * * *", () => maintainVideoTransfers())
+      );
+    }
+  };
 }
 
 export async function startServer({
@@ -110,11 +199,13 @@ export async function startServer({
   });
 
   try {
-    const { pingDatabase } = registerBackgroundJobs(server);
+    const startBackgroundJobs = registerBackgroundJobs(server);
     console.info(formatServerStartupBanner(startupInfo));
-    await server.listen({ port, host });
-    console.info("Serveur démarré avec succès.");
     await pingDatabase();
+    await maintainVideoTransfers({ startup: true });
+    await server.listen({ port, host });
+    startBackgroundJobs();
+    console.info("Serveur démarré avec succès.");
     return server;
   } catch (error) {
     await server.close().catch(() => {});

@@ -130,6 +130,7 @@ const getFirstVideoForSeries = (series) => {
 const formatSagaContent = (link) => {
   if (link.Video) {
     const video = link.Video;
+    if (video.EtatID !== ACTIVE_ETAT_ID) return null;
     return {
       SagaContentID: link.SagaContentID,
       Ordre: link.Ordre,
@@ -549,7 +550,11 @@ export const addSagaContent = async (request, reply) => {
         where: { VideoID: contentId },
         select: { VideoID: true, EtatID: true, SaisonID: true },
       });
-      if (!video || video.EtatID === DELETED_ETAT_ID || video.SaisonID !== null) {
+      if (
+        !video
+        || video.EtatID !== ACTIVE_ETAT_ID
+        || video.SaisonID !== null
+      ) {
         return reply.status(404).send({ error: "Film introuvable." });
       }
     } else {
@@ -670,6 +675,7 @@ export const getSagasForContent = async (request, reply) => {
       where: { VideoID: videoId },
       select: {
         VideoID: true,
+        EtatID: true,
         Saison: {
           select: {
             SeriesID: true,
@@ -678,7 +684,9 @@ export const getSagasForContent = async (request, reply) => {
       },
     });
 
-    if (!video) return reply.status(404).send({ error: "Vidéo introuvable." });
+    if (!video || video.EtatID !== ACTIVE_ETAT_ID) {
+      return reply.status(404).send({ error: "Vidéo introuvable." });
+    }
 
     const where = {
       Saga: { EtatID: ACTIVE_ETAT_ID },

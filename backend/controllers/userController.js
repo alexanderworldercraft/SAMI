@@ -220,6 +220,7 @@ async function buildWatchHistoryPayload(userId, limit) {
       : {};
     const videoId = log.VideoID || deletedVideoId;
     const video = videoId ? videoById.get(videoId) : null;
+    if (video?.EtatID === ETAT.BLOCKED) return null;
     const series = video?.Saison?.Series || null;
     const isDeletedVideo = !video || video.EtatID === 2;
     const deletedSeriesId = Number(meta.deletedSeriesId ?? log.SeriesID);
@@ -257,7 +258,7 @@ async function buildWatchHistoryPayload(userId, limit) {
           }
         : fallbackSeries,
     };
-  });
+  }).filter(Boolean);
 }
 
 async function getLastActivityByUserIds(userIds) {

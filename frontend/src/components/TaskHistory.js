@@ -43,7 +43,7 @@ const TaskHistory = ({ tasks }) => {
                     const displayedSteps = task.steps.filter((step) => isFinishedOpen || !isFinishedStep(step));
 
                     return (
-                        <div key={task.id} className="rounded-lg border border-sky-500/15 bg-white/90 p-4 shadow-sm dark:bg-slate-900/75">
+                        <div key={task.id} className="max-w-128 rounded-lg border border-sky-500/15 bg-white/90 p-4 shadow-sm dark:bg-slate-900/75">
                             <div className="mb-3 flex items-start justify-between gap-3">
                                 <div className="min-w-0">
                                     <p className="truncate text-base font-bold">{task.video?.titre || task.label || "Vidéo"}</p>

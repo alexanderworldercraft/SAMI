@@ -16,6 +16,7 @@ import EpisodeList from "./EpisodeList";
 import Notification from "./Notification";
 import VideoList from "./VideoList";
 import SeriesAndSeasonSelector from "./SeriesAndSeasonSelector"
+import VideoExportDrawer from "./VideoExportDrawer";
 import { buildCookieValue } from "../utils/cookieValue";
 import PaginationPage from "./PaginationPage";
 
@@ -793,6 +794,32 @@ const VideoSeePage = () => {
                       </button>
 
                     </div>
+                  </div>
+                </div>
+              </section>
+            )}
+
+            {user?.GradeID === 1 && (
+              <section className="container mx-auto overflow-visible rounded-2xl border border-violet-400/20 bg-white/80 shadow-xl shadow-slate-950/5 backdrop-blur dark:bg-slate-950/70 dark:shadow-violet-950/20">
+                <div className="rounded-t-2xl border-b border-violet-400/20 bg-gradient-to-r from-violet-500/20 via-sky-500/10 to-transparent px-6 py-5">
+                  <p className="text-sm font-bold uppercase text-violet-600 dark:text-violet-300">
+                    Super administration
+                  </p>
+                  <h2 className="mt-1 text-2xl font-black text-slate-950 dark:text-white">
+                    Export vers le serveur principal
+                  </h2>
+                  <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-slate-600 dark:text-slate-300">
+                    Transfère cette vidéo et ses fichiers depuis le clone, adapte les références de la base principale et contrôle la réception.
+                  </p>
+                </div>
+                <div className="relative p-6">
+                  <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_12%_20%,rgba(139,92,246,0.10),transparent_26%),radial-gradient(circle_at_88%_0%,rgba(14,165,233,0.08),transparent_22%)]" />
+                  <div className="relative">
+                    <VideoExportDrawer
+                      video={video}
+                      seriesTitle={series?.Titre || null}
+                      seasonNumber={currentSeason?.Numero ?? null}
+                    />
                   </div>
                 </div>
               </section>

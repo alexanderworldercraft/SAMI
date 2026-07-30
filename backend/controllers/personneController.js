@@ -4,7 +4,7 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import { ensureAdmin } from "../services/authz.js";
-import { MULTIPART_LIMITS } from "../constants.js";
+import { ETAT, MULTIPART_LIMITS } from "../constants.js";
 import { isMultipartFileTooLargeError, sendMultipartFileTooLarge } from "../utils/multipartErrors.js";
 
 // Util
@@ -15,6 +15,25 @@ const peopleRootAbs = path.join(BACKEND_ROOT, "uploads", "people");
 const peopleTmpAbs = path.join(BACKEND_ROOT, "uploads", "tmp", "people");
 if (!fs.existsSync(peopleRootAbs)) fs.mkdirSync(peopleRootAbs, { recursive: true });
 if (!fs.existsSync(peopleTmpAbs)) fs.mkdirSync(peopleTmpAbs, { recursive: true });
+
+const ensureVideoIsNotTransferBlocked = async (videoId, reply) => {
+  const video = await prisma.video.findUnique({
+    where: { VideoID: Number(videoId) },
+    select: { EtatID: true },
+  });
+  if (!video) {
+    reply.code(404).send({ error: "Vidéo introuvable." });
+    return false;
+  }
+  if (video.EtatID === ETAT.BLOCKED) {
+    reply.code(409).send({
+      error: "Cette vidéo est verrouillée pendant son transfert.",
+      code: "VIDEO_TRANSFER_IN_PROGRESS",
+    });
+    return false;
+  }
+  return true;
+};
 
 /**
  * POST /api/people  (multipart)
@@ -217,6 +236,8 @@ export const linkPersonne = async (request, reply) => {
     const PersonneID = parseInt(id, 10);
 
     if (type === "video") {
+      if (!(await ensureVideoIsNotTransferBlocked(contenuId, reply))) return;
+
       // upsert: s'il existe, maj des flags, sinon création
       const existing = await prisma.videoPersonne.findUnique({
         where: { VideoID_PersonneID: { VideoID: contenuId, PersonneID } }
@@ -285,6 +306,8 @@ export const unlinkPersonne = async (request, reply) => {
     const cibleId = Number(contenuId);
 
     if (type === "video") {
+      if (!(await ensureVideoIsNotTransferBlocked(cibleId, reply))) return;
+
       const link = await prisma.videoPersonne.findFirst({
         where: { PersonneID, VideoID: cibleId },
       });
@@ -346,7 +369,10 @@ export const unlinkPersonne = async (request, reply) => {
 export const getPeopleForVideo = async (request, reply) => {
   const { id } = request.params;
   const items = await prisma.videoPersonne.findMany({
-    where: { VideoID: parseInt(id, 10) },
+    where: {
+      VideoID: parseInt(id, 10),
+      Video: { EtatID: ETAT.ACTIVE },
+    },
     include: { Personne: true },
     orderBy: { VideoPersonneID: "asc" }
   });
@@ -383,7 +409,10 @@ export const getPersonDetails = async (request, reply) => {
 
     // 2) Liens vidéos (acteur / réalisateur)
     const vlinks = await prisma.videoPersonne.findMany({
-      where: { PersonneID },
+      where: {
+        PersonneID,
+        Video: { EtatID: ETAT.ACTIVE },
+      },
       include: {
         Video: {
           select: {
@@ -457,7 +486,10 @@ export const getPersonDetails = async (request, reply) => {
     for (const sid of seriesIds) {
       // ⚠️ Pas d'EpisodeNumero dans ton schéma → on trie par n° de saison puis par VideoID
       const first = await prisma.video.findFirst({
-        where: { Saison: { SeriesID: sid } },
+        where: {
+          EtatID: ETAT.ACTIVE,
+          Saison: { SeriesID: sid },
+        },
         orderBy: [
           { Saison: { Numero: "asc" } }, // n° de saison le plus petit
           { VideoID: "asc" },            // puis première vidéo trouvée

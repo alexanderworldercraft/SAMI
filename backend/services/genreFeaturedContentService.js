@@ -1,4 +1,5 @@
 import { prisma } from "./db.js";
+import { ETAT } from "../constants.js";
 
 const contentKeyForVideo = (id) => `video:${id}`;
 const contentKeyForSeries = (id) => `series:${id}`;
@@ -49,7 +50,12 @@ const buildCandidatesByGenre = async () => {
 
   const [videoLinks, seriesLinks] = await Promise.all([
     prisma.videoGenre.findMany({
-      where: { Video: { SaisonID: null } },
+      where: {
+        Video: {
+          SaisonID: null,
+          EtatID: ETAT.ACTIVE,
+        },
+      },
       select: { GenreID: true, VideoID: true },
     }),
     prisma.seriesGenre.findMany({
@@ -174,7 +180,18 @@ export const getGenreFeaturedContent = async (genreIds = []) => {
   const sanitizedIds = genreIds.map(Number).filter(Number.isInteger);
 
   const rows = await prisma.genreFeaturedContent.findMany({
-    where: sanitizedIds.length > 0 ? { GenreID: { in: sanitizedIds } } : undefined,
+    where: {
+      ...(sanitizedIds.length > 0
+        ? { GenreID: { in: sanitizedIds } }
+        : {}),
+      OR: [
+        {
+          VideoID: { not: null },
+          Video: { EtatID: ETAT.ACTIVE },
+        },
+        { SeriesID: { not: null } },
+      ],
+    },
     include: {
       Genre: true,
       Video: {
@@ -185,7 +202,11 @@ export const getGenreFeaturedContent = async (genreIds = []) => {
           SeriesGenres: { include: { Genre: true } },
           Saisons: {
             include: {
-              Episodes: { take: 1, orderBy: { Titre: "asc" } },
+              Episodes: {
+                where: { EtatID: ETAT.ACTIVE },
+                take: 1,
+                orderBy: { Titre: "asc" },
+              },
             },
             orderBy: { Numero: "asc" },
           },

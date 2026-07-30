@@ -6,13 +6,14 @@ import fastifySwagger from "@fastify/swagger";
 import fastifySwaggerUI from "@fastify/swagger-ui";
 import { Server as SocketIOServer } from "socket.io";
 import { fileURLToPath } from "url";
+import fs from "fs";
 import path from "path";
 
 import adminBackupRoutes from "../routes/adminBackupRoutes.js";
 import adminMessageRoutes from "../routes/adminMessageRoutes.js";
 import appSettingRoutes from "../routes/appSettingRoutes.js";
 import genreRoutes from "../routes/genreRoutes.js";
-import importRoutes from "../routes/importRoutes.js";
+import internalVideoTransferRoutes from "../routes/internalVideoTransferRoutes.js";
 import logRoutes from "../routes/logRoutes.js";
 import musicRoutes from "../routes/musicRoutes.js";
 import personneRoutes from "../routes/personneRoutes.js";
@@ -20,6 +21,7 @@ import sagaRoutes from "../routes/sagaRoutes.js";
 import seriesRoutes from "../routes/seriesRoutes.js";
 import universeRoutes from "../routes/universeRoutes.js";
 import userRoutes from "../routes/userRoutes.js";
+import videoExportRoutes from "../routes/videoExportRoutes.js";
 import videoRoutes from "../routes/videoRoutes.js";
 import { globalRateLimit } from "../middlewares/rateLimitMiddleware.js";
 import {
@@ -27,6 +29,7 @@ import {
   securityHeadersMiddleware,
 } from "../middlewares/securityMiddleware.js";
 import { setStaticFileHeaders } from "../utils/staticHeaders.js";
+import { VIDEO_TRANSFER_BLOCK_MARKER } from "../services/videoTransferConfig.js";
 import { parsePublicOrigins } from "./serverConfig.js";
 
 const backendRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -36,9 +39,10 @@ const uploadsRoot = path.join(backendRoot, "uploads");
 const ROUTES = [
   [userRoutes, "/api/users"],
   [videoRoutes, "/api/videos"],
+  [videoExportRoutes, "/api/video-exports"],
+  [internalVideoTransferRoutes, "/api/internal/video-transfers"],
   [genreRoutes, "/api/genres"],
   [seriesRoutes, "/api/series"],
-  [importRoutes, "/api/import"],
   [personneRoutes, "/api/people"],
   [logRoutes, "/api/logs"],
   [adminMessageRoutes, "/api/admin-message"],
@@ -86,13 +90,79 @@ function registerDocumentation(server, publicHost) {
   });
 }
 
-function registerStaticFiles(server) {
+function registerStaticFiles(server, uploadsRootPath = uploadsRoot) {
   server.all("/uploads/BDD", async (_request, reply) =>
     reply.status(404).send({ error: "Not found" })
   );
   server.all("/uploads/BDD/*", async (_request, reply) =>
     reply.status(404).send({ error: "Not found" })
   );
+  server.all("/uploads/video/.transfers", async (_request, reply) =>
+    reply.status(404).send({ error: "Not found" })
+  );
+  server.all("/uploads/video/.transfers/*", async (_request, reply) =>
+    reply.status(404).send({ error: "Not found" })
+  );
+  server.all("/uploads/video/.blocked", async (_request, reply) =>
+    reply.status(404).send({ error: "Not found" })
+  );
+  server.all("/uploads/video/.blocked/*", async (_request, reply) =>
+    reply.status(404).send({ error: "Not found" })
+  );
+  server.addHook("onRequest", async (request, reply) => {
+    const rawPath = String(request.raw.url || "").split("?", 1)[0];
+    let decodedPath = rawPath;
+    try {
+      decodedPath = decodeURIComponent(rawPath);
+    } catch {
+      return reply.status(404).send({ error: "Not found" });
+    }
+    if (/%(?:2f|5c|25)/i.test(rawPath)) {
+      return reply.status(404).send({ error: "Not found" });
+    }
+
+    const segments = decodedPath.split("/");
+    if (
+      decodedPath.includes("\\")
+      || decodedPath.includes("%")
+      || /[\u0000-\u001f\u007f]/.test(decodedPath)
+      || segments.some((segment) => segment === "." || segment === "..")
+      || path.posix.normalize(decodedPath) !== decodedPath
+    ) {
+      return reply.status(404).send({ error: "Not found" });
+    }
+    if (!decodedPath.startsWith("/uploads/")) return;
+    if (!decodedPath.startsWith("/uploads/video/")) return;
+    if (
+      decodedPath === "/uploads/video/.transfers"
+      || decodedPath.startsWith("/uploads/video/.transfers/")
+      || decodedPath === "/uploads/video/.blocked"
+      || decodedPath.startsWith("/uploads/video/.blocked/")
+    ) {
+      return reply.status(404).send({ error: "Not found" });
+    }
+
+    const match = decodedPath.match(
+      /^\/uploads\/video\/([1-9][0-9]*)(?:\/|$)/
+    );
+    if (!match) return;
+
+    const markerPath = path.join(
+      uploadsRootPath,
+      "video",
+      match[1],
+      VIDEO_TRANSFER_BLOCK_MARKER
+    );
+    const reservationPath = path.join(
+      uploadsRootPath,
+      "video",
+      ".blocked",
+      match[1]
+    );
+    if (fs.existsSync(reservationPath) || fs.existsSync(markerPath)) {
+      return reply.status(404).send({ error: "Not found" });
+    }
+  });
 
   server.register(fastifyStatic, {
     root: frontendBuildRoot,
@@ -102,12 +172,15 @@ function registerStaticFiles(server) {
   });
 
   server.register(fastifyStatic, {
-    root: uploadsRoot,
+    root: uploadsRootPath,
     prefix: "/uploads/",
     setHeaders: setStaticFileHeaders,
   });
 
-  server.setNotFoundHandler((_request, reply) => {
+  server.setNotFoundHandler((request, reply) => {
+    if (request.raw.url?.startsWith("/api/")) {
+      return reply.status(404).send({ error: "Route API introuvable." });
+    }
     return reply.sendFile("index.html", frontendBuildRoot);
   });
 }
@@ -117,6 +190,7 @@ export function createServer({
   trustProxy = false,
   publicUrl = process.env.PUBLIC_URL,
   publicHost = process.env.PUBLIC_HOST,
+  uploadsRootPath = uploadsRoot,
 } = {}) {
   const server = Fastify({
     ...(https ? { https } : {}),
@@ -158,7 +232,7 @@ export function createServer({
   for (const [routes, prefix] of ROUTES) {
     server.register(routes, { prefix });
   }
-  registerStaticFiles(server);
+  registerStaticFiles(server, uploadsRootPath);
 
   return server;
 }

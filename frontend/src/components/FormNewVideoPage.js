@@ -8,7 +8,6 @@ import SagaContentManager from "./SagaContentManager";
 import UniverseManager from "./UniverseManager";
 import UniverseSagaManager from "./UniverseSagaManager";
 import AddGenre from "./AddGenre";
-import ImportDrawer from "./ImportDrawer";
 import PeopleQuickAdd from "./PeopleQuickAdd";
 import { io } from "socket.io-client";
 
@@ -272,8 +271,6 @@ const FormNewVideoPage = () => {
         </div>
         </div>
       </div>
-
-      <ImportDrawer />
     </main>
   );
 };
