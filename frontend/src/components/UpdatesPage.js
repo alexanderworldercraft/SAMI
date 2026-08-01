@@ -2,6 +2,66 @@ import React, { useEffect, useState } from "react";
 
 const updates = [
   {
+    version: "7.9.0",
+    title: "Encodage video distribue experimental",
+    date: "31 juillet 2026",
+    sections: [
+      {
+        title: "Ajout multi-server reserve au super administrateur",
+        items: [
+          "La page Nouvelle video propose un second bouton Ajouter la vidéo via le multi server lorsque la fonctionnalite experimentale est active sur le serveur principal.",
+          "Le bouton, son explication et le suivi associe sont totalement absents pour les utilisateurs qui ne sont pas super administrateurs.",
+          "Une infobulle accessible explique que les resolutions sont reparties entre le primary et les clones disponibles.",
+          "Le bouton est desactive avec un retour explicite lorsqu'aucun clone compatible n'a donne de signe de vie.",
+          "L'import classique et son pipeline historique restent disponibles sans modification.",
+        ],
+      },
+      {
+        title: "Registre extensible et repartition dynamique",
+        items: [
+          "La page Fonctionnalites experimentales permet d'activer ou desactiver les nouveaux jobs et de gerer un registre extensible de clones sensibles a la casse.",
+          "Chaque clone publie sa plateforme, sa version FFmpeg, ses codecs, son etat, son unique slot et sa progression au primary toutes les quinze secondes.",
+          "Les clones les plus performants recoivent d'abord les resolutions les plus lourdes, puis le primary, moins puissant, prend en dernier la plus petite tache encore disponible.",
+          "Le premier worker compatible qui termine reprend la resolution suivante sans attendre la fin des autres workers.",
+          "Le primary reste normalement limite a 360p et ne depasse ce plafond qu'apres cinq minutes consecutives sans heartbeat ni progression d'un clone compatible.",
+          "Un clone qui arrive pendant un traitement peut prendre la prochaine tache libre sans interrompre une resolution deja commencee.",
+        ],
+      },
+      {
+        title: "Encodage, assemblage et suivi persistant",
+        items: [
+          "Chaque resolution est encodee en HLS de quatre secondes avec libx264 et AAC logiciel, puis renvoyee et controlee sur le primary.",
+          "Avec plusieurs pistes audio, les variantes video restent sans audio et les renditions AAC sont produites sur le primary avant la creation du master HLS.",
+          "Les sous-titres, l'affiche, le master, les apercus et la publication finale restent sous la responsabilite du primary.",
+          "TaskHistory affiche la progression globale, le worker attribue, la phase, les tentatives, les reprises et les erreurs de chaque resolution.",
+          "Les jobs, taches, leases, tentatives et manifestes sont persistants afin de reprendre apres un redemarrage sans publier une video partielle.",
+          "Des controles atomiques empechent une ancienne tentative ou un lease expire de remplacer un artefact plus recent.",
+        ],
+      },
+      {
+        title: "Transferts signes, cache et nettoyage",
+        items: [
+          "Les clones initient uniquement des connexions sortantes vers l'API publique du primary, ce qui permet leur utilisation derriere un LAN, un VPN ou une NAT.",
+          "Les requetes utilisent le secret de transfert existant avec un domaine HMAC distinct SAMI-DISTRIBUTED-ENCODING-V1, des nonces persistants et une liste blanche exacte des instances.",
+          "La source est telechargee avec reprise Range, taille et SHA-256, puis conservee dans un cache prive LRU plafonne a 50 Gio et epingle pendant le travail.",
+          "Le cache est purge apres une reussite ou une annulation et conserve au maximum vingt-quatre heures les sources utiles a une reprise apres echec.",
+          "Les artefacts sont recus dans un staging non public, verifies fichier par fichier puis promus avant la publication atomique de la video.",
+        ],
+      },
+      {
+        title: "Deploiement, securite et verification",
+        items: [
+          "Une migration ajoute le registre des workers, les jobs, taches, tentatives, artefacts, nonces persistants, le reglage desactive par defaut et les actions de journalisation.",
+          "Le primary doit etre deploye et migre avant les clones ; les identifiants SAMI_INSTANCE_ID exacts sont ensuite enregistres avant d'activer l'experience.",
+          "La desactivation bloque seulement les nouveaux imports : les jobs deja lances terminent leur encodage et leur publication.",
+          "Les routes internes refusent les workers desactives, les signatures invalides, les rejeux, les chemins dangereux et les leases perimes.",
+          "La maintenance recupere les leases expires, les artefacts valides, les publications interrompues et les ingestions abandonnees, puis reconcilie les journaux manquants.",
+          "Le schema Prisma, le protocole HMAC, le scheduler, le pipeline FFmpeg, les runtimes, les APIs, l'interface et le build de production disposent de validations dediees.",
+        ],
+      },
+    ],
+  },
+  {
     version: "7.8.0",
     title: "Export video securise entre instances",
     date: "30 juillet 2026",

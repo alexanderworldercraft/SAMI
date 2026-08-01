@@ -1,0 +1,83 @@
+import { describe, expect, it } from "vitest";
+import {
+  serializeEncodingJob,
+  serializeEncodingWorker,
+} from "../services/distributedEncoding/serializer.js";
+
+describe("sérialisation de l'encodage distribué", () => {
+  it("calcule la disponibilité et sérialise les BigInt sans perte", () => {
+    const now = new Date("2026-07-31T12:00:00.000Z");
+    const serialized = serializeEncodingWorker({
+      VideoEncodingWorkerID: "clone-01",
+      Role: "CLONE",
+      Enabled: true,
+      Draining: false,
+      ProtocolVersion: 1,
+      PipelineVersion: "sami-hls-libx264-aac-v1",
+      MaxNominalHeight: 2160,
+      SupportsH264: true,
+      SupportsAac: true,
+      MaxSlots: 1,
+      PerformanceScore: 2.5,
+      LastHeartbeatAt: new Date(now.getTime() - 44_999),
+      CreatedAt: now,
+      UpdatedAt: now,
+      _count: { AssignedTasks: 1 },
+    }, { now });
+
+    expect(serialized.status).toBe("online");
+    expect(serialized.activeLeaseCount).toBe(1);
+    expect(serialized.lastHeartbeatAt).toBe("2026-07-31T11:59:15.001Z");
+  });
+
+  it("expose les préférences, la fenêtre sans clone et les tailles en chaînes", () => {
+    const date = new Date("2026-07-31T12:00:00.000Z");
+    const serialized = serializeEncodingJob({
+      VideoEncodingJobID: "job-1",
+      Status: "RUNNING",
+      Progress: 25,
+      SourceOriginalName: "source.mkv",
+      SourceSize: 9_007_199_254_740_993n,
+      SourceSha256: "a".repeat(64),
+      RequestSnapshot: {},
+      PipelineVersion: "sami-hls-libx264-aac-v1",
+      EncodingSpecHash: "b".repeat(64),
+      CancelRequested: false,
+      NoCloneSinceAt: date,
+      StartedAt: new Date("2026-07-31T11:58:00.000Z"),
+      CreatedAt: date,
+      UpdatedAt: date,
+      Tasks: [{
+        VideoEncodingTaskID: "task-1",
+        VideoEncodingJobID: "job-1",
+        TaskKey: "video:1080p",
+        Kind: "VIDEO_PROFILE",
+        NominalHeight: 1080,
+        Priority: 0,
+        Weight: 1080n,
+        Required: true,
+        Spec: {},
+        SpecHash: "c".repeat(64),
+        Status: "PENDING",
+        PreferredWorkerID: "clone-01",
+        PreferenceExpiresAt: date,
+        LeaseGeneration: 0,
+        AttemptCount: 0,
+        MaxAttempts: 3,
+        Progress: 0,
+        CreatedAt: date,
+        UpdatedAt: date,
+      }],
+    }, { now: date });
+
+    expect(serialized.sourceSize).toBe("9007199254740993");
+    expect(serialized.title).toBe("source.mkv");
+    expect(serialized.noCloneSinceAt).toBe(date.toISOString());
+    expect(serialized.elapsedMs).toBe(120_000);
+    expect(serialized.tasks[0]).toMatchObject({
+      weight: "1080",
+      preferredWorkerId: "clone-01",
+      preferenceExpiresAt: date.toISOString(),
+    });
+  });
+});

@@ -29,6 +29,7 @@ import {
 } from "../services/video/videoTranscodingService.js";
 import { generateVideoPreviewFramesFromMaster } from "../services/video/videoPreviewService.js";
 import { generateVideoPreviewLiveFromMaster } from "../services/video/videoPreviewLiveService.js";
+import { createVideoProcessingTimer } from "../services/video/videoProcessingTimer.js";
 import {
   isMultipartFileTooLargeError,
   sendMultipartFileTooLarge,
@@ -64,7 +65,16 @@ const getSaisonInfo = async (saisonId) => {
   return saison;
 };
 
-const emitConversionProgress = ({ io, processingId, video, profile, progress, completed, error }) => {
+const emitConversionProgress = ({
+  io,
+  processingId,
+  processingTimer,
+  video,
+  profile,
+  progress,
+  completed,
+  error,
+}) => {
   io.emit("progress", {
     stage: "conversion",
     resolution: profile.label,
@@ -74,6 +84,7 @@ const emitConversionProgress = ({ io, processingId, video, profile, progress, co
         ? "conversion-completed"
         : "conversion",
     processingId,
+    ...processingTimer.snapshot(),
     video,
     progress,
     ...(error ? { error: error.message } : {}),
@@ -90,12 +101,14 @@ export const addVideo = async (request, reply, fastify) => {
 
     const multiAudioEnabled = await isMultiAudioActive();
     const processingId = `addvideo-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const processingTimer = createVideoProcessingTimer();
     workspace = createVideoUploadWorkspace();
 
     const { data, videoTempPath } = await readVideoMultipart({
       request,
       io: fastify.io,
       processingId,
+      processingTimer,
       workspace,
     });
 
@@ -181,6 +194,7 @@ export const addVideo = async (request, reply, fastify) => {
       stage: "analysis",
       status: "metadata",
       processingId,
+      ...processingTimer.snapshot(),
       video: processingVideoInfo,
       progress: 100,
     });
@@ -198,6 +212,7 @@ export const addVideo = async (request, reply, fastify) => {
         emitConversionProgress({
           io: fastify.io,
           processingId,
+          processingTimer,
           video: processingVideoInfo,
           profile,
           progress,
@@ -259,6 +274,7 @@ export const addVideo = async (request, reply, fastify) => {
       stage: "completed",
       status: "completed",
       processingId,
+      ...processingTimer.snapshot({ completed: true }),
       video: {
         ...processingVideoInfo,
         saisonNumero: saisonInfo?.Numero ?? processingVideoInfo.saisonNumero,

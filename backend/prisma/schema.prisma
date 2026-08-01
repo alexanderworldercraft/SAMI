@@ -231,6 +231,162 @@ model VideoTransferStep {
   @@index([VideoTransferID, Status], map: "idx_video_transfer_step_status")
 }
 
+model VideoEncodingWorker {
+  VideoEncodingWorkerID String                      @id @db.VarChar(100)
+  DisplayName           String?                     @db.VarChar(191)
+  Role                  String                      @db.VarChar(16)
+  Enabled               Boolean                     @default(false)
+  Draining              Boolean                     @default(false)
+  ProtocolVersion       Int                         @default(1)
+  PipelineVersion       String                      @db.VarChar(64)
+  Platform              String?                     @db.VarChar(64)
+  Architecture          String?                     @db.VarChar(64)
+  FfmpegVersion         String?                     @db.VarChar(191)
+  MaxNominalHeight      Int                         @default(0)
+  SupportsH264          Boolean                     @default(true)
+  SupportsAac           Boolean                     @default(true)
+  MaxSlots              Int                         @default(1)
+  PerformanceScore      Float                       @default(1)
+  Capabilities          Json?
+  BootID                String?                     @db.VarChar(100)
+  LastHeartbeatAt       DateTime?
+  LastError             String?                     @db.Text
+  CreatedAt             DateTime                    @default(now())
+  UpdatedAt             DateTime                    @default(now()) @updatedAt
+  AssignedTasks         VideoEncodingTask[]         @relation("EncodingTaskAssignedWorker")
+  PreferredTasks        VideoEncodingTask[]         @relation("EncodingTaskPreferredWorker")
+  Attempts              VideoEncodingTaskAttempt[]
+  RequestNonces         VideoEncodingRequestNonce[]
+
+  @@index([Role, Enabled, LastHeartbeatAt], map: "idx_encoding_worker_availability")
+  @@index([PipelineVersion, MaxNominalHeight], map: "idx_encoding_worker_capability")
+}
+
+model VideoEncodingJob {
+  VideoEncodingJobID String              @id @db.VarChar(36)
+  VideoID            Int?
+  IdempotencyKey     String?             @db.VarChar(191)
+  InitiatedByUserID  Int?
+  Status             String              @db.VarChar(32)
+  CurrentStep        String?             @db.VarChar(64)
+  Progress           Int                 @default(0)
+  SourceRelativePath String              @db.VarChar(512)
+  SourceOriginalName String              @db.VarChar(255)
+  SourceSize         BigInt
+  SourceSha256       String              @db.Char(64)
+  SourceMetadata     Json?
+  RequestSnapshot    Json
+  PipelineVersion    String              @db.VarChar(64)
+  EncodingSpecHash   String              @db.Char(64)
+  CancelRequested    Boolean             @default(false)
+  ErrorMessage       String?             @db.Text
+  Warnings           Json?
+  NoCloneSinceAt     DateTime?
+  StartedAt          DateTime?
+  CompletedAt        DateTime?
+  CreatedAt          DateTime            @default(now())
+  UpdatedAt          DateTime            @default(now()) @updatedAt
+  Tasks              VideoEncodingTask[]
+
+  @@unique([InitiatedByUserID, IdempotencyKey], name: "InitiatedByUserID_IdempotencyKey", map: "uniq_encoding_job_idempotency")
+  @@index([Status, UpdatedAt], map: "idx_encoding_job_status_updated")
+  @@index([VideoID], map: "idx_encoding_job_video")
+}
+
+model VideoEncodingTask {
+  VideoEncodingTaskID  String                     @id @db.VarChar(36)
+  VideoEncodingJobID   String                     @db.VarChar(36)
+  TaskKey              String                     @db.VarChar(100)
+  Kind                 String                     @db.VarChar(32)
+  ProfileLabel         String?                    @db.VarChar(32)
+  NominalHeight        Int?
+  Priority             Int                        @default(0)
+  Weight               BigInt                     @default(0)
+  Required             Boolean                    @default(true)
+  Spec                 Json
+  SpecHash             String                     @db.Char(64)
+  Status               String                     @db.VarChar(24)
+  Phase                String?                    @db.VarChar(24)
+  AssignedWorkerID     String?                    @db.VarChar(100)
+  PreferredWorkerID    String?                    @db.VarChar(100)
+  PreferenceExpiresAt  DateTime?
+  LeaseTokenHash       String?                    @db.Char(64)
+  LeaseGeneration      Int                        @default(0)
+  LeaseExpiresAt       DateTime?
+  AttemptCount         Int                        @default(0)
+  MaxAttempts          Int                        @default(4)
+  NextEligibleAt       DateTime?
+  Progress             Int                        @default(0)
+  ArtifactManifest     Json?
+  ArtifactManifestHash String?                    @db.Char(64)
+  ErrorMessage         String?                    @db.Text
+  StartedAt            DateTime?
+  CompletedAt          DateTime?
+  CreatedAt            DateTime                   @default(now())
+  UpdatedAt            DateTime                   @default(now()) @updatedAt
+  Job                  VideoEncodingJob           @relation(fields: [VideoEncodingJobID], references: [VideoEncodingJobID], onDelete: Cascade)
+  AssignedWorker       VideoEncodingWorker?       @relation("EncodingTaskAssignedWorker", fields: [AssignedWorkerID], references: [VideoEncodingWorkerID], onDelete: SetNull)
+  PreferredWorker      VideoEncodingWorker?       @relation("EncodingTaskPreferredWorker", fields: [PreferredWorkerID], references: [VideoEncodingWorkerID], onDelete: SetNull)
+  Attempts             VideoEncodingTaskAttempt[]
+
+  @@unique([VideoEncodingJobID, TaskKey], name: "VideoEncodingJobID_TaskKey", map: "uniq_encoding_task_key")
+  @@index([Status, NextEligibleAt, Priority], map: "idx_encoding_task_queue")
+  @@index([LeaseExpiresAt], map: "idx_encoding_task_lease_expiry")
+  @@index([AssignedWorkerID, Status], map: "idx_encoding_task_worker_status")
+  @@index([PreferredWorkerID, PreferenceExpiresAt], map: "idx_encoding_task_preference")
+}
+
+model VideoEncodingTaskAttempt {
+  VideoEncodingTaskAttemptID String                      @id @db.VarChar(36)
+  VideoEncodingTaskID        String                      @db.VarChar(36)
+  VideoEncodingWorkerID      String                      @db.VarChar(100)
+  AttemptNumber              Int
+  LeaseGeneration            Int
+  Status                     String                      @db.VarChar(24)
+  Progress                   Int                         @default(0)
+  ManifestHash               String?                     @db.Char(64)
+  ErrorMessage               String?                     @db.Text
+  StartedAt                  DateTime                    @default(now())
+  LastRenewedAt              DateTime?
+  CompletedAt                DateTime?
+  CreatedAt                  DateTime                    @default(now())
+  UpdatedAt                  DateTime                    @default(now()) @updatedAt
+  Task                       VideoEncodingTask           @relation(fields: [VideoEncodingTaskID], references: [VideoEncodingTaskID], onDelete: Cascade)
+  Worker                     VideoEncodingWorker         @relation(fields: [VideoEncodingWorkerID], references: [VideoEncodingWorkerID])
+  Files                      VideoEncodingArtifactFile[]
+
+  @@unique([VideoEncodingTaskID, AttemptNumber], name: "VideoEncodingTaskID_AttemptNumber", map: "uniq_encoding_task_attempt")
+  @@index([VideoEncodingWorkerID, Status], map: "idx_encoding_attempt_worker_status")
+}
+
+model VideoEncodingArtifactFile {
+  VideoEncodingArtifactFileID String                   @id @db.VarChar(36)
+  VideoEncodingTaskAttemptID  String                   @db.VarChar(36)
+  RelativePath                String                   @db.VarChar(512)
+  Size                        BigInt
+  Sha256                      String                   @db.Char(64)
+  Status                      String                   @db.VarChar(24)
+  BytesReceived               BigInt                   @default(0)
+  CreatedAt                   DateTime                 @default(now())
+  UpdatedAt                   DateTime                 @default(now()) @updatedAt
+  Attempt                     VideoEncodingTaskAttempt @relation(fields: [VideoEncodingTaskAttemptID], references: [VideoEncodingTaskAttemptID], onDelete: Cascade)
+
+  @@unique([VideoEncodingTaskAttemptID, RelativePath], name: "VideoEncodingTaskAttemptID_RelativePath", map: "uniq_encoding_artifact_path")
+  @@index([VideoEncodingTaskAttemptID, Status], map: "idx_encoding_artifact_status")
+}
+
+model VideoEncodingRequestNonce {
+  VideoEncodingRequestNonceID BigInt              @id @default(autoincrement())
+  VideoEncodingWorkerID       String              @db.VarChar(100)
+  Nonce                       String              @db.VarChar(128)
+  ExpiresAt                   DateTime
+  CreatedAt                   DateTime            @default(now())
+  Worker                      VideoEncodingWorker @relation(fields: [VideoEncodingWorkerID], references: [VideoEncodingWorkerID], onDelete: Cascade)
+
+  @@unique([VideoEncodingWorkerID, Nonce], name: "VideoEncodingWorkerID_Nonce", map: "uniq_encoding_request_nonce")
+  @@index([ExpiresAt], map: "idx_encoding_request_nonce_expiry")
+}
+
 model Saga {
   SagaID        Int            @id @default(autoincrement())
   Titre         String         @db.VarChar(100)

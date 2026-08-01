@@ -1,9 +1,18 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import GenreList from "./GenreList";
 import ImageUploader from "./ImageUploader";
 import SeriesAndSeasonSelector from "./SeriesAndSeasonSelector";
 import Notification from "./Notification";
+import AccessibleTooltip from "./AccessibleTooltip";
 import api from '../services/api';
+import {
+    countAvailableEncodingClones,
+    DISTRIBUTED_ENCODING_TOOLTIP,
+    isPrimaryVideoEncodingConfig,
+    isVideoEncodingEnabled,
+    NO_ENCODING_WORKER_MESSAGE,
+    unwrapVideoEncodingJob,
+} from "../utils/videoEncoding";
 
 // import NotificationTester from './NotificationTester';
 
@@ -20,7 +29,12 @@ const videoEncodingSpecs = [
     { resolution: "4K", minWidth: "3840", bitrate: "25000" },
 ];
 
-const NewVideoForm = () => {
+const NewVideoForm = ({
+    user: providedUser,
+    videoEncodingConfig = null,
+    videoEncodingWorkers = [],
+    onDistributedJobCreated,
+}) => {
     const [title, setTitle] = useState("");
     const [summary, setSummary] = useState("");
     const [videoFile, setVideoFile] = useState(null);
@@ -30,21 +44,10 @@ const NewVideoForm = () => {
     const [selectedSeries, setSelectedSeries] = useState(null);
     const [selectedSeason, setSelectedSeason] = useState(null);
     const [notification, setNotification] = useState(null);
-    const [user, setUser] = useState(null);
+    const user = providedUser || null;
     const [showVideoSpecs, setShowVideoSpecs] = useState(false);
-
-    useEffect(() => {
-        const fetchUser = async () => {
-            try {
-                const response = await api.get('/users/me');
-                //console.log('User profile data:', response.data); // Log des données utilisateur
-                setUser(response.data);
-            } catch (error) {
-                console.error("Erreur lors de la récupération de l'utilisateur :", error);
-            }
-        };
-        fetchUser();
-    }, []);
+    const [distributedSubmitting, setDistributedSubmitting] = useState(false);
+    const formRef = useRef(null);
 
     const showNotification = (
         message,
@@ -86,6 +89,31 @@ const NewVideoForm = () => {
         };
     }, []);
 
+    const buildVideoFormData = async () => {
+        const formData = new FormData();
+        const defaultImagePath = "./imageDefault.png";
+        const fetchDefaultImage = async () => {
+            const response = await fetch(defaultImagePath);
+            const blob = await response.blob();
+            return new File([blob], "./imageDefault.png", { type: "image/png" });
+        };
+
+        formData.append("utilisateurID", user?.UtilisateurID || "");
+        formData.append("titre", title.trim() || "");
+        formData.append("resumer", summary.trim() || "");
+        formData.append("file", videoFile || "");
+        formData.append("genres", selectedGenres.length ? JSON.stringify(selectedGenres) : "[]");
+        formData.append("SaisonID", selectedSeason ? selectedSeason : "");
+        if (imageFile) {
+            formData.append("image", imageFile);
+        } else {
+            const defaultImage = await fetchDefaultImage();
+            formData.append("image", defaultImage);
+        }
+
+        return formData;
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
 
@@ -97,34 +125,7 @@ const NewVideoForm = () => {
             { autoClose: false }
         );
 
-        const formData = new FormData();
-
-        // Chemin de l'image par défaut (accessible depuis le frontend)
-        const defaultImagePath = "./imageDefault.png";
-
-        // Fonction pour charger une image par défaut
-        const fetchDefaultImage = async () => {
-            const response = await fetch(defaultImagePath);
-            const blob = await response.blob();
-            return new File([blob], "./imageDefault.png", { type: "image/png" });
-        };
-
-        // Champs obligatoires
-        formData.append("utilisateurID", user?.UtilisateurID || "");
-        formData.append("titre", title.trim() || "");
-        formData.append("resumer", summary.trim() || "");
-        formData.append("file", videoFile || "");
-
-        // Champs optionnels
-        formData.append("genres", selectedGenres.length ? JSON.stringify(selectedGenres) : "[]");
-        formData.append("SaisonID", selectedSeason ? selectedSeason : "");
-        // Ajouter l'image par défaut si aucune image n'est sélectionnée
-        if (imageFile) {
-            formData.append("image", imageFile);
-        } else {
-            const defaultImage = await fetchDefaultImage();
-            formData.append("image", defaultImage);
-        }
+        const formData = await buildVideoFormData();
 
         console.log("Données envoyées au backend :");
         formData.forEach((value, key) => {
@@ -147,6 +148,84 @@ const NewVideoForm = () => {
         }
     };
 
+    const activeWorkersFromRegistry = countAvailableEncodingClones(videoEncodingWorkers);
+    const hasWorkerRegistry = Array.isArray(videoEncodingWorkers)
+        && videoEncodingWorkers.length > 0;
+    const configuredActiveWorkers = Number(videoEncodingConfig?.activeCloneCount);
+    const activeCloneCount = hasWorkerRegistry
+        ? activeWorkersFromRegistry
+        : Number.isFinite(configuredActiveWorkers) && configuredActiveWorkers > 0
+            ? configuredActiveWorkers
+            : 0;
+    const isSuperAdmin = user?.GradeID === 1;
+    const showDistributedEncoding = isSuperAdmin
+        && isPrimaryVideoEncodingConfig(videoEncodingConfig)
+        && isVideoEncodingEnabled(videoEncodingConfig);
+    const noActiveClone = activeCloneCount === 0;
+    const distributedUnavailableReason = noActiveClone
+        ? NO_ENCODING_WORKER_MESSAGE
+        : videoEncodingConfig?.canStart === false
+            ? videoEncodingConfig?.reason || "L'encodage multi-server n'est pas disponible."
+            : null;
+
+    const handleDistributedSubmit = async () => {
+        if (!formRef.current?.reportValidity()) return;
+        if (distributedUnavailableReason) {
+            showNotification(distributedUnavailableReason, "warning", "⚠️");
+            return;
+        }
+
+        setDistributedSubmitting(true);
+        showNotification(
+            "Téléversement vers le serveur principal en cours. Le suivi persistant apparaîtra dès la création du job.",
+            "warning",
+            "⏳",
+            { autoClose: false }
+        );
+
+        try {
+            const formData = await buildVideoFormData();
+            const response = await api.post("/video-encoding/jobs", formData, {
+                headers: {},
+                onUploadProgress: ({ loaded, total }) => {
+                    const percent = Number(total) > 0
+                        ? Math.min(100, Math.round((Number(loaded) / Number(total)) * 100))
+                        : null;
+                    showNotification(
+                        percent === null
+                            ? "Téléversement vers le serveur principal en cours."
+                            : `Téléversement vers le serveur principal : ${percent} %`,
+                        "warning",
+                        "⏳",
+                        { autoClose: false }
+                    );
+                },
+            });
+            const job = unwrapVideoEncodingJob(response.data);
+            if (job) onDistributedJobCreated?.(job);
+            showNotification("Encodage multi-server lancé.", "success", "✅");
+        } catch (error) {
+            console.error("Erreur lors du lancement de l'encodage multi-server :", error);
+            const errorCode = error.response?.data?.code;
+            const noWorkerError = [
+                "NO_ENCODING_WORKER_AVAILABLE",
+                "NO_ENCODING_WORKERS_AVAILABLE",
+                "NO_COMPATIBLE_ENCODING_WORKER",
+                "NO_ACTIVE_CLONE",
+                "NO_ACTIVE_ENCODING_CLONE",
+                "NO_ACTIVE_ENCODING_CLONES",
+                "NO_ACTIVE_WORKER",
+            ].includes(errorCode)
+                || Number(error.response?.data?.activeCloneCount) === 0;
+            const message = noWorkerError
+                ? NO_ENCODING_WORKER_MESSAGE
+                : error.response?.data?.error || "Impossible de lancer l'encodage multi-server.";
+            showNotification(message, "error", "⚠️");
+        } finally {
+            setDistributedSubmitting(false);
+        }
+    };
+
     return (
         <section className="relative overflow-visible rounded-2xl border border-sky-500/10 bg-white/70 p-6 shadow-sm dark:bg-slate-950/40 dark:text-neutral-100">
             <div className="pointer-events-none absolute inset-0 rounded-2xl bg-[radial-gradient(circle_at_12%_20%,rgba(14,165,233,0.08),transparent_26%),radial-gradient(circle_at_88%_0%,rgba(139,92,246,0.06),transparent_22%)]" />
@@ -163,7 +242,7 @@ const NewVideoForm = () => {
 
             {/* <NotificationTester/> */}
 
-            <form onSubmit={handleSubmit}>
+            <form ref={formRef} onSubmit={handleSubmit}>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                     <div className='grid gap-4'>
                         {/* Titre de la vidéo */}
@@ -290,6 +369,55 @@ const NewVideoForm = () => {
                 >
                     Ajouter la vidéo
                 </button>
+
+                {showDistributedEncoding && (
+                    <div className="mt-5 rounded-xl border border-violet-400/25 bg-violet-500/10 p-4">
+                        <div className="mb-4">
+                            <h3 className="text-base font-black text-slate-950 dark:text-white">
+                                Encodage multi-server expérimental
+                            </h3>
+                            <p className="mt-1 text-sm leading-6 text-slate-600 dark:text-slate-300">
+                                Le fichier source sera temporairement partagé avec les clones d'encodage
+                                configurés. Chaque résolution terminée sera vérifiée puis regroupée sur
+                                le serveur principal.
+                            </p>
+                        </div>
+
+                        {noActiveClone && (
+                            <p
+                                id="video-encoding-no-worker-feedback"
+                                className="mb-3 rounded-lg border border-amber-400/25 bg-amber-500/10 px-3 py-2 text-sm font-semibold text-amber-800 dark:text-amber-200"
+                            >
+                                {NO_ENCODING_WORKER_MESSAGE}
+                            </p>
+                        )}
+
+                        <AccessibleTooltip
+                            label="Informations sur l'encodage multi-server"
+                            content={DISTRIBUTED_ENCODING_TOOLTIP}
+                        >
+                            {distributedUnavailableReason ? (
+                                <button
+                                    type="button"
+                                    disabled
+                                    className={`${submitClass} cursor-not-allowed opacity-50`}
+                                >
+                                    Ajouter la vidéo via le multi server
+                                </button>
+                            ) : (
+                                <button
+                                    type="button"
+                                    onClick={handleDistributedSubmit}
+                                    disabled={distributedSubmitting}
+                                    aria-busy={distributedSubmitting}
+                                    className={`${submitClass} border-violet-300/50 bg-violet-500/15 hover:border-violet-300/80 hover:bg-violet-500/25 disabled:cursor-not-allowed disabled:opacity-60`}
+                                >
+                                    Ajouter la vidéo via le multi server
+                                </button>
+                            )}
+                        </AccessibleTooltip>
+                    </div>
+                )}
             </form>
             </div>
         </section>

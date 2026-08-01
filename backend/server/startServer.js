@@ -15,6 +15,13 @@ import {
 } from "../services/videoImportTransferService.js";
 import { getInstanceRole } from "../services/videoTransferConfig.js";
 import { reconcileVideoTransferLogs } from "../services/videoTransferLogReconciliation.js";
+import {
+  isDistributedEncodingEnvironmentEnabled,
+} from "../services/distributedEncoding/config.js";
+import { runDistributedEncodingMaintenance } from "../services/distributedEncoding/maintenanceService.js";
+import { reconcileDistributedEncodingLogs } from "../services/distributedEncoding/logReconciliation.js";
+import { startPrimaryDistributedEncodingRuntime } from "../services/distributedEncoding/primaryRuntime.js";
+import { startDistributedEncodingWorkerRuntime } from "../services/distributedEncoding/workerRuntime.js";
 import { createServer } from "./createServer.js";
 import {
   buildBackupCronExpression,
@@ -25,7 +32,9 @@ import {
 
 const backendRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const DATABASE_KEEP_ALIVE_MS = 7 * 60 * 60 * 1000;
+const DISTRIBUTED_ENCODING_MAINTENANCE_MS = 15 * 1000;
 let videoTransferMaintenancePromise = null;
+let distributedEncodingMaintenancePromise = null;
 
 async function runVideoTransferMaintenance({ startup = false } = {}) {
   const role = getInstanceRole();
@@ -98,6 +107,67 @@ async function maintainVideoTransfers(options = {}) {
   }
 }
 
+async function maintainDistributedEncoding(options = {}) {
+  if (
+    !isDistributedEncodingEnvironmentEnabled()
+    || getInstanceRole() !== "primary"
+  ) {
+    return null;
+  }
+  if (distributedEncodingMaintenancePromise) {
+    return distributedEncodingMaintenancePromise;
+  }
+
+  const maintenance = (async () => {
+    const result = await runDistributedEncodingMaintenance(options);
+    if (!options.cleanup) return result;
+    const logs = await reconcileDistributedEncodingLogs();
+    if (logs.created > 0 || logs.failed > 0) {
+      console.info("Réconciliation des Actions d'encodage distribué terminée.", logs);
+    }
+    return { ...result, logs };
+  })();
+  distributedEncodingMaintenancePromise = maintenance;
+  try {
+    return await maintenance;
+  } finally {
+    if (distributedEncodingMaintenancePromise === maintenance) {
+      distributedEncodingMaintenancePromise = null;
+    }
+  }
+}
+
+function registerDistributedEncodingRuntime(server) {
+  let runtime = null;
+
+  server.addHook("onClose", async () => {
+    await runtime?.stop?.();
+    runtime = null;
+  });
+
+  return async function startDistributedEncoding() {
+    if (!isDistributedEncodingEnvironmentEnabled()) return null;
+
+    const role = getInstanceRole();
+    if (role === "primary") {
+      await maintainDistributedEncoding({ cleanup: true });
+      runtime = await startPrimaryDistributedEncodingRuntime();
+    } else if (role === "clone") {
+      runtime = startDistributedEncodingWorkerRuntime();
+      await runtime.ready;
+    } else {
+      throw new Error(
+        "SAMI_INSTANCE_ROLE doit valoir primary ou clone pour l'encodage distribué."
+      );
+    }
+
+    console.info(
+      `Runtime d'encodage distribué démarré pour ${role}.`
+    );
+    return runtime;
+  };
+}
+
 export function loadTlsCredentials() {
   console.info("Lecture des certificats SSL...");
   const credentials = {
@@ -136,11 +206,17 @@ function registerBackgroundJobs(server) {
   };
 
   let keepAliveTimer = null;
+  let distributedEncodingTimer = null;
   let scheduledTasks = [];
 
   server.addHook("onClose", async () => {
     if (keepAliveTimer) clearInterval(keepAliveTimer);
+    if (distributedEncodingTimer) clearInterval(distributedEncodingTimer);
     scheduledTasks.forEach((task) => task.stop());
+    await Promise.allSettled(
+      [videoTransferMaintenancePromise, distributedEncodingMaintenancePromise]
+        .filter(Boolean)
+    );
   });
 
   return function startBackgroundJobs() {
@@ -177,6 +253,25 @@ function registerBackgroundJobs(server) {
         cron.schedule("17 * * * *", () => maintainVideoTransfers())
       );
     }
+    if (
+      isDistributedEncodingEnvironmentEnabled()
+      && getInstanceRole() === "primary"
+    ) {
+      distributedEncodingTimer = setInterval(
+        () => maintainDistributedEncoding().catch((error) => {
+          console.error("[distributed-encoding:maintenance]", error);
+        }),
+        DISTRIBUTED_ENCODING_MAINTENANCE_MS
+      );
+      distributedEncodingTimer.unref?.();
+      scheduledTasks.push(
+        cron.schedule("11 * * * *", () =>
+          maintainDistributedEncoding({ cleanup: true }).catch((error) => {
+            console.error("[distributed-encoding:cleanup]", error);
+          })
+        )
+      );
+    }
   };
 }
 
@@ -200,10 +295,12 @@ export async function startServer({
 
   try {
     const startBackgroundJobs = registerBackgroundJobs(server);
+    const startDistributedEncoding = registerDistributedEncodingRuntime(server);
     console.info(formatServerStartupBanner(startupInfo));
     await pingDatabase();
     await maintainVideoTransfers({ startup: true });
     await server.listen({ port, host });
+    await startDistributedEncoding();
     startBackgroundJobs();
     console.info("Serveur démarré avec succès.");
     return server;

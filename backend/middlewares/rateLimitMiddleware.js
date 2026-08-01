@@ -62,8 +62,16 @@ export const globalRateLimit = createRateLimit({
     || !request.url.startsWith("/api/")
     || (
       request.method === "PUT"
-      && request.url.startsWith("/api/internal/video-transfers/sessions/")
-      && request.url.includes("/files/")
+      && (
+        (
+          request.url.startsWith("/api/internal/video-transfers/sessions/")
+          && request.url.includes("/files/")
+        )
+        || (
+          request.url.startsWith("/api/internal/video-encoding/tasks/")
+          && request.url.includes("/artifacts/")
+        )
+      )
     ),
 });
 

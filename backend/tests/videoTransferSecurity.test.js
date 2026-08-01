@@ -271,6 +271,47 @@ describe("signature HMAC inter-serveurs", () => {
     expect(changedSignature).not.toBe(baseSignature);
   });
 
+  it("isole cryptographiquement le protocole d'encodage distribué", () => {
+    const path = "/api/internal/video-encoding/workers/heartbeat";
+    const body = '{"freeSlots":1}';
+    const signatureDomain = "SAMI-DISTRIBUTED-ENCODING-V1";
+    const headers = buildTransferHeaders({
+      secret: SECRET,
+      signatureDomain,
+      method: "POST",
+      path,
+      body,
+      timestamp: NOW,
+      nonce: `${NONCE}_domain`,
+      sourceInstanceId: SOURCE_INSTANCE_ID,
+    });
+
+    expect(() =>
+      verifyTransferHeaders({
+        headers,
+        secret: SECRET,
+        method: "POST",
+        path,
+        body,
+        now: NOW,
+        nonceCache: createNonceReplayCache(),
+      })
+    ).toThrowError(/signature.*invalide/i);
+
+    expect(
+      verifyTransferHeaders({
+        headers,
+        secret: SECRET,
+        signatureDomain,
+        method: "POST",
+        path,
+        body,
+        now: NOW,
+        nonceCache: createNonceReplayCache(),
+      }).sourceInstanceId
+    ).toBe(SOURCE_INSTANCE_ID);
+  });
+
   it("accepte une signature valide et retourne l'identité source signée", () => {
     const headers = signedHeaders();
     const result = verifyTransferHeaders({
