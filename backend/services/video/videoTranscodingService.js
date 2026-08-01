@@ -6,6 +6,11 @@ import ffmpeg from "fluent-ffmpeg";
 
 import { MULTIPART_LIMITS } from "../../constants.js";
 import {
+  getFfmpegExecutable,
+  getFfprobeExecutable,
+} from "../distributedEncoding/ffmpeg/index.js";
+import { withEncodingCapacity } from "../distributedEncoding/capacity.js";
+import {
   ERROR_ROOT,
   TEMP_ROOT,
 } from "./videoPaths.js";
@@ -22,6 +27,19 @@ import {
 const VIDEO_EXTENSIONS = new Set([".avi", ".mov", ".mkv", ".webm", ".flv", ".wmv", ".mp4"]);
 const IMAGE_EXTENSIONS = new Set([".jpg", ".jpeg", ".png", ".webp", ".gif"]);
 const HLS_AUDIO_BITRATE = 192;
+
+export function configureVideoTranscodingExecutables({
+  fluentFfmpeg = ffmpeg,
+  env = process.env,
+} = {}) {
+  const ffmpegPath = getFfmpegExecutable(env);
+  const ffprobePath = getFfprobeExecutable(env);
+  fluentFfmpeg.setFfmpegPath(ffmpegPath);
+  fluentFfmpeg.setFfprobePath(ffprobePath);
+  return { ffmpegPath, ffprobePath };
+}
+
+configureVideoTranscodingExecutables();
 
 export class VideoTranscodingError extends Error {
   constructor(message, { errors = [], reference = null } = {}) {
@@ -70,7 +88,13 @@ const drainFile = async (stream) => {
   await finished(stream).catch(() => {});
 };
 
-export async function readVideoMultipart({ request, io, processingId, workspace }) {
+export async function readVideoMultipart({
+  request,
+  io,
+  processingId,
+  processingTimer,
+  workspace,
+}) {
   if (!/multipart\/form-data/i.test(request.headers["content-type"] || "")) {
     throw new VideoImportValidationError("Un formulaire multipart avec un fichier vidéo est requis.");
   }
@@ -122,6 +146,7 @@ export async function readVideoMultipart({ request, io, processingId, workspace 
           stage: "upload",
           status: "download",
           processingId,
+          ...(processingTimer?.snapshot() || {}),
           video: buildAddVideoProcessingVideoInfo({
             data,
             processingId,
@@ -142,6 +167,7 @@ export async function readVideoMultipart({ request, io, processingId, workspace 
         stage: "upload",
         status: "download",
         processingId,
+        ...(processingTimer?.snapshot() || {}),
         video: buildAddVideoProcessingVideoInfo({
           data,
           processingId,
@@ -221,7 +247,7 @@ const archiveTranscodingFailure = ({ title, videoPath, errors }) => {
   return reference;
 };
 
-export async function transcodeVideoToHls({
+async function transcodeVideoToHlsSequential({
   videoPath,
   metadata,
   videoStream,
@@ -400,4 +426,11 @@ export async function transcodeVideoToHls({
     audioTracks: alternateAudioTracks,
     multiAudio: useAlternateAudio,
   };
+}
+
+export async function transcodeVideoToHls(options) {
+  return withEncodingCapacity(
+    () => transcodeVideoToHlsSequential(options),
+    { signal: options?.signal }
+  );
 }

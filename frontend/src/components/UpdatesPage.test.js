@@ -9,15 +9,15 @@ describe("UpdatesPage", () => {
     const navigation = screen.getByRole("navigation", {
       name: "Navigation des mises a jour",
     });
-    const latestVersionLink = screen.getByRole("link", { name: /Version 7\.8\.0/ });
+    const latestVersionLink = screen.getByRole("link", { name: /Version 7\.9\.0/ });
 
     expect(navigation).toContainElement(latestVersionLink);
-    expect(latestVersionLink).toHaveAttribute("href", "#version-7-8-0");
+    expect(latestVersionLink).toHaveAttribute("href", "#version-7-9-0");
     expect(
       screen.getByRole("article", {
-        name: /Export video securise entre instances/,
+        name: /Encodage video distribue experimental/,
       })
-    ).toHaveAttribute("data-version", "7.8.0");
+    ).toHaveAttribute("data-version", "7.9.0");
     expect(latestVersionLink).toHaveAttribute("aria-current", "location");
   });
 });

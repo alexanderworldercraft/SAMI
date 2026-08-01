@@ -3,6 +3,7 @@ import { Readable } from "stream";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
+  configureVideoTranscodingExecutables,
   createVideoUploadWorkspace,
   readVideoMultipart,
 } from "../services/video/videoTranscodingService.js";
@@ -17,10 +18,40 @@ afterEach(() => {
 });
 
 describe("videoTranscodingService", () => {
+  it("configure explicitement les exécutables FFmpeg et FFprobe avec espaces", () => {
+    const fluentFfmpeg = {
+      setFfmpegPath: vi.fn(),
+      setFfprobePath: vi.fn(),
+    };
+
+    expect(configureVideoTranscodingExecutables({
+      fluentFfmpeg,
+      env: {
+        FFMPEG_PATH: "/Applications/SAMI Tools/ffmpeg",
+        FFPROBE_PATH: "/Applications/SAMI Tools/ffprobe",
+      },
+    })).toEqual({
+      ffmpegPath: "/Applications/SAMI Tools/ffmpeg",
+      ffprobePath: "/Applications/SAMI Tools/ffprobe",
+    });
+    expect(fluentFfmpeg.setFfmpegPath).toHaveBeenCalledWith(
+      "/Applications/SAMI Tools/ffmpeg"
+    );
+    expect(fluentFfmpeg.setFfprobePath).toHaveBeenCalledWith(
+      "/Applications/SAMI Tools/ffprobe"
+    );
+  });
+
   it("lit un formulaire multipart et stocke la source dans un espace isolé", async () => {
     workspace = createVideoUploadWorkspace();
     const source = Buffer.from("fake-video");
     const io = { emit: vi.fn() };
+    const processingTimer = {
+      snapshot: vi.fn(() => ({
+        processingStartedAt: "2026-08-01T10:00:00.000Z",
+        processingElapsedMs: 12_345,
+      })),
+    };
     const request = {
       headers: {
         "content-type": "multipart/form-data; boundary=test",
@@ -42,6 +73,7 @@ describe("videoTranscodingService", () => {
       request,
       io,
       processingId: "test-upload",
+      processingTimer,
       workspace,
     });
 
@@ -53,7 +85,12 @@ describe("videoTranscodingService", () => {
     expect(fs.readFileSync(result.videoTempPath)).toEqual(source);
     expect(io.emit).toHaveBeenCalledWith(
       "progress",
-      expect.objectContaining({ stage: "upload", progress: 100 })
+      expect.objectContaining({
+        stage: "upload",
+        progress: 100,
+        processingStartedAt: "2026-08-01T10:00:00.000Z",
+        processingElapsedMs: 12_345,
+      })
     );
   });
 

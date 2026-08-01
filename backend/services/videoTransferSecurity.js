@@ -8,6 +8,7 @@ const fsPromises = fs.promises;
 
 export const VIDEO_TRANSFER_MANIFEST_VERSION = 1;
 export const TRANSFER_SIGNATURE_VERSION = "1";
+export const VIDEO_TRANSFER_SIGNATURE_DOMAIN = "SAMI-VIDEO-TRANSFER-V1";
 export const DEFAULT_TRANSFER_TIMESTAMP_WINDOW_MS = 5 * 60 * 1000;
 export const MAX_TRANSFER_FILE_COUNT = 100_000;
 export const MAX_TRANSFER_FILE_SIZE = Number.MAX_SAFE_INTEGER;
@@ -305,6 +306,18 @@ const normalizeSecret = (secret) => {
   return secret;
 };
 
+const normalizeSignatureDomain = (value) => {
+  const normalized = String(value || "");
+  if (!/^SAMI-[A-Z0-9-]{1,96}$/.test(normalized)) {
+    throw securityError(
+      "Le domaine de signature est invalide.",
+      "INVALID_SIGNATURE_DOMAIN",
+      500
+    );
+  }
+  return normalized;
+};
+
 const digestForBody = ({ body, bodySha256, bodyDigest }) => {
   const suppliedDigest = bodySha256 ?? bodyDigest;
   if (suppliedDigest !== undefined && suppliedDigest !== null) {
@@ -326,6 +339,7 @@ const digestForBody = ({ body, bodySha256, bodyDigest }) => {
  * SAMI-VIDEO-TRANSFER-V1\nMETHOD\n/raw?query\ntimestamp\nnonce\ninstanceId\nbodySha256
  */
 export const buildCanonicalTransferRequest = ({
+  signatureDomain = VIDEO_TRANSFER_SIGNATURE_DOMAIN,
   method,
   rawPathAndQuery,
   rawPath,
@@ -352,7 +366,7 @@ export const buildCanonicalTransferRequest = ({
   );
 
   return [
-    "SAMI-VIDEO-TRANSFER-V1",
+    normalizeSignatureDomain(signatureDomain),
     normalizedMethod,
     normalizedPath,
     normalizedTimestamp,
@@ -375,6 +389,7 @@ export const createTransferSignature = ({
  */
 export const buildTransferHeaders = ({
   secret,
+  signatureDomain = VIDEO_TRANSFER_SIGNATURE_DOMAIN,
   method,
   rawPathAndQuery,
   rawPath,
@@ -400,6 +415,7 @@ export const buildTransferHeaders = ({
   const normalizedPath = rawPathAndQuery ?? rawPath ?? requestPath;
   const signature = createTransferSignature({
     secret,
+    signatureDomain,
     method,
     rawPathAndQuery: normalizedPath,
     timestamp: normalizedTimestamp,
@@ -550,6 +566,7 @@ export const defaultTransferNonceReplayCache = new NonceReplayCache();
 export const verifyTransferHeaders = ({
   headers,
   secret,
+  signatureDomain = VIDEO_TRANSFER_SIGNATURE_DOMAIN,
   method,
   rawPathAndQuery,
   rawPath,
@@ -628,6 +645,7 @@ export const verifyTransferHeaders = ({
 
   const expectedSignature = createTransferSignature({
     secret,
+    signatureDomain,
     method,
     rawPathAndQuery: rawPathAndQuery ?? rawPath ?? requestPath,
     timestamp,

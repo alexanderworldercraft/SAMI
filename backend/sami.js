@@ -1,6 +1,6 @@
-import { startServer } from "./server/startServer.js";
+import { runServerProcess } from "./server/runServerProcess.js";
 
-startServer({ host: "0.0.0.0", tls: true }).catch((error) => {
+runServerProcess({ host: "0.0.0.0", tls: true }).catch((error) => {
   console.error("Impossible de démarrer le serveur SAMI avec TLS :", error);
   process.exitCode = 1;
 });

@@ -13,6 +13,7 @@ import adminBackupRoutes from "../routes/adminBackupRoutes.js";
 import adminMessageRoutes from "../routes/adminMessageRoutes.js";
 import appSettingRoutes from "../routes/appSettingRoutes.js";
 import genreRoutes from "../routes/genreRoutes.js";
+import internalVideoEncodingRoutes from "../routes/internalVideoEncodingRoutes.js";
 import internalVideoTransferRoutes from "../routes/internalVideoTransferRoutes.js";
 import logRoutes from "../routes/logRoutes.js";
 import musicRoutes from "../routes/musicRoutes.js";
@@ -22,6 +23,7 @@ import seriesRoutes from "../routes/seriesRoutes.js";
 import universeRoutes from "../routes/universeRoutes.js";
 import userRoutes from "../routes/userRoutes.js";
 import videoExportRoutes from "../routes/videoExportRoutes.js";
+import videoEncodingRoutes from "../routes/videoEncodingRoutes.js";
 import videoRoutes from "../routes/videoRoutes.js";
 import { globalRateLimit } from "../middlewares/rateLimitMiddleware.js";
 import {
@@ -39,7 +41,9 @@ const uploadsRoot = path.join(backendRoot, "uploads");
 const ROUTES = [
   [userRoutes, "/api/users"],
   [videoRoutes, "/api/videos"],
+  [videoEncodingRoutes, "/api/video-encoding"],
   [videoExportRoutes, "/api/video-exports"],
+  [internalVideoEncodingRoutes, "/api/internal/video-encoding"],
   [internalVideoTransferRoutes, "/api/internal/video-transfers"],
   [genreRoutes, "/api/genres"],
   [seriesRoutes, "/api/series"],
@@ -109,6 +113,12 @@ function registerStaticFiles(server, uploadsRootPath = uploadsRoot) {
   server.all("/uploads/video/.blocked/*", async (_request, reply) =>
     reply.status(404).send({ error: "Not found" })
   );
+  server.all("/uploads/video/.encoding", async (_request, reply) =>
+    reply.status(404).send({ error: "Not found" })
+  );
+  server.all("/uploads/video/.encoding/*", async (_request, reply) =>
+    reply.status(404).send({ error: "Not found" })
+  );
   server.addHook("onRequest", async (request, reply) => {
     const rawPath = String(request.raw.url || "").split("?", 1)[0];
     let decodedPath = rawPath;
@@ -138,6 +148,8 @@ function registerStaticFiles(server, uploadsRootPath = uploadsRoot) {
       || decodedPath.startsWith("/uploads/video/.transfers/")
       || decodedPath === "/uploads/video/.blocked"
       || decodedPath.startsWith("/uploads/video/.blocked/")
+      || decodedPath === "/uploads/video/.encoding"
+      || decodedPath.startsWith("/uploads/video/.encoding/")
     ) {
       return reply.status(404).send({ error: "Not found" });
     }
@@ -212,7 +224,7 @@ export function createServer({
   server.addHook("onRequest", securityHeadersMiddleware);
   server.register(fastifyCors, {
     origin: createCorsOriginValidator(publicUrl),
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     credentials: true,
     exposedHeaders: ["Content-Disposition", "X-Backup-Filename"],
   });

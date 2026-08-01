@@ -2,7 +2,7 @@
 
 SAMI (**Système d’Archivage Multimédia Intégré**) est une médiathèque web privée permettant d’organiser, diffuser et suivre des films, séries et musiques depuis une seule interface.
 
-La version actuelle est la **7.8.0**. Elle repose sur un backend Fastify, une interface React, Prisma avec MySQL, un pipeline vidéo FFmpeg/HLS et Socket.IO pour le retour en temps réel des traitements.
+La version actuelle est la **7.9.0**. Elle repose sur un backend Fastify, une interface React, Prisma avec MySQL, un pipeline vidéo FFmpeg/HLS et Socket.IO pour le retour en temps réel des traitements.
 
 ## Fonctionnalités
 
@@ -14,6 +14,7 @@ La version actuelle est la **7.8.0**. Elle repose sur un backend Fastify, une in
 - lecteur personnalisé avec progression lue, buffer, volume et plein écran ;
 - **Preview Live** expérimentale : aperçu au survol de la barre de lecture à partir de spritesheets et d’un fichier WebVTT ;
 - import et transcodage FFmpeg avec suivi de progression via Socket.IO ;
+- encodage multi-server expérimental : une résolution par worker, redistribution dynamique et publication finale sur le serveur principal ;
 - export sécurisé et reprenable d’une vidéo traitée depuis un clone vers l’instance principale ;
 - historique de lecture, reprise intelligente et remise à zéro d’une série ;
 - tendances, calendrier des ajouts et contenus mis en avant par genre ;
@@ -36,17 +37,17 @@ La version actuelle est la **7.8.0**. Elle repose sur un backend Fastify, une in
 - journalisation des actions et sauvegardes manuelles ou planifiées de MySQL ;
 - limitations de requêtes, contrôle CORS et en-têtes de sécurité.
 
-## Nouveautés de la version 7.8.0
+## Nouveautés de la version 7.9.0
 
-- export sécurisé et reprenable d’une vidéo traitée depuis un clone vers le serveur principal ;
-- accès réservé au super administrateur depuis la page de lecture, avec confirmation locale du mot de passe ;
-- sélection des genres et d’une éventuelle saison existante directement depuis le catalogue principal ;
-- échanges inter-serveurs signés par HMAC-SHA-256 et vérification SHA-256 de chaque fichier ;
-- réception atomique dans un stockage temporaire avec vidéo bloquée jusqu’à la validation complète du HLS ;
-- progression persistante, reprise, annulation et journalisation des étapes sur les deux instances ;
-- migration corrective du modèle `Log` pour les clones dont l’historique Prisma était incomplet.
+- second parcours d’ajout, entièrement réservé au super administrateur et activable depuis les fonctionnalités expérimentales ;
+- registre extensible de clones avec identifiants sensibles à la casse, priorité de performance, plafond de résolution et état en temps réel ;
+- attribution initiale des profils les plus lourds aux clones les plus rapides et du plus petit profil au primary ;
+- redistribution dynamique au premier worker compatible disponible, avec dépassement du plafond 360p du primary seulement après cinq minutes sans clone ;
+- leases, tentatives, progression, manifestes et reprise après redémarrage persistés dans MySQL ;
+- échanges HMAC dans un domaine distinct, contrôle SHA-256, reprise `Range` et cache privé LRU de 50 Gio sur chaque clone ;
+- assemblage et publication atomiques du HLS sur le primary, y compris avec les pistes audio multiples.
 
-L’historique complet des versions, de la 6.1.0 à la 7.8.0, est disponible dans l’application à l’adresse `/updates` et dans `frontend/src/components/UpdatesPage.js`.
+L’historique complet des versions, de la 6.1.0 à la 7.9.0, est disponible dans l’application à l’adresse `/updates` et dans `frontend/src/components/UpdatesPage.js`.
 
 ## Stack technique
 
@@ -98,6 +99,7 @@ Le schéma Prisma décrit notamment :
 - les personnes associées aux films et séries ;
 - les morceaux, albums et genres musicaux ;
 - les messages administratifs et réglages globaux de l’application.
+- le registre, les jobs, les tâches, les leases, les tentatives et les artefacts de l’encodage vidéo distribué.
 
 Le fichier source est `backend/prisma/schema.prisma`. Un diagramme est également disponible dans `backend/prisma/ERD.svg`.
 
@@ -153,6 +155,12 @@ Les principales variables du backend sont :
 | `SAMI_TRANSFER_REQUEST_TIMEOUT_MS` | Délai maximal d’une requête de transfert |
 | `SAMI_TRANSFER_SESSION_TTL_HOURS` | Durée de conservation d’une réception incomplète avant nettoyage |
 | `SAMI_TRANSFER_CONCURRENCY` | Nombre maximal de fichiers envoyés simultanément par un clone |
+| `SAMI_DISTRIBUTED_ENCODING_ENABLED` | Kill switch serveur de l’encodage distribué, à activer sur le primary et chaque clone après le déploiement |
+| `SAMI_DISTRIBUTED_ENCODING_PIPELINE_VERSION` | Version de pipeline qui doit être identique sur tous les workers |
+| `SAMI_DISTRIBUTED_ENCODING_SOURCE_ROOT` | Stockage privé optionnel des sources sur le primary |
+| `SAMI_DISTRIBUTED_ENCODING_CACHE_ROOT` | Cache privé optionnel des sources sur un clone, plafonné à 50 Gio |
+| `SAMI_DISTRIBUTED_ENCODING_STAGING_ROOT` | Staging privé optionnel des artefacts et tentatives |
+| `FFMPEG_PATH`, `FFPROBE_PATH` | Chemins optionnels des exécutables, utiles notamment sous Windows |
 | `BACKUP_DAY_OF_WEEK`, `BACKUP_TIME` | Planification de la sauvegarde MySQL |
 | `SMTP_*` | Envoi d’e-mails |
 | `USERNAMESUPERADMIN`, `PASSWORDSUPERADMIN`, `EMAILSUPERADMIN` | Compte super administrateur créé par le seed |
@@ -160,6 +168,70 @@ Les principales variables du backend sont :
 Le frontend utilise principalement `REACT_APP_URL_LOCAL`, `REACT_APP_NAME` et `REACT_APP_VER`.
 
 Ne versionnez jamais les fichiers `.env`, les secrets, les certificats privés ou les sauvegardes de production.
+
+### Encodage vidéo multi-server expérimental
+
+Le primary reçoit la source depuis la page `/nouvelle-video`, construit le plan
+d’encodage et attribue au maximum une tâche à chaque worker. Au lancement, le
+clone ayant la priorité de performance la plus élevée reçoit la résolution la
+plus lourde, les clones suivants reçoivent les profils suivants, puis le primary
+reçoit en dernier le plus petit profil encore disponible. Dès qu’un worker termine,
+il réclame la prochaine tâche compatible. Le primary est normalement limité à
+360p ; il ne peut prendre un profil plus grand qu’après cinq minutes continues
+sans heartbeat ni progression d’un clone compatible.
+
+Les clones n’ont pas besoin d’être publiquement joignables : ils ouvrent les
+connexions vers `SAMI_PRIMARY_BASE_URL`. La source est reprise par `Range`,
+contrôlée par taille et SHA-256, épinglée pendant l’encodage et conservée dans un
+cache privé LRU plafonné à 50 Gio. Une réussite ou une annulation déclenche sa
+purge ; une source en échec peut être conservée vingt-quatre heures. Les sorties
+reviennent dans un staging non public du primary et ne deviennent visibles
+qu’après vérification et publication atomique du master HLS.
+
+Le protocole réutilise `SAMI_TRANSFER_SHARED_SECRET`, sans jamais l’enregistrer
+en base, mais signe les messages dans le domaine distinct
+`SAMI-DISTRIBUTED-ENCODING-V1`. Les `SAMI_INSTANCE_ID` sont comparés avec leur
+casse exacte et doivent être inscrits dans le registre depuis la page
+Fonctionnalités expérimentales. Le réglage applicatif est désactivé par défaut ;
+le couper empêche les nouveaux jobs mais laisse finir ceux déjà lancés.
+
+Configuration minimale du primary :
+
+```dotenv
+NODE_ENV="production"
+SAMI_INSTANCE_ROLE="primary"
+SAMI_INSTANCE_ID="sami-primary"
+SAMI_PRIMARY_BASE_URL="https://sami.worldercraft.fr"
+SAMI_TRANSFER_SHARED_SECRET="<même-secret-fort-sur-toutes-les-instances>"
+SAMI_DISTRIBUTED_ENCODING_ENABLED="true"
+SAMI_DISTRIBUTED_ENCODING_PIPELINE_VERSION="sami-hls-libx264-aac-v1"
+```
+
+Configuration minimale d’un clone :
+
+```dotenv
+NODE_ENV="production"
+SAMI_INSTANCE_ROLE="clone"
+SAMI_INSTANCE_ID="Sami-clone-macbookair15"
+SAMI_PRIMARY_BASE_URL="https://sami.worldercraft.fr"
+SAMI_TRANSFER_SHARED_SECRET="<même-secret-fort-sur-toutes-les-instances>"
+SAMI_DISTRIBUTED_ENCODING_ENABLED="true"
+SAMI_DISTRIBUTED_ENCODING_PIPELINE_VERSION="sami-hls-libx264-aac-v1"
+```
+
+Enregistrez ensuite exactement `Sami-clone-macbookair15`,
+`Sami-clone-pcfixe` et tout futur clone, par exemple
+`Sami-clone-aero15XC`. Configurez une priorité plus élevée pour la machine la
+plus rapide. Chaque worker doit disposer de `ffmpeg` avec les encodeurs
+`libx264` et `aac`, de `ffprobe`, d’un seul slot et d’au moins 100 Gio d’espace
+temporaire recommandé.
+
+Avant l’activation, sauvegardez les bases puis déployez et migrez d’abord le
+primary. Déployez ensuite les clones, vérifiez leurs heartbeats dans le registre,
+puis activez le réglage expérimental. La migration ne l’active jamais
+automatiquement. Utilisez un seul processus backend par instance dans cette
+version : la promotion locale des artefacts et la capacité FFmpeg sont
+coordonnées dans le processus Node.
 
 ### Transfert d’une vidéo depuis un clone
 
@@ -224,9 +296,10 @@ validation. Les tâches sont persistées afin de permettre le suivi, l’annulat
 et la reprise après une interruption.
 
 Le reverse proxy du principal doit autoriser les requêtes `PUT` vers
-`/api/internal/video-transfers/`, désactiver leur mise en mémoire complète et
-accorder un délai et une taille de corps suffisants aux segments HLS. Exemple
-de directives Nginx à intégrer dans la location correspondante :
+`/api/internal/video-transfers/` et `/api/internal/video-encoding/`, désactiver
+leur mise en mémoire complète et accorder un délai et une taille de corps
+suffisants aux segments HLS. Exemple de directives Nginx à intégrer dans les
+locations correspondantes :
 
 ```nginx
 client_max_body_size 0;
@@ -337,7 +410,9 @@ La route `/register` est actuellement désactivée et renvoie vers l’écran de
 - `/api/users`
 - `/api/videos`
 - `/api/video-exports`
+- `/api/video-encoding` (configuration, registre et jobs superadmin)
 - `/api/internal/video-transfers` (échanges HMAC entre instances)
+- `/api/internal/video-encoding` (heartbeats, leases, sources et artefacts HMAC)
 - `/api/genres`
 - `/api/series`
 - `/api/people`
@@ -381,6 +456,7 @@ Au démarrage, le backend :
 - vérifie la connexion MySQL puis la maintient active périodiquement ;
 - planifie une sauvegarde selon `BACKUP_DAY_OF_WEEK` et `BACKUP_TIME` ;
 - renouvelle chaque lundi à 9 h les contenus mis en avant par genre ;
+- reprend les leases, jobs et publications d’encodage distribué interrompus et nettoie les caches temporaires expirés ;
 - arrête proprement ses minuteries et tâches planifiées à la fermeture.
 
 ## Données locales et fichiers sensibles
