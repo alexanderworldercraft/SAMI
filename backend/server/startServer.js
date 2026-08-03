@@ -121,6 +121,15 @@ async function maintainDistributedEncoding(options = {}) {
   const maintenance = (async () => {
     const result = await runDistributedEncodingMaintenance(options);
     if (!options.cleanup) return result;
+    if (
+      result.retention?.artifactsDeleted > 0
+      || result.retention?.jobsDeleted > 0
+    ) {
+      console.info(
+        "Rétention de l'encodage distribué appliquée.",
+        result.retention
+      );
+    }
     const logs = await reconcileDistributedEncodingLogs();
     if (logs.created > 0 || logs.failed > 0) {
       console.info("Réconciliation des Actions d'encodage distribué terminée.", logs);

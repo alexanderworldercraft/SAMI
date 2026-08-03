@@ -3,6 +3,7 @@ import { randomUUID } from "crypto";
 
 import { prisma } from "../db.js";
 import {
+  buildAddVideoAudioLabel,
   buildAudioTrackPlans,
   getAudioStreams,
   getAutoLanguageGenreNames,
@@ -118,6 +119,9 @@ const sanitizeRequestSnapshot = ({
   autoLanguageGenreNames,
   subtitleInfos,
   plan,
+  audioStream,
+  audioTracks,
+  season,
 }) => ({
   title: data.titre,
   summary: data.resumer || null,
@@ -131,6 +135,10 @@ const sanitizeRequestSnapshot = ({
     label: subtitle.label,
     relativePath: `subtitles/${subtitle.filename}`,
   })),
+  audio: buildAddVideoAudioLabel(audioStream),
+  audioTracks: audioTracks.map((track) => track.label).filter(Boolean),
+  seasonNumber: season?.Numero ?? null,
+  seriesTitle: season?.Series?.Titre ?? null,
   multiAudio: plan.multiAudio,
   audioRenditions: plan.audioRenditions,
   videoOriginalName: data.videoOriginalName,
@@ -190,7 +198,11 @@ const getSeason = async (seasonId) => {
   if (!seasonId) return null;
   const season = await prisma.saison.findUnique({
     where: { SaisonID: seasonId },
-    select: { SaisonID: true },
+    select: {
+      SaisonID: true,
+      Numero: true,
+      Series: { select: { Titre: true } },
+    },
   });
   if (!season) {
     throw new VideoImportValidationError("La saison sélectionnée est introuvable.");
@@ -342,7 +354,7 @@ export async function createDistributedVideoJob({ request, adminUserId }) {
       input.data.SaisonID ?? input.data.saisonID ?? input.data.saisonId,
       "SaisonID"
     );
-    await getSeason(input.data.SaisonID);
+    const season = await getSeason(input.data.SaisonID);
     const requestedGenreIds = parseRequestedGenreIds(input.data.genres);
     const metadata = await probeVideo(input.sourcePath);
     const videoStream = getVideoStream(metadata);
@@ -383,6 +395,9 @@ export async function createDistributedVideoJob({ request, adminUserId }) {
       autoLanguageGenreNames,
       subtitleInfos,
       plan,
+      audioStream,
+      audioTracks: multiAudioEnabled ? audioTracks : [],
+      season,
     });
 
     await createEncodingJob({

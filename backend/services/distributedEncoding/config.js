@@ -2,10 +2,12 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { validateVideoTransferConfig } from "../videoTransferSecurity.js";
 import {
+  DISTRIBUTED_ENCODING_ARTIFACT_RETENTION_DAYS,
   DISTRIBUTED_ENCODING_HEARTBEAT_INTERVAL_MS,
   DISTRIBUTED_ENCODING_CACHE_MAX_BYTES,
   DISTRIBUTED_ENCODING_FAILED_CACHE_TTL_MS,
   DISTRIBUTED_ENCODING_FAILURE_CACHE_TTL_MS,
+  DISTRIBUTED_ENCODING_JOB_RETENTION_DAYS,
   DISTRIBUTED_ENCODING_LEASE_DURATION_MS,
   DISTRIBUTED_ENCODING_LEASE_RENEW_INTERVAL_MS,
   DISTRIBUTED_ENCODING_MAX_SLOTS,
@@ -26,6 +28,20 @@ const backendRoot = path.resolve(
 
 export const DISTRIBUTED_ENCODING_SIGNATURE_DOMAIN =
   "SAMI-DISTRIBUTED-ENCODING-V1";
+
+const MAX_RETENTION_DAYS = 3_650;
+const parseRetentionDays = (value, fallback, variableName) => {
+  const normalized = String(value ?? "").trim();
+  if (!normalized) return fallback;
+
+  const days = Number(normalized);
+  if (!Number.isInteger(days) || days < 1 || days > MAX_RETENTION_DAYS) {
+    throw new Error(
+      `${variableName} doit être un entier compris entre 1 et ${MAX_RETENTION_DAYS}.`
+    );
+  }
+  return days;
+};
 
 export const DISTRIBUTED_ENCODING_SOURCE_ROOT = path.join(
   backendRoot,
@@ -116,6 +132,16 @@ export function getDistributedEncodingConfig(env = process.env) {
       DISTRIBUTED_ENCODING_PRIMARY_MAX_NOMINAL_HEIGHT,
     maxSlots: DISTRIBUTED_ENCODING_MAX_SLOTS,
     cacheMaxBytes: DISTRIBUTED_ENCODING_CACHE_MAX_BYTES,
+    artifactRetentionDays: parseRetentionDays(
+      env.SAMI_DISTRIBUTED_ENCODING_ARTIFACT_RETENTION_DAYS,
+      DISTRIBUTED_ENCODING_ARTIFACT_RETENTION_DAYS,
+      "SAMI_DISTRIBUTED_ENCODING_ARTIFACT_RETENTION_DAYS"
+    ),
+    jobRetentionDays: parseRetentionDays(
+      env.SAMI_DISTRIBUTED_ENCODING_JOB_RETENTION_DAYS,
+      DISTRIBUTED_ENCODING_JOB_RETENTION_DAYS,
+      "SAMI_DISTRIBUTED_ENCODING_JOB_RETENTION_DAYS"
+    ),
     failedCacheTtlMs: DISTRIBUTED_ENCODING_FAILED_CACHE_TTL_MS,
     failureCacheTtlMs: DISTRIBUTED_ENCODING_FAILURE_CACHE_TTL_MS,
     retryBackoffMs: DISTRIBUTED_ENCODING_RETRY_BACKOFF_MS,

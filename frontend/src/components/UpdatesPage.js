@@ -56,6 +56,7 @@ const updates = [
           "La desactivation bloque seulement les nouveaux imports : les jobs deja lances terminent leur encodage et leur publication.",
           "Les routes internes refusent les workers desactives, les signatures invalides, les rejeux, les chemins dangereux et les leases perimes.",
           "La maintenance recupere les leases expires, les artefacts valides, les publications interrompues et les ingestions abandonnees, puis reconcilie les journaux manquants.",
+          "Une retention BDD configurable purge par lots les artefacts detailles apres un jour et les jobs termines avec leurs taches et tentatives apres trente jours.",
           "Le schema Prisma, le protocole HMAC, le scheduler, le pipeline FFmpeg, les runtimes, les APIs, l'interface et le build de production disposent de validations dediees.",
         ],
       },

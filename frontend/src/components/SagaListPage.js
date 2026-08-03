@@ -62,6 +62,17 @@ const SagaListPage = () => {
     return () => window.clearTimeout(timer);
   }, [search, sort]);
 
+  useEffect(() => {
+    const targetId = decodeURIComponent(window.location.hash.replace(/^#/, ""));
+    if (!targetId || !universes.some((universe) => `universe-${universe.UniverseID}` === targetId)) return;
+
+    const animationFrame = window.requestAnimationFrame(() => {
+      document.getElementById(targetId)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+
+    return () => window.cancelAnimationFrame(animationFrame);
+  }, [universes]);
+
   const openSaga = async (saga) => {
     setSelectedSaga(saga);
     setSagaDetails(null);
@@ -91,7 +102,7 @@ const SagaListPage = () => {
               setSearch(event.target.value);
               setUniversePages({});
             }}
-            placeholder="Rechercher une saga ou un univers..."
+            placeholder="Rechercher un univers, une saga, un film ou une série..."
             className={fieldClass}
           />
           <Listbox
@@ -136,15 +147,19 @@ const SagaListPage = () => {
       {loading ? (
         <p className="text-center text-neutral-400">Chargement en cours...</p>
       ) : universes.length === 0 ? (
-        <p className="text-center text-neutral-400">Aucun univers avec saga.</p>
+        <p className="text-center text-neutral-400">Aucun univers avec contenu.</p>
       ) : (
         <div className="grid gap-6">
           {universes.map((universe) => {
-            const universeSagas = Array.isArray(universe.Sagas) ? universe.Sagas : [];
+            const universeItems = Array.isArray(universe.Items)
+              ? universe.Items
+              : Array.isArray(universe.Sagas)
+                ? universe.Sagas
+                : [];
             const universeKey = String(universe.UniverseID);
             const currentUniversePage = universePages[universeKey] || 1;
-            const universeTotalPages = Math.max(1, Math.ceil(universeSagas.length / ITEMS_PER_PAGE));
-            const paginatedSagas = universeSagas.slice(
+            const universeTotalPages = Math.max(1, Math.ceil(universeItems.length / ITEMS_PER_PAGE));
+            const paginatedItems = universeItems.slice(
               (currentUniversePage - 1) * ITEMS_PER_PAGE,
               currentUniversePage * ITEMS_PER_PAGE
             );
@@ -152,6 +167,8 @@ const SagaListPage = () => {
             return (
               <section
                 key={universe.UniverseID}
+                id={`universe-${universe.UniverseID}`}
+                aria-labelledby={`universe-title-${universe.UniverseID}`}
                 ref={(element) => {
                   if (element) {
                     sectionRefs.current[universeKey] = element;
@@ -159,24 +176,24 @@ const SagaListPage = () => {
                     delete sectionRefs.current[universeKey];
                   }
                 }}
-                className="overflow-hidden rounded-2xl border border-sky-500/10 bg-white/80 p-5 shadow-xl shadow-slate-950/5 backdrop-blur dark:bg-slate-950/70 dark:shadow-sky-950/20"
+                className="scroll-mt-24 overflow-hidden rounded-2xl border border-sky-500/10 bg-white/80 p-5 shadow-xl shadow-slate-950/5 backdrop-blur dark:bg-slate-950/70 dark:shadow-sky-950/20"
               >
                 <div className="mb-4">
                   <p className="text-sm font-bold uppercase text-sky-500 dark:text-sky-400">Univers</p>
-                  <h2 className="mt-1 text-2xl font-black text-slate-950 dark:text-white">{universe.Titre}</h2>
+                  <h2 id={`universe-title-${universe.UniverseID}`} className="mt-1 text-2xl font-black text-slate-950 dark:text-white">{universe.Titre}</h2>
                   {universe.Resume && (
                     <p className="mt-2 line-clamp-3 text-sm leading-6 text-slate-600 dark:text-slate-300">{universe.Resume}</p>
                   )}
                 </div>
                 <div className="[&_.container]:w-full">
-                  <VideoList videos={paginatedSagas} onItemClick={openSaga} />
+                  <VideoList videos={paginatedItems} onItemClick={openSaga} />
                 </div>
-                {universeSagas.length > ITEMS_PER_PAGE && (
+                {universeItems.length > ITEMS_PER_PAGE && (
                   <div className="mt-6">
                     <PaginationPage
                       currentPage={currentUniversePage}
                       totalPages={universeTotalPages}
-                      totalItems={universeSagas.length}
+                      totalItems={universeItems.length}
                       itemsPerPage={ITEMS_PER_PAGE}
                       onPageChange={(page) =>
                         setUniversePages((current) => ({

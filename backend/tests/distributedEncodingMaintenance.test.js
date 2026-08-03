@@ -9,6 +9,7 @@ import {
   INCOMPLETE_ENCODING_CLEANUP_STEP,
   INCOMPLETE_ENCODING_EXPIRED_STEP,
   isIncompleteEncodingJobStatus,
+  purgeDistributedEncodingHistory,
   recoverIncompleteDistributedEncodingJobs,
 } from "../services/distributedEncoding/maintenanceService.js";
 
@@ -246,5 +247,96 @@ describe("nettoyage des workspaces distribués sans job", () => {
     expect(fs.existsSync(path.join(sourceRoot, recentId))).toBe(true);
     expect(fs.existsSync(path.join(sourceRoot, trackedId))).toBe(true);
     expect(fs.existsSync(invalidSource)).toBe(true);
+  });
+});
+
+describe("rétention de l'historique d'encodage distribué", () => {
+  it("purge par lots les artefacts à 1 jour puis les jobs à 30 jours", async () => {
+    const database = {
+      videoEncodingArtifactFile: {
+        findMany: vi.fn(async () => [
+          { VideoEncodingArtifactFileID: "artifact-1" },
+          { VideoEncodingArtifactFileID: "artifact-2" },
+        ]),
+        deleteMany: vi.fn(async () => ({ count: 2 })),
+      },
+      videoEncodingJob: {
+        findMany: vi.fn(async () => [
+          { VideoEncodingJobID: "job-old" },
+        ]),
+        deleteMany: vi.fn(async () => ({ count: 1 })),
+      },
+    };
+
+    const result = await purgeDistributedEncodingHistory({
+      now: NOW,
+      database,
+      artifactRetentionDays: 1,
+      jobRetentionDays: 30,
+      artifactBatchSize: 500,
+      jobBatchSize: 25,
+    });
+
+    expect(result).toEqual({
+      artifactRetentionDays: 1,
+      jobRetentionDays: 30,
+      artifactsDeleted: 2,
+      jobsDeleted: 1,
+    });
+    expect(database.videoEncodingArtifactFile.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        take: 500,
+        where: {
+          Attempt: {
+            Task: {
+              Job: expect.objectContaining({
+                CompletedAt: { lte: new Date("2026-07-30T12:00:00.000Z") },
+              }),
+            },
+          },
+        },
+      })
+    );
+    expect(database.videoEncodingJob.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        take: 25,
+        where: expect.objectContaining({
+          CompletedAt: { lte: new Date("2026-07-01T12:00:00.000Z") },
+          OR: expect.arrayContaining([
+            { Status: "COMPLETED" },
+            { Status: "CANCELLED" },
+            {
+              Status: "FAILED",
+              CurrentStep: {
+                in: ["expired", "incomplete_expired"],
+              },
+            },
+          ]),
+        }),
+      })
+    );
+    expect(database.videoEncodingJob.deleteMany).toHaveBeenCalledWith({
+      where: expect.objectContaining({
+        VideoEncodingJobID: { in: ["job-old"] },
+      }),
+    });
+  });
+
+  it("ne lance aucune suppression lorsqu'aucune ligne n'est expirée", async () => {
+    const database = {
+      videoEncodingArtifactFile: {
+        findMany: vi.fn(async () => []),
+        deleteMany: vi.fn(),
+      },
+      videoEncodingJob: {
+        findMany: vi.fn(async () => []),
+        deleteMany: vi.fn(),
+      },
+    };
+
+    await expect(purgeDistributedEncodingHistory({ now: NOW, database }))
+      .resolves.toMatchObject({ artifactsDeleted: 0, jobsDeleted: 0 });
+    expect(database.videoEncodingArtifactFile.deleteMany).not.toHaveBeenCalled();
+    expect(database.videoEncodingJob.deleteMany).not.toHaveBeenCalled();
   });
 });

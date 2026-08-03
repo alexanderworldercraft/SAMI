@@ -21,7 +21,7 @@ const AdminUniverseManager = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [form, setForm] = useState(emptyForm);
   const [initialForm, setInitialForm] = useState(emptyForm);
-  const [sagas, setSagas] = useState([]);
+  const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
@@ -46,7 +46,7 @@ const AdminUniverseManager = () => {
   const resetForm = () => {
     setForm(emptyForm);
     setInitialForm(emptyForm);
-    setSagas([]);
+    setItems([]);
   };
 
   const loadUniverses = useCallback(async () => {
@@ -77,7 +77,7 @@ const AdminUniverseManager = () => {
       };
       setForm(nextForm);
       setInitialForm(nextForm);
-      setSagas(Array.isArray(data.Sagas) ? data.Sagas : []);
+      setItems(Array.isArray(data.Items) ? data.Items : []);
     } catch (error) {
       console.error("Erreur lors de la récupération de l'univers :", error);
       setErrorMessage(error.response?.data?.error || "Impossible de charger cet univers.");
@@ -129,19 +129,21 @@ const AdminUniverseManager = () => {
     }
   };
 
-  const persistOrder = async (nextSagas) => {
+  const persistOrder = async (nextItems) => {
     if (!selectedUniverseId) return;
-    const items = nextSagas.map((item, index) => ({
+    const payloadItems = nextItems.map((item, index) => ({
+      UniverseItemType: item.UniverseItemType,
       UniverseSagaID: item.UniverseSagaID,
+      UniverseContentID: item.UniverseContentID,
       Ordre: Number(item.Ordre) > 0 ? Number(item.Ordre) : index + 1,
     }));
-    await api.put(`/universes/${selectedUniverseId}/sagas/order`, { items });
+    await api.put(`/universes/${selectedUniverseId}/items/order`, { items: payloadItems });
   };
 
-  const handleOrderInput = (universeSagaId, value) => {
-    setSagas((current) =>
+  const handleOrderInput = (universeItemKey, value) => {
+    setItems((current) =>
       current.map((item) =>
-        item.UniverseSagaID === universeSagaId ? { ...item, Ordre: value } : item
+        item.UniverseItemKey === universeItemKey ? { ...item, Ordre: value } : item
       )
     );
   };
@@ -151,9 +153,10 @@ const AdminUniverseManager = () => {
     resetFeedback();
 
     try {
-      const normalized = [...sagas]
+      const normalized = [...items]
         .map((item) => ({ ...item, Ordre: Math.max(1, Number(item.Ordre) || 1) }))
-        .sort((a, b) => Number(a.Ordre) - Number(b.Ordre));
+        .sort((a, b) => Number(a.Ordre) - Number(b.Ordre))
+        .map((item, index) => ({ ...item, Ordre: index + 1 }));
       await persistOrder(normalized);
       await loadUniverseDetails(selectedUniverseId);
       setMessage("Ordre de l'univers mis à jour.");
@@ -167,14 +170,14 @@ const AdminUniverseManager = () => {
 
   const handleDrop = async (targetId) => {
     if (!draggedId || draggedId === targetId) return;
-    const current = [...sagas];
-    const fromIndex = current.findIndex((item) => item.UniverseSagaID === draggedId);
-    const toIndex = current.findIndex((item) => item.UniverseSagaID === targetId);
+    const current = [...items];
+    const fromIndex = current.findIndex((item) => item.UniverseItemKey === draggedId);
+    const toIndex = current.findIndex((item) => item.UniverseItemKey === targetId);
     if (fromIndex < 0 || toIndex < 0) return;
     const [moved] = current.splice(fromIndex, 1);
     current.splice(toIndex, 0, moved);
     const next = current.map((item, index) => ({ ...item, Ordre: index + 1 }));
-    setSagas(next);
+    setItems(next);
     setDraggedId(null);
 
     try {
@@ -187,7 +190,7 @@ const AdminUniverseManager = () => {
     }
   };
 
-  const removeSaga = async (item) => {
+  const removeItem = async (item) => {
     if (!selectedUniverseId) return;
     if (!window.confirm(`Retirer "${item.Titre}" de cet univers ?`)) return;
 
@@ -195,12 +198,16 @@ const AdminUniverseManager = () => {
     resetFeedback();
 
     try {
-      await api.delete(`/universes/${selectedUniverseId}/sagas/${item.UniverseSagaID}`);
+      if (item.UniverseItemType === "saga") {
+        await api.delete(`/universes/${selectedUniverseId}/sagas/${item.UniverseSagaID}`);
+      } else {
+        await api.delete(`/universes/${selectedUniverseId}/contents/${item.UniverseContentID}`);
+      }
       await loadUniverseDetails(selectedUniverseId);
-      setMessage("Saga retirée de l'univers.");
+      setMessage("Élément retiré de l'univers.");
     } catch (error) {
-      console.error("Erreur lors du retrait de la saga :", error);
-      setErrorMessage(error.response?.data?.error || "Impossible de retirer cette saga.");
+      console.error("Erreur lors du retrait de l'élément :", error);
+      setErrorMessage(error.response?.data?.error || "Impossible de retirer cet élément.");
     } finally {
       setSaving(false);
     }
@@ -233,7 +240,7 @@ const AdminUniverseManager = () => {
         <p className="text-sm font-bold uppercase text-sky-500 dark:text-sky-400">Administration</p>
         <h2 className="mt-1 text-2xl font-black text-slate-950 dark:text-white">Univers</h2>
         <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-300">
-          Modifie les univers et l'ordre des sagas qui les composent.
+          Modifie les univers et l'ordre des sagas, films et séries qui les composent.
         </p>
       </div>
 
@@ -322,38 +329,40 @@ const AdminUniverseManager = () => {
 
               <div className="mt-8">
                 <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <h3 className="text-xl font-black text-slate-950 dark:text-white">Ordre des sagas</h3>
-                  <button type="button" onClick={saveOrder} disabled={saving || sagas.length === 0} className={buttonClass}>
+                  <h3 className="text-xl font-black text-slate-950 dark:text-white">Ordre des éléments</h3>
+                  <button type="button" onClick={saveOrder} disabled={saving || items.length === 0} className={buttonClass}>
                     Sauvegarder l'ordre
                   </button>
                 </div>
 
-                {sagas.length === 0 ? (
-                  <p className="rounded-xl border border-sky-500/10 bg-white/70 px-4 py-5 text-sm font-semibold text-slate-600 dark:bg-slate-950/40 dark:text-slate-300">Aucune saga dans cet univers.</p>
+                {items.length === 0 ? (
+                  <p className="rounded-xl border border-sky-500/10 bg-white/70 px-4 py-5 text-sm font-semibold text-slate-600 dark:bg-slate-950/40 dark:text-slate-300">Aucune saga, aucun film ou aucune série dans cet univers.</p>
                 ) : (
                   <ul className="divide-y divide-sky-500/10 overflow-hidden rounded-xl border border-sky-500/10 bg-white/70 dark:bg-slate-950/40">
-                    {sagas.map((item) => (
+                    {items.map((item) => (
                       <li
-                        key={item.UniverseSagaID}
+                        key={item.UniverseItemKey}
                         draggable
-                        onDragStart={() => setDraggedId(item.UniverseSagaID)}
+                        onDragStart={() => setDraggedId(item.UniverseItemKey)}
                         onDragOver={(event) => event.preventDefault()}
-                        onDrop={() => handleDrop(item.UniverseSagaID)}
+                        onDrop={() => handleDrop(item.UniverseItemKey)}
                         className="flex cursor-move flex-col gap-4 px-4 py-4 sm:flex-row sm:items-center"
                       >
                         <div className="flex-1">
                           <p className="font-black text-slate-950 dark:text-white">{item.Titre}</p>
-                          <p className="mt-1 text-xs font-semibold uppercase text-slate-500 dark:text-slate-400">Saga #{item.SagaID}</p>
+                          <p className="mt-1 text-xs font-semibold uppercase text-slate-500 dark:text-slate-400">
+                            {item.type === "saga" ? `Saga #${item.SagaID}` : item.type === "series" ? `Série #${item.SeriesID}` : `Film #${item.VideoID}`}
+                          </p>
                         </div>
                         <input
                           type="number"
                           min="1"
                           value={item.Ordre}
-                          onChange={(event) => handleOrderInput(item.UniverseSagaID, event.target.value)}
+                          onChange={(event) => handleOrderInput(item.UniverseItemKey, event.target.value)}
                           className={`${fieldClass} sm:w-28`}
                           aria-label="Ordre"
                         />
-                        <button type="button" onClick={() => removeSaga(item)} disabled={saving} className={dangerButtonClass}>
+                        <button type="button" onClick={() => removeItem(item)} disabled={saving} className={dangerButtonClass}>
                           Retirer
                         </button>
                       </li>
@@ -371,7 +380,7 @@ const AdminUniverseManager = () => {
           <div className="w-full max-w-md rounded-2xl border border-red-300/20 bg-white p-6 shadow-2xl dark:bg-slate-950 dark:text-white">
             <h3 className="text-xl font-black text-slate-950 dark:text-white">Mettre l'univers en corbeille</h3>
             <p className="mt-3 text-sm leading-6 text-slate-600 dark:text-slate-300">
-              Mettre "{pendingDelete.Titre}" dans la corbeille ? Les liaisons avec les sagas seront conservées jusqu'à la suppression définitive.
+              Mettre "{pendingDelete.Titre}" dans la corbeille ? Les liaisons avec les sagas, films et séries seront conservées jusqu'à la suppression définitive.
             </p>
             <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
               <button type="button" onClick={() => setPendingDelete(null)} disabled={saving} className="inline-flex items-center justify-center rounded-lg border border-slate-300/60 bg-white px-5 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-100 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">Annuler</button>

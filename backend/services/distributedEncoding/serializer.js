@@ -132,6 +132,7 @@ export const serializeEncodingTask = (task) =>
   });
 
 export const serializeEncodingJob = (job, { now = new Date() } = {}) => {
+  const snapshot = job.RequestSnapshot || {};
   const startedAt = job.StartedAt || job.CreatedAt || null;
   const completedAt = job.CompletedAt || null;
   const isActive = ACTIVE_ENCODING_JOB_STATUSES.includes(job.Status);
@@ -144,7 +145,7 @@ export const serializeEncodingJob = (job, { now = new Date() } = {}) => {
 
   return toEncodingJsonValue({
     id: job.VideoEncodingJobID,
-    title: job.RequestSnapshot?.title || job.SourceOriginalName,
+    title: snapshot.title || job.SourceOriginalName,
     videoId: job.VideoID ?? null,
     initiatedByUserId: job.InitiatedByUserID ?? null,
     status: job.Status,
@@ -154,7 +155,19 @@ export const serializeEncodingJob = (job, { now = new Date() } = {}) => {
     sourceSize: job.SourceSize,
     sourceSha256: job.SourceSha256,
     sourceMetadata: job.SourceMetadata || null,
-    request: job.RequestSnapshot,
+    request: snapshot,
+    video: {
+      titre: snapshot.title || job.SourceOriginalName,
+      audio: snapshot.audio || null,
+      audioTracks: Array.isArray(snapshot.audioTracks)
+        ? snapshot.audioTracks
+        : [],
+      subtitles: Array.isArray(snapshot.subtitles)
+        ? snapshot.subtitles.map((subtitle) => subtitle?.label).filter(Boolean)
+        : [],
+      saisonNumero: snapshot.seasonNumber ?? null,
+      seriesTitre: snapshot.seriesTitle || null,
+    },
     pipelineVersion: job.PipelineVersion,
     encodingSpecHash: job.EncodingSpecHash,
     cancelRequested: job.CancelRequested,

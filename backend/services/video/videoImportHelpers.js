@@ -262,7 +262,7 @@ export const buildMultiAudioMasterPlaylist = (
   ].join("\n");
 };
 
-const buildAddVideoAudioLabel = (stream) => {
+export const buildAddVideoAudioLabel = (stream) => {
   if (!stream) return "Non detecte";
   const parts = [
     stream.tags?.language,

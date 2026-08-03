@@ -19,6 +19,7 @@ import SeriesAndSeasonSelector from "./SeriesAndSeasonSelector"
 import VideoExportDrawer from "./VideoExportDrawer";
 import { buildCookieValue } from "../utils/cookieValue";
 import PaginationPage from "./PaginationPage";
+import ContentUniverseSection from "./ContentUniverseSection";
 
 
 const apiUrl = process.env.REACT_APP_URL_LOCAL;
@@ -62,6 +63,7 @@ const VideoSeePage = () => {
   const [multiAudioEnabled, setMultiAudioEnabled] = useState(false);
   const [resumeChoicePulse, setResumeChoicePulse] = useState(false);
   const [contentSagas, setContentSagas] = useState([]);
+  const [contentUniverses, setContentUniverses] = useState([]);
   const [sagaPage, setSagaPage] = useState(1);
   const [sagaTotalPages, setSagaTotalPages] = useState(1);
   const [sagaTotalItems, setSagaTotalItems] = useState(0);
@@ -391,6 +393,33 @@ const VideoSeePage = () => {
 
   useEffect(() => {
     fetchContentSagas(1);
+  }, [currentVideoId]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!currentVideoId) {
+      setContentUniverses([]);
+      return undefined;
+    }
+
+    setContentUniverses([]);
+    api.get(`/universes/content/video/${currentVideoId}`)
+      .then((response) => {
+        if (!cancelled) {
+          setContentUniverses(Array.isArray(response.data?.items) ? response.data.items : []);
+        }
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          console.error("Erreur lors de la récupération des univers du contenu :", error);
+          setContentUniverses([]);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, [currentVideoId]);
 
   const formatTimecode = (seconds) => {
@@ -824,6 +853,8 @@ const VideoSeePage = () => {
                 </div>
               </section>
             )}
+
+            <ContentUniverseSection universes={contentUniverses} />
 
             {renderSagaSection()}
 

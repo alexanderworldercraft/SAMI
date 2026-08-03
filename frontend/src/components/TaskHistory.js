@@ -115,6 +115,35 @@ const renderListValue = (items) => {
     return Array.isArray(items) ? items.join(", ") : items;
 };
 
+const VideoInformationGrid = ({ video }) => (
+    <dl className="mb-4 grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
+        <div>
+            <dt className="font-bold text-slate-500 dark:text-slate-400">Audio</dt>
+            <dd className="break-words font-semibold">
+                {video?.audioTracks?.length > 0
+                    ? renderListValue(video.audioTracks)
+                    : video?.audio || "Analyse en cours"}
+            </dd>
+        </div>
+        <div>
+            <dt className="font-bold text-slate-500 dark:text-slate-400">Sous-titres</dt>
+            <dd className="break-words font-semibold">{renderListValue(video?.subtitles)}</dd>
+        </div>
+        {video?.saisonNumero !== null && video?.saisonNumero !== undefined && (
+            <div>
+                <dt className="font-bold text-slate-500 dark:text-slate-400">Saison n°</dt>
+                <dd className="font-semibold">{video.saisonNumero}</dd>
+            </div>
+        )}
+        {video?.seriesTitre && (
+            <div>
+                <dt className="font-bold text-slate-500 dark:text-slate-400">Série</dt>
+                <dd className="break-words font-semibold">{video.seriesTitre}</dd>
+            </div>
+        )}
+    </dl>
+);
+
 const isFinishedStep = (step) => step.completed && !step.error;
 
 const encodingStatusLabels = {
@@ -215,6 +244,8 @@ const EncodingJobCard = ({
                     {formatEncodingStatus(job.status)}
                 </span>
             </div>
+
+            <VideoInformationGrid video={job.video} />
 
             <UploadProgressBar
                 progress={job.progress}
@@ -457,32 +488,7 @@ const TaskHistory = ({
                                 </div>
                             </div>
 
-                        <dl className="mb-4 grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
-                            <div>
-                                <dt className="font-bold text-slate-500 dark:text-slate-400">Audio</dt>
-                                <dd className="break-words font-semibold">
-                                    {task.video?.audioTracks?.length > 0
-                                        ? renderListValue(task.video.audioTracks)
-                                        : task.video?.audio || "Analyse en cours"}
-                                </dd>
-                            </div>
-                            <div>
-                                <dt className="font-bold text-slate-500 dark:text-slate-400">Sous-titres</dt>
-                                <dd className="break-words font-semibold">{renderListValue(task.video?.subtitles)}</dd>
-                            </div>
-                            {task.video?.saisonNumero !== null && task.video?.saisonNumero !== undefined && (
-                                <div>
-                                    <dt className="font-bold text-slate-500 dark:text-slate-400">Saison n°</dt>
-                                    <dd className="font-semibold">{task.video.saisonNumero}</dd>
-                                </div>
-                            )}
-                            {task.video?.seriesTitre && (
-                                <div>
-                                    <dt className="font-bold text-slate-500 dark:text-slate-400">Series</dt>
-                                    <dd className="break-words font-semibold">{task.video.seriesTitre}</dd>
-                                </div>
-                            )}
-                        </dl>
+                        <VideoInformationGrid video={task.video} />
 
                             <div className="grid gap-3">
                             {displayedSteps.map((step) => (

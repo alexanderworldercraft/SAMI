@@ -11,30 +11,55 @@ const listboxOptionsClass = "z-[9999] max-h-72 w-[var(--button-width)] overflow-
 
 const UniverseSagaManager = () => {
   const [universes, setUniverses] = useState([]);
-  const [sagas, setSagas] = useState([]);
+  const [catalog, setCatalog] = useState({ sagas: [], videos: [], series: [] });
   const [selectedUniverse, setSelectedUniverse] = useState(null);
-  const [selectedSaga, setSelectedSaga] = useState(null);
+  const [selectedItem, setSelectedItem] = useState(null);
   const [universeSearch, setUniverseSearch] = useState("");
-  const [sagaSearch, setSagaSearch] = useState("");
+  const [itemSearch, setItemSearch] = useState("");
   const [order, setOrder] = useState("");
   const [saving, setSaving] = useState(false);
   const [notification, setNotification] = useState(null);
 
-  const filteredSagas = useMemo(() => {
-    const search = sagaSearch.trim().toLowerCase();
-    if (!search) return sagas;
+  const items = useMemo(() => {
+    const sagaItems = (catalog.sagas || []).map((saga) => ({
+      key: `saga-${saga.SagaID}`,
+      id: saga.SagaID,
+      type: "saga",
+      label: saga.Titre,
+      meta: `Saga #${saga.SagaID}`,
+    }));
+    const filmItems = (catalog.videos || []).map((video) => ({
+      key: `video-${video.VideoID}`,
+      id: video.VideoID,
+      type: "video",
+      label: video.Titre,
+      meta: `Film #${video.VideoID}`,
+    }));
+    const seriesItems = (catalog.series || []).map((serie) => ({
+      key: `series-${serie.SeriesID}`,
+      id: serie.SeriesID,
+      type: "series",
+      label: serie.Titre,
+      meta: `Série #${serie.SeriesID}`,
+    }));
 
-    return sagas.filter((saga) =>
-      [saga.Titre, String(saga.SagaID)]
+    return [...sagaItems, ...filmItems, ...seriesItems]
+      .sort((left, right) => left.label.localeCompare(right.label));
+  }, [catalog]);
+
+  const filteredItems = useMemo(() => {
+    const search = itemSearch.trim().toLowerCase();
+    if (!search) return items;
+    return items.filter((item) =>
+      [item.label, item.meta, String(item.id)]
         .filter(Boolean)
         .some((value) => String(value).toLowerCase().includes(search))
     );
-  }, [sagaSearch, sagas]);
+  }, [itemSearch, items]);
 
   const filteredUniverses = useMemo(() => {
     const search = universeSearch.trim().toLowerCase();
     if (!search) return universes;
-
     return universes.filter((universe) =>
       [universe.Titre, String(universe.UniverseID)]
         .filter(Boolean)
@@ -49,15 +74,19 @@ const UniverseSagaManager = () => {
   useEffect(() => {
     const loadData = async () => {
       try {
-        const [universeResponse, sagaResponse] = await Promise.all([
+        const [universeResponse, catalogResponse] = await Promise.all([
           api.get("/universes/admin"),
-          api.get("/sagas/admin"),
+          api.get("/universes/admin/catalog"),
         ]);
         setUniverses(Array.isArray(universeResponse.data) ? universeResponse.data : []);
-        setSagas(Array.isArray(sagaResponse.data) ? sagaResponse.data : []);
+        setCatalog({
+          sagas: Array.isArray(catalogResponse.data?.sagas) ? catalogResponse.data.sagas : [],
+          videos: Array.isArray(catalogResponse.data?.videos) ? catalogResponse.data.videos : [],
+          series: Array.isArray(catalogResponse.data?.series) ? catalogResponse.data.series : [],
+        });
       } catch (error) {
-        console.error("Erreur lors du chargement des univers ou sagas :", error);
-        showNotification("Impossible de charger les univers ou sagas.", "⚠️", "error");
+        console.error("Erreur lors du chargement des univers et de leur catalogue :", error);
+        showNotification("Impossible de charger les univers ou les contenus.", "⚠️", "error");
       }
     };
 
@@ -66,27 +95,35 @@ const UniverseSagaManager = () => {
 
   const handleSubmit = async (event) => {
     event.preventDefault();
-
-    if (!selectedUniverse?.UniverseID || !selectedSaga?.SagaID) {
-      showNotification("Sélectionne un univers et une saga.", "⚠️", "error");
+    if (!selectedUniverse?.UniverseID || !selectedItem?.id) {
+      showNotification("Sélectionne un univers et un élément.", "⚠️", "error");
       return;
     }
 
     setSaving(true);
-
     try {
-      await api.post(`/universes/${selectedUniverse.UniverseID}/sagas`, {
-        SagaID: Number(selectedSaga.SagaID),
-        Ordre: order ? Number(order) : undefined,
-      });
-      setSelectedSaga(null);
+      const payload = { Ordre: order ? Number(order) : undefined };
+      if (selectedItem.type === "saga") {
+        await api.post(`/universes/${selectedUniverse.UniverseID}/sagas`, {
+          ...payload,
+          SagaID: Number(selectedItem.id),
+        });
+      } else {
+        await api.post(`/universes/${selectedUniverse.UniverseID}/contents`, {
+          ...payload,
+          type: selectedItem.type,
+          id: Number(selectedItem.id),
+        });
+      }
+
+      setSelectedItem(null);
       setUniverseSearch("");
-      setSagaSearch("");
+      setItemSearch("");
       setOrder("");
-      showNotification("Saga ajoutée à l'univers.", "✅", "success");
+      showNotification(`${selectedItem.meta.split(" #")[0]} ajouté à l'univers.`, "✅", "success");
     } catch (error) {
-      console.error("Erreur lors de l'ajout de la saga à l'univers :", error);
-      showNotification(error.response?.data?.error || "Impossible d'ajouter cette saga.", "⚠️", "error");
+      console.error("Erreur lors de l'ajout à l'univers :", error);
+      showNotification(error.response?.data?.error || "Impossible d'ajouter cet élément.", "⚠️", "error");
     } finally {
       setSaving(false);
     }
@@ -109,7 +146,10 @@ const UniverseSagaManager = () => {
         <form onSubmit={handleSubmit}>
           <div className="mb-5">
             <p className="text-sm font-bold uppercase text-sky-500 dark:text-sky-400">Univers</p>
-            <h3 className="mt-1 text-2xl font-black text-slate-950 dark:text-white">Ajouter une saga à un univers</h3>
+            <h3 className="mt-1 text-2xl font-black text-slate-950 dark:text-white">Ajouter un élément à un univers</h3>
+            <p className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">
+              Ajoute une saga, un film autonome ou une série complète à un univers existant.
+            </p>
           </div>
 
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -134,25 +174,21 @@ const UniverseSagaManager = () => {
                         className="w-full rounded-lg border border-sky-500/20 bg-slate-50 px-3 py-2 text-slate-900 placeholder:text-slate-400 focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-400/40 dark:bg-slate-900 dark:text-slate-100"
                       />
                     </div>
-                    {filteredUniverses.length > 0 ? (
-                      filteredUniverses.map((universe) => (
-                        <ListboxOption
-                          key={universe.UniverseID}
-                          value={universe}
-                          className={({ active }) =>
-                            `relative cursor-default select-none py-2.5 pl-10 pr-4 ${active ? "bg-sky-500/15 text-sky-700 dark:text-sky-300" : "text-slate-700 dark:text-slate-200"}`
-                          }
-                        >
-                          {({ selected }) => (
-                            <>
-                              <span className={`block truncate ${selected ? "font-semibold" : "font-normal"}`}>{universe.Titre}</span>
-                              <span className="block truncate text-xs text-slate-500 dark:text-slate-400">#{universe.UniverseID}</span>
-                              {selected && <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-sky-400"><CheckIcon className="size-5" /></span>}
-                            </>
-                          )}
-                        </ListboxOption>
-                      ))
-                    ) : (
+                    {filteredUniverses.length > 0 ? filteredUniverses.map((universe) => (
+                      <ListboxOption
+                        key={universe.UniverseID}
+                        value={universe}
+                        className={({ active }) => `relative cursor-default select-none py-2.5 pl-10 pr-4 ${active ? "bg-sky-500/15 text-sky-700 dark:text-sky-300" : "text-slate-700 dark:text-slate-200"}`}
+                      >
+                        {({ selected }) => (
+                          <>
+                            <span className={`block truncate ${selected ? "font-semibold" : "font-normal"}`}>{universe.Titre}</span>
+                            <span className="block truncate text-xs text-slate-500 dark:text-slate-400">#{universe.UniverseID}</span>
+                            {selected && <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-sky-400"><CheckIcon className="size-5" /></span>}
+                          </>
+                        )}
+                      </ListboxOption>
+                    )) : (
                       <div className="px-4 py-3 text-sm text-slate-500 dark:text-slate-400">Aucun univers trouvé.</div>
                     )}
                   </ListboxOptions>
@@ -166,11 +202,11 @@ const UniverseSagaManager = () => {
             </div>
 
             <div className="md:col-span-2">
-              <label className={labelClass}>Saga</label>
-              <Listbox value={selectedSaga} onChange={setSelectedSaga}>
+              <label className={labelClass}>Saga, film ou série</label>
+              <Listbox value={selectedItem} onChange={setSelectedItem}>
                 <div className="relative z-[60]">
                   <ListboxButton className={`${fieldClass} text-left`}>
-                    <span className="block truncate">{selectedSaga ? selectedSaga.Titre : "Choisir une saga..."}</span>
+                    <span className="block truncate">{selectedItem ? `${selectedItem.label} — ${selectedItem.meta}` : "Choisir un élément..."}</span>
                     <span className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2">
                       <ChevronUpDownIcon className="size-5 text-sky-500 dark:text-sky-300" />
                     </span>
@@ -179,33 +215,29 @@ const UniverseSagaManager = () => {
                     <div className="sticky top-0 z-10 bg-white px-3 py-3 dark:bg-slate-950">
                       <input
                         type="text"
-                        value={sagaSearch}
-                        onChange={(event) => setSagaSearch(event.target.value)}
+                        value={itemSearch}
+                        onChange={(event) => setItemSearch(event.target.value)}
                         onKeyDown={(event) => event.stopPropagation()}
-                        placeholder="Rechercher une saga..."
+                        placeholder="Rechercher une saga, un film ou une série..."
                         className="w-full rounded-lg border border-sky-500/20 bg-slate-50 px-3 py-2 text-slate-900 placeholder:text-slate-400 focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-400/40 dark:bg-slate-900 dark:text-slate-100"
                       />
                     </div>
-                    {filteredSagas.length > 0 ? (
-                      filteredSagas.map((saga) => (
-                        <ListboxOption
-                          key={saga.SagaID}
-                          value={saga}
-                          className={({ active }) =>
-                            `relative cursor-default select-none py-2.5 pl-10 pr-4 ${active ? "bg-sky-500/15 text-sky-700 dark:text-sky-300" : "text-slate-700 dark:text-slate-200"}`
-                          }
-                        >
-                          {({ selected }) => (
-                            <>
-                              <span className={`block truncate ${selected ? "font-semibold" : "font-normal"}`}>{saga.Titre}</span>
-                              <span className="block truncate text-xs text-slate-500 dark:text-slate-400">#{saga.SagaID}</span>
-                              {selected && <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-sky-400"><CheckIcon className="size-5" /></span>}
-                            </>
-                          )}
-                        </ListboxOption>
-                      ))
-                    ) : (
-                      <div className="px-4 py-3 text-sm text-slate-500 dark:text-slate-400">Aucune saga trouvée.</div>
+                    {filteredItems.length > 0 ? filteredItems.map((item) => (
+                      <ListboxOption
+                        key={item.key}
+                        value={item}
+                        className={({ active }) => `relative cursor-default select-none py-2.5 pl-10 pr-4 ${active ? "bg-sky-500/15 text-sky-700 dark:text-sky-300" : "text-slate-700 dark:text-slate-200"}`}
+                      >
+                        {({ selected }) => (
+                          <>
+                            <span className={`block truncate ${selected ? "font-semibold" : "font-normal"}`}>{item.label}</span>
+                            <span className="block truncate text-xs text-slate-500 dark:text-slate-400">{item.meta}</span>
+                            {selected && <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-sky-400"><CheckIcon className="size-5" /></span>}
+                          </>
+                        )}
+                      </ListboxOption>
+                    )) : (
+                      <div className="px-4 py-3 text-sm text-slate-500 dark:text-slate-400">Aucun élément trouvé.</div>
                     )}
                   </ListboxOptions>
                 </div>

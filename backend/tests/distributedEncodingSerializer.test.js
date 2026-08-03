@@ -39,7 +39,14 @@ describe("sérialisation de l'encodage distribué", () => {
       SourceOriginalName: "source.mkv",
       SourceSize: 9_007_199_254_740_993n,
       SourceSha256: "a".repeat(64),
-      RequestSnapshot: {},
+      RequestSnapshot: {
+        title: "Épisode distribué",
+        audio: "jpn - AAC - 2 canaux",
+        audioTracks: ["Japonais", "Français"],
+        subtitles: [{ label: "Français forcés", filename: "fr.vtt" }],
+        seasonNumber: 2,
+        seriesTitle: "Série de test",
+      },
       PipelineVersion: "sami-hls-libx264-aac-v1",
       EncodingSpecHash: "b".repeat(64),
       CancelRequested: false,
@@ -71,9 +78,17 @@ describe("sérialisation de l'encodage distribué", () => {
     }, { now: date });
 
     expect(serialized.sourceSize).toBe("9007199254740993");
-    expect(serialized.title).toBe("source.mkv");
+    expect(serialized.title).toBe("Épisode distribué");
     expect(serialized.noCloneSinceAt).toBe(date.toISOString());
     expect(serialized.elapsedMs).toBe(120_000);
+    expect(serialized.video).toEqual({
+      titre: "Épisode distribué",
+      audio: "jpn - AAC - 2 canaux",
+      audioTracks: ["Japonais", "Français"],
+      subtitles: ["Français forcés"],
+      saisonNumero: 2,
+      seriesTitre: "Série de test",
+    });
     expect(serialized.tasks[0]).toMatchObject({
       weight: "1080",
       preferredWorkerId: "clone-01",
