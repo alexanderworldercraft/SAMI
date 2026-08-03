@@ -97,7 +97,7 @@ const tabs = [
   { id: "sagas", name: "Sagas", icon: UsersIcon },
   { id: "saga-content", name: "Contenus saga", icon: BuildingOfficeIcon },
   { id: "universes", name: "Univers", icon: UsersIcon },
-  { id: "universe-sagas", name: "Sagas univers", icon: BuildingOfficeIcon },
+  { id: "universe-sagas", name: "Contenus univers", icon: BuildingOfficeIcon },
 ];
 
 const FormNewVideoPage = () => {

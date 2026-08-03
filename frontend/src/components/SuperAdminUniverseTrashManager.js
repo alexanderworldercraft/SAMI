@@ -116,7 +116,7 @@ const SuperAdminUniverseTrashManager = () => {
         <p className="text-sm font-bold uppercase text-sky-500 dark:text-sky-400">Super administration</p>
         <h2 className="mt-1 text-2xl font-black text-slate-950 dark:text-white">Corbeille univers</h2>
         <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-300">
-          Restaure un univers ou supprime définitivement ses liaisons avec les sagas.
+          Restaure un univers ou supprime définitivement ses liaisons avec les sagas, films et séries.
         </p>
       </div>
 
@@ -172,7 +172,7 @@ const SuperAdminUniverseTrashManager = () => {
           <div className="w-full max-w-md rounded-2xl border border-red-300/20 bg-white p-6 shadow-2xl dark:bg-slate-950 dark:text-white">
             <h3 className="text-xl font-black text-slate-950 dark:text-white">Suppression définitive</h3>
             <p className="mt-3 text-sm leading-6 text-slate-600 dark:text-slate-300">
-              Supprimer définitivement "{pendingDelete.Titre}" ? Cette action retire les liaisons avec les sagas et supprime l'univers. Les sagas ne seront pas supprimées.
+              Supprimer définitivement "{pendingDelete.Titre}" ? Cette action retire ses liaisons avec les sagas, films et séries, puis supprime l'univers. Les contenus liés ne seront pas supprimés.
             </p>
             <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
               <button type="button" onClick={() => setPendingDelete(null)} disabled={saving} className="inline-flex items-center justify-center rounded-lg border border-slate-300/60 bg-white px-5 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-100 disabled:opacity-60 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200">Annuler</button>

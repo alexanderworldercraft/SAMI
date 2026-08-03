@@ -58,6 +58,7 @@ model Series {
   SeriesGenres         SeriesGenre[]
   SeriesPersonne       SeriesPersonne[]
   SagaContents         SagaContent[]
+  UniverseContents     UniverseContent[]
   UserSeriesWatchReset UserSeriesWatchReset[]
   GenreFeaturedContent GenreFeaturedContent[]
   UserFavoriteContent  UserFavoriteContent[]
@@ -111,6 +112,7 @@ model Video {
   VideoGenres          VideoGenre[]
   VideoPersonne        VideoPersonne[]
   SagaContents         SagaContent[]
+  UniverseContents     UniverseContent[]
   UserVideoProgress    UserVideoProgress[]
   VideoSubtitles       VideoSubtitle[]
   VideoAudioTracks     VideoAudioTrack[]
@@ -403,13 +405,14 @@ model Saga {
 }
 
 model Universe {
-  UniverseID    Int            @id @default(autoincrement())
-  Titre         String         @db.VarChar(100)
-  Resume        String?        @db.Text
-  EtatID        Int
-  CreateDate    DateTime?      @default(now())
-  Etat          Etat           @relation(fields: [EtatID], references: [EtatID])
-  UniverseSagas UniverseSaga[]
+  UniverseID       Int               @id @default(autoincrement())
+  Titre            String            @db.VarChar(100)
+  Resume           String?           @db.Text
+  EtatID           Int
+  CreateDate       DateTime?         @default(now())
+  Etat             Etat              @relation(fields: [EtatID], references: [EtatID])
+  UniverseSagas    UniverseSaga[]
+  UniverseContents UniverseContent[]
 
   @@index([EtatID], map: "Universe_EtatID_fkey")
 }
@@ -426,6 +429,24 @@ model UniverseSaga {
   @@unique([UniverseID, SagaID], map: "uniq_universe_saga")
   @@index([UniverseID, Ordre], map: "idx_universe_saga_order")
   @@index([SagaID], map: "UniverseSaga_SagaID_fkey")
+}
+
+model UniverseContent {
+  UniverseContentID Int       @id @default(autoincrement())
+  UniverseID        Int
+  VideoID           Int?
+  SeriesID          Int?
+  Ordre             Int       @default(0)
+  CreateDate        DateTime? @default(now())
+  Universe          Universe  @relation(fields: [UniverseID], references: [UniverseID], onDelete: Cascade)
+  Video             Video?    @relation(fields: [VideoID], references: [VideoID], onDelete: Cascade)
+  Series            Series?   @relation(fields: [SeriesID], references: [SeriesID], onDelete: Cascade)
+
+  @@unique([UniverseID, VideoID], map: "uniq_universe_video")
+  @@unique([UniverseID, SeriesID], map: "uniq_universe_series")
+  @@index([UniverseID, Ordre], map: "idx_universe_content_order")
+  @@index([VideoID], map: "UniverseContent_VideoID_fkey")
+  @@index([SeriesID], map: "UniverseContent_SeriesID_fkey")
 }
 
 model SagaContent {
