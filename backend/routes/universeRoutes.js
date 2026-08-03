@@ -7,6 +7,7 @@ import {
   getUniverseAdminCatalog,
   getUniverseAdminDetails,
   getUniverses,
+  getUniversesForContent,
   permanentlyDeleteUniverse,
   removeUniverseContent,
   removeUniverseSaga,
@@ -23,6 +24,7 @@ export default async function (fastify) {
   fastify.get("/admin", { preHandler: authMiddleware }, getAdminUniverses);
   fastify.get("/admin/catalog", { preHandler: authMiddleware }, getUniverseAdminCatalog);
   fastify.get("/admin/deleted", { preHandler: authMiddleware }, getDeletedUniverses);
+  fastify.get("/content/video/:videoId", { preHandler: authMiddleware }, getUniversesForContent);
   fastify.get("/:id/admin", { preHandler: authMiddleware }, getUniverseAdminDetails);
 
   fastify.post("/", { preHandler: authMiddleware }, createUniverse);

@@ -48,5 +48,42 @@ describe("SagaListPage - univers mixtes", () => {
     expect(screen.getByText("video:Rogue One")).toBeInTheDocument();
     expect(screen.getByText("series:The Mandalorian")).toBeInTheDocument();
     expect(screen.queryByText("saga:Ancienne réponse")).not.toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Star Wars" })).toHaveAttribute("id", "universe-12");
+  });
+
+  test("fait défiler la page vers l'univers demandé par le lien", async () => {
+    const originalRequestAnimationFrame = window.requestAnimationFrame;
+    const originalCancelAnimationFrame = window.cancelAnimationFrame;
+    const originalScrollIntoView = Element.prototype.scrollIntoView;
+    window.requestAnimationFrame = jest.fn((callback) => {
+      callback();
+      return 1;
+    });
+    window.cancelAnimationFrame = jest.fn();
+    Element.prototype.scrollIntoView = jest.fn();
+    window.location.hash = "#universe-12";
+    api.get.mockResolvedValue({
+      data: {
+        items: [{
+          UniverseID: 12,
+          Titre: "Star Wars",
+          Items: [{ id: 42, type: "video", Titre: "Rogue One", Ordre: 1 }],
+        }],
+      },
+    });
+
+    render(<SagaListPage />);
+
+    await waitFor(() => {
+      expect(Element.prototype.scrollIntoView).toHaveBeenCalledWith({
+        behavior: "smooth",
+        block: "start",
+      });
+    });
+
+    window.location.hash = "";
+    window.requestAnimationFrame = originalRequestAnimationFrame;
+    window.cancelAnimationFrame = originalCancelAnimationFrame;
+    Element.prototype.scrollIntoView = originalScrollIntoView;
   });
 });

@@ -1162,6 +1162,11 @@
     height: calc(var(--spacing) * 10);
   }
 
+  .size-11 {
+    width: calc(var(--spacing) * 11);
+    height: calc(var(--spacing) * 11);
+  }
+
   .size-12 {
     width: calc(var(--spacing) * 12);
     height: calc(var(--spacing) * 12);
@@ -1738,6 +1743,10 @@
 
   .resize-y {
     resize: vertical;
+  }
+
+  .scroll-mt-24 {
+    scroll-margin-top: calc(var(--spacing) * 24);
   }
 
   .scroll-mt-28 {
@@ -4073,6 +4082,20 @@
 
   .from-violet-500 {
     --tw-gradient-from: var(--color-violet-500);
+    --tw-gradient-stops: var(--tw-gradient-via-stops, var(--tw-gradient-position), var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-to) var(--tw-gradient-to-position));
+  }
+
+  .from-violet-500\/15 {
+    --tw-gradient-from: #8d54ff26;
+  }
+
+  @supports (color: color-mix(in lab, red, red)) {
+    .from-violet-500\/15 {
+      --tw-gradient-from: color-mix(in oklab, var(--color-violet-500) 15%, transparent);
+    }
+  }
+
+  .from-violet-500\/15 {
     --tw-gradient-stops: var(--tw-gradient-via-stops, var(--tw-gradient-position), var(--tw-gradient-from) var(--tw-gradient-from-position), var(--tw-gradient-to) var(--tw-gradient-to-position));
   }
 
@@ -6554,6 +6577,16 @@
       }
     }
 
+    .hover\:border-sky-400\/50:hover {
+      border-color: #00bcfe80;
+    }
+
+    @supports (color: color-mix(in lab, red, red)) {
+      .hover\:border-sky-400\/50:hover {
+        border-color: color-mix(in oklab, var(--color-sky-400) 50%, transparent);
+      }
+    }
+
     .hover\:border-sky-400\/60:hover {
       border-color: #00bcfe99;
     }
@@ -6970,6 +7003,11 @@
 
     .hover\:text-white:hover {
       color: var(--color-white);
+    }
+
+    .hover\:shadow-lg:hover {
+      --tw-shadow: 0 10px 15px -3px var(--tw-shadow-color, #0000001a), 0 4px 6px -4px var(--tw-shadow-color, #0000001a);
+      box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow);
     }
 
     .hover\:shadow-md:hover {
@@ -8006,6 +8044,10 @@
 
     .xl\:grid-cols-3 {
       grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .xl\:grid-cols-4 {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
     }
 
     .xl\:grid-cols-8 {

@@ -14,7 +14,7 @@ vi.mock("../services/db.js", () => ({
       findMany: vi.fn(),
       update: vi.fn(),
     },
-    video: { findFirst: vi.fn() },
+    video: { findFirst: vi.fn(), findUnique: vi.fn() },
     series: { findFirst: vi.fn() },
   },
 }));
@@ -23,6 +23,7 @@ import {
   addUniverseContent,
   formatUniverseContent,
   getUniverses,
+  getUniversesForContent,
   sortUniverseItems,
   updateUniverseItemsOrder,
 } from "../controllers/universeController.js";
@@ -253,5 +254,65 @@ describe("universeController - contenus mixtes", () => {
     });
     expect(prisma.$transaction).toHaveBeenCalledTimes(1);
     expect(reply.send).toHaveBeenCalledWith({ ok: true });
+  });
+
+  it("retrouve tous les univers réels d'un épisode via la série et ses sagas", async () => {
+    prisma.video.findUnique.mockResolvedValue({
+      VideoID: 77,
+      EtatID: 1,
+      Saison: { SeriesID: 6 },
+    });
+    prisma.universe.findMany.mockResolvedValue([
+      { UniverseID: 12, Titre: "Star Wars", Resume: "" },
+      { UniverseID: 18, Titre: "Univers chronologique", Resume: "" },
+    ]);
+    const reply = createReply();
+
+    await getUniversesForContent({ params: { videoId: "77" } }, reply);
+
+    const membershipFilters = [{ VideoID: 77 }, { SeriesID: 6 }];
+    expect(prisma.universe.findMany).toHaveBeenCalledWith({
+      where: {
+        EtatID: 1,
+        OR: [
+          {
+            UniverseContents: {
+              some: { OR: membershipFilters },
+            },
+          },
+          {
+            UniverseSagas: {
+              some: {
+                Saga: {
+                  EtatID: 1,
+                  SagaContents: {
+                    some: { OR: membershipFilters },
+                  },
+                },
+              },
+            },
+          },
+        ],
+      },
+      orderBy: [{ Titre: "asc" }, { UniverseID: "asc" }],
+      select: { UniverseID: true, Titre: true, Resume: true },
+    });
+    expect(reply.send).toHaveBeenCalledWith({
+      items: [
+        { UniverseID: 12, Titre: "Star Wars", Resume: "" },
+        { UniverseID: 18, Titre: "Univers chronologique", Resume: "" },
+      ],
+      totalItems: 2,
+    });
+  });
+
+  it("ne fabrique pas l'univers par défaut pour une saga orpheline", async () => {
+    prisma.video.findUnique.mockResolvedValue({ VideoID: 42, EtatID: 1, Saison: null });
+    prisma.universe.findMany.mockResolvedValue([]);
+    const reply = createReply();
+
+    await getUniversesForContent({ params: { videoId: "42" } }, reply);
+
+    expect(reply.send).toHaveBeenCalledWith({ items: [], totalItems: 0 });
   });
 });

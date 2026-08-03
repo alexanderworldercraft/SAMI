@@ -62,6 +62,17 @@ const SagaListPage = () => {
     return () => window.clearTimeout(timer);
   }, [search, sort]);
 
+  useEffect(() => {
+    const targetId = decodeURIComponent(window.location.hash.replace(/^#/, ""));
+    if (!targetId || !universes.some((universe) => `universe-${universe.UniverseID}` === targetId)) return;
+
+    const animationFrame = window.requestAnimationFrame(() => {
+      document.getElementById(targetId)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+
+    return () => window.cancelAnimationFrame(animationFrame);
+  }, [universes]);
+
   const openSaga = async (saga) => {
     setSelectedSaga(saga);
     setSagaDetails(null);
@@ -156,6 +167,8 @@ const SagaListPage = () => {
             return (
               <section
                 key={universe.UniverseID}
+                id={`universe-${universe.UniverseID}`}
+                aria-labelledby={`universe-title-${universe.UniverseID}`}
                 ref={(element) => {
                   if (element) {
                     sectionRefs.current[universeKey] = element;
@@ -163,11 +176,11 @@ const SagaListPage = () => {
                     delete sectionRefs.current[universeKey];
                   }
                 }}
-                className="overflow-hidden rounded-2xl border border-sky-500/10 bg-white/80 p-5 shadow-xl shadow-slate-950/5 backdrop-blur dark:bg-slate-950/70 dark:shadow-sky-950/20"
+                className="scroll-mt-24 overflow-hidden rounded-2xl border border-sky-500/10 bg-white/80 p-5 shadow-xl shadow-slate-950/5 backdrop-blur dark:bg-slate-950/70 dark:shadow-sky-950/20"
               >
                 <div className="mb-4">
                   <p className="text-sm font-bold uppercase text-sky-500 dark:text-sky-400">Univers</p>
-                  <h2 className="mt-1 text-2xl font-black text-slate-950 dark:text-white">{universe.Titre}</h2>
+                  <h2 id={`universe-title-${universe.UniverseID}`} className="mt-1 text-2xl font-black text-slate-950 dark:text-white">{universe.Titre}</h2>
                   {universe.Resume && (
                     <p className="mt-2 line-clamp-3 text-sm leading-6 text-slate-600 dark:text-slate-300">{universe.Resume}</p>
                   )}

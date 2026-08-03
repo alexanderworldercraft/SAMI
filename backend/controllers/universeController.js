@@ -366,6 +366,71 @@ export const getUniverses = async (request, reply) => {
   }
 };
 
+export const getUniversesForContent = async (request, reply) => {
+  const videoId = parsePositiveInt(request.params?.videoId);
+  if (!videoId) return reply.status(400).send({ error: "VideoID invalide." });
+
+  try {
+    const video = await prisma.video.findUnique({
+      where: { VideoID: videoId },
+      select: {
+        VideoID: true,
+        EtatID: true,
+        Saison: {
+          select: { SeriesID: true },
+        },
+      },
+    });
+
+    if (!video || video.EtatID !== ACTIVE_ETAT_ID) {
+      return reply.status(404).send({ error: "Vidéo introuvable." });
+    }
+
+    const membershipFilters = [
+      { VideoID: videoId },
+      ...(video.Saison?.SeriesID ? [{ SeriesID: video.Saison.SeriesID }] : []),
+    ];
+    const universes = await prisma.universe.findMany({
+      where: {
+        EtatID: ACTIVE_ETAT_ID,
+        OR: [
+          {
+            UniverseContents: {
+              some: { OR: membershipFilters },
+            },
+          },
+          {
+            UniverseSagas: {
+              some: {
+                Saga: {
+                  EtatID: ACTIVE_ETAT_ID,
+                  SagaContents: {
+                    some: { OR: membershipFilters },
+                  },
+                },
+              },
+            },
+          },
+        ],
+      },
+      orderBy: [{ Titre: "asc" }, { UniverseID: "asc" }],
+      select: {
+        UniverseID: true,
+        Titre: true,
+        Resume: true,
+      },
+    });
+
+    return reply.send({
+      items: universes,
+      totalItems: universes.length,
+    });
+  } catch (error) {
+    console.error("Erreur lors de la récupération des univers du contenu :", error);
+    return reply.status(500).send({ error: "Erreur lors de la récupération des univers du contenu." });
+  }
+};
+
 export const getAdminUniverses = async (request, reply) => {
   const admin = await ensureUniverseAdmin(request, reply);
   if (!admin) return;
