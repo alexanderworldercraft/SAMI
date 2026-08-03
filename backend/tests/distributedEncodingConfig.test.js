@@ -41,6 +41,8 @@ describe("configuration de l'encodage distribué", () => {
       primaryMaxNominalHeight: 360,
       maxSlots: 1,
       cacheMaxBytes: 50 * 1024 * 1024 * 1024,
+      artifactRetentionDays: 1,
+      jobRetentionDays: 30,
       failedCacheTtlMs: 24 * 60 * 60 * 1000,
       retryBackoffMs: [15_000, 60_000, 300_000],
     });
@@ -68,6 +70,22 @@ describe("configuration de l'encodage distribué", () => {
     expect(config.sharedSecret).toBe(secret);
     expect(config.primaryBaseUrl).toBeInstanceOf(URL);
     expect(config.primaryBaseUrl.origin).toBe("https://primary.test");
+  });
+
+  it("valide et expose les deux durées de rétention BDD", () => {
+    const config = getDistributedEncodingConfig(primaryEnv({
+      SAMI_DISTRIBUTED_ENCODING_ARTIFACT_RETENTION_DAYS: "2",
+      SAMI_DISTRIBUTED_ENCODING_JOB_RETENTION_DAYS: "45",
+    }));
+
+    expect(config.artifactRetentionDays).toBe(2);
+    expect(config.jobRetentionDays).toBe(45);
+    expect(() => getDistributedEncodingConfig(primaryEnv({
+      SAMI_DISTRIBUTED_ENCODING_ARTIFACT_RETENTION_DAYS: "0",
+    }))).toThrow(/ARTIFACT_RETENTION_DAYS/);
+    expect(() => getDistributedEncodingConfig(primaryEnv({
+      SAMI_DISTRIBUTED_ENCODING_JOB_RETENTION_DAYS: "1.5",
+    }))).toThrow(/JOB_RETENTION_DAYS/);
   });
 
   it("refuse les assertions si l'expérimentation est désactivée ou le rôle faux", () => {

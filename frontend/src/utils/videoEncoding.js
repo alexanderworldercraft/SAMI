@@ -119,6 +119,9 @@ export const normalizeVideoEncodingJob = (job = {}) => ({
     || job.video?.title
     || job.sourceOriginalName
     || "Encodage multi-server",
+  video: job.video && typeof job.video === "object"
+    ? job.video
+    : null,
   status: String(job.status || job.state || "queued").toLowerCase(),
   currentStep: job.currentStep || job.step || null,
   progress: clampEncodingProgress(job.progress ?? job.Progress),

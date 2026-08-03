@@ -28,6 +28,14 @@ describe("TaskHistory - jobs multi-server persistants", () => {
             status: "RUNNING",
             currentStep: "Encodage réparti",
             progress: 42,
+            video: {
+              titre: "Film distribué",
+              audio: "jpn - AAC - 2 canaux",
+              audioTracks: ["Japonais", "Français"],
+              subtitles: ["Français forcés"],
+              saisonNumero: 2,
+              seriesTitre: "Série distribuée",
+            },
             tasks: [
               {
                 id: "task-360",
@@ -51,6 +59,9 @@ describe("TaskHistory - jobs multi-server persistants", () => {
     expect(screen.getByText("360p · Clone 01 47%")).toBeInTheDocument();
     expect(screen.getByText("Encodage")).toBeInTheDocument();
     expect(screen.getByText("Tentative 2/3")).toBeInTheDocument();
+    expect(screen.getByText("Japonais, Français")).toBeInTheDocument();
+    expect(screen.getByText("Français forcés")).toBeInTheDocument();
+    expect(screen.getByText("Série distribuée")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Annuler le job" }));
     expect(onCancelDistributedJob).toHaveBeenCalledWith("job-01");
   });

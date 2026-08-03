@@ -157,6 +157,8 @@ Les principales variables du backend sont :
 | `SAMI_TRANSFER_CONCURRENCY` | Nombre maximal de fichiers envoyés simultanément par un clone |
 | `SAMI_DISTRIBUTED_ENCODING_ENABLED` | Kill switch serveur de l’encodage distribué, à activer sur le primary et chaque clone après le déploiement |
 | `SAMI_DISTRIBUTED_ENCODING_PIPELINE_VERSION` | Version de pipeline qui doit être identique sur tous les workers |
+| `SAMI_DISTRIBUTED_ENCODING_ARTIFACT_RETENTION_DAYS` | Durée de conservation des lignes `VideoEncodingArtifactFile` terminées sur le primary, 1 jour par défaut |
+| `SAMI_DISTRIBUTED_ENCODING_JOB_RETENTION_DAYS` | Durée de conservation des jobs terminés et de leurs tâches/tentatives, 30 jours par défaut |
 | `SAMI_DISTRIBUTED_ENCODING_SOURCE_ROOT` | Stockage privé optionnel des sources sur le primary |
 | `SAMI_DISTRIBUTED_ENCODING_CACHE_ROOT` | Cache privé optionnel des sources sur un clone, plafonné à 50 Gio |
 | `SAMI_DISTRIBUTED_ENCODING_STAGING_ROOT` | Staging privé optionnel des artefacts et tentatives |
@@ -205,7 +207,15 @@ SAMI_PRIMARY_BASE_URL="https://sami.worldercraft.fr"
 SAMI_TRANSFER_SHARED_SECRET="<même-secret-fort-sur-toutes-les-instances>"
 SAMI_DISTRIBUTED_ENCODING_ENABLED="true"
 SAMI_DISTRIBUTED_ENCODING_PIPELINE_VERSION="sami-hls-libx264-aac-v1"
+SAMI_DISTRIBUTED_ENCODING_ARTIFACT_RETENTION_DAYS="1"
+SAMI_DISTRIBUTED_ENCODING_JOB_RETENTION_DAYS="30"
 ```
+
+Sur le primary, la purge s'exécute au démarrage puis pendant la maintenance
+horaire. Elle conserve toujours les jobs actifs ou encore récupérables. Les
+lignes d'artefacts des jobs terminés sont supprimées en premier, puis la
+suppression d'un job expiré retire en cascade ses tâches, ses tentatives et les
+éventuels artefacts restants.
 
 Configuration minimale d’un clone :
 

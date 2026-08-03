@@ -8,9 +8,13 @@ import { VIDEO_TRANSFER_BLOCK_MARKER } from "../videoTransferConfig.js";
 import { cleanupReservedImportedVideo } from "../video/videoImportPersistenceService.js";
 import {
   ACTIVE_ENCODING_JOB_STATUSES,
+  DISTRIBUTED_ENCODING_ARTIFACT_RETENTION_DAYS,
   DISTRIBUTED_ENCODING_INGESTING_TIMEOUT_MS,
+  DISTRIBUTED_ENCODING_JOB_RETENTION_DAYS,
   DISTRIBUTED_ENCODING_ORPHAN_WORKSPACE_TTL_MS,
   DISTRIBUTED_ENCODING_PLANNING_TIMEOUT_MS,
+  DISTRIBUTED_ENCODING_RETENTION_ARTIFACT_BATCH_SIZE,
+  DISTRIBUTED_ENCODING_RETENTION_JOB_BATCH_SIZE,
   ENCODING_JOB_STATUS,
   ENCODING_TASK_STATUS,
   INCOMPLETE_ENCODING_CLEANUP_STEP,
@@ -31,6 +35,7 @@ import {
 import { taskOutputPrefix } from "./artifactManifest.js";
 
 const FAILURE_RETENTION_MS = 24 * 60 * 60 * 1000;
+const DAY_MS = 24 * 60 * 60 * 1000;
 const WORKSPACE_JOB_ID_PATTERN =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 
@@ -451,6 +456,74 @@ const recoverMissingAcceptedArtifacts = async (job) => {
   return { promoted, reset };
 };
 
+const terminalHistoryWhere = (cutoff) => ({
+  CompletedAt: { lte: cutoff },
+  OR: [
+    { Status: ENCODING_JOB_STATUS.COMPLETED },
+    { Status: ENCODING_JOB_STATUS.CANCELLED },
+    {
+      Status: ENCODING_JOB_STATUS.FAILED,
+      CurrentStep: { in: ["expired", INCOMPLETE_ENCODING_EXPIRED_STEP] },
+    },
+  ],
+});
+
+export async function purgeDistributedEncodingHistory({
+  now = new Date(),
+  database = prisma,
+  artifactRetentionDays = DISTRIBUTED_ENCODING_ARTIFACT_RETENTION_DAYS,
+  jobRetentionDays = DISTRIBUTED_ENCODING_JOB_RETENTION_DAYS,
+  artifactBatchSize = DISTRIBUTED_ENCODING_RETENTION_ARTIFACT_BATCH_SIZE,
+  jobBatchSize = DISTRIBUTED_ENCODING_RETENTION_JOB_BATCH_SIZE,
+} = {}) {
+  const instant = new Date(now);
+  const artifactCutoff = new Date(
+    instant.getTime() - artifactRetentionDays * DAY_MS
+  );
+  const jobCutoff = new Date(instant.getTime() - jobRetentionDays * DAY_MS);
+  const artifactJobWhere = terminalHistoryWhere(artifactCutoff);
+  const jobWhere = terminalHistoryWhere(jobCutoff);
+
+  const artifactRows = await database.videoEncodingArtifactFile.findMany({
+    where: { Attempt: { Task: { Job: artifactJobWhere } } },
+    select: { VideoEncodingArtifactFileID: true },
+    orderBy: { CreatedAt: "asc" },
+    take: Math.max(1, Number(artifactBatchSize) || 1),
+  });
+  const artifactIds = artifactRows.map((row) => row.VideoEncodingArtifactFileID);
+  const deletedArtifacts = artifactIds.length > 0
+    ? await database.videoEncodingArtifactFile.deleteMany({
+        where: {
+          VideoEncodingArtifactFileID: { in: artifactIds },
+          Attempt: { Task: { Job: artifactJobWhere } },
+        },
+      })
+    : { count: 0 };
+
+  const expiredJobs = await database.videoEncodingJob.findMany({
+    where: jobWhere,
+    select: { VideoEncodingJobID: true },
+    orderBy: { CompletedAt: "asc" },
+    take: Math.max(1, Number(jobBatchSize) || 1),
+  });
+  const jobIds = expiredJobs.map((job) => job.VideoEncodingJobID);
+  const deletedJobs = jobIds.length > 0
+    ? await database.videoEncodingJob.deleteMany({
+        where: {
+          VideoEncodingJobID: { in: jobIds },
+          ...jobWhere,
+        },
+      })
+    : { count: 0 };
+
+  return {
+    artifactRetentionDays,
+    jobRetentionDays,
+    artifactsDeleted: deletedArtifacts.count,
+    jobsDeleted: deletedJobs.count,
+  };
+}
+
 export async function runDistributedEncodingMaintenance({ cleanup = false } = {}) {
   const [reclaimedLeases, prunedNonces, incompleteJobs, orphanWorkspaces] =
     await Promise.all([
@@ -536,6 +609,20 @@ export async function runDistributedEncodingMaintenance({ cleanup = false } = {}
     jobsAdvanced += 1;
   }
 
+  const retentionConfig = cleanup ? getDistributedEncodingConfig() : null;
+  const retention = cleanup
+    ? await purgeDistributedEncodingHistory({
+        now: new Date(now),
+        artifactRetentionDays: retentionConfig.artifactRetentionDays,
+        jobRetentionDays: retentionConfig.jobRetentionDays,
+      })
+    : {
+        artifactRetentionDays: null,
+        jobRetentionDays: null,
+        artifactsDeleted: 0,
+        jobsDeleted: 0,
+      };
+
   return {
     reclaimedLeases,
     prunedNonces: prunedNonces.count,
@@ -546,5 +633,6 @@ export async function runDistributedEncodingMaintenance({ cleanup = false } = {}
     incompleteJobs,
     incompleteJobsWaiting,
     orphanWorkspaces,
+    retention,
   };
 }
