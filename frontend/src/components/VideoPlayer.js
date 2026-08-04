@@ -10,8 +10,23 @@ const AMBIENT_LIGHT_STORAGE_KEY = "sami-ambient-light-enabled";
 const AMBIENT_LIGHT_DEFAULT_COLOR = "rgb(3, 3, 3)";
 const AMBIENT_LIGHT_REFRESH_MS = 200;
 const PLAYER_SEEK_SECONDS = 15;
+const PLAYER_VOLUME_STEP = 0.05;
 const PLAYER_SINGLE_CLICK_DELAY_MS = 300;
 const PLAYER_CONTROLS_HIDE_DELAY_MS = 3000;
+const PLAYER_KEYBOARD_SHORTCUTS = [
+  { key: "←", label: "Reculer de 15 secondes" },
+  { key: "→", label: "Avancer de 15 secondes" },
+  { key: "↑", label: "Augmenter le volume" },
+  { key: "↓", label: "Réduire le volume" },
+  { key: "Espace", label: "Lecture / pause" },
+];
+const PLAYER_CLICK_COMMANDS = [
+  { key: "1 clic", label: "Afficher / masquer les contrôles" },
+  { key: "Centre", label: "Lecture / pause" },
+  { key: "2× gauche", label: "Reculer de 15 secondes" },
+  { key: "2× centre", label: "Basculer en plein écran" },
+  { key: "2× droite", label: "Avancer de 15 secondes" },
+];
 const PLAYER_CENTER_TARGET = {
   widthRatio: 0.24,
   minWidth: 120,
@@ -31,6 +46,10 @@ const formatPlaybackTime = (seconds) => {
     ? `${hours}:${String(minutes).padStart(2, "0")}:${String(remainingSeconds).padStart(2, "0")}`
     : `${minutes}:${String(remainingSeconds).padStart(2, "0")}`;
 };
+
+const isInteractiveShortcutTarget = (target) => Boolean(target?.closest?.(
+  'input, textarea, select, button, a[href], [contenteditable]:not([contenteditable="false"]), [role="button"], [role="link"], [role="menuitem"], [role="menuitemradio"], [role="slider"], [role="textbox"], [role="combobox"], [role="spinbutton"], [role="switch"], [role="checkbox"], [role="radio"], [role="tab"]'
+));
 
 const VideoPlayer = ({
   video,
@@ -63,6 +82,7 @@ const VideoPlayer = ({
   const [availableAudioTracks, setAvailableAudioTracks] = useState([]);
   const [selectedAudioTrackIndex, setSelectedAudioTrackIndex] = useState(-1);
   const [audioMenuOpen, setAudioMenuOpen] = useState(false);
+  const [keyboardHelpOpen, setKeyboardHelpOpen] = useState(false);
   const [previewCues, setPreviewCues] = useState([]);
   const [hoverPreview, setHoverPreview] = useState(null);
   const [ambientLightEnabled, setAmbientLightEnabled] = useState(() => {
@@ -100,6 +120,7 @@ const VideoPlayer = ({
     setAvailableAudioTracks([]);
     setSelectedAudioTrackIndex(-1);
     setAudioMenuOpen(false);
+    setKeyboardHelpOpen(false);
     setPreviewCues([]);
     setHoverPreview(null);
 
@@ -626,9 +647,13 @@ const VideoPlayer = ({
 
   const updateVolume = (nextVolume) => {
     const videoElement = videoRef.current;
-    if (!videoElement) return;
-    videoElement.volume = nextVolume;
-    videoElement.muted = nextVolume === 0;
+    if (!videoElement || !Number.isFinite(nextVolume)) return;
+
+    const normalizedVolume = Math.max(0, Math.min(1, nextVolume));
+    videoElement.volume = normalizedVolume;
+    videoElement.muted = normalizedVolume === 0;
+    setVolume(normalizedVolume);
+    setMuted(videoElement.muted);
   };
 
   const toggleMute = () => {
@@ -725,6 +750,88 @@ const VideoPlayer = ({
     }, PLAYER_CONTROLS_HIDE_DELAY_MS);
   };
 
+  const openKeyboardHelp = () => {
+    setKeyboardHelpOpen(true);
+    setControlsVisible(true);
+    setControlsDismissed(false);
+    if (controlsHideTimeoutRef.current) {
+      clearTimeout(controlsHideTimeoutRef.current);
+      controlsHideTimeoutRef.current = null;
+    }
+  };
+
+  const closeKeyboardHelp = () => {
+    setKeyboardHelpOpen(false);
+    showControls();
+  };
+
+  useEffect(() => {
+    if (!keyboardHelpOpen) return undefined;
+
+    const handleOutsidePointerDown = (event) => {
+      if (!event.target?.closest?.('[data-player-keyboard-help="true"]')) {
+        closeKeyboardHelp();
+      }
+    };
+
+    document.addEventListener("pointerdown", handleOutsidePointerDown);
+    return () => document.removeEventListener("pointerdown", handleOutsidePointerDown);
+    // closeKeyboardHelp utilise toujours les setters React et la réf courante du minuteur.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [keyboardHelpOpen]);
+
+  useEffect(() => {
+    if (!video?.CheminAcces) return undefined;
+
+    const handlePlayerKeyDown = (event) => {
+      if (
+        event.defaultPrevented
+        || event.isComposing
+        || event.altKey
+        || event.ctrlKey
+        || event.metaKey
+        || isInteractiveShortcutTarget(event.target)
+      ) {
+        return;
+      }
+
+      const isSpaceKey = event.code === "Space"
+        || event.key === " "
+        || event.key === "Space"
+        || event.key === "Spacebar";
+      if (isSpaceKey && event.repeat) return;
+
+      let action = null;
+      switch (event.key) {
+        case "ArrowLeft":
+          action = () => seekBy(-PLAYER_SEEK_SECONDS);
+          break;
+        case "ArrowRight":
+          action = () => seekBy(PLAYER_SEEK_SECONDS);
+          break;
+        case "ArrowUp":
+          action = () => updateVolume((videoRef.current?.volume || 0) + PLAYER_VOLUME_STEP);
+          break;
+        case "ArrowDown":
+          action = () => updateVolume((videoRef.current?.volume || 0) - PLAYER_VOLUME_STEP);
+          break;
+        default:
+          if (isSpaceKey) action = togglePlayback;
+      }
+
+      if (!action) return;
+      event.preventDefault();
+      showControls();
+      action();
+    };
+
+    window.addEventListener("keydown", handlePlayerKeyDown);
+    return () => window.removeEventListener("keydown", handlePlayerKeyDown);
+    // Les actions lisent directement l'élément vidéo courant ; seule la durée de repli
+    // peut rendre nécessaire de recréer le gestionnaire.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [duration, video?.CheminAcces, video?.VideoID]);
+
   const hideControls = () => {
     setControlsVisible(false);
     setControlsDismissed(true);
@@ -813,11 +920,13 @@ const VideoPlayer = ({
 
   const playedPercent = duration > 0 ? Math.min(100, (currentTime / duration) * 100) : 0;
   const bufferedPercent = duration > 0 ? Math.min(100, (bufferedTime / duration) * 100) : 0;
-  const playerChromeVisibilityClass = controlsDismissed
-    ? "opacity-0"
-    : playing && !controlsVisible
-      ? "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100"
-      : "opacity-100";
+  const playerChromeVisibilityClass = keyboardHelpOpen
+    ? "opacity-100"
+    : controlsDismissed
+      ? "opacity-0"
+      : playing && !controlsVisible
+        ? "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100"
+        : "opacity-100";
   const topControlsVisibilityClass = controlsDismissed
     ? `${playerChromeVisibilityClass} pointer-events-none`
     : playerChromeVisibilityClass;
@@ -1104,6 +1213,86 @@ const VideoPlayer = ({
                 </button>
               </div>
             )}
+
+            <div
+              data-player-keyboard-help="true"
+              className="relative"
+              onMouseEnter={openKeyboardHelp}
+              onMouseLeave={(event) => {
+                if (!event.currentTarget.contains(document.activeElement)) {
+                  closeKeyboardHelp();
+                }
+              }}
+              onBlurCapture={(event) => {
+                if (!event.currentTarget.contains(event.relatedTarget)) {
+                  closeKeyboardHelp();
+                }
+              }}
+            >
+              {keyboardHelpOpen && (
+                <div
+                  id="player-keyboard-shortcuts"
+                  role="tooltip"
+                  className="absolute bottom-full right-0 z-50 mb-2 max-h-72 w-72 overflow-y-auto rounded-lg border border-white/20 bg-black/95 p-3 text-left shadow-2xl backdrop-blur"
+                >
+                  <p className="text-xs font-bold uppercase tracking-wide text-white/60">
+                    Commandes du lecteur
+                  </p>
+                  <p className="mb-2 mt-3 text-[11px] font-bold uppercase tracking-wide text-white/60">
+                    Clavier
+                  </p>
+                  <ul className="space-y-1.5">
+                    {PLAYER_KEYBOARD_SHORTCUTS.map((shortcut) => (
+                      <li
+                        key={shortcut.key}
+                        className="flex items-center justify-between gap-3 text-xs text-white/85"
+                      >
+                        <span>{shortcut.label}</span>
+                        <kbd className="min-w-8 rounded border border-white/25 bg-white/10 px-1.5 py-0.5 text-center font-mono font-bold text-white">
+                          {shortcut.key}
+                        </kbd>
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="mb-2 mt-4 text-[11px] font-bold uppercase tracking-wide text-white/60">
+                    Clics sur la vidéo
+                  </p>
+                  <ul className="space-y-1.5">
+                    {PLAYER_CLICK_COMMANDS.map((command) => (
+                      <li
+                        key={command.key}
+                        className="flex items-center justify-between gap-3 text-xs text-white/85"
+                      >
+                        <span>{command.label}</span>
+                        <kbd className="shrink-0 rounded border border-white/25 bg-white/10 px-1.5 py-0.5 text-center font-mono font-bold text-white">
+                          {command.key}
+                        </kbd>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              <button
+                type="button"
+                onClick={openKeyboardHelp}
+                onFocus={openKeyboardHelp}
+                onKeyDown={(event) => {
+                  if (event.key === "Escape") {
+                    event.preventDefault();
+                    closeKeyboardHelp();
+                    event.currentTarget.blur();
+                  }
+                }}
+                aria-label="Afficher les commandes du lecteur"
+                aria-controls="player-keyboard-shortcuts"
+                aria-describedby={keyboardHelpOpen ? "player-keyboard-shortcuts" : undefined}
+                aria-expanded={keyboardHelpOpen}
+                className="flex h-7 w-7 items-center justify-center rounded-full border border-white/35 bg-white/10 text-sm font-black text-white/90 transition hover:bg-white/20"
+              >
+                ?
+              </button>
+            </div>
 
             <button
               type="button"

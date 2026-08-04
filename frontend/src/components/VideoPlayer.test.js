@@ -238,6 +238,116 @@ it("masque le sélecteur lorsque la fonctionnalité expérimentale est désactiv
   ).not.toBeInTheDocument();
 });
 
+describe("raccourcis clavier du lecteur", () => {
+  it("recule et avance de 15 secondes avec les flèches horizontales", () => {
+    const { container } = renderPlayer();
+    const videoElement = container.querySelector("video");
+
+    Object.defineProperty(videoElement, "duration", {
+      configurable: true,
+      value: 200,
+    });
+    videoElement.currentTime = 100;
+
+    fireEvent.keyDown(window, { key: "ArrowLeft" });
+    expect(videoElement.currentTime).toBe(85);
+
+    fireEvent.keyDown(window, { key: "ArrowRight" });
+    expect(videoElement.currentTime).toBe(100);
+  });
+
+  it("augmente et réduit le volume avec les flèches verticales", () => {
+    const { container } = renderPlayer();
+    const videoElement = container.querySelector("video");
+    act(() => {
+      videoElement.volume = 0.5;
+    });
+
+    fireEvent.keyDown(window, { key: "ArrowUp" });
+    expect(videoElement.volume).toBeCloseTo(0.55);
+
+    fireEvent.keyDown(window, { key: "ArrowDown" });
+    expect(videoElement.volume).toBeCloseTo(0.5);
+  });
+
+  it("bascule lecture et pause avec la barre espace sans répéter l'action", () => {
+    const { container } = renderPlayer();
+    const videoElement = container.querySelector("video");
+    let paused = true;
+
+    Object.defineProperty(videoElement, "paused", {
+      configurable: true,
+      get: () => paused,
+    });
+    videoElement.play = jest.fn(() => {
+      paused = false;
+      return Promise.resolve();
+    });
+    videoElement.pause = jest.fn(() => {
+      paused = true;
+    });
+
+    fireEvent.keyDown(window, { key: " ", code: "Space" });
+    expect(videoElement.play).toHaveBeenCalledTimes(1);
+
+    fireEvent.keyDown(window, { key: " ", code: "Space", repeat: true });
+    expect(videoElement.pause).not.toHaveBeenCalled();
+
+    fireEvent.keyDown(window, { key: " ", code: "Space" });
+    expect(videoElement.pause).toHaveBeenCalledTimes(1);
+  });
+
+  it("laisse les champs et boutons gérer leurs propres touches", () => {
+    const { container } = renderPlayer();
+    const videoElement = container.querySelector("video");
+    const input = document.createElement("input");
+    const play = jest.fn(() => Promise.resolve());
+
+    Object.defineProperty(videoElement, "paused", {
+      configurable: true,
+      get: () => true,
+    });
+    videoElement.play = play;
+    container.appendChild(input);
+
+    fireEvent.keyDown(input, { key: " ", code: "Space" });
+    fireEvent.keyDown(screen.getByRole("button", { name: "Lire" }), {
+      key: " ",
+      code: "Space",
+    });
+
+    expect(play).not.toHaveBeenCalled();
+  });
+});
+
+it("affiche au clic la liste complète des commandes du lecteur", () => {
+  renderPlayer();
+
+  const helpButton = screen.getByRole("button", {
+    name: "Afficher les commandes du lecteur",
+  });
+  expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+
+  fireEvent.click(helpButton);
+
+  expect(screen.getByRole("tooltip")).toBeInTheDocument();
+  expect(screen.getByText("Clavier")).toBeInTheDocument();
+  expect(screen.getByText("Clics sur la vidéo")).toBeInTheDocument();
+  expect(screen.getAllByText("Reculer de 15 secondes")).toHaveLength(2);
+  expect(screen.getAllByText("Avancer de 15 secondes")).toHaveLength(2);
+  expect(screen.getByText("Augmenter le volume")).toBeInTheDocument();
+  expect(screen.getByText("Réduire le volume")).toBeInTheDocument();
+  expect(screen.getAllByText("Lecture / pause")).toHaveLength(2);
+  expect(screen.getByText("Afficher / masquer les contrôles")).toBeInTheDocument();
+  expect(screen.getByText("Basculer en plein écran")).toBeInTheDocument();
+  expect(screen.getByText("2× gauche")).toBeInTheDocument();
+  expect(screen.getByText("2× centre")).toBeInTheDocument();
+  expect(screen.getByText("2× droite")).toBeInTheDocument();
+
+  fireEvent.pointerDown(document.body);
+  expect(screen.queryByRole("tooltip")).not.toBeInTheDocument();
+});
+
 describe("zones de clic du lecteur", () => {
   beforeEach(() => {
     jest.useFakeTimers();
