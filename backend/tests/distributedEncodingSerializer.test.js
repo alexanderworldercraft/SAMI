@@ -95,4 +95,67 @@ describe("sérialisation de l'encodage distribué", () => {
       preferenceExpiresAt: date.toISOString(),
     });
   });
+
+  it("ordonne les tâches et tentatives en mémoire sans dépendre du tri SQL", () => {
+    const createdAt = new Date("2026-07-31T12:00:00.000Z");
+    const task = (id, priority, offset, attempts = []) => ({
+      VideoEncodingTaskID: id,
+      VideoEncodingJobID: "job-1",
+      TaskKey: id,
+      Kind: "VIDEO_PROFILE",
+      Priority: priority,
+      Weight: 1n,
+      Required: true,
+      Spec: {},
+      SpecHash: "a".repeat(64),
+      Status: "SUCCEEDED",
+      LeaseGeneration: 0,
+      AttemptCount: attempts.length,
+      MaxAttempts: 4,
+      Progress: 100,
+      CreatedAt: new Date(createdAt.getTime() + offset),
+      UpdatedAt: createdAt,
+      Attempts: attempts,
+    });
+    const attempt = (number) => ({
+      VideoEncodingTaskAttemptID: `attempt-${number}`,
+      VideoEncodingTaskID: "task-high-old",
+      VideoEncodingWorkerID: "primary",
+      AttemptNumber: number,
+      LeaseGeneration: number,
+      Status: "SUCCEEDED",
+      Progress: 100,
+      StartedAt: createdAt,
+      CreatedAt: createdAt,
+      UpdatedAt: createdAt,
+    });
+
+    const serialized = serializeEncodingJob({
+      VideoEncodingJobID: "job-1",
+      Status: "COMPLETED",
+      Progress: 100,
+      SourceOriginalName: "source.mkv",
+      SourceSize: 1n,
+      SourceSha256: "b".repeat(64),
+      RequestSnapshot: {},
+      PipelineVersion: "pipeline",
+      EncodingSpecHash: "c".repeat(64),
+      CancelRequested: false,
+      CreatedAt: createdAt,
+      UpdatedAt: createdAt,
+      Tasks: [
+        task("task-low", 1, 0),
+        task("task-high-new", 10, 2_000),
+        task("task-high-old", 10, 1_000, [attempt(2), attempt(1)]),
+      ],
+    }, { now: createdAt });
+
+    expect(serialized.tasks.map(({ id }) => id)).toEqual([
+      "task-high-old",
+      "task-high-new",
+      "task-low",
+    ]);
+    expect(serialized.tasks[0].attempts.map(({ attemptNumber }) => attemptNumber))
+      .toEqual([1, 2]);
+  });
 });

@@ -50,6 +50,7 @@ export async function encodeSingleVideoProfile({
     includeAudio,
     audioBitrateKbps,
     segmentDurationSeconds,
+    durationSeconds,
   });
   await runFfmpegImpl({
     args,
@@ -102,6 +103,7 @@ export async function encodeAudioRendition({
     sourceIndex: track.sourceIndex,
     audioBitrateKbps,
     segmentDurationSeconds,
+    durationSeconds,
   });
   await runFfmpegImpl({
     args,

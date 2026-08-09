@@ -220,7 +220,10 @@ const NewVideoForm = ({
             const message = noWorkerError
                 ? NO_ENCODING_WORKER_MESSAGE
                 : error.response?.data?.error || "Impossible de lancer l'encodage multi-server.";
-            showNotification(message, "error", "⚠️");
+            const messageWithCode = !noWorkerError && errorCode
+                ? `${message} Code : ${errorCode}.`
+                : message;
+            showNotification(messageWithCode, "error", "⚠️", { autoClose: false });
         } finally {
             setDistributedSubmitting(false);
         }

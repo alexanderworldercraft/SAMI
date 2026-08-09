@@ -78,6 +78,20 @@ export const serializeEncodingArtifact = (file) =>
     updatedAt: file.UpdatedAt,
   });
 
+const timestamp = (value) => {
+  const parsed = value ? new Date(value).getTime() : 0;
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
+const orderedEncodingAttempts = (attempts) => [...(attempts || [])].sort(
+  (left, right) => Number(left.AttemptNumber) - Number(right.AttemptNumber)
+);
+
+const orderedEncodingTasks = (tasks) => [...(tasks || [])].sort(
+  (left, right) => Number(right.Priority) - Number(left.Priority)
+    || timestamp(left.CreatedAt) - timestamp(right.CreatedAt)
+);
+
 export const serializeEncodingAttempt = (attempt) =>
   toEncodingJsonValue({
     id: attempt.VideoEncodingTaskAttemptID,
@@ -128,7 +142,7 @@ export const serializeEncodingTask = (task) =>
     completedAt: task.CompletedAt || null,
     createdAt: task.CreatedAt,
     updatedAt: task.UpdatedAt,
-    attempts: (task.Attempts || []).map(serializeEncodingAttempt),
+    attempts: orderedEncodingAttempts(task.Attempts).map(serializeEncodingAttempt),
   });
 
 export const serializeEncodingJob = (job, { now = new Date() } = {}) => {
@@ -179,7 +193,7 @@ export const serializeEncodingJob = (job, { now = new Date() } = {}) => {
     elapsedMs,
     createdAt: job.CreatedAt,
     updatedAt: job.UpdatedAt,
-    tasks: (job.Tasks || []).map(serializeEncodingTask),
+    tasks: orderedEncodingTasks(job.Tasks).map(serializeEncodingTask),
   });
 };
 

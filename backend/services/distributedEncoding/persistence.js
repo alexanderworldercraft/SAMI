@@ -14,23 +14,48 @@ import {
 
 const { createHash, randomUUID } = crypto;
 
+export const VIDEO_ENCODING_TASK_PROFILE_LABEL_MAX_LENGTH = 32;
+
 export const encodingJobWithDetails = Object.freeze({
   Tasks: {
-    orderBy: [{ Priority: "desc" }, { CreatedAt: "asc" }],
     include: {
-      Attempts: {
-        orderBy: { AttemptNumber: "asc" },
-        include: { Files: { orderBy: { RelativePath: "asc" } } },
-      },
+      Attempts: true,
+    },
+  },
+});
+
+export const encodingJobLifecycleDetails = Object.freeze({
+  Tasks: {
+    select: {
+      VideoEncodingTaskID: true,
+      VideoEncodingJobID: true,
+      TaskKey: true,
+      Kind: true,
+      ProfileLabel: true,
+      NominalHeight: true,
+      Required: true,
+      Spec: true,
+      Status: true,
+      ErrorMessage: true,
     },
   },
 });
 
 export class DistributedEncodingPersistenceError extends Error {
-  constructor(message, { code = "DISTRIBUTED_ENCODING_ERROR", cause } = {}) {
+  constructor(
+    message,
+    {
+      code = "DISTRIBUTED_ENCODING_ERROR",
+      statusCode,
+      retryable,
+      cause,
+    } = {}
+  ) {
     super(message, cause ? { cause } : undefined);
     this.name = "DistributedEncodingPersistenceError";
     this.code = code;
+    if (statusCode !== undefined) this.statusCode = statusCode;
+    if (retryable !== undefined) this.retryable = retryable;
   }
 }
 
@@ -219,6 +244,14 @@ export const getJobWithDetails = (
   include: encodingJobWithDetails,
 });
 
+export const getJobForLifecycle = (
+  jobId,
+  { database = prisma } = {}
+) => database.videoEncodingJob.findUnique({
+  where: { VideoEncodingJobID: String(jobId) },
+  include: encodingJobLifecycleDetails,
+});
+
 export const listActiveJobs = (
   { database = prisma, limit = 100 } = {}
 ) => database.videoEncodingJob.findMany({
@@ -296,6 +329,27 @@ export function createEncodingTasks(
   tasks,
   { database = prisma } = {}
 ) {
+  for (const [index, task] of tasks.entries()) {
+    const profileLabel = task.profileLabel == null
+      ? null
+      : String(task.profileLabel);
+    const profileLabelLength = profileLabel == null
+      ? 0
+      : Array.from(profileLabel).length;
+    if (profileLabelLength > VIDEO_ENCODING_TASK_PROFILE_LABEL_MAX_LENGTH) {
+      throw new DistributedEncodingPersistenceError(
+        `Le libellé technique de la tâche ${task.key || index + 1} dépasse `
+          + `${VIDEO_ENCODING_TASK_PROFILE_LABEL_MAX_LENGTH} caractères `
+          + `(${profileLabelLength} caractères reçus). Le job n'a pas été créé.`,
+        {
+          code: "VIDEO_ENCODING_TASK_PROFILE_LABEL_TOO_LONG",
+          statusCode: 500,
+          retryable: false,
+        }
+      );
+    }
+  }
+
   return database.videoEncodingTask.createMany({
     data: tasks.map((task, index) => ({
       VideoEncodingTaskID: task.id || randomUUID(),

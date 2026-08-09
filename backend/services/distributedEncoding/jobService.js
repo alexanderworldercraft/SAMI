@@ -51,7 +51,6 @@ import {
   getEncodingWorker,
   getJobWithDetails,
   heartbeatEncodingWorker,
-  listActiveJobs,
   listEncodingWorkers,
   updateEncodingJob,
   upsertEncodingWorker,
@@ -76,6 +75,85 @@ import {
   isDistributedEncodingSettingActive,
   setDistributedEncodingSetting,
 } from "./settingService.js";
+import { buildDistributedEncodingTerminalHistoryWhere } from "./retentionPolicy.js";
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+const distributedEncodingAttemptSummarySelect = Object.freeze({
+  VideoEncodingTaskAttemptID: true,
+  VideoEncodingTaskID: true,
+  VideoEncodingWorkerID: true,
+  AttemptNumber: true,
+  LeaseGeneration: true,
+  Status: true,
+  Progress: true,
+  ManifestHash: true,
+  ErrorMessage: true,
+  StartedAt: true,
+  LastRenewedAt: true,
+  CompletedAt: true,
+  CreatedAt: true,
+  UpdatedAt: true,
+});
+
+const distributedEncodingTaskSummarySelect = Object.freeze({
+  VideoEncodingTaskID: true,
+  VideoEncodingJobID: true,
+  TaskKey: true,
+  Kind: true,
+  ProfileLabel: true,
+  NominalHeight: true,
+  Priority: true,
+  Weight: true,
+  Required: true,
+  SpecHash: true,
+  Status: true,
+  Phase: true,
+  AssignedWorkerID: true,
+  PreferredWorkerID: true,
+  PreferenceExpiresAt: true,
+  LeaseGeneration: true,
+  LeaseExpiresAt: true,
+  AttemptCount: true,
+  MaxAttempts: true,
+  NextEligibleAt: true,
+  Progress: true,
+  ArtifactManifestHash: true,
+  ErrorMessage: true,
+  StartedAt: true,
+  CompletedAt: true,
+  CreatedAt: true,
+  UpdatedAt: true,
+  Attempts: {
+    orderBy: { AttemptNumber: "asc" },
+    select: distributedEncodingAttemptSummarySelect,
+  },
+});
+
+const distributedEncodingJobSummarySelect = Object.freeze({
+  VideoEncodingJobID: true,
+  VideoID: true,
+  InitiatedByUserID: true,
+  Status: true,
+  CurrentStep: true,
+  Progress: true,
+  SourceOriginalName: true,
+  SourceSize: true,
+  RequestSnapshot: true,
+  PipelineVersion: true,
+  CancelRequested: true,
+  ErrorMessage: true,
+  Warnings: true,
+  NoCloneSinceAt: true,
+  StartedAt: true,
+  CompletedAt: true,
+  CreatedAt: true,
+  UpdatedAt: true,
+  Tasks: {
+    orderBy: [{ Priority: "desc" }, { CreatedAt: "asc" }],
+    select: distributedEncodingTaskSummarySelect,
+  },
+});
 
 const nominalHeightForProfile = (profile) => {
   if (String(profile.label).toUpperCase() === "4K") return 2160;
@@ -141,10 +219,19 @@ const sanitizeRequestSnapshot = ({
   seriesTitle: season?.Series?.Titre ?? null,
   multiAudio: plan.multiAudio,
   audioRenditions: plan.audioRenditions,
+  mediaDurations: {
+    videoSeconds: plan.durationSeconds,
+    audioTracks: plan.audioRenditions.map((track) => ({
+      label: track.label,
+      order: track.order,
+      sourceSeconds: track.sourceDurationSeconds,
+      silencePaddingSeconds: track.silencePaddingSeconds,
+    })),
+  },
   videoOriginalName: data.videoOriginalName,
 });
 
-const buildTasks = ({ plan, encodingSpecHash }) => {
+export const buildDistributedEncodingTasks = ({ plan, encodingSpecHash }) => {
   const videoTasks = plan.profiles.map((profile) => {
     const spec = {
       specVersion: VIDEO_ENCODING_SPEC_VERSION,
@@ -183,7 +270,9 @@ const buildTasks = ({ plan, encodingSpecHash }) => {
       id: randomUUID(),
       key: `audio-${track.order}`,
       kind: ENCODING_TASK_KIND.AUDIO_RENDITION,
-      profileLabel: `Audio ${track.label}`,
+      // ProfileLabel est un identifiant technique stocké dans un VARCHAR(32).
+      // Le libellé utilisateur complet reste disponible dans Spec.track.label.
+      profileLabel: `Audio ${track.order + 1}`,
       nominalHeight: null,
       priority: 90,
       weight: Math.max(1, Math.round(plan.durationSeconds * plan.audioBitrateKbps)),
@@ -193,6 +282,32 @@ const buildTasks = ({ plan, encodingSpecHash }) => {
   });
   return [...videoTasks, ...audioTasks];
 };
+
+export const buildAudioDurationWarnings = (plan) =>
+  plan.audioRenditions.flatMap((track) => {
+    if (track.sourceDurationSeconds == null) {
+      return [{
+        code: "AUDIO_TRACK_DURATION_UNKNOWN",
+        message: `La durée de la piste audio « ${track.label} » n'a pas pu être `
+          + "déterminée. Sa sortie sera alignée sur la durée de la vidéo.",
+        trackOrder: track.order,
+        sourceDurationSeconds: null,
+        targetDurationSeconds: plan.durationSeconds,
+        silencePaddingSeconds: null,
+      }];
+    }
+    if (Number(track.silencePaddingSeconds) <= 2) return [];
+    return [{
+      code: "AUDIO_TRACK_PADDED_WITH_SILENCE",
+      message: `La piste audio « ${track.label} » est plus courte que la vidéo de `
+        + `${Number(track.silencePaddingSeconds).toFixed(3)} s. `
+        + "La fin sera complétée avec du silence.",
+      trackOrder: track.order,
+      sourceDurationSeconds: track.sourceDurationSeconds,
+      targetDurationSeconds: plan.durationSeconds,
+      silencePaddingSeconds: track.silencePaddingSeconds,
+    }];
+  });
 
 const getSeason = async (seasonId) => {
   if (!seasonId) return null;
@@ -289,6 +404,8 @@ export async function getDistributedEncodingPublicConfig() {
     protocolVersion: config?.protocolVersion || null,
     pipelineVersion: config?.pipelineVersion || null,
     activeCloneCount: activeClones.length,
+    artifactRetentionDays: config?.artifactRetentionDays ?? null,
+    jobRetentionDays: config?.jobRetentionDays ?? null,
     workers: serializedWorkers,
     updatedAt: setting.updatedAt,
   };
@@ -414,6 +531,7 @@ export async function createDistributedVideoJob({ request, adminUserId }) {
       pipelineVersion: config.pipelineVersion || DISTRIBUTED_ENCODING_PIPELINE_VERSION,
       encodingSpecHash,
       idempotencyKey: request.headers["x-idempotency-key"] || null,
+      warnings: buildAudioDurationWarnings(plan),
     });
     jobCreated = true;
     const reservedVideo = await reserveImportedVideoForEncodingJob({
@@ -426,7 +544,10 @@ export async function createDistributedVideoJob({ request, adminUserId }) {
       jobId,
     });
     videoId = reservedVideo.VideoID;
-    await createEncodingTasks(jobId, buildTasks({ plan, encodingSpecHash }));
+    await createEncodingTasks(
+      jobId,
+      buildDistributedEncodingTasks({ plan, encodingSpecHash })
+    );
     return updateEncodingJob(jobId, {
       status: ENCODING_JOB_STATUS.QUEUED,
       currentStep: "queued",
@@ -445,20 +566,105 @@ export async function createDistributedVideoJob({ request, adminUserId }) {
   }
 }
 
-export async function listDistributedVideoJobs({ active = false, limit = 20 } = {}) {
-  const jobs = active
-    ? await listActiveJobs({ limit })
-    : await prisma.videoEncodingJob.findMany({
-        orderBy: { UpdatedAt: "desc" },
-        take: Math.max(1, Math.min(100, Number(limit) || 20)),
-        include: {
-          Tasks: {
-            orderBy: [{ Priority: "desc" }, { CreatedAt: "asc" }],
-            include: { Attempts: { orderBy: { AttemptNumber: "asc" } } },
-          },
-        },
-      });
-  return jobs.map(serializeEncodingJob);
+export async function listDistributedVideoJobs({
+  active = false,
+  page = 1,
+  limit = 20,
+} = {}) {
+  const normalizedLimit = Math.max(1, Math.min(100, Number(limit) || 20));
+  const requestedPage = Number.isSafeInteger(Number(page))
+    ? Math.max(1, Number(page))
+    : 1;
+  const where = active
+    ? { Status: { in: ACTIVE_ENCODING_JOB_STATUSES } }
+    : undefined;
+  const total = await prisma.videoEncodingJob.count({ where });
+  const totalPages = Math.max(1, Math.ceil(total / normalizedLimit));
+  const normalizedPage = Math.min(requestedPage, totalPages);
+  const jobs = await prisma.videoEncodingJob.findMany({
+    where,
+    orderBy: { UpdatedAt: active ? "asc" : "desc" },
+    skip: (normalizedPage - 1) * normalizedLimit,
+    take: normalizedLimit,
+    select: distributedEncodingJobSummarySelect,
+  });
+  return {
+    jobs: jobs.map(serializeEncodingJob),
+    pagination: {
+      page: normalizedPage,
+      limit: normalizedLimit,
+      total,
+      totalPages,
+      hasPreviousPage: normalizedPage > 1,
+      hasNextPage: normalizedPage < totalPages,
+    },
+  };
+}
+
+export async function getDistributedEncodingRetentionSnapshot({ now = new Date() } = {}) {
+  const config = getDistributedEncodingConfig();
+  const checkedAt = new Date(now);
+  const artifactCutoff = new Date(
+    checkedAt.getTime() - config.artifactRetentionDays * DAY_MS
+  );
+  const jobCutoff = new Date(
+    checkedAt.getTime() - config.jobRetentionDays * DAY_MS
+  );
+  const retainedTerminalWhere = buildDistributedEncodingTerminalHistoryWhere(checkedAt);
+  const artifactEligibleJobWhere = buildDistributedEncodingTerminalHistoryWhere(
+    artifactCutoff
+  );
+  const jobEligibleWhere = buildDistributedEncodingTerminalHistoryWhere(jobCutoff);
+  const retainedArtifactWhere = {
+    Attempt: { Task: { Job: retainedTerminalWhere } },
+  };
+  const eligibleArtifactWhere = {
+    Attempt: { Task: { Job: artifactEligibleJobWhere } },
+  };
+
+  const [
+    totalJobs,
+    eligibleJobs,
+    terminalJobDates,
+    totalArtifacts,
+    eligibleArtifacts,
+    terminalArtifactDates,
+  ] = await Promise.all([
+    prisma.videoEncodingJob.count(),
+    prisma.videoEncodingJob.count({ where: jobEligibleWhere }),
+    prisma.videoEncodingJob.aggregate({
+      where: retainedTerminalWhere,
+      _min: { CompletedAt: true },
+      _max: { CompletedAt: true },
+    }),
+    prisma.videoEncodingArtifactFile.count(),
+    prisma.videoEncodingArtifactFile.count({ where: eligibleArtifactWhere }),
+    prisma.videoEncodingArtifactFile.aggregate({
+      where: retainedArtifactWhere,
+      _min: { CreatedAt: true },
+      _max: { CreatedAt: true },
+    }),
+  ]);
+
+  return {
+    checkedAt: checkedAt.toISOString(),
+    artifactRetentionDays: config.artifactRetentionDays,
+    jobRetentionDays: config.jobRetentionDays,
+    jobs: {
+      total: totalJobs,
+      eligibleForPurge: eligibleJobs,
+      cutoff: jobCutoff.toISOString(),
+      oldestTerminalCompletedAt: terminalJobDates._min.CompletedAt || null,
+      newestTerminalCompletedAt: terminalJobDates._max.CompletedAt || null,
+    },
+    artifacts: {
+      total: totalArtifacts,
+      eligibleForPurge: eligibleArtifacts,
+      cutoff: artifactCutoff.toISOString(),
+      oldestTerminalCreatedAt: terminalArtifactDates._min.CreatedAt || null,
+      newestTerminalCreatedAt: terminalArtifactDates._max.CreatedAt || null,
+    },
+  };
 }
 
 export async function getDistributedVideoJob(jobId) {

@@ -19,6 +19,7 @@ import SuperAdminUniverseTrashManager from "./SuperAdminUniverseTrashManager";
 import SuperAdminMusicTrashManager from "./SuperAdminMusicTrashManager";
 import AdminBackupManager from "./AdminBackupManager";
 import AdminExperimentalFeatures from "./AdminExperimentalFeatures";
+import AdminDistributedEncodingDiagnostics from "./AdminDistributedEncodingDiagnostics";
 
 const tabButtonClass = (active) =>
     `rounded-lg px-4 py-2 text-sm font-bold transition duration-200 ${
@@ -144,6 +145,7 @@ const AdministrationPage = () => {
             </section>
             <AdminMessageSettings />
             <AdminExperimentalFeatures />
+            <AdminDistributedEncodingDiagnostics />
             <AdminHomepageGenreManager />
             <AdminFavoriteContentManager />
             <TabbedAdminSection

@@ -1,17 +1,66 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   consumeEncodingRequestNonce,
+  createEncodingTasks,
   failEncodingTaskLease,
+  getJobForLifecycle,
+  getJobWithDetails,
   hashEncodingLeaseToken,
   heartbeatEncodingWorker,
+  listActiveJobs,
   recalculateEncodingJobProgress,
   releaseEncodingTaskLease,
   renewEncodingTaskLease,
   upsertEncodingWorker,
+  VIDEO_ENCODING_TASK_PROFILE_LABEL_MAX_LENGTH,
 } from "../services/distributedEncoding/persistence.js";
 import { canEncodingWorkerClaimTask } from "../services/distributedEncoding/scheduler.js";
 
 describe("persistance de l'encodage distribué", () => {
+  it("ne trie pas en SQL les gros manifestes et allège la lecture de maintenance", async () => {
+    const findUnique = vi.fn(async () => null);
+    const findMany = vi.fn(async () => []);
+    const database = {
+      videoEncodingJob: { findUnique, findMany },
+    };
+
+    await getJobWithDetails("job-01", { database });
+    await getJobForLifecycle("job-01", { database });
+    await listActiveJobs({ database });
+
+    for (const query of [findUnique.mock.calls[0][0], findMany.mock.calls[0][0]]) {
+      expect(query.include.Tasks).not.toHaveProperty("orderBy");
+      expect(query.include.Tasks.include.Attempts).toBe(true);
+    }
+
+    const lifecycleQuery = findUnique.mock.calls[1][0];
+    expect(lifecycleQuery.include.Tasks).not.toHaveProperty("orderBy");
+    expect(lifecycleQuery.include.Tasks.select).not.toHaveProperty("Attempts");
+    expect(lifecycleQuery.include.Tasks.select).not.toHaveProperty("ArtifactManifest");
+  });
+
+  it("refuse un libellé technique trop long avant l'écriture Prisma", async () => {
+    const createMany = vi.fn();
+    const profileLabel = "x".repeat(
+      VIDEO_ENCODING_TASK_PROFILE_LABEL_MAX_LENGTH + 1
+    );
+
+    expect(() => createEncodingTasks("job-01", [{
+      id: "task-01",
+      key: "audio-0",
+      kind: "AUDIO_RENDITION",
+      profileLabel,
+      specHash: "a".repeat(64),
+    }], {
+      database: { videoEncodingTask: { createMany } },
+    })).toThrow(expect.objectContaining({
+      code: "VIDEO_ENCODING_TASK_PROFILE_LABEL_TOO_LONG",
+      statusCode: 500,
+      retryable: false,
+    }));
+    expect(createMany).not.toHaveBeenCalled();
+  });
+
   it("ajoute un worker désactivé par défaut et impose un seul slot en V1", async () => {
     const upsert = vi.fn(async (query) => query);
     await upsertEncodingWorker({

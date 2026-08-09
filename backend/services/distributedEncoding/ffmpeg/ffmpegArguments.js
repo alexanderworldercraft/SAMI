@@ -24,6 +24,7 @@ export function buildVideoProfileArguments({
   includeAudio,
   audioBitrateKbps,
   segmentDurationSeconds,
+  durationSeconds,
 }) {
   const duration = asPositiveNumber(segmentDurationSeconds, "segmentDurationSeconds");
   const args = ["-hide_banner", "-nostdin"];
@@ -49,13 +50,17 @@ export function buildVideoProfileArguments({
       "-c:a", "aac",
       "-ac", "2",
       "-ar", "48000",
-      "-b:a", `${asPositiveNumber(audioBitrateKbps, "audioBitrateKbps")}k`
+      "-b:a", `${asPositiveNumber(audioBitrateKbps, "audioBitrateKbps")}k`,
+      "-af", "apad"
     );
   } else {
     args.push("-an");
   }
 
   args.push(
+    ...(includeAudio && Number(durationSeconds) > 0
+      ? ["-t", String(asPositiveNumber(durationSeconds, "durationSeconds"))]
+      : []),
     "-f", "hls",
     "-hls_time", String(duration),
     "-hls_playlist_type", "vod",
@@ -77,8 +82,10 @@ export function buildAudioRenditionArguments({
   sourceIndex,
   audioBitrateKbps,
   segmentDurationSeconds,
+  durationSeconds,
 }) {
   const duration = asPositiveNumber(segmentDurationSeconds, "segmentDurationSeconds");
+  const targetDuration = asPositiveNumber(durationSeconds, "durationSeconds");
   return [
     "-hide_banner",
     "-nostdin",
@@ -91,6 +98,8 @@ export function buildAudioRenditionArguments({
     "-ac", "2",
     "-ar", "48000",
     "-b:a", `${asPositiveNumber(audioBitrateKbps, "audioBitrateKbps")}k`,
+    "-af", "apad",
+    "-t", String(targetDuration),
     "-f", "hls",
     "-hls_time", String(duration),
     "-hls_playlist_type", "vod",

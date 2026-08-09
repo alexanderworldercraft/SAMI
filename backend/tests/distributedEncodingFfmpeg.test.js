@@ -121,6 +121,43 @@ describe("plan d'encodage distribué", () => {
       multiAudioEnabled: true,
     })).toThrow(/exactement une piste par défaut/);
   });
+
+  it("mesure les durées vidéo/audio et calcule le silence à ajouter", () => {
+    const plan = buildVideoEncodingPlan({
+      metadata: { format: { duration: 6000 } },
+      videoStream: {
+        index: 0,
+        width: 1920,
+        height: 1080,
+        duration: "N/A",
+        tags: { DURATION: "01:39:51.611000000" },
+      },
+      audioStream: { index: 1 },
+      audioTracks: [
+        {
+          label: "Français",
+          order: 0,
+          sourceIndex: 1,
+          isDefault: true,
+          durationSeconds: 5740.394,
+        },
+        {
+          label: "Canadien",
+          order: 1,
+          sourceIndex: 2,
+          durationSeconds: 5991.466,
+        },
+      ],
+      multiAudioEnabled: true,
+    });
+
+    expect(plan.durationSeconds).toBeCloseTo(5991.611, 6);
+    expect(plan.audioRenditions[0]).toMatchObject({
+      sourceDurationSeconds: 5740.394,
+    });
+    expect(plan.audioRenditions[0].silencePaddingSeconds).toBeCloseTo(251.217, 6);
+    expect(plan.audioRenditions[1].silencePaddingSeconds).toBeCloseTo(0.145, 6);
+  });
 });
 
 describe("arguments et exécution FFmpeg portables", () => {
@@ -151,6 +188,7 @@ describe("arguments et exécution FFmpeg portables", () => {
       includeAudio: true,
       audioBitrateKbps: 192,
       segmentDurationSeconds: 4,
+      durationSeconds: 120.5,
     });
 
     expect(args).toContain("/tmp/source avec espace.mkv");
@@ -162,6 +200,12 @@ describe("arguments et exécution FFmpeg portables", () => {
     ]);
     expect(args).toContain("expr:gte(t,n_forced*4)");
     expect(args).toContain("independent_segments");
+    expect(args.slice(args.indexOf("-af"), args.indexOf("-af") + 2)).toEqual([
+      "-af", "apad",
+    ]);
+    expect(args.slice(args.indexOf("-t"), args.indexOf("-t") + 2)).toEqual([
+      "-t", "120.5",
+    ]);
     expect(args.slice(
       args.indexOf("-hls_segment_filename"),
       args.indexOf("-hls_segment_filename") + 2
@@ -177,11 +221,18 @@ describe("arguments et exécution FFmpeg portables", () => {
       sourceIndex: 7,
       audioBitrateKbps: 192,
       segmentDurationSeconds: 4,
+      durationSeconds: 5991.611,
     });
 
     expect(args).toContain("-vn");
     expect(args).toContain("aac");
     expect(args).not.toContain("libx264");
+    expect(args.slice(args.indexOf("-af"), args.indexOf("-af") + 2)).toEqual([
+      "-af", "apad",
+    ]);
+    expect(args.slice(args.indexOf("-t"), args.indexOf("-t") + 2)).toEqual([
+      "-t", "5991.611",
+    ]);
     expect(args.slice(args.indexOf("-map"), args.indexOf("-map") + 2)).toEqual([
       "-map", "0:7",
     ]);
@@ -292,6 +343,7 @@ describe("artefacts HLS unitaires", () => {
         videoPath: "source.mkv",
         outputDir,
         track,
+        durationSeconds: 10,
         runFfmpegImpl: runAudio,
       }));
     }

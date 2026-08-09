@@ -23,7 +23,7 @@ import {
   resolveDistributedSourcePath,
 } from "./sourceService.js";
 import {
-  getJobWithDetails,
+  getJobForLifecycle,
   recalculateEncodingJobProgress,
   updateEncodingJob,
 } from "./persistence.js";
@@ -158,10 +158,10 @@ const finalizeCompletedJob = async (job) => {
       ErrorMessage: null,
     },
   });
-  if (locked.count !== 1) return getJobWithDetails(job.VideoEncodingJobID);
+  if (locked.count !== 1) return getJobForLifecycle(job.VideoEncodingJobID);
 
   try {
-    const fresh = await getJobWithDetails(job.VideoEncodingJobID);
+    const fresh = await getJobForLifecycle(job.VideoEncodingJobID);
     const inputs = await buildFinalizationInputs(fresh);
     await updateEncodingJob(job.VideoEncodingJobID, {
       status: ENCODING_JOB_STATUS.VERIFYING,
@@ -185,7 +185,7 @@ const finalizeCompletedJob = async (job) => {
       },
     });
     if (publishing.count !== 1) {
-      const current = await getJobWithDetails(job.VideoEncodingJobID);
+      const current = await getJobForLifecycle(job.VideoEncodingJobID);
       if (current?.CancelRequested) return cancelJob(current);
       return current;
     }
@@ -233,7 +233,7 @@ const finalizeCompletedJob = async (job) => {
       errorMessage: null,
       cancelRequested: false,
     });
-    return getJobWithDetails(job.VideoEncodingJobID);
+    return getJobForLifecycle(job.VideoEncodingJobID);
   } catch (error) {
     await updateEncodingJob(job.VideoEncodingJobID, {
       status: ENCODING_JOB_STATUS.FAILED,
@@ -286,11 +286,11 @@ const cancelJob = async (job) => {
       CancelRequested: false,
     },
   });
-  return getJobWithDetails(job.VideoEncodingJobID);
+  return getJobForLifecycle(job.VideoEncodingJobID);
 };
 
 async function advance(jobId) {
-  let job = await getJobWithDetails(jobId);
+  let job = await getJobForLifecycle(jobId);
   if (!job) return null;
   if (job.Status === ENCODING_JOB_STATUS.CANCEL_REQUESTED || job.CancelRequested) {
     return cancelJob(job);
@@ -305,7 +305,7 @@ async function advance(jobId) {
     return job;
   }
   await recalculateEncodingJobProgress(jobId);
-  job = await getJobWithDetails(jobId);
+  job = await getJobForLifecycle(jobId);
   const required = job.Tasks.filter((task) => task.Required);
   const failed = required.find((task) => task.Status === ENCODING_TASK_STATUS.FAILED);
   if (failed) {

@@ -1,4 +1,7 @@
-import { getHlsProfiles } from "../../video/videoImportHelpers.js";
+import {
+  getHlsProfiles,
+  getVideoDurationSeconds,
+} from "../../video/videoImportHelpers.js";
 
 export const VIDEO_ENCODING_PLAN_VERSION = 1;
 export const VIDEO_ENCODING_SPEC_VERSION = "sami-hls-libx264-aac-v1";
@@ -13,7 +16,12 @@ const asStreamIndex = (value, fieldName) => {
   return index;
 };
 
-const normalizeAudioRenditions = (audioTracks) => {
+const normalizeOptionalDuration = (value) => {
+  const duration = Number(value);
+  return Number.isFinite(duration) && duration > 0 ? duration : null;
+};
+
+const normalizeAudioRenditions = (audioTracks, targetDurationSeconds) => {
   const renditions = audioTracks.map((track, position) => ({
     label: String(track?.label || `Audio ${position + 1}`).trim(),
     language: String(track?.language || "und").trim() || "und",
@@ -24,7 +32,14 @@ const normalizeAudioRenditions = (audioTracks) => {
       `audioTracks[${position}].sourceIndex`
     ),
     outputChannels: 2,
+    sourceDurationSeconds: normalizeOptionalDuration(track?.durationSeconds),
   }));
+
+  for (const rendition of renditions) {
+    rendition.silencePaddingSeconds = rendition.sourceDurationSeconds == null
+      ? null
+      : Math.max(0, targetDurationSeconds - rendition.sourceDurationSeconds);
+  }
 
   const orders = new Set();
   for (const rendition of renditions) {
@@ -52,6 +67,9 @@ export function validateVideoEncodingPlan(plan) {
   }
   asStreamIndex(plan.videoStreamIndex, "videoStreamIndex");
   asStreamIndex(plan.audioStreamIndex, "audioStreamIndex");
+  if (!Number.isFinite(plan.durationSeconds) || plan.durationSeconds <= 0) {
+    throw new TypeError("La durée du flux vidéo est introuvable.");
+  }
 
   if (!Array.isArray(plan.profiles) || plan.profiles.length === 0) {
     throw new TypeError("Le plan doit contenir au moins un profil vidéo.");
@@ -91,12 +109,16 @@ export function buildVideoEncodingPlan({
   audioTracks = [],
   multiAudioEnabled = false,
 }) {
-  const normalizedAudioTracks = normalizeAudioRenditions(audioTracks);
+  const durationSeconds = getVideoDurationSeconds(metadata, videoStream);
+  const normalizedAudioTracks = normalizeAudioRenditions(
+    audioTracks,
+    durationSeconds
+  );
   const multiAudio = Boolean(multiAudioEnabled && normalizedAudioTracks.length > 1);
   const plan = {
     version: VIDEO_ENCODING_PLAN_VERSION,
     specVersion: VIDEO_ENCODING_SPEC_VERSION,
-    durationSeconds: Number(metadata?.format?.duration) || 0,
+    durationSeconds,
     segmentDurationSeconds: HLS_SEGMENT_DURATION_SECONDS,
     audioBitrateKbps: HLS_AUDIO_BITRATE_KBPS,
     videoStreamIndex: asStreamIndex(videoStream?.index, "videoStream.index"),

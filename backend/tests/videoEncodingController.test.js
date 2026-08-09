@@ -8,6 +8,7 @@ const mocks = vi.hoisted(() => ({
   ensureSuperAdmin: vi.fn(),
   getConfig: vi.fn(),
   getJob: vi.fn(),
+  getRetention: vi.fn(),
   listJobs: vi.fn(),
   listWorkers: vi.fn(),
   patchWorker: vi.fn(),
@@ -29,6 +30,7 @@ vi.mock("../services/distributedEncoding/jobService.js", () => ({
   deleteDistributedEncodingWorker: mocks.deleteWorker,
   getDistributedEncodingPublicConfig: mocks.getConfig,
   getDistributedVideoJob: mocks.getJob,
+  getDistributedEncodingRetentionSnapshot: mocks.getRetention,
   listDistributedEncodingWorkers: mocks.listWorkers,
   listDistributedVideoJobs: mocks.listJobs,
   patchDistributedEncodingWorker: mocks.patchWorker,
@@ -175,6 +177,31 @@ describe("videoEncodingController", () => {
     );
   });
 
+  it("renvoie une erreur exploitable au front si ProfileLabel dépasse la colonne", async () => {
+    const prismaError = Object.assign(new Error("Value too long"), {
+      code: "P2000",
+      meta: {
+        modelName: "VideoEncodingTask",
+        column_name: "ProfileLabel",
+      },
+    });
+    mocks.createJob.mockRejectedValue(prismaError);
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    const reply = createReply();
+
+    await createVideoEncodingJob({ user: { userId: 7 }, headers: {} }, reply);
+
+    expect(reply.statusCode).toBe(500);
+    expect(reply.payload).toEqual({
+      error: "Le job n'a pas pu être créé car le libellé technique d'une tâche "
+        + "d'encodage dépasse la taille acceptée par la base de données.",
+      code: "VIDEO_ENCODING_TASK_PROFILE_LABEL_STORAGE_ERROR",
+      retryable: false,
+    });
+    expect(consoleError).toHaveBeenCalledWith("[distributed-encoding]", prismaError);
+    consoleError.mockRestore();
+  });
+
   it("journalise les créations, modifications et retraits du registre", async () => {
     mocks.registerWorker.mockResolvedValue({ id: "Sami-clone-aero15XC" });
     mocks.patchWorker.mockResolvedValue({
@@ -211,16 +238,55 @@ describe("videoEncodingController", () => {
   });
 
   it("traduit scope=active et borne limit pour la liste", async () => {
-    mocks.listJobs.mockResolvedValue([{ id: "job-actif" }]);
+    mocks.listJobs.mockResolvedValue({
+      jobs: [{ id: "job-actif" }],
+      pagination: { page: 2, limit: 100, total: 101, totalPages: 2 },
+    });
     const reply = createReply();
 
     await getVideoEncodingJobs(
-      { query: { scope: "active", limit: "999" } },
+      { query: { scope: "active", page: "2", limit: "999" } },
       reply
     );
 
-    expect(mocks.listJobs).toHaveBeenCalledWith({ active: true, limit: 100 });
-    expect(reply.payload).toEqual({ jobs: [{ id: "job-actif" }] });
+    expect(mocks.listJobs).toHaveBeenCalledWith({
+      active: true,
+      page: 2,
+      limit: 100,
+    });
+    expect(reply.payload).toEqual({
+      jobs: [{ id: "job-actif" }],
+      pagination: { page: 2, limit: 100, total: 101, totalPages: 2 },
+    });
+    expect(mocks.getRetention).not.toHaveBeenCalled();
+  });
+
+  it("ajoute l'état de rétention uniquement lorsqu'il est demandé", async () => {
+    mocks.listJobs.mockResolvedValue({
+      jobs: [],
+      pagination: { page: 1, limit: 25, total: 0, totalPages: 1 },
+    });
+    mocks.getRetention.mockResolvedValue({
+      artifactRetentionDays: 1,
+      jobRetentionDays: 30,
+    });
+    const reply = createReply();
+
+    await getVideoEncodingJobs(
+      { query: { page: "invalide", limit: "25", includeRetention: "true" } },
+      reply
+    );
+
+    expect(mocks.listJobs).toHaveBeenCalledWith({
+      active: false,
+      page: 1,
+      limit: 25,
+    });
+    expect(mocks.getRetention).toHaveBeenCalledTimes(1);
+    expect(reply.payload.retention).toEqual({
+      artifactRetentionDays: 1,
+      jobRetentionDays: 30,
+    });
   });
 
   it("renvoie un contrat 404 stable pour un job absent", async () => {

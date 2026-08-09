@@ -28,6 +28,10 @@ describe("TaskHistory - jobs multi-server persistants", () => {
             status: "RUNNING",
             currentStep: "Encodage réparti",
             progress: 42,
+            warnings: [{
+              code: "AUDIO_TRACK_PADDED_WITH_SILENCE",
+              message: "La piste audio « Français » sera complétée avec du silence.",
+            }],
             video: {
               titre: "Film distribué",
               audio: "jpn - AAC - 2 canaux",
@@ -62,6 +66,9 @@ describe("TaskHistory - jobs multi-server persistants", () => {
     expect(screen.getByText("Japonais, Français")).toBeInTheDocument();
     expect(screen.getByText("Français forcés")).toBeInTheDocument();
     expect(screen.getByText("Série distribuée")).toBeInTheDocument();
+    expect(screen.getByText(
+      "La piste audio « Français » sera complétée avec du silence."
+    )).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Annuler le job" }));
     expect(onCancelDistributedJob).toHaveBeenCalledWith("job-01");
   });

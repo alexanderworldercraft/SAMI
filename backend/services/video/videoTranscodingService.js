@@ -20,6 +20,7 @@ import {
   buildMasterPlaylist,
   buildMultiAudioMasterPlaylist,
   getHlsProfiles,
+  getVideoDurationSeconds,
   normalizeLangTag,
   timemarkToSeconds,
 } from "./videoImportHelpers.js";
@@ -258,7 +259,7 @@ async function transcodeVideoToHlsSequential({
   title,
   onProgress,
 }) {
-  const duration = Number(metadata?.format?.duration) || 0;
+  const duration = getVideoDurationSeconds(metadata, videoStream);
   const profiles = getHlsProfiles(videoStream);
   const playlists = [];
   const alternateAudioTracks = [];
@@ -296,7 +297,9 @@ async function transcodeVideoToHlsSequential({
             "-c:a aac",
             "-ac 2",
             "-ar 48000",
-            `-b:a ${HLS_AUDIO_BITRATE}k`
+            `-b:a ${HLS_AUDIO_BITRATE}k`,
+            "-af apad",
+            ...(duration > 0 ? [`-t ${duration}`] : [])
           );
         }
 
@@ -356,6 +359,8 @@ async function transcodeVideoToHlsSequential({
               "-ac 2",
               "-ar 48000",
               `-b:a ${HLS_AUDIO_BITRATE}k`,
+              "-af apad",
+              ...(duration > 0 ? [`-t ${duration}`] : []),
               "-hls_time 4",
               "-hls_playlist_type vod",
               `-hls_segment_filename ${segmentPath}`,

@@ -8,6 +8,10 @@ import { randomUUID } from "crypto";
 import { prisma } from "../db.js";
 import { probeVideo } from "../video/videoTranscodingService.js";
 import {
+  getVideoDurationSeconds,
+  getVideoStream,
+} from "../video/videoImportHelpers.js";
+import {
   normalizeVideoTransferRelativePath,
   resolveVideoTransferPath,
   sha256File,
@@ -502,9 +506,11 @@ const verifySemanticOutput = async ({ task, playlistPath }) => {
     }
   }
 
-  const expectedDuration = Number(task.Job?.SourceMetadata?.format?.duration)
-    || Number(task.Job?.SourceMetadata?.durationSeconds)
-    || 0;
+  const sourceMetadata = task.Job?.SourceMetadata;
+  const expectedDuration = getVideoDurationSeconds(
+    sourceMetadata,
+    getVideoStream(sourceMetadata)
+  );
   const actualDuration = Number(metadata?.format?.duration) || 0;
   const tolerance = Math.max(2, expectedDuration * 0.02);
   if (

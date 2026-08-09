@@ -7,7 +7,9 @@ import {
   getAudioStreams,
   getAutoLanguageGenreNames,
   getHlsProfiles,
+  getMediaStreamDurationSeconds,
   getVideoStream,
+  getVideoDurationSeconds,
   parseOptionalPositiveInt,
   parseRequestedGenreIds,
   selectPreferredAudioStream,
@@ -45,7 +47,12 @@ describe("videoImportHelpers", () => {
           codec_type: "audio",
           codec_name: "aac",
           channels: 6,
-          tags: { language: "fra", title: "VFF" },
+          duration: "N/A",
+          tags: {
+            language: "fra",
+            title: "VFF",
+            DURATION: "01:35:40.394000000",
+          },
         },
         {
           index: 9,
@@ -66,6 +73,25 @@ describe("videoImportHelpers", () => {
     expect(tracks.map((track) => track.language)).toEqual(["fr", "ja"]);
     expect(tracks[0].label).toContain("VFF");
     expect(tracks[1].label).toBe("Japonais");
+    expect(tracks[0].durationSeconds).toBeCloseTo(5740.394, 6);
+  });
+
+  it("détermine la durée de chaque flux avec les fallbacks FFprobe", () => {
+    expect(getMediaStreamDurationSeconds({ duration: "12.5" })).toBe(12.5);
+    expect(getMediaStreamDurationSeconds({
+      duration: "N/A",
+      duration_ts: 12_345,
+      time_base: "1/1000",
+    })).toBeCloseTo(12.345, 6);
+    expect(getMediaStreamDurationSeconds({
+      duration: "N/A",
+      duration_ts: "N/A",
+      tags: { DURATION: "01:39:51.611000000" },
+    })).toBeCloseTo(5991.611, 6);
+    expect(getVideoDurationSeconds(
+      { format: { duration: 6000 } },
+      { tags: { DURATION: "01:39:51.611000000" } }
+    )).toBeCloseTo(5991.611, 6);
   });
 
   it("ajoute le genre MultiAudio uniquement quand plusieurs pistes sont conservées", () => {

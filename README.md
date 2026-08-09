@@ -2,7 +2,7 @@
 
 SAMI (**Système d’Archivage Multimédia Intégré**) est une médiathèque web privée permettant d’organiser, diffuser et suivre des films, séries et musiques depuis une seule interface.
 
-La version actuelle est la **7.9.0**. Elle repose sur un backend Fastify, une interface React, Prisma avec MySQL, un pipeline vidéo FFmpeg/HLS et Socket.IO pour le retour en temps réel des traitements.
+La version actuelle est la **7.10.0**. Elle repose sur un backend Fastify, une interface React, Prisma avec MySQL, un pipeline vidéo FFmpeg/HLS et Socket.IO pour le retour en temps réel des traitements.
 
 ## Fonctionnalités
 
@@ -37,17 +37,17 @@ La version actuelle est la **7.9.0**. Elle repose sur un backend Fastify, une in
 - journalisation des actions et sauvegardes manuelles ou planifiées de MySQL ;
 - limitations de requêtes, contrôle CORS et en-têtes de sécurité.
 
-## Nouveautés de la version 7.9.0
+## Nouveautés de la version 7.10.0
 
-- second parcours d’ajout, entièrement réservé au super administrateur et activable depuis les fonctionnalités expérimentales ;
-- registre extensible de clones avec identifiants sensibles à la casse, priorité de performance, plafond de résolution et état en temps réel ;
-- attribution initiale des profils les plus lourds aux clones les plus rapides et du plus petit profil au primary ;
-- redistribution dynamique au premier worker compatible disponible, avec dépassement du plafond 360p du primary seulement après cinq minutes sans clone ;
-- leases, tentatives, progression, manifestes et reprise après redémarrage persistés dans MySQL ;
-- échanges HMAC dans un domaine distinct, contrôle SHA-256, reprise `Range` et cache privé LRU de 50 Gio sur chaque clone ;
-- assemblage et publication atomiques du HLS sur le primary, y compris avec les pistes audio multiples.
+- diagnostic d’encodage distribué depuis l’administration avec pagination, comparaison de deux jobs et export JSON sans secrets ;
+- visibilité sur la rétention progressive des artefacts et des jobs terminaux ;
+- mesure robuste de la durée vidéo et de chaque piste audio dès l’analyse initiale ;
+- ajout automatique de silence jusqu’à la durée de la vidéo pour les pistes audio trop courtes, dans les pipelines classique et distribué ;
+- avertissements audio persistants dans TaskHistory et les diagnostics ;
+- identifiants techniques audio courts, validation préventive de `ProfileLabel` et erreurs persistantes avec code dans le frontend ;
+- requêtes de finalisation allégées afin d’éviter les erreurs MySQL de mémoire de tri sur les films longs et multi-audio.
 
-L’historique complet des versions, de la 6.1.0 à la 7.9.0, est disponible dans l’application à l’adresse `/updates` et dans `frontend/src/components/UpdatesPage.js`.
+L’historique complet des versions, de la 6.1.0 à la 7.10.0, est disponible dans l’application à l’adresse `/updates` et dans `frontend/src/components/UpdatesPage.js`.
 
 ## Stack technique
 

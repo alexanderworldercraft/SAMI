@@ -21,7 +21,9 @@ jest.mock("./ImageUploader", () => ({ setImage }) => (
     onChange={(event) => setImage(event.target.files[0])}
   />
 ));
-jest.mock("./Notification", () => ({ message }) => <div role="status">{message}</div>);
+jest.mock("./Notification", () => ({ message, duration }) => (
+  <div role="status" data-duration={duration}>{message}</div>
+));
 
 const primaryConfig = {
   enabled: true,
@@ -159,6 +161,39 @@ describe("NewVideoForm - encodage multi-server", () => {
     expect(onDistributedJobCreated).toHaveBeenCalledWith(
       expect.objectContaining({ id: "job-01", status: "queued" })
     );
+  });
+
+  test("affiche durablement le détail et le code d'une erreur de création", async () => {
+    jest.spyOn(HTMLFormElement.prototype, "reportValidity").mockReturnValue(true);
+    api.post.mockRejectedValue({
+      response: {
+        data: {
+          error: "Le libellé technique d'une tâche est trop long.",
+          code: "VIDEO_ENCODING_TASK_PROFILE_LABEL_TOO_LONG",
+        },
+      },
+    });
+    const { container } = render(
+      <NewVideoForm
+        user={{ GradeID: 1, UtilisateurID: 7 }}
+        videoEncodingConfig={primaryConfig}
+        videoEncodingWorkers={[onlineWorker]}
+      />
+    );
+    fillRequiredFields(container);
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Ajouter la vidéo via le multi server" })
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole("status")).toHaveTextContent(
+        "Le libellé technique d'une tâche est trop long. "
+          + "Code : VIDEO_ENCODING_TASK_PROFILE_LABEL_TOO_LONG."
+      );
+    });
+    const feedback = screen.getByRole("status");
+    expect(feedback).toHaveAttribute("data-duration", "0");
   });
 
   test("conserve l'ajout classique sur /videos/add", async () => {

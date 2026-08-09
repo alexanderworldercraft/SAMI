@@ -18,6 +18,7 @@ import {
 import {
   buildAudioTrackPlans,
   getAudioStreams,
+  getVideoDurationSeconds,
   getVideoStream,
   selectPreferredAudioStream,
 } from "../services/video/videoImportHelpers.js";
@@ -50,7 +51,7 @@ ffmpegDescribe("pipeline HLS réel libx264/AAC", () => {
       "-f", "lavfi",
       "-i", "testsrc2=size=320x240:rate=24",
       "-f", "lavfi",
-      "-i", "sine=frequency=880:sample_rate=48000",
+      "-i", "sine=frequency=880:sample_rate=48000:duration=3",
       "-f", "lavfi",
       "-i", "sine=frequency=440:sample_rate=48000",
       "-t", "5",
@@ -146,6 +147,9 @@ ffmpegDescribe("pipeline HLS réel libx264/AAC", () => {
     expect(result.multiAudio).toBe(true);
     expect(result.audioTracks).toHaveLength(2);
     expect(result.audioTracks.filter((track) => track.isDefault)).toHaveLength(1);
+    expect(audioTracks[0].durationSeconds).toBeLessThan(
+      getVideoDurationSeconds(metadata, videoStream) - 1
+    );
     const videoPlaylistPath = path.join(outputDir, result.playlists[0].resolutionPlaylist);
     const encodedVideo = await probeVideo(videoPlaylistPath);
     expect(encodedVideo.streams.some((stream) => stream.codec_type === "video")).toBe(true);

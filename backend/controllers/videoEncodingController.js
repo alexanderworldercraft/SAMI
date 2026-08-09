@@ -4,6 +4,7 @@ import {
   createDistributedVideoJob,
   deleteDistributedEncodingWorker,
   getDistributedEncodingPublicConfig,
+  getDistributedEncodingRetentionSnapshot,
   getDistributedVideoJob,
   listDistributedEncodingWorkers,
   listDistributedVideoJobs,
@@ -31,6 +32,15 @@ const boundedLimit = (value, fallback = 20) => {
     ? Math.min(100, parsed)
     : fallback;
 };
+
+const boundedPage = (value) => {
+  const parsed = Number(value);
+  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : 1;
+};
+
+const isTruthyQueryValue = (value) => ["1", "true", "yes", "on"].includes(
+  String(value || "").trim().toLowerCase()
+);
 
 export const getVideoEncodingConfig = async (request, reply) => {
   try {
@@ -188,11 +198,22 @@ export const createVideoEncodingJob = async (request, reply) => {
 export const getVideoEncodingJobs = async (request, reply) => {
   try {
     if (!(await requireSuperAdmin(request, reply))) return;
-    const jobs = await listDistributedVideoJobs({
-      active: String(request.query?.scope || "").toLowerCase() === "active",
-      limit: boundedLimit(request.query?.limit),
+    const query = request.query || {};
+    const includeRetention = isTruthyQueryValue(query.includeRetention);
+    const [result, retention] = await Promise.all([
+      listDistributedVideoJobs({
+        active: String(query.scope || "").toLowerCase() === "active",
+        page: boundedPage(query.page),
+        limit: boundedLimit(query.limit),
+      }),
+      includeRetention
+        ? getDistributedEncodingRetentionSnapshot()
+        : Promise.resolve(null),
+    ]);
+    return reply.send({
+      ...result,
+      ...(retention ? { retention } : {}),
     });
-    return reply.send({ jobs });
   } catch (error) {
     return sendError(reply, error, "Impossible de récupérer les jobs d'encodage.");
   }

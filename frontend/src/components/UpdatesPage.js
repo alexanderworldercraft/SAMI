@@ -2,6 +2,63 @@ import React, { useEffect, useState } from "react";
 
 const updates = [
   {
+    version: "7.10.0",
+    title: "Diagnostic et fiabilisation de l'encodage distribue",
+    date: "9 aout 2026",
+    sections: [
+      {
+        title: "Diagnostic complet depuis l'administration",
+        items: [
+          "Une nouvelle section reservee au super administrateur permet d'analyser les jobs d'encodage distribue directement depuis l'administration du primary.",
+          "L'historique est charge par pages de vingt-cinq jobs afin de rester rapide meme lorsque de nombreux encodages et incidents sont conserves.",
+          "Un job en incident et un job de comparaison sain peuvent etre selectionnes pour confronter leurs taches, tentatives, erreurs, avertissements et informations video.",
+          "Le diagnostic JSON telechargeable rassemble la configuration utile, les workers, la retention et les deux jobs sans inclure les cookies, JWT, secrets de transfert ou autres donnees d'authentification.",
+          "Les tentatives echouees, annulees ou expirees restent visibles dans le diagnostic meme lorsqu'un nouvel essai a ensuite permis de terminer le job.",
+        ],
+      },
+      {
+        title: "Durees video et audio controlees avant l'encodage",
+        items: [
+          "L'analyse initiale determine maintenant la duree de la video et de chaque piste audio avant de construire le plan d'encodage classique ou distribue.",
+          "La lecture FFprobe accepte la duree du conteneur, celle du flux, le couple duration_ts et time_base ainsi que les tags DURATION afin de couvrir davantage de fichiers MKV et de pistes atypiques.",
+          "Les durees mesurees sont conservees dans le plan et le diagnostic avec, pour chaque piste, la duree source et la quantite de silence eventuellement ajoutee.",
+          "TaskHistory affiche un avertissement explicite lorsqu'une piste audio est plus courte que la video de plus de deux secondes.",
+          "Une duree introuvable est egalement signalee sans masquer le reste du suivi du job.",
+        ],
+      },
+      {
+        title: "Pistes audio courtes completees avec du silence",
+        items: [
+          "Les pistes audio plus courtes sont maintenant prolongees avec du silence jusqu'a la duree exacte de la video au lieu de produire une rendition HLS incomplete.",
+          "Le filtre FFmpeg apad et une duree de sortie bornee sont appliques aux renditions multi-audio du pipeline distribue.",
+          "Le meme alignement est applique au pipeline classique lorsque l'audio est integre aux variantes video afin de conserver un comportement coherent entre les deux parcours.",
+          "La verification semantique des artefacts utilise la meme detection robuste de duree pour eviter de refuser une sortie valide a cause d'une metadonnee de conteneur absente.",
+          "Les tests FFmpeg reels couvrent le parcours classique, les variantes video seules et les renditions multi-audio completees.",
+        ],
+      },
+      {
+        title: "Erreurs explicites et identifiants audio courts",
+        items: [
+          "Les taches audio utilisent des identifiants techniques courts comme Audio 1 tandis que le libelle complet choisi par l'utilisateur reste conserve dans les specifications de la piste.",
+          "Le backend controle la limite de trente-deux caracteres avant l'ecriture Prisma et refuse proprement un libelle technique invalide avant de creer un job partiel.",
+          "Une ancienne erreur Prisma P2000 sur la colonne ProfileLabel est traduite en message exploitable avec un code d'erreur stable.",
+          "La page Nouvelle video affiche les echecs de creation multi-server dans une notification persistante avec leur code, sans obliger a consulter les logs du backend.",
+          "Les avertissements audio sont persistants dans le job et restent consultables apres un rechargement ou un redemarrage.",
+        ],
+      },
+      {
+        title: "Maintenance et retention allegees",
+        items: [
+          "L'administration expose les horizons de retention, le nombre de jobs et d'artefacts conserves ainsi que les elements devenus eligibles a la prochaine purge.",
+          "Les artefacts detailles restent purges progressivement apres un jour et les jobs terminaux apres trente jours, par lots bornes et sans toucher aux travaux actifs ou reprenables.",
+          "La maintenance de finalisation utilise maintenant une lecture Prisma minimale sans manifestes, tentatives, fichiers de segments ni tri SQL.",
+          "L'ordre des taches et des tentatives est restitue cote application afin de conserver la presentation existante sans solliciter le filesort MySQL sur de gros JSON.",
+          "Cette reduction evite l'erreur MySQL 1038 Out of sort memory sur les films longs avec plusieurs profils et pistes audio, puis permet leur reprise automatique au passage de maintenance suivant.",
+        ],
+      },
+    ],
+  },
+  {
     version: "7.9.0",
     title: "Encodage video distribue experimental",
     date: "31 juillet 2026",

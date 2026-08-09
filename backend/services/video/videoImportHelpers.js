@@ -123,6 +123,50 @@ const cleanAudioText = (value) =>
     .replace(/\s+/g, " ")
     .trim();
 
+const positiveFiniteNumber = (value) => {
+  const number = Number(value);
+  return Number.isFinite(number) && number > 0 ? number : null;
+};
+
+const parseClockDurationSeconds = (value) => {
+  if (!value) return null;
+  const parts = String(value).trim().split(":");
+  const seconds = Number.parseFloat(parts.pop() || "0");
+  const minutes = Number.parseInt(parts.pop() || "0", 10);
+  const hours = Number.parseInt(parts.pop() || "0", 10);
+  const total = seconds + minutes * 60 + hours * 3600;
+  return Number.isFinite(total) && total > 0 ? total : null;
+};
+
+export const getMediaStreamDurationSeconds = (stream) => {
+  const directDuration = positiveFiniteNumber(stream?.duration);
+  if (directDuration) return directDuration;
+
+  const durationTimestamp = positiveFiniteNumber(stream?.duration_ts);
+  const [timeBaseNumerator, timeBaseDenominator] = String(stream?.time_base || "")
+    .split("/")
+    .map(Number);
+  if (
+    durationTimestamp
+    && Number.isFinite(timeBaseNumerator)
+    && timeBaseNumerator > 0
+    && Number.isFinite(timeBaseDenominator)
+    && timeBaseDenominator > 0
+  ) {
+    return durationTimestamp * timeBaseNumerator / timeBaseDenominator;
+  }
+
+  const durationTag = Object.entries(stream?.tags || {}).find(
+    ([key]) => key.toLowerCase() === "duration"
+  )?.[1];
+  return parseClockDurationSeconds(durationTag);
+};
+
+export const getVideoDurationSeconds = (metadata, videoStream) =>
+  getMediaStreamDurationSeconds(videoStream)
+  || positiveFiniteNumber(metadata?.format?.duration)
+  || 0;
+
 export const normalizeAudioLanguage = (value) => {
   const normalized = normalizeLangTag(value).replace(/_/g, "-");
   if (!normalized || normalized === "und") return "und";
@@ -158,6 +202,7 @@ export const buildAudioTrackPlans = (audioStreams, preferredAudioStream) => {
       language,
       codec: stream.codec_name || null,
       channels: Number(stream.channels) || null,
+      durationSeconds: getMediaStreamDurationSeconds(stream),
       isDefault: stream.index === preferredIndex,
     };
   });
@@ -167,14 +212,7 @@ export const getVideoStream = (metadata) =>
   (metadata?.streams || []).find((stream) => stream.codec_type === "video") || null;
 
 export const timemarkToSeconds = (timemark) => {
-  if (!timemark) return 0;
-
-  const parts = String(timemark).split(":");
-  const seconds = Number.parseFloat(parts.pop() || "0");
-  const minutes = Number.parseInt(parts.pop() || "0", 10);
-  const hours = Number.parseInt(parts.pop() || "0", 10);
-  const total = seconds + minutes * 60 + hours * 3600;
-  return Number.isFinite(total) ? total : 0;
+  return parseClockDurationSeconds(timemark) || 0;
 };
 
 const HLS_PROFILES = [

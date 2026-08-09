@@ -12,6 +12,7 @@ import {
   cleanupAddVideoTemp,
   getAudioStreams,
   getAutoLanguageGenreNames,
+  getVideoDurationSeconds,
   getVideoStream,
   isDuplicateAddVideo,
   parseOptionalPositiveInt,
@@ -167,16 +168,21 @@ export const addVideo = async (request, reply, fastify) => {
       throw new VideoImportValidationError("Aucun flux vidéo disponible dans le fichier.");
     }
 
-    const videoDuration = Number(videoStream.duration);
+    const videoDuration = getVideoDurationSeconds(metadata, videoStream);
     for (const track of audioTracks) {
-      const audioDuration = Number(track.stream.duration);
+      const audioDuration = track.durationSeconds == null
+        ? null
+        : Number(track.durationSeconds);
       if (
-        Number.isFinite(audioDuration)
+        audioDuration !== null
+        && Number.isFinite(audioDuration)
         && Number.isFinite(videoDuration)
-        && Math.abs(audioDuration - videoDuration) > 2
+        && videoDuration - audioDuration > 2
       ) {
         console.warn(
-          `[addVideo] Désynchronisation potentielle pour la piste audio ${track.label}.`
+          `[addVideo] La piste audio ${track.label} est plus courte que la vidéo `
+            + `(${audioDuration.toFixed(3)} s contre ${videoDuration.toFixed(3)} s). `
+            + "Elle sera complétée avec du silence."
         );
       }
     }

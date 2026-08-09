@@ -8593,6 +8593,10 @@
     color: var(--color-amber-200);
   }
 
+  .dark\:text-amber-300:is(.dark *) {
+    color: var(--color-amber-300);
+  }
+
   .dark\:text-blue-50:is(.dark *) {
     color: var(--color-blue-50);
   }

@@ -33,6 +33,7 @@ import {
   resolveDistributedSourcePath,
 } from "./sourceService.js";
 import { taskOutputPrefix } from "./artifactManifest.js";
+import { buildDistributedEncodingTerminalHistoryWhere } from "./retentionPolicy.js";
 
 const FAILURE_RETENTION_MS = 24 * 60 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -456,18 +457,6 @@ const recoverMissingAcceptedArtifacts = async (job) => {
   return { promoted, reset };
 };
 
-const terminalHistoryWhere = (cutoff) => ({
-  CompletedAt: { lte: cutoff },
-  OR: [
-    { Status: ENCODING_JOB_STATUS.COMPLETED },
-    { Status: ENCODING_JOB_STATUS.CANCELLED },
-    {
-      Status: ENCODING_JOB_STATUS.FAILED,
-      CurrentStep: { in: ["expired", INCOMPLETE_ENCODING_EXPIRED_STEP] },
-    },
-  ],
-});
-
 export async function purgeDistributedEncodingHistory({
   now = new Date(),
   database = prisma,
@@ -481,8 +470,10 @@ export async function purgeDistributedEncodingHistory({
     instant.getTime() - artifactRetentionDays * DAY_MS
   );
   const jobCutoff = new Date(instant.getTime() - jobRetentionDays * DAY_MS);
-  const artifactJobWhere = terminalHistoryWhere(artifactCutoff);
-  const jobWhere = terminalHistoryWhere(jobCutoff);
+  const artifactJobWhere = buildDistributedEncodingTerminalHistoryWhere(
+    artifactCutoff
+  );
+  const jobWhere = buildDistributedEncodingTerminalHistoryWhere(jobCutoff);
 
   const artifactRows = await database.videoEncodingArtifactFile.findMany({
     where: { Attempt: { Task: { Job: artifactJobWhere } } },
