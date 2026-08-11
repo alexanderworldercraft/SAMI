@@ -292,7 +292,7 @@ export async function startServer({
 } = {}) {
   const port = parseServerPort(process.env.PORTS);
   const https = tls ? loadTlsCredentials() : undefined;
-  const server = createServer({ https, trustProxy });
+  const server = createServer({ appName, https, trustProxy });
   const startupInfo = getServerStartupInfo({
     appName,
     publicUrl: process.env.PUBLIC_URL,

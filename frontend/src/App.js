@@ -121,6 +121,8 @@ const routesMeta = {
 
 function MetaUpdater() {
   const location = useLocation();
+  if (/^\/lecture\/[^/]+\/?$/.test(location.pathname)) return null;
+
   const meta = routesMeta[location.pathname] || {
     title: `${NameApp}`,
     description: `Bienvenue sur ${NameApp}, votre application de streaming privée.`,

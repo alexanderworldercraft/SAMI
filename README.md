@@ -145,9 +145,9 @@ Les principales variables du backend sont :
 | `DB_HOST`, `DB_USER`, `DB_PASSWORD`, `DB_NAME` | Connexion utilisée notamment par les sauvegardes |
 | `JWT_SECRET` | Signature des jetons d’authentification |
 | `NODE_ENV` | Environnement d’exécution ; doit valoir `production` sur les serveurs déployés |
-| `APP_NAME` | Nom affiché au démarrage |
+| `APP_NAME` | Nom affiché au démarrage et dans les aperçus sociaux servis par le backend |
 | `PORTS` | Port d’écoute du backend |
-| `PUBLIC_URL`, `PUBLIC_HOST` | URL et hôte publics, utilisés par CORS, Socket.IO et Swagger |
+| `PUBLIC_URL`, `PUBLIC_HOST` | URL et hôte publics, utilisés par CORS, Socket.IO, Swagger et les URL canoniques des aperçus sociaux |
 | `SAMI_INSTANCE_ROLE` | Rôle de l’installation : `clone` pour exporter ou `primary` pour recevoir |
 | `SAMI_INSTANCE_ID` | Identifiant stable et unique de l’installation, utilisé pour l’idempotence |
 | `SAMI_PRIMARY_BASE_URL` | URL configurable de l’instance principale ; l’exemple utilise `https://sami.worldercraft.fr` |
@@ -168,6 +168,9 @@ Les principales variables du backend sont :
 | `USERNAMESUPERADMIN`, `PASSWORDSUPERADMIN`, `EMAILSUPERADMIN` | Compte super administrateur créé par le seed |
 
 Le frontend utilise principalement `REACT_APP_URL_LOCAL`, `REACT_APP_NAME` et `REACT_APP_VER`.
+Pour que les aperçus de partage restent cohérents, `APP_NAME` et `REACT_APP_NAME`
+doivent porter le même nom, et `PUBLIC_URL` doit contenir en premier l'origine HTTPS
+publique qui sert l'application.
 
 Ne versionnez jamais les fichiers `.env`, les secrets, les certificats privés ou les sauvegardes de production.
 

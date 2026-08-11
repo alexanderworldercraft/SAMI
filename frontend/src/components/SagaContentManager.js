@@ -9,6 +9,42 @@ const labelClass = "mb-2 block text-sm font-bold text-slate-700 dark:text-slate-
 const submitClass = "inline-flex items-center justify-center rounded-lg border border-sky-300/40 bg-sky-500/15 px-5 py-3 text-sm font-bold text-slate-900 transition duration-200 hover:border-sky-300/80 hover:bg-sky-500/25 disabled:cursor-not-allowed disabled:opacity-60 dark:text-white";
 const listboxOptionsClass = "z-[9999] max-h-72 w-[var(--button-width)] overflow-auto rounded-xl border border-sky-500/20 bg-white py-2 text-sm shadow-2xl shadow-sky-950/20 focus:outline-none dark:bg-slate-950 dark:text-slate-100";
 
+const getCreationTimestamp = (value) => {
+  const timestamp = Date.parse(value);
+  return Number.isFinite(timestamp) ? timestamp : Number.NEGATIVE_INFINITY;
+};
+
+export const buildSagaContentItems = (videos = [], series = []) => {
+  const filmItems = videos
+    .filter((video) => video.type === "film" || !video.SaisonID)
+    .map((video) => ({
+      key: `video-${video.VideoID}`,
+      id: video.VideoID,
+      type: "video",
+      label: video.Titre,
+      meta: `Film #${video.VideoID}`,
+      createDate: video.CreateDate,
+    }));
+
+  const seriesItems = series.map((serie) => ({
+    key: `series-${serie.SeriesID}`,
+    id: serie.SeriesID,
+    type: "series",
+    label: serie.Titre,
+    meta: `Série #${serie.SeriesID}`,
+    createDate: serie.CreateDate,
+  }));
+
+  return [...filmItems, ...seriesItems].sort((left, right) => {
+    const leftTimestamp = getCreationTimestamp(left.createDate);
+    const rightTimestamp = getCreationTimestamp(right.createDate);
+    if (leftTimestamp !== rightTimestamp) return rightTimestamp > leftTimestamp ? 1 : -1;
+
+    const titleComparison = left.label.localeCompare(right.label, "fr");
+    return titleComparison !== 0 ? titleComparison : left.key.localeCompare(right.key);
+  });
+};
+
 const SagaContentManager = () => {
   const [sagas, setSagas] = useState([]);
   const [videos, setVideos] = useState([]);
@@ -21,27 +57,7 @@ const SagaContentManager = () => {
   const [saving, setSaving] = useState(false);
   const [notification, setNotification] = useState(null);
 
-  const contents = useMemo(() => {
-    const filmItems = videos
-      .filter((video) => video.type === "film" || !video.SaisonID)
-      .map((video) => ({
-        key: `video-${video.VideoID}`,
-        id: video.VideoID,
-        type: "video",
-        label: video.Titre,
-        meta: `Film #${video.VideoID}`,
-      }));
-
-    const seriesItems = series.map((serie) => ({
-      key: `series-${serie.SeriesID}`,
-      id: serie.SeriesID,
-      type: "series",
-      label: serie.Titre,
-      meta: `Série #${serie.SeriesID}`,
-    }));
-
-    return [...filmItems, ...seriesItems].sort((left, right) => left.label.localeCompare(right.label));
-  }, [series, videos]);
+  const contents = useMemo(() => buildSagaContentItems(videos, series), [series, videos]);
 
   const filteredContents = useMemo(() => {
     const search = contentSearch.trim().toLowerCase();

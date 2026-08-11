@@ -9,6 +9,48 @@ const labelClass = "mb-2 block text-sm font-bold text-slate-700 dark:text-slate-
 const submitClass = "inline-flex items-center justify-center rounded-lg border border-sky-300/40 bg-sky-500/15 px-5 py-3 text-sm font-bold text-slate-900 transition duration-200 hover:border-sky-300/80 hover:bg-sky-500/25 disabled:cursor-not-allowed disabled:opacity-60 dark:text-white";
 const listboxOptionsClass = "z-[9999] max-h-72 w-[var(--button-width)] overflow-auto rounded-xl border border-sky-500/20 bg-white py-2 text-sm shadow-2xl shadow-sky-950/20 focus:outline-none dark:bg-slate-950 dark:text-slate-100";
 
+const getCreationTimestamp = (value) => {
+  const timestamp = Date.parse(value);
+  return Number.isFinite(timestamp) ? timestamp : Number.NEGATIVE_INFINITY;
+};
+
+export const buildUniverseCatalogItems = (catalog = {}) => {
+  const sagaItems = (catalog.sagas || []).map((saga) => ({
+    key: `saga-${saga.SagaID}`,
+    id: saga.SagaID,
+    type: "saga",
+    label: saga.Titre,
+    meta: `Saga #${saga.SagaID}`,
+    createDate: saga.CreateDate,
+  }));
+  const filmItems = (catalog.videos || []).map((video) => ({
+    key: `video-${video.VideoID}`,
+    id: video.VideoID,
+    type: "video",
+    label: video.Titre,
+    meta: `Film #${video.VideoID}`,
+    createDate: video.CreateDate,
+  }));
+  const seriesItems = (catalog.series || []).map((serie) => ({
+    key: `series-${serie.SeriesID}`,
+    id: serie.SeriesID,
+    type: "series",
+    label: serie.Titre,
+    meta: `Série #${serie.SeriesID}`,
+    createDate: serie.CreateDate,
+  }));
+
+  return [...sagaItems, ...filmItems, ...seriesItems]
+    .sort((left, right) => {
+      const leftTimestamp = getCreationTimestamp(left.createDate);
+      const rightTimestamp = getCreationTimestamp(right.createDate);
+      if (leftTimestamp !== rightTimestamp) return rightTimestamp > leftTimestamp ? 1 : -1;
+
+      const titleComparison = left.label.localeCompare(right.label, "fr");
+      return titleComparison !== 0 ? titleComparison : left.key.localeCompare(right.key);
+    });
+};
+
 const UniverseSagaManager = () => {
   const [universes, setUniverses] = useState([]);
   const [catalog, setCatalog] = useState({ sagas: [], videos: [], series: [] });
@@ -20,32 +62,7 @@ const UniverseSagaManager = () => {
   const [saving, setSaving] = useState(false);
   const [notification, setNotification] = useState(null);
 
-  const items = useMemo(() => {
-    const sagaItems = (catalog.sagas || []).map((saga) => ({
-      key: `saga-${saga.SagaID}`,
-      id: saga.SagaID,
-      type: "saga",
-      label: saga.Titre,
-      meta: `Saga #${saga.SagaID}`,
-    }));
-    const filmItems = (catalog.videos || []).map((video) => ({
-      key: `video-${video.VideoID}`,
-      id: video.VideoID,
-      type: "video",
-      label: video.Titre,
-      meta: `Film #${video.VideoID}`,
-    }));
-    const seriesItems = (catalog.series || []).map((serie) => ({
-      key: `series-${serie.SeriesID}`,
-      id: serie.SeriesID,
-      type: "series",
-      label: serie.Titre,
-      meta: `Série #${serie.SeriesID}`,
-    }));
-
-    return [...sagaItems, ...filmItems, ...seriesItems]
-      .sort((left, right) => left.label.localeCompare(right.label));
-  }, [catalog]);
+  const items = useMemo(() => buildUniverseCatalogItems(catalog), [catalog]);
 
   const filteredItems = useMemo(() => {
     const search = itemSearch.trim().toLowerCase();

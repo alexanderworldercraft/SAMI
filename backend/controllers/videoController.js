@@ -1142,6 +1142,7 @@ export const getAdminVideos = async (request, reply) => {
         Titre: true,
         CheminImage: true,
         SaisonID: true,
+        CreateDate: true,
         Saison: {
           select: {
             Numero: true,
@@ -1162,6 +1163,7 @@ export const getAdminVideos = async (request, reply) => {
         Titre: video.Titre,
         CheminImage: video.CheminImage,
         SaisonID: video.SaisonID,
+        CreateDate: video.CreateDate ?? null,
         type: video.SaisonID ? "episode" : "film",
         SaisonNumero: video.Saison?.Numero ?? null,
         SeriesID: video.Saison?.Series?.SeriesID ?? null,

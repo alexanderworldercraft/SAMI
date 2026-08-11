@@ -6,6 +6,7 @@ import {
   DialogTitle,
 } from "@headlessui/react";
 import { ExclamationTriangleIcon, XMarkIcon } from "@heroicons/react/24/outline";
+import { Helmet } from "react-helmet-async";
 import api from '../services/api';
 import { useParams } from "react-router-dom";
 import VideoPlayer from "./VideoPlayer";
@@ -20,6 +21,7 @@ import VideoExportDrawer from "./VideoExportDrawer";
 import { buildCookieValue } from "../utils/cookieValue";
 import PaginationPage from "./PaginationPage";
 import ContentUniverseSection from "./ContentUniverseSection";
+import { buildVideoPageMetadata } from "../utils/videoPageMetadata";
 
 
 const apiUrl = process.env.REACT_APP_URL_LOCAL;
@@ -264,16 +266,19 @@ const VideoSeePage = () => {
         setSeries(data.series);
         setSeriesId(data.series.SeriesID);
 
-        const currentSeason = data.series.Saisons.find((saison) =>
+        const matchingSeason = data.series.Saisons.find((saison) =>
           saison.Episodes.some(
             (episode) => episode.VideoID === parseInt(id, 10)
           )
         );
 
-        if (currentSeason) {
-          setCurrentSeason(currentSeason);
-          setEpisodes(currentSeason.Episodes);
-        }
+        setCurrentSeason(matchingSeason || null);
+        setEpisodes(matchingSeason?.Episodes || []);
+      } else {
+        setSeries(null);
+        setSeriesId(null);
+        setCurrentSeason(null);
+        setEpisodes([]);
       }
     } catch (error) {
       if (error.response) {
@@ -367,9 +372,20 @@ const VideoSeePage = () => {
   const isEpisode = Boolean(video?.SaisonID);
   const isPremiumUser = isAdmin || !!(user?.PremiumEndDate && new Date(user.PremiumEndDate) > new Date());
 
-  const NameApp = process.env.REACT_APP_NAME;
+  const NameApp = process.env.REACT_APP_NAME || "SAMI";
   const currentVideoId = video?.VideoID || null;
   const sagaItemsPerPage = 8;
+  const pageOrigin = typeof window !== "undefined" ? window.location.origin : apiUrl;
+  const metadataVideo = String(video?.VideoID || "") === String(id) ? video : null;
+  const pageMetadata = buildVideoPageMetadata({
+    id,
+    video: metadataVideo,
+    series: metadataVideo ? series : null,
+    currentSeason: metadataVideo ? currentSeason : null,
+    siteName: NameApp,
+    pageOrigin,
+    assetOrigin: apiUrl || pageOrigin,
+  });
 
   const fetchContentSagas = async (page = 1) => {
     if (!currentVideoId) return;
@@ -432,25 +448,6 @@ const VideoSeePage = () => {
     const paddedSecs = String(secs).padStart(2, "0");
     return hrs > 0 ? `${hrs}:${paddedMins}:${paddedSecs}` : `${paddedMins}:${paddedSecs}`;
   };
-
-  // Mise à jour dynamique de l'onglet
-  useEffect(() => {
-    const metaDescription = document.querySelector('meta[name="description"]');
-
-    if (video?.Titre && series?.Titre && currentSeason) {
-      document.title = `${video.Titre} (Saison ${currentSeason.Numero} - ${series.Titre}) - ${NameApp}`;
-      metaDescription?.setAttribute("content", `Regardez ${video.Titre} de la saison ${currentSeason.Numero} de la série ${series.Titre} sur ${NameApp}.`);
-    } else if (video?.Titre && series?.Titre) {
-      document.title = `${video.Titre} (${series.Titre}) - ${NameApp}`;
-      metaDescription?.setAttribute("content", `Regardez ${video.Titre} de la série ${series.Titre} sur ${NameApp}.`);
-    } else if (video?.Titre) {
-      document.title = `${video.Titre} - ${NameApp}`;
-      metaDescription?.setAttribute("content", `Regardez ${video.Titre} en streaming sur ${NameApp}.`);
-    } else {
-      document.title = `Lecture de vidéo - ${NameApp}`;
-      metaDescription?.setAttribute("content", `Regardez des vidéos en streaming sur ${NameApp}.`);
-    }
-  }, [video?.Titre, series?.Titre, currentSeason]);
 
   useEffect(() => {
     // 1. Mettre à jour le cookie
@@ -688,6 +685,25 @@ const VideoSeePage = () => {
 
   return (
     <div className="relative">
+      <Helmet>
+        <title>{pageMetadata.title}</title>
+        <meta name="description" content={pageMetadata.description} />
+        <meta name="application-name" content={pageMetadata.siteName} />
+        <link rel="canonical" href={pageMetadata.canonicalUrl} />
+        <meta property="og:type" content={pageMetadata.openGraphType} />
+        <meta property="og:locale" content="fr_FR" />
+        <meta property="og:site_name" content={pageMetadata.siteName} />
+        <meta property="og:title" content={pageMetadata.title} />
+        <meta property="og:description" content={pageMetadata.description} />
+        <meta property="og:url" content={pageMetadata.canonicalUrl} />
+        <meta property="og:image" content={pageMetadata.imageUrl} />
+        <meta property="og:image:alt" content={pageMetadata.imageAlt} />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content={pageMetadata.title} />
+        <meta name="twitter:description" content={pageMetadata.description} />
+        <meta name="twitter:image" content={pageMetadata.imageUrl} />
+        <meta name="twitter:image:alt" content={pageMetadata.imageAlt} />
+      </Helmet>
       <div ref={backgroundBlur} className="fixed w-full h-full inset-0 -z-10 blur-3xl opacity-70"></div>
       {notification && (
         <Notification

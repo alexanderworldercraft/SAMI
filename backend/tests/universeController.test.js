@@ -14,14 +14,15 @@ vi.mock("../services/db.js", () => ({
       findMany: vi.fn(),
       update: vi.fn(),
     },
-    video: { findFirst: vi.fn(), findUnique: vi.fn() },
-    series: { findFirst: vi.fn() },
+    video: { findFirst: vi.fn(), findMany: vi.fn(), findUnique: vi.fn() },
+    series: { findFirst: vi.fn(), findMany: vi.fn() },
   },
 }));
 
 import {
   addUniverseContent,
   formatUniverseContent,
+  getUniverseAdminCatalog,
   getUniverses,
   getUniversesForContent,
   sortUniverseItems,
@@ -61,6 +62,35 @@ describe("universeController - contenus mixtes", () => {
       { UniverseItemKey: "saga:3", Ordre: 1 },
       { UniverseItemKey: "content:8", Ordre: 2 },
     ]);
+  });
+
+  it("charge le catalogue univers par date de création décroissante", async () => {
+    const saga = { SagaID: 3, Titre: "Saga récente", CreateDate: new Date("2026-08-11T09:00:00.000Z") };
+    const video = { VideoID: 8, Titre: "Film récent", CreateDate: new Date("2026-08-10T09:00:00.000Z") };
+    const serie = { SeriesID: 5, Titre: "Série récente", CreateDate: new Date("2026-08-09T09:00:00.000Z") };
+    prisma.saga.findMany.mockResolvedValue([saga]);
+    prisma.video.findMany.mockResolvedValue([video]);
+    prisma.series.findMany.mockResolvedValue([serie]);
+    const reply = createReply();
+
+    await getUniverseAdminCatalog({ user: { userId: 3 } }, reply);
+
+    expect(prisma.saga.findMany).toHaveBeenCalledWith({
+      where: { EtatID: 1 },
+      orderBy: [{ CreateDate: "desc" }, { SagaID: "desc" }],
+      select: { SagaID: true, Titre: true, CreateDate: true },
+    });
+    expect(prisma.video.findMany).toHaveBeenCalledWith({
+      where: { EtatID: 1, SaisonID: null },
+      orderBy: [{ CreateDate: "desc" }, { VideoID: "desc" }],
+      select: { VideoID: true, Titre: true, CreateDate: true },
+    });
+    expect(prisma.series.findMany).toHaveBeenCalledWith({
+      where: { EtatID: 1 },
+      orderBy: [{ CreateDate: "desc" }, { SeriesID: "desc" }],
+      select: { SeriesID: true, Titre: true, CreateDate: true },
+    });
+    expect(reply.send).toHaveBeenCalledWith({ sagas: [saga], videos: [video], series: [serie] });
   });
 
   it("normalise un film autonome pour VideoList", () => {

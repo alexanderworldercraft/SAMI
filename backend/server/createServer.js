@@ -25,6 +25,7 @@ import userRoutes from "../routes/userRoutes.js";
 import videoExportRoutes from "../routes/videoExportRoutes.js";
 import videoEncodingRoutes from "../routes/videoEncodingRoutes.js";
 import videoRoutes from "../routes/videoRoutes.js";
+import { registerSocialPreviewRoute } from "../routes/socialPreviewRoutes.js";
 import { globalRateLimit } from "../middlewares/rateLimitMiddleware.js";
 import {
   createCorsOriginValidator,
@@ -94,7 +95,11 @@ function registerDocumentation(server, publicHost) {
   });
 }
 
-function registerStaticFiles(server, uploadsRootPath = uploadsRoot) {
+function registerStaticFiles(
+  server,
+  uploadsRootPath = uploadsRoot,
+  frontendBuildRootPath = frontendBuildRoot
+) {
   server.all("/uploads/BDD", async (_request, reply) =>
     reply.status(404).send({ error: "Not found" })
   );
@@ -177,7 +182,7 @@ function registerStaticFiles(server, uploadsRootPath = uploadsRoot) {
   });
 
   server.register(fastifyStatic, {
-    root: frontendBuildRoot,
+    root: frontendBuildRootPath,
     prefix: "/",
     wildcard: true,
     decorateReply: false,
@@ -193,12 +198,15 @@ function registerStaticFiles(server, uploadsRootPath = uploadsRoot) {
     if (request.raw.url?.startsWith("/api/")) {
       return reply.status(404).send({ error: "Route API introuvable." });
     }
-    return reply.sendFile("index.html", frontendBuildRoot);
+    return reply.sendFile("index.html", frontendBuildRootPath);
   });
 }
 
 export function createServer({
+  appName = process.env.APP_NAME || "SAMI",
+  frontendBuildRootPath = frontendBuildRoot,
   https,
+  loadSocialPreviewMetadata,
   trustProxy = false,
   publicUrl = process.env.PUBLIC_URL,
   publicHost = process.env.PUBLIC_HOST,
@@ -244,7 +252,15 @@ export function createServer({
   for (const [routes, prefix] of ROUTES) {
     server.register(routes, { prefix });
   }
-  registerStaticFiles(server, uploadsRootPath);
+  registerSocialPreviewRoute(server, {
+    appName,
+    frontendBuildRoot: frontendBuildRootPath,
+    ...(loadSocialPreviewMetadata
+      ? { loadMetadata: loadSocialPreviewMetadata }
+      : {}),
+    publicUrl,
+  });
+  registerStaticFiles(server, uploadsRootPath, frontendBuildRootPath);
 
   return server;
 }

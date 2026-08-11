@@ -462,18 +462,18 @@ export const getUniverseAdminCatalog = async (request, reply) => {
     const [sagas, videos, series] = await Promise.all([
       prisma.saga.findMany({
         where: { EtatID: ACTIVE_ETAT_ID },
-        orderBy: { Titre: "asc" },
-        select: { SagaID: true, Titre: true },
+        orderBy: [{ CreateDate: "desc" }, { SagaID: "desc" }],
+        select: { SagaID: true, Titre: true, CreateDate: true },
       }),
       prisma.video.findMany({
         where: { EtatID: ACTIVE_ETAT_ID, SaisonID: null },
-        orderBy: { Titre: "asc" },
-        select: { VideoID: true, Titre: true },
+        orderBy: [{ CreateDate: "desc" }, { VideoID: "desc" }],
+        select: { VideoID: true, Titre: true, CreateDate: true },
       }),
       prisma.series.findMany({
         where: { EtatID: ACTIVE_ETAT_ID },
-        orderBy: { Titre: "asc" },
-        select: { SeriesID: true, Titre: true },
+        orderBy: [{ CreateDate: "desc" }, { SeriesID: "desc" }],
+        select: { SeriesID: true, Titre: true, CreateDate: true },
       }),
     ]);
 
