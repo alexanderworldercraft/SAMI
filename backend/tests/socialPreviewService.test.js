@@ -92,7 +92,7 @@ describe("socialPreviewService", () => {
     ).resolves.toBeNull();
   });
 
-  it("préfère l'affiche de série à une image par défaut d'épisode", () => {
+  it("préfère l'affiche de série même lorsque l'épisode a sa propre affiche", () => {
     const summary = `  ${"Résumé très détaillé. ".repeat(20)}  `;
     const meta = buildLectureSocialMeta({
       videoId: 73,
@@ -104,7 +104,7 @@ describe("socialPreviewService", () => {
         video: {
           title: "Épisode 4",
           summary,
-          image: "uploads/images/imageDefault.PNG",
+          image: "uploads/video/73/affiche-episode.webp",
         },
         season: { number: 2 },
         series: {
@@ -122,6 +122,57 @@ describe("socialPreviewService", () => {
     expect(meta.imageUrl).toBe("https://sami.example/uploads/serie/8/affiche.webp");
     expect(meta.imageAlt).toBe("Affiche de La Série");
     expect(meta.canonicalUrl).toBe("https://sami.example/lecture/73");
+  });
+
+  it("utilise l'affiche de l'épisode lorsque la série n'a pas d'affiche exploitable", () => {
+    const meta = buildLectureSocialMeta({
+      videoId: 73,
+      appName: "SAMI Privé",
+      publicOrigin: "https://sami.example",
+      content: {
+        type: "episode",
+        videoId: 73,
+        video: {
+          title: "Épisode 4",
+          summary: "Résumé",
+          image: "uploads/video/73/affiche-episode.webp",
+        },
+        season: { number: 2 },
+        series: {
+          title: "La Série",
+          summary: "Résumé de la série",
+          image: "uploads/images/imageDefault.PNG",
+        },
+      },
+    });
+
+    expect(meta.imageUrl).toBe("https://sami.example/uploads/video/73/affiche-episode.webp");
+    expect(meta.imageAlt).toBe("Affiche de Épisode 4");
+  });
+
+  it("conserve l'affiche vidéo pour un film", () => {
+    const meta = buildLectureSocialMeta({
+      videoId: 74,
+      appName: "SAMI Privé",
+      publicOrigin: "https://sami.example",
+      content: {
+        type: "movie",
+        videoId: 74,
+        video: {
+          title: "Le Film",
+          summary: "Résumé du film",
+          image: "uploads/video/74/affiche-film.webp",
+        },
+        series: {
+          title: "Série ignorée",
+          image: "uploads/serie/8/affiche-serie.webp",
+        },
+      },
+    });
+
+    expect(meta.type).toBe("video.movie");
+    expect(meta.imageUrl).toBe("https://sami.example/uploads/video/74/affiche-film.webp");
+    expect(meta.imageAlt).toBe("Affiche de Le Film");
   });
 
   it("échappe le HTML et remplace un bloc existant sans doublon", () => {

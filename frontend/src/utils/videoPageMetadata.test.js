@@ -59,6 +59,51 @@ describe("buildVideoPageMetadata", () => {
     expect(metadata.openGraphType).toBe("video.episode");
   });
 
+  test("donne la priorité à l'affiche de la série pour un épisode ayant sa propre affiche", () => {
+    const metadata = buildVideoPageMetadata({
+      id: 85,
+      video: {
+        VideoID: 85,
+        Titre: "Épisode 4",
+        CheminImage: "uploads/video/85/affiche/episode.webp",
+        SaisonID: 7,
+      },
+      series: {
+        Titre: "La Série",
+        CheminImage: "uploads/series/12/poster.webp",
+      },
+      currentSeason: { Numero: 2 },
+      siteName: "SAMI",
+      pageOrigin: "https://sami.example",
+      assetOrigin: "https://media.example",
+    });
+
+    expect(metadata.imageUrl).toBe("https://media.example/uploads/series/12/poster.webp");
+    expect(metadata.imageAlt).toBe("Affiche de La Série");
+  });
+
+  test("utilise l'affiche de l'épisode si la série n'a pas d'affiche exploitable", () => {
+    const metadata = buildVideoPageMetadata({
+      id: 86,
+      video: {
+        VideoID: 86,
+        Titre: "Épisode 5",
+        CheminImage: "uploads/video/86/affiche/episode.webp",
+        SaisonID: 7,
+      },
+      series: {
+        Titre: "La Série",
+        CheminImage: "/imageDefault.png",
+      },
+      siteName: "SAMI",
+      pageOrigin: "https://sami.example",
+      assetOrigin: "https://media.example",
+    });
+
+    expect(metadata.imageUrl).toBe("https://media.example/uploads/video/86/affiche/episode.webp");
+    expect(metadata.imageAlt).toBe("Affiche de Épisode 5");
+  });
+
   test("utilise le logo si aucune affiche exploitable n'est disponible", () => {
     const metadata = buildVideoPageMetadata({
       id: 9,

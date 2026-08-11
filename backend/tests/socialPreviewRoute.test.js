@@ -53,7 +53,7 @@ describe("GET /lecture/:id social preview", () => {
       video: {
         title: "Le Départ",
         summary: "Résumé de l'épisode",
-        image: "uploads/images/default.png",
+        image: "uploads/video/42/le-depart.webp",
       },
       season: { number: 3 },
       series: {

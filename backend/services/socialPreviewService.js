@@ -86,16 +86,20 @@ function buildAbsoluteUrl(origin, pathname) {
 }
 
 function selectPublicPoster(content) {
-  const videoImage = content?.video?.image;
-  if (!isPlaceholderImagePath(videoImage)) {
-    const path = normalizePublicAssetPath(videoImage);
-    if (path) return { path, source: "video" };
-  }
+  const candidates = content?.type === "episode"
+    ? [
+        { image: content?.series?.image, source: "series" },
+        { image: content?.video?.image, source: "video" },
+      ]
+    : [
+        { image: content?.video?.image, source: "video" },
+        { image: content?.series?.image, source: "series" },
+      ];
 
-  const seriesImage = content?.series?.image;
-  if (!isPlaceholderImagePath(seriesImage)) {
-    const path = normalizePublicAssetPath(seriesImage);
-    if (path) return { path, source: "series" };
+  for (const candidate of candidates) {
+    if (isPlaceholderImagePath(candidate.image)) continue;
+    const path = normalizePublicAssetPath(candidate.image);
+    if (path) return { path, source: candidate.source };
   }
 
   return null;

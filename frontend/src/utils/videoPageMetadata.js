@@ -119,8 +119,10 @@ export const buildVideoPageMetadata = ({
   const seriesPoster = isEpisode && !isDefaultPosterPath(seriesPosterCandidate)
     ? normalizePublicPosterPath(seriesPosterCandidate)
     : null;
-  const posterPath = videoPoster || seriesPoster;
-  const posterTitle = videoPoster ? videoTitle : seriesTitle;
+  const posterPath = isEpisode
+    ? (seriesPoster || videoPoster)
+    : videoPoster;
+  const posterTitle = posterPath === seriesPoster ? seriesTitle : videoTitle;
   const posterUrl = posterPath ? buildAbsoluteUrl(posterPath, resolvedAssetOrigin) : null;
   const imageUrl = posterUrl || buildAbsoluteUrl("/logo512.png", resolvedPageOrigin);
   const normalizedId = String(id ?? "").trim();
