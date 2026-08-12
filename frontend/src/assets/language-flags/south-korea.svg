@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 18 12">
+  <path fill="#fff" d="M0 0h18v12H0z"/>
+  <path fill="#cd2e3a" d="M6.5 6a2.5 2.5 0 0 1 5 0 1.25 1.25 0 0 1-2.5 0 1.25 1.25 0 0 0-2.5 0z"/>
+  <path fill="#0047a0" d="M11.5 6a2.5 2.5 0 0 1-5 0A1.25 1.25 0 0 1 9 6a1.25 1.25 0 0 0 2.5 0z"/>
+  <g stroke="#111" stroke-width=".45">
+    <path d="m3 2 2 1.4m-2.35-.9 2 1.4m8.35 4.7 2 1.4m-2.35-.9 2 1.4"/>
+    <path stroke-dasharray=".75 .3" d="m13 3.4 2-1.4m-2.35 2 2-1.4M3 10l2-1.4m-2.35.9 2-1.4"/>
+  </g>
+</svg>

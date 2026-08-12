@@ -60,7 +60,13 @@ beforeAll(() => {
 
 beforeEach(() => {
   Hls.instances.length = 0;
+  localStorage.clear();
 });
+
+const openSettings = () => {
+  fireEvent.click(screen.getByRole("button", { name: "Ouvrir les réglages du lecteur" }));
+  return screen.getByRole("menu", { name: "Réglages du lecteur" });
+};
 
 const renderPlayer = () => render(
   <VideoPlayer
@@ -109,9 +115,12 @@ it("remplace les contrôles natifs par la barre de progression personnalisée", 
   expect(screen.getByRole("slider", { name: "Position de lecture" })).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Lire" })).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "Basculer en plein écran" })).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Ouvrir les réglages du lecteur" })).toBeInTheDocument();
+  expect(container.querySelector(".resolution-selector")).not.toBeInTheDocument();
+  expect(container.querySelector(".ambient-light-selector")).not.toBeInTheDocument();
 });
 
-it("active la première piste par défaut et permet de sélectionner un autre sous-titre", () => {
+it("regroupe les sous-titres dans les réglages avec les drapeaux et l'option de désactivation", () => {
   render(
     <VideoPlayer
       video={{
@@ -126,26 +135,29 @@ it("active la première piste par défaut et permet de sélectionner un autre so
     />
   );
 
-  const captionsButton = screen.getByRole("button", {
-    name: "Désactiver les sous-titres",
-  });
-  expect(captionsButton).toHaveAttribute("aria-pressed", "true");
-
-  fireEvent.focus(captionsButton);
-  expect(screen.getByRole("menu", { name: "Choisir les sous-titres" })).toBeInTheDocument();
+  openSettings();
+  expect(screen.getByRole("menuitem", { name: /Audio Par défaut/ })).toBeInTheDocument();
+  expect(screen.getByRole("menuitemcheckbox", { name: /Ambiance Activée/ })).toBeInTheDocument();
+  expect(screen.getByRole("menuitem", { name: /Qualité Indisponible/ })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("menuitem", { name: /Sous-titres Français/ }));
   expect(screen.getByRole("menuitemradio", { name: "Français" })).toHaveAttribute(
     "aria-checked",
     "true"
   );
+  expect(screen.getByTitle("Langue : français")).toBeInTheDocument();
 
   fireEvent.click(screen.getByRole("menuitemradio", { name: "English" }));
   expect(screen.getByRole("menuitemradio", { name: "English" })).toHaveAttribute(
     "aria-checked",
     "true"
   );
+  expect(screen.getByTitle("Langue : anglais")).toBeInTheDocument();
 
-  fireEvent.click(captionsButton);
-  expect(captionsButton).toHaveAttribute("aria-pressed", "false");
+  fireEvent.click(screen.getByRole("menuitemradio", { name: "Désactivés" }));
+  expect(screen.getByRole("menuitemradio", { name: "Désactivés" })).toHaveAttribute(
+    "aria-checked",
+    "true"
+  );
 });
 
 it("affiche et change les pistes audio uniquement pour une vidéo multi-audio expérimentale", () => {
@@ -175,20 +187,23 @@ it("affiche et change les pistes audio uniquement pour une vidéo multi-audio ex
     });
   });
 
-  const audioButton = screen.getByRole("button", { name: "Choisir la piste audio" });
-  fireEvent.focus(audioButton);
-
-  expect(screen.getByRole("menu", { name: "Choisir la piste audio" })).toBeInTheDocument();
+  openSettings();
+  fireEvent.click(screen.getByRole("menuitem", { name: /Audio Japonais/ }));
   expect(screen.getByRole("menuitemradio", { name: "Japonais" })).toHaveAttribute(
     "aria-checked",
     "true"
   );
+  expect(screen.getByTitle("Langue : japonais")).toBeInTheDocument();
 
   fireEvent.click(screen.getByRole("menuitemradio", { name: "Français" }));
   expect(hls.audioTrack).toBe(1);
+  expect(screen.getByRole("menuitemradio", { name: "Français" })).toHaveAttribute(
+    "aria-checked",
+    "true"
+  );
 });
 
-it("ne propose pas de sélecteur audio aux anciennes vidéos", () => {
+it("conserve l'entrée audio désactivée pour les anciennes vidéos", () => {
   render(
     <VideoPlayer
       video={{
@@ -202,12 +217,11 @@ it("ne propose pas de sélecteur audio aux anciennes vidéos", () => {
     />
   );
 
-  expect(
-    screen.queryByRole("button", { name: "Choisir la piste audio" })
-  ).not.toBeInTheDocument();
+  openSettings();
+  expect(screen.getByRole("menuitem", { name: "Audio Par défaut" })).toBeDisabled();
 });
 
-it("masque le sélecteur lorsque la fonctionnalité expérimentale est désactivée", () => {
+it("conserve l'entrée audio désactivée lorsque la fonctionnalité expérimentale est inactive", () => {
   render(
     <VideoPlayer
       video={{
@@ -233,9 +247,49 @@ it("masque le sélecteur lorsque la fonctionnalité expérimentale est désactiv
     });
   });
 
-  expect(
-    screen.queryByRole("button", { name: "Choisir la piste audio" })
-  ).not.toBeInTheDocument();
+  openSettings();
+  expect(screen.getByRole("menuitem", { name: "Audio Par défaut" })).toBeDisabled();
+});
+
+it("change la qualité depuis un sous-menu et conserve le mode automatique", () => {
+  renderPlayer();
+  const hls = Hls.instances.at(-1);
+  hls.levels = [{ height: 360 }, { height: 1080 }];
+
+  act(() => {
+    hls.emit(Hls.Events.MANIFEST_PARSED, {});
+  });
+
+  openSettings();
+  fireEvent.click(screen.getByRole("menuitem", { name: "Qualité Automatique" }));
+  expect(screen.getByRole("menuitemradio", { name: "Automatique" })).toHaveAttribute(
+    "aria-checked",
+    "true"
+  );
+
+  fireEvent.click(screen.getByRole("menuitemradio", { name: "1080p" }));
+  expect(hls.currentLevel).toBe(1);
+  expect(screen.getByRole("menuitemradio", { name: "1080p" })).toHaveAttribute(
+    "aria-checked",
+    "true"
+  );
+});
+
+it("active l'ambiance directement dans le menu et ferme les réglages à l'extérieur", () => {
+  renderPlayer();
+
+  openSettings();
+  const ambienceTile = screen.getByRole("menuitemcheckbox", { name: "Ambiance Activée" });
+  expect(ambienceTile).toHaveAttribute("aria-checked", "true");
+
+  fireEvent.click(ambienceTile);
+  expect(screen.getByRole("menuitemcheckbox", { name: "Ambiance Désactivée" })).toHaveAttribute(
+    "aria-checked",
+    "false"
+  );
+
+  fireEvent.pointerDown(document.body);
+  expect(screen.queryByRole("menu", { name: "Réglages du lecteur" })).not.toBeInTheDocument();
 });
 
 describe("raccourcis clavier du lecteur", () => {
@@ -366,19 +420,13 @@ describe("zones de clic du lecteur", () => {
 
     fireEvent.play(videoElement);
     expect(screen.getByTestId("player-controls")).toHaveClass("opacity-0");
-    expect(screen.getByTestId("ambient-light-selector")).toHaveClass("opacity-0");
 
     fireEvent.click(layer, { clientX: 100, clientY: 250, detail: 1 });
     expect(screen.getByTestId("player-controls")).toHaveClass("opacity-100");
-    expect(screen.getByTestId("ambient-light-selector")).toHaveClass("opacity-100");
 
     fireEvent.click(layer, { clientX: 100, clientY: 250, detail: 1 });
     expect(screen.getByTestId("player-controls")).toHaveClass("opacity-0");
     expect(screen.getByTestId("player-controls")).not.toHaveClass("group-hover:opacity-100");
-    expect(screen.getByTestId("ambient-light-selector")).toHaveClass(
-      "opacity-0",
-      "pointer-events-none"
-    );
   });
 
   it("respecte le masquage explicite lorsque la vidéo est en pause", () => {

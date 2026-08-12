@@ -1,10 +1,13 @@
 import React, { useEffect, useRef, useState } from "react";
 import Hls from "hls.js";
+import { ArrowLeftIcon, GlobeAltIcon } from "@heroicons/react/24/outline";
+import { CheckIcon, Cog6ToothIcon } from "@heroicons/react/24/solid";
 import api from "../services/api";
 import {
   parsePreviewLiveVtt,
   toAbsoluteAssetUrl,
 } from "../utils/previewLive";
+import { resolvePlayerLanguageFlag } from "../utils/playerLanguageFlags";
 
 const AMBIENT_LIGHT_STORAGE_KEY = "sami-ambient-light-enabled";
 const AMBIENT_LIGHT_DEFAULT_COLOR = "rgb(3, 3, 3)";
@@ -36,6 +39,13 @@ const PLAYER_CENTER_TARGET = {
   maxHeight: 220,
 };
 
+const SETTINGS_PANEL = {
+  MAIN: "main",
+  SUBTITLES: "subtitles",
+  AUDIO: "audio",
+  QUALITY: "quality",
+};
+
 const formatPlaybackTime = (seconds) => {
   const safeSeconds = Number.isFinite(seconds) ? Math.max(0, Math.floor(seconds)) : 0;
   const hours = Math.floor(safeSeconds / 3600);
@@ -50,6 +60,58 @@ const formatPlaybackTime = (seconds) => {
 const isInteractiveShortcutTarget = (target) => Boolean(target?.closest?.(
   'input, textarea, select, button, a[href], [contenteditable]:not([contenteditable="false"]), [role="button"], [role="link"], [role="menuitem"], [role="menuitemradio"], [role="slider"], [role="textbox"], [role="combobox"], [role="spinbutton"], [role="switch"], [role="checkbox"], [role="radio"], [role="tab"]'
 ));
+
+const PlayerLanguageFlag = ({ flag }) => (
+  flag ? (
+    <img
+      src={flag.src}
+      alt=""
+      aria-hidden="true"
+      title={`Langue : ${flag.name}`}
+      className="h-4 w-6 shrink-0 rounded-sm border border-white/20 object-cover shadow-sm"
+    />
+  ) : (
+    <span
+      title="Langue non identifiée"
+      aria-label="Langue non identifiée"
+      className="flex h-4 w-6 shrink-0 items-center justify-center rounded-sm border border-white/15 bg-white/5"
+    >
+      <GlobeAltIcon className="h-3.5 w-3.5 text-white/55" aria-hidden="true" />
+    </span>
+  )
+);
+
+const SettingsTile = ({
+  title,
+  value,
+  disabled = false,
+  onClick,
+  flag = undefined,
+  children = null,
+  role = "menuitem",
+  ariaChecked = undefined,
+}) => (
+  <button
+    type="button"
+    role={role}
+    aria-checked={ariaChecked}
+    disabled={disabled}
+    onClick={onClick}
+    className={`flex min-h-24 flex-col items-center justify-center gap-2 rounded-xl border px-3 py-4 text-center transition ${
+      disabled
+        ? "cursor-not-allowed border-white/5 bg-white/[0.025] text-white/30"
+        : "border-white/5 bg-white/[0.055] text-white/85 hover:border-sky-400/30 hover:bg-white/10 focus:border-sky-400/50 focus:bg-white/10"
+    }`}
+  >
+    <span className="text-sm font-bold sm:text-base">{title}</span>
+    {children || (
+      <span className="flex min-w-0 max-w-full items-center gap-2 text-xs text-white/55 sm:text-sm">
+        {flag !== undefined && <PlayerLanguageFlag flag={flag} />}
+        <span className="truncate">{value}</span>
+      </span>
+    )}
+  </button>
+);
 
 const VideoPlayer = ({
   video,
@@ -78,10 +140,10 @@ const VideoPlayer = ({
   const [muted, setMuted] = useState(false);
   const [captionsEnabled, setCaptionsEnabled] = useState(true);
   const [selectedSubtitleIndex, setSelectedSubtitleIndex] = useState(0);
-  const [subtitleMenuOpen, setSubtitleMenuOpen] = useState(false);
   const [availableAudioTracks, setAvailableAudioTracks] = useState([]);
   const [selectedAudioTrackIndex, setSelectedAudioTrackIndex] = useState(-1);
-  const [audioMenuOpen, setAudioMenuOpen] = useState(false);
+  const [settingsMenuOpen, setSettingsMenuOpen] = useState(false);
+  const [settingsPanel, setSettingsPanel] = useState(SETTINGS_PANEL.MAIN);
   const [keyboardHelpOpen, setKeyboardHelpOpen] = useState(false);
   const [previewCues, setPreviewCues] = useState([]);
   const [hoverPreview, setHoverPreview] = useState(null);
@@ -116,10 +178,10 @@ const VideoPlayer = ({
     setControlsDismissed(false);
     setCaptionsEnabled(true);
     setSelectedSubtitleIndex(0);
-    setSubtitleMenuOpen(false);
     setAvailableAudioTracks([]);
     setSelectedAudioTrackIndex(-1);
-    setAudioMenuOpen(false);
+    setSettingsMenuOpen(false);
+    setSettingsPanel(SETTINGS_PANEL.MAIN);
     setKeyboardHelpOpen(false);
     setPreviewCues([]);
     setHoverPreview(null);
@@ -459,7 +521,8 @@ const VideoPlayer = ({
       setSelectedLevel(-1);
       setAvailableAudioTracks([]);
       setSelectedAudioTrackIndex(-1);
-      setAudioMenuOpen(false);
+      setSettingsMenuOpen(false);
+      setSettingsPanel(SETTINGS_PANEL.MAIN);
 
       if (onVideoElement) {
         onVideoElement(null);
@@ -677,19 +740,6 @@ const VideoPlayer = ({
     }
 
     setSelectedAudioTrackIndex(audioTrackIndex);
-    setAudioMenuOpen(false);
-  };
-
-  const handleAudioMenuBlur = (event) => {
-    if (!event.currentTarget.contains(event.relatedTarget)) {
-      setAudioMenuOpen(false);
-    }
-  };
-
-  const handleAudioMenuMouseLeave = (event) => {
-    if (!event.currentTarget.contains(document.activeElement)) {
-      setAudioMenuOpen(false);
-    }
   };
 
   const applySubtitleSelection = (subtitleIndex, enabled) => {
@@ -699,28 +749,15 @@ const VideoPlayer = ({
     });
   };
 
-  const toggleCaptions = () => {
-    const nextEnabled = !captionsEnabled;
-    applySubtitleSelection(selectedSubtitleIndex, nextEnabled);
-    setCaptionsEnabled(nextEnabled);
+  const disableCaptions = () => {
+    applySubtitleSelection(selectedSubtitleIndex, false);
+    setCaptionsEnabled(false);
   };
 
   const selectSubtitle = (subtitleIndex) => {
     applySubtitleSelection(subtitleIndex, true);
     setSelectedSubtitleIndex(subtitleIndex);
     setCaptionsEnabled(true);
-  };
-
-  const handleSubtitleMenuBlur = (event) => {
-    if (!event.currentTarget.contains(event.relatedTarget)) {
-      setSubtitleMenuOpen(false);
-    }
-  };
-
-  const handleSubtitleMenuMouseLeave = (event) => {
-    if (!event.currentTarget.contains(document.activeElement)) {
-      setSubtitleMenuOpen(false);
-    }
   };
 
   const toggleFullscreen = async () => {
@@ -751,6 +788,8 @@ const VideoPlayer = ({
   };
 
   const openKeyboardHelp = () => {
+    setSettingsMenuOpen(false);
+    setSettingsPanel(SETTINGS_PANEL.MAIN);
     setKeyboardHelpOpen(true);
     setControlsVisible(true);
     setControlsDismissed(false);
@@ -763,6 +802,32 @@ const VideoPlayer = ({
   const closeKeyboardHelp = () => {
     setKeyboardHelpOpen(false);
     showControls();
+  };
+
+  const openSettingsMenu = () => {
+    setKeyboardHelpOpen(false);
+    setSettingsMenuOpen(true);
+    setSettingsPanel(SETTINGS_PANEL.MAIN);
+    setControlsVisible(true);
+    setControlsDismissed(false);
+    if (controlsHideTimeoutRef.current) {
+      clearTimeout(controlsHideTimeoutRef.current);
+      controlsHideTimeoutRef.current = null;
+    }
+  };
+
+  const closeSettingsMenu = () => {
+    setSettingsMenuOpen(false);
+    setSettingsPanel(SETTINGS_PANEL.MAIN);
+    showControls();
+  };
+
+  const toggleSettingsMenu = () => {
+    if (settingsMenuOpen) {
+      closeSettingsMenu();
+    } else {
+      openSettingsMenu();
+    }
   };
 
   useEffect(() => {
@@ -779,6 +844,31 @@ const VideoPlayer = ({
     // closeKeyboardHelp utilise toujours les setters React et la réf courante du minuteur.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [keyboardHelpOpen]);
+
+  useEffect(() => {
+    if (!settingsMenuOpen) return undefined;
+
+    const handleOutsidePointerDown = (event) => {
+      if (!event.target?.closest?.('[data-player-settings="true"]')) {
+        closeSettingsMenu();
+      }
+    };
+    const handleSettingsKeyDown = (event) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        closeSettingsMenu();
+      }
+    };
+
+    document.addEventListener("pointerdown", handleOutsidePointerDown);
+    document.addEventListener("keydown", handleSettingsKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", handleOutsidePointerDown);
+      document.removeEventListener("keydown", handleSettingsKeyDown);
+    };
+    // Les fermetures réutilisent uniquement les setters et la réf courante du minuteur.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settingsMenuOpen]);
 
   useEffect(() => {
     if (!video?.CheminAcces) return undefined;
@@ -920,22 +1010,43 @@ const VideoPlayer = ({
 
   const playedPercent = duration > 0 ? Math.min(100, (currentTime / duration) * 100) : 0;
   const bufferedPercent = duration > 0 ? Math.min(100, (bufferedTime / duration) * 100) : 0;
-  const playerChromeVisibilityClass = keyboardHelpOpen
+  const subtitleTracks = video?.subtitles || [];
+  const selectedSubtitle = subtitleTracks[selectedSubtitleIndex] || null;
+  const selectedSubtitleFlag = captionsEnabled && selectedSubtitle
+    ? resolvePlayerLanguageFlag({
+        language: selectedSubtitle.language,
+        label: selectedSubtitle.label,
+        source: selectedSubtitle.url,
+      })
+    : null;
+  const hasAudioOptions = Boolean(
+    multiAudioEnabled
+    && video?.audioTracks?.length > 1
+    && availableAudioTracks.length > 1
+  );
+  const selectedAudioTrack = availableAudioTracks.find(
+    (track) => track.index === selectedAudioTrackIndex
+  ) || null;
+  const selectedAudioFlag = selectedAudioTrack
+    ? resolvePlayerLanguageFlag(selectedAudioTrack)
+    : null;
+  const selectedQuality = selectedLevel === -1
+    ? "Automatique"
+    : availableLevels.find((level) => level.level === selectedLevel)?.resolution
+      || "Automatique";
+  const playerChromeVisibilityClass = keyboardHelpOpen || settingsMenuOpen
     ? "opacity-100"
     : controlsDismissed
       ? "opacity-0"
       : playing && !controlsVisible
         ? "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100"
         : "opacity-100";
-  const topControlsVisibilityClass = controlsDismissed
-    ? `${playerChromeVisibilityClass} pointer-events-none`
-    : playerChromeVisibilityClass;
 
   return (
     <div ref={fitContainerRef} className="relative w-full h-full flex items-center justify-center">
       <div
         ref={playerContainerRef}
-        className="relative border-0 ring-0 group rounded-xl xl:rounded-2xl shadow-xl/30 overflow-hidden"
+        className="relative border-0 ring-0 group rounded-xl xl:rounded-2xl shadow-xl/30 overflow-visible"
         style={{
           width: isFullscreen ? "100vw" : playerSize.width ? `${playerSize.width}px` : "100%",
           height: isFullscreen ? "100vh" : playerSize.height ? `${playerSize.height}px` : "100%",
@@ -956,55 +1067,9 @@ const VideoPlayer = ({
           aria-hidden="true"
         />
 
-        {availableLevels.length > 0 && (
-          <div
-            className={`resolution-selector absolute top-0 left-0 z-50 transition-opacity duration-200 ${topControlsVisibilityClass}`}
-          >
-            <select
-              value={selectedLevel}
-              onChange={(e) => changeResolution(parseInt(e.target.value))}
-              className="p-2 rounded-br-lg shadow-md backdrop-blur bg-black/40 text-neutral-200 font-semibold border-b border-r border-neutral-500"
-            >
-              <option value="-1">Auto</option>
-              {availableLevels.map((level) => (
-                <option key={level.level} value={level.level} className="border-none">
-                  {level.resolution}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
-
-        <div
-          data-testid="ambient-light-selector"
-          className={`ambient-light-selector absolute top-0 right-0 z-50 transition-opacity duration-200 ${topControlsVisibilityClass}`}
-        >
-          <button
-            type="button"
-            onClick={toggleAmbientLight}
-            aria-pressed={ambientLightEnabled}
-            title={ambientLightEnabled ? "Désactiver les lumières d'ambiance" : "Activer les lumières d'ambiance"}
-            className="flex items-center gap-2 p-2 shadow-md backdrop-blur bg-black/40 text-neutral-200 font-semibold border-b border-l border-neutral-500"
-            style={{ borderBottomLeftRadius: "0.5rem" }}
-          >
-            <span
-              className={`relative inline-flex h-5 w-10 shrink-0 items-center rounded-full transition-colors duration-200 ${
-                ambientLightEnabled ? "bg-sky-500" : "bg-neutral-700"
-              }`}
-              aria-hidden="true"
-            >
-              <span
-                className="inline-block h-4 w-4 rounded-full bg-white shadow transition-transform duration-200"
-                style={{ transform: ambientLightEnabled ? "translateX(1.25rem)" : "translateX(0.25rem)" }}
-              ></span>
-            </span>
-            <span className="text-sm">Ambiance</span>
-          </button>
-        </div>
-
         <div
           data-testid="player-controls"
-          className={`absolute inset-x-0 bottom-0 z-40 bg-gradient-to-t from-black/95 via-black/65 to-transparent px-3 pb-3 pt-10 text-white transition-opacity duration-200 ${playerChromeVisibilityClass}`}
+          className={`absolute inset-x-0 bottom-0 z-40 rounded-b-xl bg-gradient-to-t from-black/95 via-black/65 to-transparent px-3 pb-3 pt-10 text-white transition-opacity duration-200 xl:rounded-b-2xl ${playerChromeVisibilityClass}`}
         >
           <div
             className="relative mb-2 flex h-5 items-center"
@@ -1095,85 +1160,120 @@ const VideoPlayer = ({
 
             <span className="flex-1" />
 
-            {multiAudioEnabled
-              && video?.audioTracks?.length > 1
-              && availableAudioTracks.length > 1 && (
-              <div
-                className="relative"
-                onMouseEnter={() => setAudioMenuOpen(true)}
-                onMouseLeave={handleAudioMenuMouseLeave}
-                onFocusCapture={() => setAudioMenuOpen(true)}
-                onBlurCapture={handleAudioMenuBlur}
-              >
-                {audioMenuOpen && (
-                  <div
-                    role="menu"
-                    aria-label="Choisir la piste audio"
-                    className="absolute bottom-full right-0 z-50 min-w-48 overflow-hidden rounded-lg border border-white/20 bg-black/95 p-1.5 text-left shadow-2xl backdrop-blur"
-                  >
-                    <p className="px-2 py-1 text-[11px] font-bold uppercase tracking-wide text-white/55">
-                      Audio
-                    </p>
-                    <div className="max-h-48 overflow-y-auto">
-                      {availableAudioTracks.map((track) => {
-                        const isSelected = selectedAudioTrackIndex === track.index;
-                        return (
-                          <button
-                            type="button"
-                            role="menuitemradio"
-                            aria-checked={isSelected}
-                            key={`${track.label}-${track.index}`}
-                            onClick={() => selectAudioTrack(track.index)}
-                            className={`flex w-full items-center justify-between gap-3 rounded-md px-2 py-2 text-sm transition ${
-                              isSelected
-                                ? "bg-sky-500/25 font-bold text-sky-100"
-                                : "text-white/80 hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white"
-                            }`}
-                          >
-                            <span>{track.label}</span>
-                            <span className="w-4 text-center text-sky-300" aria-hidden="true">
-                              {isSelected ? "✓" : ""}
-                            </span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                <button
-                  type="button"
-                  onClick={() => setAudioMenuOpen(true)}
-                  aria-haspopup="menu"
-                  aria-expanded={audioMenuOpen}
-                  aria-label="Choisir la piste audio"
-                  className="rounded bg-white/15 px-2 py-1 text-xs font-black text-white/85 transition hover:bg-white/25"
+            <div data-player-settings="true" className="relative">
+              {settingsMenuOpen && (
+                <div
+                  id="player-settings-menu"
+                  role="menu"
+                  aria-label="Réglages du lecteur"
+                  className="absolute bottom-full right-0 z-50 mb-3 max-h-[65vh] w-[min(24rem,calc(100vw-1.5rem))] overflow-y-auto rounded-2xl border border-white/15 bg-neutral-950/95 p-3 text-left shadow-2xl shadow-black/60 backdrop-blur-xl sm:p-4"
+                  style={playerSize.width > 0 && playerSize.width < 480 ? {
+                    right: "-5.5rem",
+                    width: `${Math.max(0, playerSize.width - 8)}px`,
+                  } : undefined}
                 >
-                  Audio
-                </button>
-              </div>
-            )}
+                  {settingsPanel === SETTINGS_PANEL.MAIN && (
+                    <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
+                      <SettingsTile
+                        title="Sous-titres"
+                        value={captionsEnabled && selectedSubtitle
+                          ? selectedSubtitle.label || `Sous-titre ${selectedSubtitleIndex + 1}`
+                          : subtitleTracks.length > 0 ? "Désactivés" : "Indisponible"}
+                        disabled={subtitleTracks.length === 0}
+                        flag={captionsEnabled && selectedSubtitle ? selectedSubtitleFlag : undefined}
+                        onClick={() => setSettingsPanel(SETTINGS_PANEL.SUBTITLES)}
+                      />
+                      <SettingsTile
+                        title="Audio"
+                        value={hasAudioOptions ? selectedAudioTrack?.label || "Par défaut" : "Par défaut"}
+                        disabled={!hasAudioOptions}
+                        flag={hasAudioOptions && selectedAudioTrack ? selectedAudioFlag : undefined}
+                        onClick={() => setSettingsPanel(SETTINGS_PANEL.AUDIO)}
+                      />
+                      <SettingsTile
+                        title="Ambiance"
+                        value={ambientLightEnabled ? "Activée" : "Désactivée"}
+                        onClick={toggleAmbientLight}
+                        role="menuitemcheckbox"
+                        ariaChecked={ambientLightEnabled}
+                      >
+                        <span className="flex items-center gap-2 text-xs text-white/60 sm:text-sm">
+                          <span
+                            className={`relative inline-flex h-5 w-10 shrink-0 items-center rounded-full transition-colors duration-200 ${
+                              ambientLightEnabled ? "bg-sky-500" : "bg-neutral-700"
+                            }`}
+                            aria-hidden="true"
+                          >
+                            <span
+                              className="inline-block h-4 w-4 rounded-full bg-white shadow transition-transform duration-200"
+                              style={{
+                                transform: ambientLightEnabled
+                                  ? "translateX(1.25rem)"
+                                  : "translateX(0.25rem)",
+                              }}
+                            />
+                          </span>
+                          <span>{ambientLightEnabled ? "Activée" : "Désactivée"}</span>
+                        </span>
+                      </SettingsTile>
+                      <SettingsTile
+                        title="Qualité"
+                        value={availableLevels.length > 0 ? selectedQuality : "Indisponible"}
+                        disabled={availableLevels.length === 0}
+                        onClick={() => setSettingsPanel(SETTINGS_PANEL.QUALITY)}
+                      />
+                    </div>
+                  )}
 
-            {video?.subtitles?.length > 0 && (
-              <div
-                className="relative"
-                onMouseEnter={() => setSubtitleMenuOpen(true)}
-                onMouseLeave={handleSubtitleMenuMouseLeave}
-                onFocusCapture={() => setSubtitleMenuOpen(true)}
-                onBlurCapture={handleSubtitleMenuBlur}
-              >
-                {subtitleMenuOpen && (
-                  <div
-                    role="menu"
-                    aria-label="Choisir les sous-titres"
-                    className="absolute bottom-full right-0 z-50 min-w-48 overflow-hidden rounded-lg border border-white/20 bg-black/95 p-1.5 text-left shadow-2xl backdrop-blur"
-                  >
-                    <p className="px-2 py-1 text-[11px] font-bold uppercase tracking-wide text-white/55">
-                      Sous-titres
-                    </p>
-                    <div className="max-h-48 overflow-y-auto">
-                      {video.subtitles.map((subtitle, index) => {
+                  {settingsPanel !== SETTINGS_PANEL.MAIN && (
+                    <>
+                      <div className="flex items-center gap-3 px-1 py-1">
+                        <button
+                          type="button"
+                          role="menuitem"
+                          onClick={() => setSettingsPanel(SETTINGS_PANEL.MAIN)}
+                          aria-label="Retour aux réglages"
+                          className="rounded-full p-1.5 text-white/70 transition hover:bg-white/10 hover:text-white"
+                        >
+                          <ArrowLeftIcon className="h-5 w-5" aria-hidden="true" />
+                        </button>
+                        <p className="text-base font-bold text-white/90 sm:text-lg">
+                          {settingsPanel === SETTINGS_PANEL.SUBTITLES && "Sous-titres"}
+                          {settingsPanel === SETTINGS_PANEL.AUDIO && "Audio"}
+                          {settingsPanel === SETTINGS_PANEL.QUALITY && "Qualité"}
+                        </p>
+                      </div>
+                      <div className="my-3 border-t border-white/10" />
+                    </>
+                  )}
+
+                  {settingsPanel === SETTINGS_PANEL.SUBTITLES && (
+                    <div className="max-h-[48vh] space-y-1 overflow-y-auto pr-1">
+                      <button
+                        type="button"
+                        role="menuitemradio"
+                        aria-checked={!captionsEnabled}
+                        onClick={disableCaptions}
+                        className={`flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-sm transition ${
+                          !captionsEnabled
+                            ? "bg-white/10 font-bold text-white"
+                            : "text-white/70 hover:bg-white/5 hover:text-white"
+                        }`}
+                      >
+                        <span>Désactivés</span>
+                        <span className={`flex h-5 w-5 items-center justify-center rounded-full ${
+                          !captionsEnabled ? "bg-sky-500 text-neutral-950" : "text-transparent"
+                        }`} aria-hidden="true">
+                          {!captionsEnabled && <CheckIcon className="h-3.5 w-3.5" />}
+                        </span>
+                      </button>
+                      {subtitleTracks.map((subtitle, index) => {
                         const isSelected = captionsEnabled && selectedSubtitleIndex === index;
+                        const flag = resolvePlayerLanguageFlag({
+                          language: subtitle.language,
+                          label: subtitle.label,
+                          source: subtitle.url,
+                        });
                         return (
                           <button
                             type="button"
@@ -1181,38 +1281,107 @@ const VideoPlayer = ({
                             aria-checked={isSelected}
                             key={`${subtitle.label || "Sous-titre"}-${index}`}
                             onClick={() => selectSubtitle(index)}
-                            className={`flex w-full items-center justify-between gap-3 rounded-md px-2 py-2 text-sm transition ${
+                            className={`flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-sm transition ${
                               isSelected
-                                ? "bg-sky-500/25 font-bold text-sky-100"
-                                : "text-white/80 hover:bg-white/10 hover:text-white focus:bg-white/10 focus:text-white"
+                                ? "bg-white/10 font-bold text-white"
+                                : "text-white/70 hover:bg-white/5 hover:text-white"
                             }`}
                           >
-                            <span>{subtitle.label || `Sous-titre ${index + 1}`}</span>
-                            <span className="w-4 text-center text-sky-300" aria-hidden="true">
-                              {isSelected ? "✓" : ""}
+                            <span className="flex min-w-0 items-center gap-3">
+                              <PlayerLanguageFlag flag={flag} />
+                              <span className="truncate">
+                                {subtitle.label || `Sous-titre ${index + 1}`}
+                              </span>
+                            </span>
+                            <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full ${
+                              isSelected ? "bg-sky-500 text-neutral-950" : "text-transparent"
+                            }`} aria-hidden="true">
+                              {isSelected && <CheckIcon className="h-3.5 w-3.5" />}
                             </span>
                           </button>
                         );
                       })}
                     </div>
-                  </div>
-                )}
+                  )}
 
-                <button
-                  type="button"
-                  onClick={toggleCaptions}
-                  aria-pressed={captionsEnabled}
-                  aria-haspopup="menu"
-                  aria-expanded={subtitleMenuOpen}
-                  aria-label={captionsEnabled ? "Désactiver les sous-titres" : "Activer les sous-titres"}
-                  className={`rounded px-2 py-1 text-xs font-black transition ${
-                    captionsEnabled ? "bg-sky-500 text-white" : "bg-white/15 text-white/75"
-                  }`}
-                >
-                  CC
-                </button>
-              </div>
-            )}
+                  {settingsPanel === SETTINGS_PANEL.AUDIO && (
+                    <div className="max-h-[48vh] space-y-1 overflow-y-auto pr-1">
+                      {availableAudioTracks.map((track) => {
+                        const isSelected = selectedAudioTrackIndex === track.index;
+                        const flag = resolvePlayerLanguageFlag(track);
+                        return (
+                          <button
+                            type="button"
+                            role="menuitemradio"
+                            aria-checked={isSelected}
+                            key={`${track.label}-${track.index}`}
+                            onClick={() => selectAudioTrack(track.index)}
+                            className={`flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-sm transition ${
+                              isSelected
+                                ? "bg-white/10 font-bold text-white"
+                                : "text-white/70 hover:bg-white/5 hover:text-white"
+                            }`}
+                          >
+                            <span className="flex min-w-0 items-center gap-3">
+                              <PlayerLanguageFlag flag={flag} />
+                              <span className="truncate">{track.label}</span>
+                            </span>
+                            <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full ${
+                              isSelected ? "bg-sky-500 text-neutral-950" : "text-transparent"
+                            }`} aria-hidden="true">
+                              {isSelected && <CheckIcon className="h-3.5 w-3.5" />}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {settingsPanel === SETTINGS_PANEL.QUALITY && (
+                    <div className="max-h-[48vh] space-y-1 overflow-y-auto pr-1">
+                      {[{ level: -1, resolution: "Automatique" }, ...availableLevels].map((level) => {
+                        const isSelected = selectedLevel === level.level;
+                        return (
+                          <button
+                            type="button"
+                            role="menuitemradio"
+                            aria-checked={isSelected}
+                            key={level.level}
+                            onClick={() => changeResolution(level.level)}
+                            className={`flex w-full items-center justify-between gap-3 rounded-lg px-3 py-2.5 text-sm transition ${
+                              isSelected
+                                ? "bg-white/10 font-bold text-white"
+                                : "text-white/70 hover:bg-white/5 hover:text-white"
+                            }`}
+                          >
+                            <span>{level.resolution}</span>
+                            <span className={`flex h-5 w-5 items-center justify-center rounded-full ${
+                              isSelected ? "bg-sky-500 text-neutral-950" : "text-transparent"
+                            }`} aria-hidden="true">
+                              {isSelected && <CheckIcon className="h-3.5 w-3.5" />}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <button
+                type="button"
+                onClick={toggleSettingsMenu}
+                aria-haspopup="menu"
+                aria-expanded={settingsMenuOpen}
+                aria-controls="player-settings-menu"
+                aria-label={settingsMenuOpen ? "Fermer les réglages du lecteur" : "Ouvrir les réglages du lecteur"}
+                className={`flex h-8 w-8 items-center justify-center rounded-full transition ${
+                  settingsMenuOpen ? "bg-white text-neutral-950" : "text-white/90 hover:bg-white/15"
+                }`}
+              >
+                <Cog6ToothIcon className="h-6 w-6" aria-hidden="true" />
+              </button>
+            </div>
 
             <div
               data-player-keyboard-help="true"
