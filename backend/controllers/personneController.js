@@ -3,7 +3,7 @@ import { prisma } from "../services/db.js";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
-import { ensureAdmin } from "../services/authz.js";
+import { ensureAdmin, ensureSuperAdmin } from "../services/authz.js";
 import { ETAT, MULTIPART_LIMITS } from "../constants.js";
 import { isMultipartFileTooLargeError, sendMultipartFileTooLarge } from "../utils/multipartErrors.js";
 
@@ -13,8 +13,45 @@ const __dirname = path.dirname(__filename);
 const BACKEND_ROOT = path.join(__dirname, "..");
 const peopleRootAbs = path.join(BACKEND_ROOT, "uploads", "people");
 const peopleTmpAbs = path.join(BACKEND_ROOT, "uploads", "tmp", "people");
+const ACTIVE_ETAT_ID = ETAT.ACTIVE;
+const DELETED_ETAT_ID = ETAT.DELETED;
 if (!fs.existsSync(peopleRootAbs)) fs.mkdirSync(peopleRootAbs, { recursive: true });
 if (!fs.existsSync(peopleTmpAbs)) fs.mkdirSync(peopleTmpAbs, { recursive: true });
+
+const parsePersonId = (value) => {
+  const personId = Number(value);
+  return Number.isInteger(personId) && personId > 0 ? personId : null;
+};
+
+const removePersonDirectory = (personId) => {
+  const target = path.resolve(peopleRootAbs, String(personId));
+  const root = `${path.resolve(peopleRootAbs)}${path.sep}`;
+  if (!target.startsWith(root) || !fs.existsSync(target)) return false;
+
+  try {
+    fs.rmSync(target, { recursive: true, force: true });
+    return true;
+  } catch (error) {
+    console.warn("Suppression du dossier personne échouée :", error.message);
+    return false;
+  }
+};
+
+const removeStoredPersonImage = (relativePath) => {
+  if (!relativePath || relativePath.includes("default")) return false;
+
+  const target = path.resolve(BACKEND_ROOT, relativePath.replace(/^[/\\]+/, ""));
+  const root = `${path.resolve(peopleRootAbs)}${path.sep}`;
+  if (!target.startsWith(root) || !fs.existsSync(target)) return false;
+
+  try {
+    fs.rmSync(target, { force: true });
+    return true;
+  } catch (error) {
+    console.warn("Suppression de l'image personne échouée :", error.message);
+    return false;
+  }
+};
 
 const ensureVideoIsNotTransferBlocked = async (videoId, reply) => {
   const video = await prisma.video.findUnique({
@@ -81,6 +118,7 @@ export const createPersonne = async (request, reply) => {
         Nom, Prenom, Surnom,
         CheminImage: null,
         ImageStatut: "DEFAULT",
+        EtatID: ACTIVE_ETAT_ID,
       }
     });
 
@@ -116,7 +154,15 @@ export const updatePersonnePhoto = async (request, reply) => {
     const admin = await ensureAdmin(request, reply);
     if (!admin) return;
 
-    const { id } = request.params;
+    const personId = parsePersonId(request.params?.id);
+    if (!personId) return reply.code(400).send({ error: "PersonneID invalide." });
+
+    const old = await prisma.personne.findFirst({
+      where: { PersonneID: personId, EtatID: ACTIVE_ETAT_ID },
+      select: { CheminImage: true, ImageStatut: true },
+    });
+    if (!old) return reply.code(404).send({ error: "Personne introuvable." });
+
     const parts = request.parts({ limits: { fileSize: MULTIPART_LIMITS.IMAGE_FILE_SIZE } });
 
     let savedPath = null;
@@ -146,7 +192,6 @@ export const updatePersonnePhoto = async (request, reply) => {
       return reply.code(400).send({ error: "Aucun fichier image reçu (champ 'image')." });
     }
 
-    const personId = parseInt(id, 10);
     const personDirAbs = path.join(peopleRootAbs, String(personId));
     if (!fs.existsSync(personDirAbs)) fs.mkdirSync(personDirAbs, { recursive: true });
     const filename = `${Date.now()}${tempExt}`;
@@ -154,17 +199,9 @@ export const updatePersonnePhoto = async (request, reply) => {
     fs.renameSync(tempPath, finalAbs);
     savedPath = path.join("uploads", "people", String(personId), filename);
 
-    const old = await prisma.personne.findUnique({
-      where: { PersonneID: personId },
-      select: { CheminImage: true, ImageStatut: true },
-    });
-
     // supprime ancien fichier custom
     if (old?.CheminImage && old.ImageStatut === "CUSTOM") {
-      const oldAbs = path.join(BACKEND_ROOT, old.CheminImage);
-      if (fs.existsSync(oldAbs)) {
-        try { fs.unlinkSync(oldAbs); } catch (_) { }
-      }
+      removeStoredPersonImage(old.CheminImage);
     }
 
     const updated = await prisma.personne.update({
@@ -188,7 +225,9 @@ export const updatePersonnePhoto = async (request, reply) => {
 export const searchPeople = async (request, reply) => {
   const q = (request.query.search || "").trim();
   try {
-    const where = q
+    const where = {
+      EtatID: ACTIVE_ETAT_ID,
+      ...(q
       ? {
         OR: [
           { Nom: { contains: q } },
@@ -196,7 +235,8 @@ export const searchPeople = async (request, reply) => {
           { Surnom: { contains: q } }
         ]
       }
-      : {};
+      : {}),
+    };
 
     const people = await prisma.personne.findMany({
       where,
@@ -208,6 +248,180 @@ export const searchPeople = async (request, reply) => {
   } catch (e) {
     console.error("searchPeople:", e);
     return reply.code(500).send({ error: "Erreur lors de la recherche." });
+  }
+};
+
+export const getAdminPeople = async (request, reply) => {
+  const admin = await ensureAdmin(request, reply);
+  if (!admin) return;
+
+  try {
+    const people = await prisma.personne.findMany({
+      where: { EtatID: ACTIVE_ETAT_ID },
+      orderBy: { PersonneID: "desc" },
+      select: {
+        PersonneID: true,
+        Nom: true,
+        Prenom: true,
+        Surnom: true,
+        CheminImage: true,
+        ImageStatut: true,
+        EtatID: true,
+        CreateDate: true,
+      },
+    });
+    return reply.send(people);
+  } catch (error) {
+    console.error("getAdminPeople:", error);
+    return reply.code(500).send({ error: "Impossible de récupérer les personnes." });
+  }
+};
+
+export const getDeletedPeople = async (request, reply) => {
+  const admin = await ensureSuperAdmin(request, reply);
+  if (!admin) return;
+
+  try {
+    const people = await prisma.personne.findMany({
+      where: { EtatID: DELETED_ETAT_ID },
+      orderBy: { PersonneID: "desc" },
+      select: {
+        PersonneID: true,
+        Nom: true,
+        Prenom: true,
+        Surnom: true,
+        CheminImage: true,
+        EtatID: true,
+      },
+    });
+    return reply.send(people);
+  } catch (error) {
+    console.error("getDeletedPeople:", error);
+    return reply.code(500).send({ error: "Impossible de récupérer les personnes en corbeille." });
+  }
+};
+
+export const updatePersonne = async (request, reply) => {
+  const admin = await ensureAdmin(request, reply);
+  if (!admin) return;
+
+  const personId = parsePersonId(request.params?.id);
+  if (!personId) return reply.code(400).send({ error: "PersonneID invalide." });
+
+  const Nom = typeof request.body?.Nom === "string" ? request.body.Nom.trim() : "";
+  const Prenom = typeof request.body?.Prenom === "string" ? request.body.Prenom.trim() : "";
+  const Surnom = typeof request.body?.Surnom === "string" ? request.body.Surnom.trim() || null : null;
+  if (!Nom || !Prenom) return reply.code(400).send({ error: "Nom et prénom sont requis." });
+
+  try {
+    const existing = await prisma.personne.findFirst({
+      where: { PersonneID: personId, EtatID: ACTIVE_ETAT_ID },
+      select: { PersonneID: true },
+    });
+    if (!existing) return reply.code(404).send({ error: "Personne introuvable." });
+
+    const updated = await prisma.personne.update({
+      where: { PersonneID: personId },
+      data: { Nom, Prenom, Surnom },
+    });
+    return reply.send(updated);
+  } catch (error) {
+    console.error("updatePersonne:", error);
+    return reply.code(500).send({ error: "Impossible de mettre à jour la personne." });
+  }
+};
+
+export const deletePersonnePhoto = async (request, reply) => {
+  const admin = await ensureAdmin(request, reply);
+  if (!admin) return;
+
+  const personId = parsePersonId(request.params?.id);
+  if (!personId) return reply.code(400).send({ error: "PersonneID invalide." });
+
+  try {
+    const person = await prisma.personne.findFirst({
+      where: { PersonneID: personId, EtatID: ACTIVE_ETAT_ID },
+      select: { CheminImage: true, ImageStatut: true },
+    });
+    if (!person) return reply.code(404).send({ error: "Personne introuvable." });
+
+    if (person.ImageStatut === "CUSTOM") removeStoredPersonImage(person.CheminImage);
+    const updated = await prisma.personne.update({
+      where: { PersonneID: personId },
+      data: { CheminImage: null, ImageStatut: "DEFAULT" },
+      select: { CheminImage: true, ImageStatut: true },
+    });
+    return reply.send(updated);
+  } catch (error) {
+    console.error("deletePersonnePhoto:", error);
+    return reply.code(500).send({ error: "Impossible de retirer la photo de la personne." });
+  }
+};
+
+export const softDeletePersonne = async (request, reply) => {
+  const admin = await ensureAdmin(request, reply);
+  if (!admin) return;
+
+  const personId = parsePersonId(request.params?.id);
+  if (!personId) return reply.code(400).send({ error: "PersonneID invalide." });
+
+  try {
+    const result = await prisma.personne.updateMany({
+      where: { PersonneID: personId, EtatID: ACTIVE_ETAT_ID },
+      data: { EtatID: DELETED_ETAT_ID },
+    });
+    if (!result.count) return reply.code(404).send({ error: "Personne introuvable." });
+    return reply.send({ ok: true });
+  } catch (error) {
+    console.error("softDeletePersonne:", error);
+    return reply.code(500).send({ error: "Impossible de placer la personne dans la corbeille." });
+  }
+};
+
+export const restorePersonne = async (request, reply) => {
+  const admin = await ensureSuperAdmin(request, reply);
+  if (!admin) return;
+
+  const personId = parsePersonId(request.params?.id);
+  if (!personId) return reply.code(400).send({ error: "PersonneID invalide." });
+
+  try {
+    const result = await prisma.personne.updateMany({
+      where: { PersonneID: personId, EtatID: DELETED_ETAT_ID },
+      data: { EtatID: ACTIVE_ETAT_ID },
+    });
+    if (!result.count) return reply.code(404).send({ error: "Personne introuvable dans la corbeille." });
+    return reply.send({ ok: true });
+  } catch (error) {
+    console.error("restorePersonne:", error);
+    return reply.code(500).send({ error: "Impossible de restaurer la personne." });
+  }
+};
+
+export const permanentlyDeletePersonne = async (request, reply) => {
+  const admin = await ensureSuperAdmin(request, reply);
+  if (!admin) return;
+
+  const personId = parsePersonId(request.params?.id);
+  if (!personId) return reply.code(400).send({ error: "PersonneID invalide." });
+
+  try {
+    const person = await prisma.personne.findFirst({
+      where: { PersonneID: personId, EtatID: DELETED_ETAT_ID },
+      select: { PersonneID: true },
+    });
+    if (!person) return reply.code(404).send({ error: "Personne introuvable dans la corbeille." });
+
+    await prisma.$transaction([
+      prisma.videoPersonne.deleteMany({ where: { PersonneID: personId } }),
+      prisma.seriesPersonne.deleteMany({ where: { PersonneID: personId } }),
+      prisma.personne.delete({ where: { PersonneID: personId } }),
+    ]);
+    removePersonDirectory(personId);
+    return reply.send({ ok: true });
+  } catch (error) {
+    console.error("permanentlyDeletePersonne:", error);
+    return reply.code(500).send({ error: "Impossible de supprimer définitivement la personne." });
   }
 };
 
@@ -234,6 +448,11 @@ export const linkPersonne = async (request, reply) => {
     }
 
     const PersonneID = parseInt(id, 10);
+    const person = await prisma.personne.findFirst({
+      where: { PersonneID, EtatID: ACTIVE_ETAT_ID },
+      select: { PersonneID: true },
+    });
+    if (!person) return reply.code(404).send({ error: "Personne introuvable." });
 
     if (type === "video") {
       if (!(await ensureVideoIsNotTransferBlocked(contenuId, reply))) return;
@@ -372,6 +591,7 @@ export const getPeopleForVideo = async (request, reply) => {
     where: {
       VideoID: parseInt(id, 10),
       Video: { EtatID: ETAT.ACTIVE },
+      Personne: { EtatID: ACTIVE_ETAT_ID },
     },
     include: { Personne: true },
     orderBy: { VideoPersonneID: "asc" }
@@ -382,7 +602,7 @@ export const getPeopleForVideo = async (request, reply) => {
 export const getPeopleForSeries = async (request, reply) => {
   const { id } = request.params;
   const items = await prisma.seriesPersonne.findMany({
-    where: { SeriesID: parseInt(id, 10) },
+    where: { SeriesID: parseInt(id, 10), Personne: { EtatID: ACTIVE_ETAT_ID } },
     include: { Personne: true },
     orderBy: { SeriesPersonneID: "asc" }
   });
@@ -394,8 +614,8 @@ export const getPersonDetails = async (request, reply) => {
     const PersonneID = parseInt(request.params.id, 10);
 
     // 1) Personne
-    const personne = await prisma.personne.findUnique({
-      where: { PersonneID },
+    const personne = await prisma.personne.findFirst({
+      where: { PersonneID, EtatID: ACTIVE_ETAT_ID },
       select: {
         PersonneID: true,
         Nom: true,

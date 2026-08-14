@@ -2,16 +2,17 @@
 
 SAMI (**Système d’Archivage Multimédia Intégré**) est une médiathèque web privée permettant d’organiser, diffuser et suivre des films, séries et musiques depuis une seule interface.
 
-La version actuelle est la **7.10.0**. Elle repose sur un backend Fastify, une interface React, Prisma avec MySQL, un pipeline vidéo FFmpeg/HLS et Socket.IO pour le retour en temps réel des traitements.
+La version actuelle est la **7.11.0**. Elle repose sur un backend Fastify, une interface React, Prisma avec MySQL, un pipeline vidéo FFmpeg/HLS et Socket.IO pour le retour en temps réel des traitements.
 
 ## Fonctionnalités
 
 ### Vidéo
 
 - catalogue de films et de séries, saisons et épisodes ;
-- lecture HLS avec choix de la qualité, sous-titres et éclairage d’ambiance ;
+- lecture HLS avec choix de la qualité, sous-titres et éclairage d’ambiance classique ou avancé, personnalisé par compte ;
 - pistes audio multiples expérimentales pour les nouvelles vidéos importées, avec choix dans le lecteur ;
 - lecteur personnalisé avec progression lue, buffer, volume et plein écran ;
+- aperçus Open Graph et Twitter spécifiques aux pages `/lecture/:id`, y compris pour les épisodes ;
 - **Preview Live** expérimentale : aperçu au survol de la barre de lecture à partir de spritesheets et d’un fichier WebVTT ;
 - import et transcodage FFmpeg avec suivi de progression via Socket.IO ;
 - encodage multi-server expérimental : une résolution par worker, redistribution dynamique et publication finale sur le serveur principal ;
@@ -33,21 +34,22 @@ La version actuelle est la **7.10.0**. Elle repose sur un backend Fastify, une i
 - profils utilisateur, grades, premium et préférences de genres ;
 - espaces protégés pour les administrateurs et super administrateurs ;
 - gestion des vidéos, séries, genres, personnes, sagas, univers et musiques ;
+- édition des personnes avec photos, suppression réversible et corbeille réservée au super administrateur ;
 - messages généraux, fonctionnalités expérimentales et statistiques ;
 - journalisation des actions et sauvegardes manuelles ou planifiées de MySQL ;
 - limitations de requêtes, contrôle CORS et en-têtes de sécurité.
 
-## Nouveautés de la version 7.10.0
+## Nouveautés de la version 7.11.0
 
-- diagnostic d’encodage distribué depuis l’administration avec pagination, comparaison de deux jobs et export JSON sans secrets ;
-- visibilité sur la rétention progressive des artefacts et des jobs terminaux ;
-- mesure robuste de la durée vidéo et de chaque piste audio dès l’analyse initiale ;
-- ajout automatique de silence jusqu’à la durée de la vidéo pour les pistes audio trop courtes, dans les pipelines classique et distribué ;
-- avertissements audio persistants dans TaskHistory et les diagnostics ;
-- identifiants techniques audio courts, validation préventive de `ProfileLabel` et erreurs persistantes avec code dans le frontend ;
-- requêtes de finalisation allégées afin d’éviter les erreurs MySQL de mémoire de tri sur les films longs et multi-audio.
+- préférences d’éclairage d’ambiance enregistrées par compte, avec activation, mode et cadence de 3 à 60 actualisations par seconde ;
+- nouveau mode avancé de 3 × 3 à 9 × 9, fondé sur les couleurs pondérées du pourtour de la vidéo et projeté sans zone noire vers l’intérieur du dôme ;
+- menu de réglages du lecteur réorganisé pour les sous-titres, les pistes audio, l’ambiance et la qualité, avec identification visuelle des langues ;
+- aperçus sociaux rendus dans le HTML initial des pages `/lecture/:id`, avec priorité à l’affiche de la série pour les épisodes ;
+- administration complète des personnes, photos, suppression réversible, restauration et suppression définitive depuis la corbeille ;
+- imports contrôlés des crédits CSV et des photos Wikidata/Wikimedia, avec simulation, vérification d’identité et conservation des attributions ;
+- tri des contenus des gestionnaires de sagas et d’univers par date d’ajout la plus récente.
 
-L’historique complet des versions, de la 6.1.0 à la 7.10.0, est disponible dans l’application à l’adresse `/updates` et dans `frontend/src/components/UpdatesPage.js`.
+L’historique complet des versions, de la 6.1.0 à la 7.11.0, est disponible dans l’application à l’adresse `/updates` et dans `frontend/src/components/UpdatesPage.js`.
 
 ## Stack technique
 

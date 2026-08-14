@@ -1,0 +1,8 @@
+ALTER TABLE `Personne`
+    ADD COLUMN `EtatID` INTEGER NOT NULL DEFAULT 1,
+    ADD INDEX `Personne_EtatID_fkey`(`EtatID`);
+
+ALTER TABLE `Personne`
+    ADD CONSTRAINT `Personne_EtatID_fkey`
+    FOREIGN KEY (`EtatID`) REFERENCES `Etat`(`EtatID`)
+    ON DELETE RESTRICT ON UPDATE CASCADE;

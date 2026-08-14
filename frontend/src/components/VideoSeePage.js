@@ -704,7 +704,11 @@ const VideoSeePage = () => {
         <meta name="twitter:image" content={pageMetadata.imageUrl} />
         <meta name="twitter:image:alt" content={pageMetadata.imageAlt} />
       </Helmet>
-      <div ref={backgroundBlur} className="fixed w-full h-full inset-0 -z-10 blur-3xl opacity-70"></div>
+      <canvas
+        ref={backgroundBlur}
+        aria-hidden="true"
+        className="fixed inset-0 -z-10 h-full w-full blur-3xl opacity-70"
+      />
       {notification && (
         <Notification
           message={notification.message}

@@ -7,6 +7,7 @@ import {
   registerRateLimit,
 } from "../middlewares/rateLimitMiddleware.js";
 import { userRepository } from '../models/user.js';
+import { userPlayerPreferenceController } from "../controllers/userPlayerPreferenceController.js";
 
 // petite fonction utilitaire
 function isUserPremium(user) {
@@ -30,6 +31,9 @@ export default async function userRoutes(fastify, options) {
   fastify.post('/premium/webhook/fake', userController.fakePremiumPaymentWebhook);
   fastify.post('/favorites/status', { preHandler: authMiddleware }, userController.getFavoriteStatus);
   fastify.post('/favorites/toggle', { preHandler: authMiddleware }, userController.toggleFavorite);
+
+  fastify.get('/player-preferences', { preHandler: authMiddleware }, userPlayerPreferenceController.get);
+  fastify.put('/player-preferences', { preHandler: authMiddleware }, userPlayerPreferenceController.update);
 
   fastify.put('/update', { preHandler: authMiddleware }, userController.updateUser);
   fastify.put('/delete-account', { preHandler: authMiddleware }, userController.deleteAccount);

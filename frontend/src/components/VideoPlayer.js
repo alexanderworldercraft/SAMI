@@ -8,10 +8,18 @@ import {
   toAbsoluteAssetUrl,
 } from "../utils/previewLive";
 import { resolvePlayerLanguageFlag } from "../utils/playerLanguageFlags";
+import {
+  AMBIENT_LIGHT_DEFAULT_COLOR,
+  AMBIENT_LIGHT_REFRESH_RATES,
+  AMBIENT_LIGHT_STORAGE_KEY,
+  DEFAULT_AMBIENT_LIGHT_PREFERENCES,
+  buildAmbientDomeColors,
+  extractWeightedFrameColor,
+  extractWeightedPerimeterColors,
+  normalizeAmbientLightPreferences,
+  readLegacyAmbientLightEnabled,
+} from "../utils/ambientLight";
 
-const AMBIENT_LIGHT_STORAGE_KEY = "sami-ambient-light-enabled";
-const AMBIENT_LIGHT_DEFAULT_COLOR = "rgb(3, 3, 3)";
-const AMBIENT_LIGHT_REFRESH_MS = 200;
 const PLAYER_SEEK_SECONDS = 15;
 const PLAYER_VOLUME_STEP = 0.05;
 const PLAYER_SINGLE_CLICK_DELAY_MS = 300;
@@ -44,6 +52,7 @@ const SETTINGS_PANEL = {
   SUBTITLES: "subtitles",
   AUDIO: "audio",
   QUALITY: "quality",
+  AMBIENT: "ambient",
 };
 
 const formatPlaybackTime = (seconds) => {
@@ -147,18 +156,23 @@ const VideoPlayer = ({
   const [keyboardHelpOpen, setKeyboardHelpOpen] = useState(false);
   const [previewCues, setPreviewCues] = useState([]);
   const [hoverPreview, setHoverPreview] = useState(null);
-  const [ambientLightEnabled, setAmbientLightEnabled] = useState(() => {
-    try {
-      return localStorage.getItem(AMBIENT_LIGHT_STORAGE_KEY) !== "false";
-    } catch (e) {
-      return true;
-    }
-  });
+  const [ambientLightPreferences, setAmbientLightPreferences] = useState(
+    DEFAULT_AMBIENT_LIGHT_PREFERENCES
+  );
+  const [ambientPreferencesError, setAmbientPreferencesError] = useState("");
 
   // Réfs internes
   const hlsRef = useRef(null);
   const blurIntervalRef = useRef(null);
-  const ambientLightEnabledRef = useRef(ambientLightEnabled);
+  const ambientVideoFrameRequestRef = useRef(null);
+  const ambientVideoFrameOwnerRef = useRef(null);
+  const ambientLastUpdateAtRef = useRef(0);
+  const ambientSampleCanvasRef = useRef(null);
+  const ambientLightPreferencesRef = useRef(ambientLightPreferences);
+  const ambientPreferencesErrorRef = useRef(ambientPreferencesError);
+  const ambientPreferencesTouchedRef = useRef(false);
+  const ambientPreferenceSaveQueueRef = useRef(Promise.resolve());
+  const componentMountedRef = useRef(true);
   const isFullscreenRef = useRef(false);
   const isPictureInPictureRef = useRef(false);
   const pendingCenterClickRef = useRef(null);
@@ -196,13 +210,75 @@ const VideoPlayer = ({
     }
   }, [video?.VideoID]);
 
-  useEffect(() => () => {
-    if (pendingCenterClickRef.current) {
-      clearTimeout(pendingCenterClickRef.current);
-    }
-    if (controlsHideTimeoutRef.current) {
-      clearTimeout(controlsHideTimeoutRef.current);
-    }
+  useEffect(() => {
+    componentMountedRef.current = true;
+    return () => {
+      componentMountedRef.current = false;
+      if (pendingCenterClickRef.current) {
+        clearTimeout(pendingCenterClickRef.current);
+      }
+      if (controlsHideTimeoutRef.current) {
+        clearTimeout(controlsHideTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadAmbientPreferences = async () => {
+      const legacyEnabled = readLegacyAmbientLightEnabled();
+
+      try {
+        const response = await api.get("/users/player-preferences");
+        if (cancelled || ambientPreferencesTouchedRef.current) return;
+        let preferences = normalizeAmbientLightPreferences(response.data?.preferences);
+
+        if (!response.data?.initialized) {
+          preferences = {
+            ...preferences,
+            ambientLightEnabled: legacyEnabled ?? preferences.ambientLightEnabled,
+          };
+          const migrationResponse = await api.put("/users/player-preferences", preferences);
+          preferences = normalizeAmbientLightPreferences(
+            migrationResponse.data?.preferences || preferences
+          );
+          if (cancelled || ambientPreferencesTouchedRef.current) return;
+        }
+
+        if (cancelled) return;
+        ambientLightPreferencesRef.current = preferences;
+        setAmbientLightPreferences(preferences);
+        if (ambientPreferencesErrorRef.current) {
+          ambientPreferencesErrorRef.current = "";
+          setAmbientPreferencesError("");
+        }
+        try {
+          localStorage.removeItem(AMBIENT_LIGHT_STORAGE_KEY);
+        } catch (error) {
+          // La préférence est déjà persistée sur le compte.
+        }
+      } catch (error) {
+        if (cancelled || ambientPreferencesTouchedRef.current) return;
+        const fallbackPreferences = {
+          ...DEFAULT_AMBIENT_LIGHT_PREFERENCES,
+          ambientLightEnabled: legacyEnabled
+            ?? DEFAULT_AMBIENT_LIGHT_PREFERENCES.ambientLightEnabled,
+        };
+        ambientLightPreferencesRef.current = fallbackPreferences;
+        setAmbientLightPreferences(fallbackPreferences);
+        if (![401, 403].includes(error?.response?.status)) {
+          const message = "Les préférences du compte sont momentanément indisponibles.";
+          ambientPreferencesErrorRef.current = message;
+          setAmbientPreferencesError(message);
+        }
+      }
+    };
+
+    loadAmbientPreferences();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -246,16 +322,10 @@ const VideoPlayer = ({
   }, [skipFirstPlayLogKey]);
 
   useEffect(() => {
-    ambientLightEnabledRef.current = ambientLightEnabled;
-    try {
-      localStorage.setItem(AMBIENT_LIGHT_STORAGE_KEY, ambientLightEnabled ? "true" : "false");
-    } catch (e) {
-      // ignore
-    }
-
+    ambientLightPreferencesRef.current = ambientLightPreferences;
     const videoElement = videoRef.current;
-    if (!ambientLightEnabled) {
-      stopBackgroundUpdate();
+    stopBackgroundUpdate();
+    if (!ambientLightPreferences.ambientLightEnabled) {
       resetBackgroundColor();
       return;
     }
@@ -264,7 +334,7 @@ const VideoPlayer = ({
       startBackgroundUpdate();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ambientLightEnabled]);
+  }, [ambientLightPreferences]);
 
   useEffect(() => {
     if (onVideoElement) {
@@ -565,11 +635,16 @@ const VideoPlayer = ({
   }, [aspectRatio]);
 
   // -------------------------
-  // Fond dynamique (moyenne couleur)
+  // Fond dynamique (couleur globale ou pourtour multi-zones)
   // -------------------------
   const resetBackgroundColor = () => {
-    if (!backgroundBlur?.current) return;
-    backgroundBlur.current.style.backgroundColor = AMBIENT_LIGHT_DEFAULT_COLOR;
+    const ambientCanvas = backgroundBlur?.current;
+    if (!ambientCanvas) return;
+    if (ambientCanvas.tagName === "CANVAS") {
+      ambientCanvas.width = 1;
+      ambientCanvas.height = 1;
+    }
+    ambientCanvas.style.backgroundColor = AMBIENT_LIGHT_DEFAULT_COLOR;
   };
 
   const stopBackgroundUpdate = () => {
@@ -577,12 +652,23 @@ const VideoPlayer = ({
       clearInterval(blurIntervalRef.current);
       blurIntervalRef.current = null;
     }
+    const frameOwner = ambientVideoFrameOwnerRef.current;
+    if (
+      ambientVideoFrameRequestRef.current !== null
+      && typeof frameOwner?.cancelVideoFrameCallback === "function"
+    ) {
+      frameOwner.cancelVideoFrameCallback(ambientVideoFrameRequestRef.current);
+    }
+    ambientVideoFrameRequestRef.current = null;
+    ambientVideoFrameOwnerRef.current = null;
+    ambientLastUpdateAtRef.current = 0;
   };
 
   const startBackgroundUpdate = () => {
     const videoElement = videoRef.current;
+    const preferences = ambientLightPreferencesRef.current;
     if (
-      !ambientLightEnabledRef.current ||
+      !preferences.ambientLightEnabled ||
       isFullscreenRef.current ||
       isPictureInPictureRef.current ||
       !videoElement ||
@@ -593,18 +679,49 @@ const VideoPlayer = ({
     }
 
     updateBackgroundColor();
+    const refreshInterval = 1000 / preferences.ambientLightRefreshRate;
+
+    if (typeof videoElement.requestVideoFrameCallback === "function") {
+      if (ambientVideoFrameRequestRef.current !== null) return;
+      ambientLastUpdateAtRef.current = performance.now();
+      ambientVideoFrameOwnerRef.current = videoElement;
+
+      const handleVideoFrame = (timestamp) => {
+        const currentPreferences = ambientLightPreferencesRef.current;
+        if (
+          !currentPreferences.ambientLightEnabled
+          || videoElement.paused
+          || videoElement.ended
+          || isFullscreenRef.current
+          || isPictureInPictureRef.current
+        ) {
+          ambientVideoFrameRequestRef.current = null;
+          return;
+        }
+
+        const currentRefreshInterval = 1000 / currentPreferences.ambientLightRefreshRate;
+        if (timestamp - ambientLastUpdateAtRef.current >= currentRefreshInterval) {
+          updateBackgroundColor();
+          ambientLastUpdateAtRef.current = timestamp;
+        }
+        ambientVideoFrameRequestRef.current = videoElement.requestVideoFrameCallback(handleVideoFrame);
+      };
+
+      ambientVideoFrameRequestRef.current = videoElement.requestVideoFrameCallback(handleVideoFrame);
+      return;
+    }
+
     if (!blurIntervalRef.current) {
-      blurIntervalRef.current = setInterval(updateBackgroundColor, AMBIENT_LIGHT_REFRESH_MS);
+      blurIntervalRef.current = setInterval(updateBackgroundColor, refreshInterval);
     }
   };
 
   const updateBackgroundColor = () => {
     const videoElement = videoRef.current;
-    const canvas = document.createElement("canvas");
-    const ctx = canvas.getContext("2d");
+    const preferences = ambientLightPreferencesRef.current;
 
     if (
-      !ambientLightEnabledRef.current ||
+      !preferences.ambientLightEnabled ||
       isFullscreenRef.current ||
       isPictureInPictureRef.current ||
       !videoElement ||
@@ -614,33 +731,98 @@ const VideoPlayer = ({
       return;
     }
 
-    canvas.width = videoElement.videoWidth / 10;
-    canvas.height = videoElement.videoHeight / 10;
-
-    ctx.drawImage(videoElement, 0, 0, canvas.width, canvas.height);
-
-    const frame = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
-    let r = 0,
-      g = 0,
-      b = 0,
-      count = 0;
-
-    for (let i = 0; i < frame.length; i += 4) {
-      r += frame[i];
-      g += frame[i + 1];
-      b += frame[i + 2];
-      count++;
+    if (!ambientSampleCanvasRef.current) {
+      ambientSampleCanvasRef.current = document.createElement("canvas");
     }
+    const sampleCanvas = ambientSampleCanvasRef.current;
 
-    r = Math.floor(r / count);
-    g = Math.floor(g / count);
-    b = Math.floor(b / count);
+    try {
+      const sampleContext = sampleCanvas.getContext("2d", { willReadFrequently: true });
+      if (!sampleContext) return;
 
-    backgroundBlur.current.style.backgroundColor = `rgb(${r}, ${g}, ${b})`;
+      if (preferences.ambientLightMode === "advanced") {
+        const gridSize = preferences.ambientLightGridSize;
+        const samplesPerSector = 8;
+        sampleCanvas.width = gridSize * samplesPerSector;
+        sampleCanvas.height = gridSize * samplesPerSector;
+        sampleContext.drawImage(videoElement, 0, 0, sampleCanvas.width, sampleCanvas.height);
+        const imageData = sampleContext.getImageData(
+          0,
+          0,
+          sampleCanvas.width,
+          sampleCanvas.height
+        );
+        const perimeterColors = extractWeightedPerimeterColors(imageData, gridSize);
+        const domeColors = buildAmbientDomeColors(perimeterColors, gridSize);
+        const ambientCanvas = backgroundBlur.current;
+        ambientCanvas.width = gridSize;
+        ambientCanvas.height = gridSize;
+        ambientCanvas.style.backgroundColor = AMBIENT_LIGHT_DEFAULT_COLOR;
+        const ambientContext = ambientCanvas.getContext("2d");
+        if (!ambientContext) return;
+        ambientContext.clearRect(0, 0, gridSize, gridSize);
+        domeColors.forEach(({ row, column, color }) => {
+          ambientContext.fillStyle = `rgb(${color[0]}, ${color[1]}, ${color[2]})`;
+          ambientContext.fillRect(column, row, 1, 1);
+        });
+        return;
+      }
+
+      const sampleWidth = 64;
+      const sampleHeight = Math.max(
+        1,
+        Math.round(sampleWidth * (videoElement.videoHeight / videoElement.videoWidth))
+      );
+      sampleCanvas.width = sampleWidth;
+      sampleCanvas.height = sampleHeight;
+      sampleContext.drawImage(videoElement, 0, 0, sampleWidth, sampleHeight);
+      const color = extractWeightedFrameColor(
+        sampleContext.getImageData(0, 0, sampleWidth, sampleHeight)
+      );
+      const ambientCanvas = backgroundBlur.current;
+      ambientCanvas.width = 1;
+      ambientCanvas.height = 1;
+      ambientCanvas.style.backgroundColor = `rgb(${color[0]}, ${color[1]}, ${color[2]})`;
+    } catch (error) {
+      stopBackgroundUpdate();
+      console.warn("Analyse de la lumière d'ambiance impossible :", error?.message || error);
+    }
   };
 
-  const toggleAmbientLight = () => {
-    setAmbientLightEnabled((enabled) => !enabled);
+  const queueAmbientPreferenceSave = (preferences) => {
+    ambientPreferenceSaveQueueRef.current = ambientPreferenceSaveQueueRef.current
+      .catch(() => undefined)
+      .then(() => api.put("/users/player-preferences", preferences))
+      .then(() => {
+        if (componentMountedRef.current && ambientPreferencesErrorRef.current) {
+          ambientPreferencesErrorRef.current = "";
+          setAmbientPreferencesError("");
+        }
+        try {
+          localStorage.removeItem(AMBIENT_LIGHT_STORAGE_KEY);
+        } catch (error) {
+          // La préférence serveur reste la source de vérité.
+        }
+      })
+      .catch((error) => {
+        if (componentMountedRef.current) {
+          const message = error?.response?.data?.error
+            || "Impossible d'enregistrer les préférences.";
+          ambientPreferencesErrorRef.current = message;
+          setAmbientPreferencesError(message);
+        }
+      });
+  };
+
+  const updateAmbientPreferences = (changes) => {
+    ambientPreferencesTouchedRef.current = true;
+    const nextPreferences = normalizeAmbientLightPreferences({
+      ...ambientLightPreferencesRef.current,
+      ...changes,
+    });
+    ambientLightPreferencesRef.current = nextPreferences;
+    setAmbientLightPreferences(nextPreferences);
+    queueAmbientPreferenceSave(nextPreferences);
   };
 
   // -------------------------
@@ -1192,30 +1374,11 @@ const VideoPlayer = ({
                       />
                       <SettingsTile
                         title="Ambiance"
-                        value={ambientLightEnabled ? "Activée" : "Désactivée"}
-                        onClick={toggleAmbientLight}
-                        role="menuitemcheckbox"
-                        ariaChecked={ambientLightEnabled}
-                      >
-                        <span className="flex items-center gap-2 text-xs text-white/60 sm:text-sm">
-                          <span
-                            className={`relative inline-flex h-5 w-10 shrink-0 items-center rounded-full transition-colors duration-200 ${
-                              ambientLightEnabled ? "bg-sky-500" : "bg-neutral-700"
-                            }`}
-                            aria-hidden="true"
-                          >
-                            <span
-                              className="inline-block h-4 w-4 rounded-full bg-white shadow transition-transform duration-200"
-                              style={{
-                                transform: ambientLightEnabled
-                                  ? "translateX(1.25rem)"
-                                  : "translateX(0.25rem)",
-                              }}
-                            />
-                          </span>
-                          <span>{ambientLightEnabled ? "Activée" : "Désactivée"}</span>
-                        </span>
-                      </SettingsTile>
+                        value={ambientLightPreferences.ambientLightEnabled
+                          ? `${ambientLightPreferences.ambientLightMode === "advanced" ? "Avancé" : "Classique"} · ${ambientLightPreferences.ambientLightRefreshRate}/s`
+                          : "Désactivée"}
+                        onClick={() => setSettingsPanel(SETTINGS_PANEL.AMBIENT)}
+                      />
                       <SettingsTile
                         title="Qualité"
                         value={availableLevels.length > 0 ? selectedQuality : "Indisponible"}
@@ -1241,10 +1404,161 @@ const VideoPlayer = ({
                           {settingsPanel === SETTINGS_PANEL.SUBTITLES && "Sous-titres"}
                           {settingsPanel === SETTINGS_PANEL.AUDIO && "Audio"}
                           {settingsPanel === SETTINGS_PANEL.QUALITY && "Qualité"}
+                          {settingsPanel === SETTINGS_PANEL.AMBIENT && "Ambiance"}
                         </p>
                       </div>
                       <div className="my-3 border-t border-white/10" />
                     </>
+                  )}
+
+                  {settingsPanel === SETTINGS_PANEL.AMBIENT && (
+                    <div className="space-y-4 px-1 pb-1">
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={ambientLightPreferences.ambientLightEnabled}
+                        aria-label="Lumière d'ambiance"
+                        onClick={() => updateAmbientPreferences({
+                          ambientLightEnabled: !ambientLightPreferences.ambientLightEnabled,
+                        })}
+                        className="flex w-full items-center justify-between gap-4 rounded-xl border border-white/10 bg-white/5 px-3 py-3 text-sm text-white/85 transition hover:bg-white/10"
+                      >
+                        <span className="font-bold">Lumière d'ambiance</span>
+                        <span className="flex items-center gap-2 text-white/60">
+                          <span>{ambientLightPreferences.ambientLightEnabled ? "Activée" : "Désactivée"}</span>
+                          <span
+                            className={`relative inline-flex h-5 w-10 shrink-0 items-center rounded-full transition-colors duration-200 ${
+                              ambientLightPreferences.ambientLightEnabled
+                                ? "bg-sky-500"
+                                : "bg-neutral-700"
+                            }`}
+                            aria-hidden="true"
+                          >
+                            <span
+                              className="inline-block h-4 w-4 rounded-full bg-white shadow transition-transform duration-200"
+                              style={{
+                                transform: ambientLightPreferences.ambientLightEnabled
+                                  ? "translateX(1.25rem)"
+                                  : "translateX(0.25rem)",
+                              }}
+                            />
+                          </span>
+                        </span>
+                      </button>
+
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={ambientLightPreferences.ambientLightMode === "advanced"}
+                        aria-label="Mode d'ambiance avancé"
+                        onClick={() => updateAmbientPreferences({
+                          ambientLightMode: ambientLightPreferences.ambientLightMode === "advanced"
+                            ? "classic"
+                            : "advanced",
+                        })}
+                        className="flex w-full items-center justify-between gap-4 rounded-xl border border-white/10 bg-white/5 px-3 py-3 text-sm text-white/85 transition hover:bg-white/10"
+                      >
+                        <span className="font-bold">Mode</span>
+                        <span className="flex items-center gap-2 text-white/60">
+                          <span>
+                            {ambientLightPreferences.ambientLightMode === "advanced"
+                              ? "Avancé"
+                              : "Classique"}
+                          </span>
+                          <span
+                            className={`relative inline-flex h-5 w-10 shrink-0 items-center rounded-full transition-colors duration-200 ${
+                              ambientLightPreferences.ambientLightMode === "advanced"
+                                ? "bg-violet-500"
+                                : "bg-sky-500"
+                            }`}
+                            aria-hidden="true"
+                          >
+                            <span
+                              className="inline-block h-4 w-4 rounded-full bg-white shadow transition-transform duration-200"
+                              style={{
+                                transform: ambientLightPreferences.ambientLightMode === "advanced"
+                                  ? "translateX(1.25rem)"
+                                  : "translateX(0.25rem)",
+                              }}
+                            />
+                          </span>
+                        </span>
+                      </button>
+
+                      <label className="block rounded-xl border border-white/10 bg-white/5 px-3 py-3">
+                        <span className="flex items-center justify-between gap-3 text-sm">
+                          <span className="font-bold text-white/85">Fréquence</span>
+                          <span className="tabular-nums text-white/60">
+                            {ambientLightPreferences.ambientLightRefreshRate} fois/s
+                          </span>
+                        </span>
+                        <input
+                          type="range"
+                          min="0"
+                          max={AMBIENT_LIGHT_REFRESH_RATES.length - 1}
+                          step="1"
+                          list="ambient-frequency-steps"
+                          value={AMBIENT_LIGHT_REFRESH_RATES.indexOf(
+                            ambientLightPreferences.ambientLightRefreshRate
+                          )}
+                          onChange={(event) => updateAmbientPreferences({
+                            ambientLightRefreshRate: AMBIENT_LIGHT_REFRESH_RATES[
+                              Number(event.target.value)
+                            ],
+                          })}
+                          aria-label="Fréquence de la lumière d'ambiance"
+                          aria-valuetext={`${ambientLightPreferences.ambientLightRefreshRate} fois par seconde`}
+                          className="mt-3 h-1.5 w-full cursor-pointer accent-sky-500"
+                        />
+                        <datalist id="ambient-frequency-steps">
+                          {AMBIENT_LIGHT_REFRESH_RATES.map((rate) => (
+                            <option value={AMBIENT_LIGHT_REFRESH_RATES.indexOf(rate)} key={rate} />
+                          ))}
+                        </datalist>
+                        <span className="mt-2 grid grid-cols-6 text-center text-[10px] tabular-nums text-white/40">
+                          {AMBIENT_LIGHT_REFRESH_RATES.map((rate) => <span key={rate}>{rate}</span>)}
+                        </span>
+                      </label>
+
+                      {ambientLightPreferences.ambientLightMode === "advanced" && (
+                        <label className="block rounded-xl border border-white/10 bg-white/5 px-3 py-3">
+                          <span className="flex items-center justify-between gap-3 text-sm">
+                            <span className="font-bold text-white/85">Découpage du pourtour</span>
+                            <span className="tabular-nums text-white/60">
+                              {ambientLightPreferences.ambientLightGridSize}×{ambientLightPreferences.ambientLightGridSize}
+                            </span>
+                          </span>
+                          <input
+                            type="range"
+                            min="3"
+                            max="9"
+                            step="1"
+                            list="ambient-grid-steps"
+                            value={ambientLightPreferences.ambientLightGridSize}
+                            onChange={(event) => updateAmbientPreferences({
+                              ambientLightGridSize: Number(event.target.value),
+                            })}
+                            aria-label="Découpage de la lumière d'ambiance"
+                            aria-valuetext={`${ambientLightPreferences.ambientLightGridSize} par ${ambientLightPreferences.ambientLightGridSize}`}
+                            className="mt-3 h-1.5 w-full cursor-pointer accent-violet-500"
+                          />
+                          <datalist id="ambient-grid-steps">
+                            {[3, 4, 5, 6, 7, 8, 9].map((size) => (
+                              <option value={size} key={size} />
+                            ))}
+                          </datalist>
+                          <span className="mt-2 grid grid-cols-7 text-center text-[10px] tabular-nums text-white/40">
+                            {[3, 4, 5, 6, 7, 8, 9].map((size) => <span key={size}>{size}</span>)}
+                          </span>
+                        </label>
+                      )}
+
+                      {ambientPreferencesError && (
+                        <p role="alert" className="rounded-lg bg-red-500/10 px-3 py-2 text-xs text-red-200">
+                          {ambientPreferencesError}
+                        </p>
+                      )}
+                    </div>
                   )}
 
                   {settingsPanel === SETTINGS_PANEL.SUBTITLES && (

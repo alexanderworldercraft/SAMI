@@ -26,6 +26,7 @@ async function main() {
   const hashedPasswordSuperAdmin = await bcrypt.hash(`${process.env.PASSWORDSUPERADMIN}`, saltSuperAdmin);
   const hashedPasswordAdmin = await bcrypt.hash(`${process.env.PASSWORDADMIN}`, saltAdmin);
 
+
   // Ajouter des grades par défaut
   await prisma.grade.createMany({
     data: uniqueByNom([

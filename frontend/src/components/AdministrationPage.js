@@ -13,10 +13,12 @@ import AdminSagaManager from "./AdminSagaManager";
 import AdminUniverseManager from "./AdminUniverseManager";
 import AdminVideoManager from "./AdminVideoManager";
 import AdminMusicContentManager from "./AdminMusicContentManager";
+import AdminPersonManager from "./AdminPersonManager";
 import SuperAdminVideoTrashManager from "./SuperAdminVideoTrashManager";
 import SuperAdminSagaTrashManager from "./SuperAdminSagaTrashManager";
 import SuperAdminUniverseTrashManager from "./SuperAdminUniverseTrashManager";
 import SuperAdminMusicTrashManager from "./SuperAdminMusicTrashManager";
+import SuperAdminPersonTrashManager from "./SuperAdminPersonTrashManager";
 import AdminBackupManager from "./AdminBackupManager";
 import AdminExperimentalFeatures from "./AdminExperimentalFeatures";
 import AdminDistributedEncodingDiagnostics from "./AdminDistributedEncodingDiagnostics";
@@ -99,12 +101,14 @@ const AdministrationPage = () => {
         { id: "videos", label: "Vidéos", content: <AdminVideoManager /> },
         { id: "sagas", label: "Sagas", content: <AdminSagaManager /> },
         { id: "universes", label: "Univers", content: <AdminUniverseManager /> },
+        { id: "people", label: "Personnes", content: <AdminPersonManager /> },
     ];
 
     const trashTabs = [
         { id: "sagas", label: "Sagas", content: <SuperAdminSagaTrashManager /> },
         { id: "universes", label: "Univers", content: <SuperAdminUniverseTrashManager /> },
         { id: "videos", label: "Vidéos", content: <SuperAdminVideoTrashManager /> },
+        { id: "people", label: "Personnes", content: <SuperAdminPersonTrashManager /> },
     ];
 
     const musicContentTabs = [
@@ -150,7 +154,7 @@ const AdministrationPage = () => {
             <AdminFavoriteContentManager />
             <TabbedAdminSection
                 title="Gestion des contenus"
-                description="Modifie les genres, séries, vidéos, sagas et univers depuis une seule zone."
+                description="Modifie les genres, séries, vidéos, sagas, univers et personnes depuis une seule zone."
                 tabs={contentTabs}
                 activeTab={activeContentTab}
                 onTabChange={setActiveContentTab}

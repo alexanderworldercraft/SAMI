@@ -19,6 +19,7 @@ model Etat {
   Sagas        Saga[]
   Universes    Universe[]
   Musiques     Musique[]
+  Personnes    Personne[]
   Series       Series[]
   Utilisateurs Utilisateur[]
   Videos       Video[]
@@ -507,9 +508,21 @@ model Utilisateur {
   UserVideoProgress    UserVideoProgress[]
   UserSeriesWatchReset UserSeriesWatchReset[]
   UserFavoriteContent  UserFavoriteContent[]
+  PlayerPreference     UserPlayerPreference?
 
   @@index([GradeID], map: "Utilisateur_GradeID_fkey")
   @@index([EtatID], map: "Utilisateur_EtatID_fkey")
+}
+
+model UserPlayerPreference {
+  UtilisateurID           Int         @id
+  AmbientLightEnabled     Boolean     @default(true)
+  AmbientLightMode        String      @default("classic") @db.VarChar(16)
+  AmbientLightRefreshRate Int         @default(6)
+  AmbientLightGridSize    Int         @default(3)
+  CreateDate              DateTime    @default(now())
+  UpdateDate              DateTime    @updatedAt
+  Utilisateur             Utilisateur @relation(fields: [UtilisateurID], references: [UtilisateurID], onDelete: Cascade)
 }
 
 model UserFavoriteContent {
@@ -757,9 +770,13 @@ model Personne {
   Surnom      String?
   CheminImage String?
   ImageStatut StatutImage      @default(DEFAULT)
+  EtatID      Int              @default(1)
   CreateDate  DateTime?        @default(now())
+  Etat        Etat             @relation(fields: [EtatID], references: [EtatID])
   Series      SeriesPersonne[]
   Videos      VideoPersonne[]
+
+  @@index([EtatID], map: "Personne_EtatID_fkey")
 }
 
 model VideoPersonne {

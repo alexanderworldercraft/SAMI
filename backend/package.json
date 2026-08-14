@@ -5,6 +5,11 @@
   "type": "module",
   "scripts": {
     "seed": "node prisma/seed.js",
+    "seed:tempo": "node prisma/seedTempo.js",
+    "seed:tempo:dry-run": "node prisma/seedTempo.js --dry-run",
+    "seed:people-images": "node prisma/seedPersonneImages.js",
+    "seed:people-images:dry-run": "node prisma/seedPersonneImages.js --dry-run",
+    "seed:people-images:retry-misses": "node prisma/seedPersonneImages.js --retry-misses",
     "start": "node sami.js",
     "test": "vitest run"
   },

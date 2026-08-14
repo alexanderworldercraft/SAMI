@@ -18,6 +18,7 @@ frontend/.env.*
 build/
 dist/
 frontend/build/
+outputs/
 
 # Local media and generated user data
 backend/uploads/

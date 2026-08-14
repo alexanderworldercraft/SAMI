@@ -2,6 +2,74 @@ import React, { useEffect, useState } from "react";
 
 const updates = [
   {
+    version: "7.11.0",
+    title: "Lecteur immersif, apercus sociaux et gestion des personnes",
+    date: "14 aout 2026",
+    sections: [
+      {
+        title: "Eclairage d'ambiance personnalise par compte",
+        items: [
+          "Les reglages de l'eclairage d'ambiance sont maintenant enregistres dans le compte connecte et retrouves automatiquement sur les autres appareils.",
+          "L'ancien choix active ou desactive conserve localement dans le navigateur est migre une seule fois vers les nouvelles preferences du compte.",
+          "Le menu Ambiance permet d'activer l'effet, de choisir le mode classique ou avance et de regler sa frequence de rafraichissement.",
+          "La barre crantee propose 3, 6, 12, 24, 48 ou 60 actualisations par seconde, avec 6 par seconde comme valeur par defaut afin de limiter la charge inutile.",
+          "Le serveur valide chaque valeur et une migration ajoute les preferences du lecteur sans modifier les comptes existants.",
+        ],
+      },
+      {
+        title: "Dome multi-zones fidele au pourtour de la video",
+        items: [
+          "Le mode classique conserve une couleur globale ponderee tandis que le nouveau mode avance prolonge independamment les couleurs dominantes des bords de l'image.",
+          "Le decoupage avance est reglable de 3 par 3 a 9 par 9 et utilise exactement la meme grille pour analyser la video et construire le dome lumineux.",
+          "Seules les sections du pourtour sont echantillonnees afin de simuler une extension de l'ecran sans laisser le centre de l'image influencer les couleurs exterieures.",
+          "Les couleurs sont ponderees selon la luminosite des pixels, puis projetees vers l'interieur du canvas en fonction de leur distance aux quatre bords.",
+          "Cette interpolation retire la grande zone noire qui apparaissait sur la gauche avec les grilles fines, notamment en 9 par 9, tout en preservant les couleurs mesurees sur le pourtour.",
+          "L'actualisation suit les images reellement decodees par la video lorsque le navigateur le permet et respecte la cadence choisie sans continuer inutilement pendant une pause.",
+        ],
+      },
+      {
+        title: "Reglages du lecteur reorganises",
+        items: [
+          "Le bouton Reglages ouvre maintenant un menu unifie compose de quatre acces clairs : sous-titres, audio, ambiance et qualite.",
+          "Chaque rubrique possede son propre panneau avec un retour vers le menu principal, au lieu d'empiler toutes les options sur les controles de lecture.",
+          "Les langues des sous-titres et des pistes audio sont accompagnees de leur drapeau lorsqu'elles peuvent etre identifiees.",
+          "Le menu indique directement l'option active, par exemple la langue, la qualite automatique ou manuelle, le mode d'ambiance et sa cadence.",
+          "La disposition reste utilisable sur les lecteurs et ecrans etroits et les controles conservent leurs libelles accessibles au clavier et aux lecteurs d'ecran.",
+        ],
+      },
+      {
+        title: "Apercus sociaux complets pour les pages de lecture",
+        items: [
+          "Les liens /lecture/:id fournissent maintenant leur titre, leur resume, leur affiche et leur URL canonique directement dans le HTML initial renvoye aux robots sociaux.",
+          "Les balises Open Graph et Twitter ne dependent plus de l'execution de React pour produire un apercu propre dans Discord et les autres services compatibles.",
+          "Un episode utilise en priorite l'affiche et le resume de sa serie afin d'eviter une miniature generique lorsque sa propre affiche est absente.",
+          "Les films et episodes conservent un titre descriptif avec la saison et la serie lorsque ces informations sont disponibles.",
+          "Les chemins d'image et les donnees injectees dans le document sont controles avant de remplacer les metadonnees generiques de l'application.",
+        ],
+      },
+      {
+        title: "Administration et corbeille des personnes",
+        items: [
+          "Une nouvelle section Personnes dans l'administration permet de rechercher une fiche, de modifier son identite et de remplacer ou retirer sa photo.",
+          "La suppression place d'abord la personne dans une corbeille afin d'eviter la perte immediate de ses associations aux films et aux series.",
+          "La corbeille reservee au super administrateur permet de restaurer une personne ou de confirmer sa suppression definitive avec ses associations et sa photo stockee.",
+          "Les personnes placees dans la corbeille disparaissent des recherches, fiches publiques, associations, statistiques et donnees du calendrier jusqu'a leur restauration.",
+          "Une migration ajoute l'etat des personnes et les routes sensibles appliquent les droits administrateur ou super administrateur correspondants.",
+        ],
+      },
+      {
+        title: "Credits, photos et catalogues plus faciles a maintenir",
+        items: [
+          "Un import controle peut creer ou reutiliser les personnes mentionnees dans les fichiers CSV de credits, puis relier acteurs et realisateurs aux films et series correspondants.",
+          "Un mode de simulation permet de verifier les correspondances et les creations prevues avant toute ecriture dans la base de donnees.",
+          "Un second outil recherche les photos manquantes via Wikidata et Wikimedia Commons, verifie l'identite et le metier, conserve les attributions et distingue les resultats absents, sans image ou ambigus.",
+          "Les identifiants Wikidata verifies sont reutilises avant la recherche textuelle et les echecs temporaires peuvent etre retentes sans telecharger de nouveau les images deja traitees.",
+          "Dans la gestion des univers et des sagas, les contenus disponibles sont maintenant tries par date d'ajout decroissante, les elements sans date etant places a la fin avec un ordre stable.",
+        ],
+      },
+    ],
+  },
+  {
     version: "7.10.0",
     title: "Diagnostic et fiabilisation de l'encodage distribue",
     date: "9 aout 2026",

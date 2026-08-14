@@ -1460,6 +1460,10 @@
     width: calc(var(--spacing) * 24);
   }
 
+  .w-32 {
+    width: calc(var(--spacing) * 32);
+  }
+
   .w-36 {
     width: calc(var(--spacing) * 36);
   }
@@ -1792,6 +1796,10 @@
 
   .grid-cols-4 {
     grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .grid-cols-6 {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
   }
 
   .grid-cols-7 {
@@ -5391,6 +5399,16 @@
     }
   }
 
+  .text-white\/40 {
+    color: #fff6;
+  }
+
+  @supports (color: color-mix(in lab, red, red)) {
+    .text-white\/40 {
+      color: color-mix(in oklab, var(--color-white) 40%, transparent);
+    }
+  }
+
   .text-white\/55 {
     color: #ffffff8c;
   }
@@ -5472,6 +5490,10 @@
 
   .accent-sky-500 {
     accent-color: var(--color-sky-500);
+  }
+
+  .accent-violet-500 {
+    accent-color: var(--color-violet-500);
   }
 
   .\[color-scheme\:light\] {
@@ -7643,8 +7665,16 @@
       grid-template-columns: repeat(4, minmax(0, 1fr));
     }
 
+    .sm\:grid-cols-\[1fr_auto\] {
+      grid-template-columns: 1fr auto;
+    }
+
     .sm\:grid-cols-\[6rem_1fr\] {
       grid-template-columns: 6rem 1fr;
+    }
+
+    .sm\:grid-cols-\[8rem_1fr\] {
+      grid-template-columns: 8rem 1fr;
     }
 
     .sm\:flex-row {

@@ -1,6 +1,7 @@
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 
 import Hls from "hls.js";
+import api from "../services/api";
 import VideoPlayer from "./VideoPlayer";
 
 jest.mock("hls.js", () => ({
@@ -47,6 +48,7 @@ jest.mock("../services/api", () => ({
   default: {
     get: jest.fn(() => Promise.reject({ response: { status: 403 } })),
     post: jest.fn(),
+    put: jest.fn(() => Promise.resolve({ data: {} })),
   },
 }));
 
@@ -59,8 +61,18 @@ beforeAll(() => {
 });
 
 beforeEach(() => {
+  jest.clearAllMocks();
   Hls.instances.length = 0;
   localStorage.clear();
+  api.get.mockImplementation((url) => {
+    if (url === "/users/player-preferences") {
+      return new Promise(() => {});
+    }
+    return Promise.reject({ response: { status: 403 } });
+  });
+  api.put.mockImplementation((_url, preferences) => Promise.resolve({
+    data: { preferences },
+  }));
 });
 
 const openSettings = () => {
@@ -137,7 +149,7 @@ it("regroupe les sous-titres dans les réglages avec les drapeaux et l'option de
 
   openSettings();
   expect(screen.getByRole("menuitem", { name: /Audio Par défaut/ })).toBeInTheDocument();
-  expect(screen.getByRole("menuitemcheckbox", { name: /Ambiance Activée/ })).toBeInTheDocument();
+  expect(screen.getByRole("menuitem", { name: /Ambiance Classique/ })).toBeInTheDocument();
   expect(screen.getByRole("menuitem", { name: /Qualité Indisponible/ })).toBeInTheDocument();
   fireEvent.click(screen.getByRole("menuitem", { name: /Sous-titres Français/ }));
   expect(screen.getByRole("menuitemradio", { name: "Français" })).toHaveAttribute(
@@ -275,21 +287,137 @@ it("change la qualité depuis un sous-menu et conserve le mode automatique", () 
   );
 });
 
-it("active l'ambiance directement dans le menu et ferme les réglages à l'extérieur", () => {
+it("configure l'ambiance dans son sous-menu et ferme les réglages à l'extérieur", async () => {
   renderPlayer();
 
   openSettings();
-  const ambienceTile = screen.getByRole("menuitemcheckbox", { name: "Ambiance Activée" });
-  expect(ambienceTile).toHaveAttribute("aria-checked", "true");
+  fireEvent.click(screen.getByRole("menuitem", { name: /Ambiance Classique/ }));
+  const ambienceToggle = screen.getByRole("switch", { name: "Lumière d'ambiance" });
+  expect(ambienceToggle).toHaveAttribute("aria-checked", "true");
 
-  fireEvent.click(ambienceTile);
-  expect(screen.getByRole("menuitemcheckbox", { name: "Ambiance Désactivée" })).toHaveAttribute(
-    "aria-checked",
-    "false"
-  );
+  fireEvent.click(screen.getByRole("switch", { name: "Mode d'ambiance avancé" }));
+  expect(screen.getByRole("slider", { name: "Découpage de la lumière d'ambiance" }))
+    .toHaveValue("3");
+  fireEvent.change(screen.getByRole("slider", { name: "Fréquence de la lumière d'ambiance" }), {
+    target: { value: "3" },
+  });
+  expect(screen.getByText("24 fois/s")).toBeInTheDocument();
+
+  fireEvent.click(ambienceToggle);
+  expect(ambienceToggle).toHaveAttribute("aria-checked", "false");
+  await waitFor(() => expect(api.put).toHaveBeenLastCalledWith(
+    "/users/player-preferences",
+    expect.objectContaining({
+      ambientLightEnabled: false,
+      ambientLightMode: "advanced",
+      ambientLightRefreshRate: 24,
+      ambientLightGridSize: 3,
+    })
+  ));
 
   fireEvent.pointerDown(document.body);
   expect(screen.queryByRole("menu", { name: "Réglages du lecteur" })).not.toBeInTheDocument();
+});
+
+it("migre une seule fois l'ancien toggle local vers le compte", async () => {
+  localStorage.setItem("sami-ambient-light-enabled", "false");
+  api.get.mockImplementation((url) => {
+    if (url === "/users/player-preferences") {
+      return Promise.resolve({
+        data: {
+          initialized: false,
+          preferences: {
+            ambientLightEnabled: true,
+            ambientLightMode: "classic",
+            ambientLightRefreshRate: 6,
+            ambientLightGridSize: 3,
+          },
+        },
+      });
+    }
+    return Promise.reject({ response: { status: 403 } });
+  });
+
+  renderPlayer();
+
+  await waitFor(() => expect(api.put).toHaveBeenCalledWith(
+    "/users/player-preferences",
+    {
+      ambientLightEnabled: false,
+      ambientLightMode: "classic",
+      ambientLightRefreshRate: 6,
+      ambientLightGridSize: 3,
+    }
+  ));
+  expect(localStorage.getItem("sami-ambient-light-enabled")).toBeNull();
+
+  openSettings();
+  expect(screen.getByRole("menuitem", { name: "Ambiance Désactivée" })).toBeInTheDocument();
+});
+
+it("étend les secteurs du pourtour sur tout le dôme en mode avancé", async () => {
+  const ambientContext = {
+    clearRect: jest.fn(),
+    fillRect: jest.fn(),
+    fillStyle: "",
+  };
+  const ambientCanvas = {
+    tagName: "CANVAS",
+    width: 1,
+    height: 1,
+    style: {},
+    getContext: jest.fn(() => ambientContext),
+  };
+  const sampleContext = {
+    drawImage: jest.fn(),
+    getImageData: jest.fn((_x, _y, width, height) => {
+      const data = new Uint8ClampedArray(width * height * 4);
+      for (let offset = 0; offset < data.length; offset += 4) {
+        data[offset] = 120;
+        data[offset + 1] = 40;
+        data[offset + 2] = 20;
+        data[offset + 3] = 255;
+      }
+      return { data, width, height };
+    }),
+  };
+  const getContext = jest
+    .spyOn(HTMLCanvasElement.prototype, "getContext")
+    .mockReturnValue(sampleContext);
+  const { container } = render(
+    <VideoPlayer
+      video={{
+        VideoID: 19,
+        CheminAcces: "uploads/video/19/hls/master.m3u8",
+        subtitles: [],
+      }}
+      backgroundBlur={{ current: ambientCanvas }}
+    />
+  );
+  const videoElement = container.querySelector("video");
+  Object.defineProperties(videoElement, {
+    videoWidth: { configurable: true, value: 1920 },
+    videoHeight: { configurable: true, value: 1080 },
+    paused: { configurable: true, value: false },
+    ended: { configurable: true, value: false },
+  });
+  videoElement.requestVideoFrameCallback = jest.fn(() => 41);
+  videoElement.cancelVideoFrameCallback = jest.fn();
+
+  openSettings();
+  fireEvent.click(screen.getByRole("menuitem", { name: /Ambiance Classique/ }));
+  fireEvent.click(screen.getByRole("switch", { name: "Mode d'ambiance avancé" }));
+  ambientContext.fillRect.mockClear();
+  fireEvent.play(videoElement);
+
+  await waitFor(() => expect(ambientCanvas.width).toBe(3));
+  expect(ambientCanvas.height).toBe(3);
+  expect(ambientContext.fillRect).toHaveBeenCalledTimes(9);
+  expect(ambientContext.fillRect).toHaveBeenCalledWith(1, 1, 1, 1);
+  expect(videoElement.requestVideoFrameCallback).toHaveBeenCalledTimes(1);
+
+  fireEvent.pause(videoElement);
+  getContext.mockRestore();
 });
 
 describe("raccourcis clavier du lecteur", () => {

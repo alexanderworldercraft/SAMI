@@ -1437,12 +1437,12 @@ export const getVideoDetails = async (request, reply) => {
     const seriesId = video.Saison?.Series?.SeriesID;
     const [videoLinks, seriesLinks, favoriteKeys] = await Promise.all([
       prisma.videoPersonne.findMany({
-        where: { VideoID: videoId },
+        where: { VideoID: videoId, Personne: { EtatID: ACTIVE_ETAT_ID } },
         include: { Personne: true },
       }),
       seriesId
         ? prisma.seriesPersonne.findMany({
-            where: { SeriesID: seriesId },
+            where: { SeriesID: seriesId, Personne: { EtatID: ACTIVE_ETAT_ID } },
             include: { Personne: true },
           })
         : [],

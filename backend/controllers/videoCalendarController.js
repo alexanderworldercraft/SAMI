@@ -527,6 +527,7 @@ export const getAdditionsByDate = async (request, reply) => {
         by: ["CreateDate"],
         _count: { _all: true },
         where: {
+          EtatID: ACTIVE_ETAT_ID,
           CreateDate: {
             not: null,
             gte: from,
@@ -631,6 +632,7 @@ export const getAdditionsForDate = async (request, reply) => {
       }),
       prisma.personne.findMany({
         where: {
+          EtatID: ACTIVE_ETAT_ID,
           CreateDate: {
             not: null,
             gte: from,
