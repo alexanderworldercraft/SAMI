@@ -2,7 +2,7 @@
 
 SAMI (**Système d’Archivage Multimédia Intégré**) est une médiathèque web privée permettant d’organiser, diffuser et suivre des films, séries et musiques depuis une seule interface.
 
-La version actuelle est la **7.11.1**. Elle repose sur un backend Fastify, une interface React, Prisma avec MySQL, un pipeline vidéo FFmpeg/HLS et Socket.IO pour le retour en temps réel des traitements.
+La version actuelle est la **7.12.0**. Elle repose sur un backend Fastify, une interface React, Prisma avec MySQL, un pipeline vidéo FFmpeg/HLS et Socket.IO pour le retour en temps réel des traitements.
 
 ## Fonctionnalités
 
@@ -35,17 +35,21 @@ La version actuelle est la **7.11.1**. Elle repose sur un backend Fastify, une i
 - espaces protégés pour les administrateurs et super administrateurs ;
 - gestion des vidéos, séries, genres, personnes, sagas, univers et musiques ;
 - édition des personnes avec photos, suppression réversible et corbeille réservée au super administrateur ;
+- association semi-automatique d’acteurs et réalisateurs à un film ou une série, avec création contrôlée et recherche des photos manquantes ;
+- détection des personnes potentiellement dupliquées, classement des doutes et fusion réservée au super administrateur ;
 - messages généraux, fonctionnalités expérimentales et statistiques ;
 - journalisation des actions et sauvegardes manuelles ou planifiées de MySQL ;
 - limitations de requêtes, contrôle CORS et en-têtes de sécurité.
 
-## Nouveautés de la version 7.11.1
+## Nouveautés de la version 7.12.0
 
-- retour automatique et fluide en haut de la page lorsqu’un épisode ou un contenu proposé est sélectionné ;
-- fermeture automatique de la fenêtre d’une saga avant l’ouverture de son film ou du premier épisode de sa série ;
-- ajout d’une ancre stable aux liens internes concernés sur les pages `/lecture/:id`.
+- ajout semi-automatique des acteurs et réalisateurs depuis la page Nouvelle vidéo, avec réutilisation ou création des personnes, association au contenu et recherche des photos manquantes ;
+- affichage des personnes sans photo sur les pages de lecture avec une indication explicite à la place de l’image ;
+- vérification des doublons depuis l’administration avec gestion des doutes, confirmation des personnes distinctes et fusion contrôlée par le super administrateur ;
+- comparaison améliorée des accents, variantes Unicode et translittérations proches comme `Yūki` et `Yuuki` ;
+- pérennisation des outils de crédits, simplification des quatre listes CSV et extension des actions journalisées.
 
-L’historique complet des versions, de la 6.1.0 à la 7.11.1, est disponible dans l’application à l’adresse `/updates` et dans `frontend/src/components/UpdatesPage.js`.
+L’historique complet des versions, de la 6.1.0 à la 7.12.0, est disponible dans l’application à l’adresse `/updates` et dans `frontend/src/components/UpdatesPage.js`.
 
 ## Stack technique
 

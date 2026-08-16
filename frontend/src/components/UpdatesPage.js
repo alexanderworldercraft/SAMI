@@ -2,6 +2,54 @@ import React, { useEffect, useState } from "react";
 
 const updates = [
   {
+    version: "7.12.0",
+    title: "Credits semi-automatiques et qualite des personnes",
+    date: "16 aout 2026",
+    sections: [
+      {
+        title: "Acteurs et realisateurs ajoutes depuis Nouvelle video",
+        items: [
+          "Une nouvelle section de la page Nouvelle video permet de selectionner un film ou une serie puis de choisir entre acteurs et realisateurs.",
+          "Une liste de noms separes par le caractere | ou par des retours a la ligne peut etre verifiee et traitee en une seule operation, dans la limite de cinquante personnes.",
+          "Chaque personne existante est reutilisee, une fiche manquante est creee, puis le role est ajoute au contenu sans dupliquer une association deja presente.",
+          "Apres l'association, SAMI recherche automatiquement les photos encore manquantes avec les memes controles d'identite que l'outil d'import dedie.",
+          "Le bilan distingue les personnes creees, les liens ajoutes, les roles completes et le resultat de chaque recherche de photo.",
+          "Les formulaires manuels existants restent disponibles en parallele pour corriger ou completer individuellement les credits.",
+        ],
+      },
+      {
+        title: "Credits et photos plus faciles a maintenir",
+        items: [
+          "Le script temporaire de preparation des credits devient l'outil permanent seedCreditsPersonnes, avec ses commandes et ses tests renommes.",
+          "Les quatre listes CSV des acteurs et realisateurs de films et de series n'utilisent plus la colonne titre devenue inutile.",
+          "L'import accepte maintenant ces listes sans colonne titre et continue d'identifier les contenus a partir de leurs identifiants.",
+          "Sur les pages de lecture, les acteurs et realisateurs restent affiches meme lorsque leur photo manque, avec un cadre indiquant clairement Photo manquante pour cette personne.",
+        ],
+      },
+      {
+        title: "Detection et fusion des doublons",
+        items: [
+          "La section Personnes de l'administration integre une verification a la demande des prenoms et noms proches, sans lancer d'analyse automatique en arriere-plan.",
+          "La comparaison tolere les accents, les variantes Unicode et de petites differences de translitteration, notamment Aoi Yuki et Aoi Yuuki lorsque le prenom est identique.",
+          "Chaque paire affiche son score global ainsi que les scores du prenom et du nom afin de faciliter la decision.",
+          "Le super administrateur peut conserver une paire dans les doutes, confirmer qu'il s'agit de personnes differentes ou choisir la fiche a conserver avant une fusion.",
+          "Une fusion reunit les roles et associations aux films et series, reprend la photo disponible si necessaire puis place la fiche secondaire dans la corbeille.",
+          "Les decisions douteuses restent visibles lors des prochaines verifications tandis que les paires confirmees distinctes ou deja fusionnees ne sont plus reproposees.",
+        ],
+      },
+      {
+        title: "Journalisation et tracabilite completees",
+        items: [
+          "Les modifications d'identite et de photo, les imports groupes, la corbeille, les restaurations et les suppressions definitives de personnes disposent maintenant de leurs propres actions journalisees.",
+          "Les decisions et fusions de doublons sont enregistrees avec les identifiants concernes et une criticite adaptee.",
+          "Les ajouts, retraits et changements d'ordre dans les univers ainsi que les preferences du lecteur sont egalement traces.",
+          "Le cycle de vie de l'encodage distribue journalise desormais le demarrage, la reprise, l'annulation, la reussite et l'echec des jobs.",
+          "Une migration ajoute les actions recentes absentes des anciennes installations sans modifier les journaux deja conserves.",
+        ],
+      },
+    ],
+  },
+  {
     version: "7.11.1",
     title: "Navigation plus fluide sur les pages de lecture",
     date: "15 aout 2026",
