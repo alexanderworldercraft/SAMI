@@ -25,6 +25,8 @@ import { buildVideoPageMetadata } from "../utils/videoPageMetadata";
 
 
 const apiUrl = process.env.REACT_APP_URL_LOCAL;
+const LECTURE_TOP_ID = "lecture-top";
+const LECTURE_TOP_ANCHOR = `#${LECTURE_TOP_ID}`;
 
 const PREMIUM_MESSAGE = `Ce contenu est réservé aux membres Premium.
 Il fait partie des vidéos et séries exclusives disponibles uniquement avec un abonnement actif.
@@ -592,6 +594,19 @@ const VideoSeePage = () => {
     window.setTimeout(() => setResumeChoicePulse(false), 900);
   };
 
+  const scrollToLectureTop = () => {
+    document.getElementById(LECTURE_TOP_ID)?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+  };
+
+  const handleSagaContentClick = () => {
+    setSelectedSaga(null);
+    setSelectedSagaDetails(null);
+    scrollToLectureTop();
+  };
+
   const renderRecommendationSection = (title, videos, label = "Propositions") => (
     <section className="container mx-auto overflow-hidden rounded-2xl border border-sky-500/10 bg-white/80 shadow-xl shadow-slate-950/5 backdrop-blur dark:bg-slate-950/70 dark:shadow-sky-950/20">
       <div className="border-b border-sky-500/10 bg-gradient-to-r from-sky-500/15 via-blue-500/10 to-transparent px-6 py-5">
@@ -603,7 +618,11 @@ const VideoSeePage = () => {
       <div className="relative p-6">
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_12%_20%,rgba(14,165,233,0.10),transparent_26%),radial-gradient(circle_at_88%_0%,rgba(139,92,246,0.08),transparent_22%)]" />
         <div className="relative">
-          <VideoList videos={videos} />
+          <VideoList
+            videos={videos}
+            linkAnchor={LECTURE_TOP_ANCHOR}
+            onContentClick={scrollToLectureTop}
+          />
         </div>
       </div>
     </section>
@@ -684,7 +703,7 @@ const VideoSeePage = () => {
   };
 
   return (
-    <div className="relative">
+    <div id={LECTURE_TOP_ID} className="relative scroll-mt-4">
       <Helmet>
         <title>{pageMetadata.title}</title>
         <meta name="description" content={pageMetadata.description} />
@@ -795,6 +814,8 @@ const VideoSeePage = () => {
                           episodes={episodes}
                           currentEpisode={currentEpisode}
                           canAccessPremium={isPremiumUser}
+                          linkAnchor={LECTURE_TOP_ANCHOR}
+                          onEpisodeClick={scrollToLectureTop}
                         />
                       </div>
                     </div>
@@ -963,7 +984,11 @@ const VideoSeePage = () => {
               {selectedSagaLoading ? (
                 <p className="text-sm font-semibold text-slate-500 dark:text-slate-300">Chargement...</p>
               ) : selectedSagaDetails?.Contents?.length ? (
-                <VideoList videos={selectedSagaDetails.Contents} />
+                <VideoList
+                  videos={selectedSagaDetails.Contents}
+                  linkAnchor={LECTURE_TOP_ANCHOR}
+                  onContentClick={handleSagaContentClick}
+                />
               ) : (
                 <p className="rounded-xl border border-sky-500/10 bg-slate-50 px-4 py-5 text-sm font-semibold text-slate-600 dark:bg-slate-900 dark:text-slate-300">
                   Aucun contenu dans cette saga.

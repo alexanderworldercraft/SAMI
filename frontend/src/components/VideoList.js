@@ -16,7 +16,15 @@ const isRecentDate = (date) => {
   return value >= Date.now() - NEW_CONTENT_WINDOW_DAYS * 24 * 60 * 60 * 1000;
 };
 
-const VideoList = ({ videos = [], overlayActions, onItemClick, gridClassName = "", onFavoriteChange }) => {
+const VideoList = ({
+  videos = [],
+  overlayActions,
+  onItemClick,
+  gridClassName = "",
+  onFavoriteChange,
+  linkAnchor = "",
+  onContentClick,
+}) => {
   const favoriteItems = useMemo(
     () =>
       (videos || [])
@@ -244,7 +252,8 @@ const VideoList = ({ videos = [], overlayActions, onItemClick, gridClassName = "
           item.type === "series" ? (
             <div key={`series-${item.id}`} className="group relative hover:-translate-y-2 duration-300">
               <Link
-                to={item.FirstVideoID ? `/lecture/${item.FirstVideoID}` : "#"}
+                to={item.FirstVideoID ? `/lecture/${item.FirstVideoID}${linkAnchor}` : "#"}
+                onClick={() => item.FirstVideoID && onContentClick?.(item)}
                 className="block"
               >
               <ContentPreviewTooltip item={item} title={item.Titre}>
@@ -312,7 +321,11 @@ const VideoList = ({ videos = [], overlayActions, onItemClick, gridClassName = "
             :
             (
               <div key={`video-${item.id}`} className="group relative hover:-translate-y-2 duration-300">
-              <Link to={`/lecture/${item.id}`} className="block">
+              <Link
+                to={`/lecture/${item.id}${linkAnchor}`}
+                onClick={() => onContentClick?.(item)}
+                className="block"
+              >
                 <ContentPreviewTooltip item={item} title={item.Titre}>
                 <div className="min-h-full h-max max-h-max">
                   <div className="rounded-xl overflow-hidden border border-neutral-400 bg-gradient-to-br from-slate-950 to-slate-900 mb-2 relative transition duration-300 ease-in-out group-hover:border-blue-500">

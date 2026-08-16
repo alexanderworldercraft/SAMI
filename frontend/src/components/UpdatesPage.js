@@ -2,6 +2,22 @@ import React, { useEffect, useState } from "react";
 
 const updates = [
   {
+    version: "7.11.1",
+    title: "Navigation plus fluide sur les pages de lecture",
+    date: "15 aout 2026",
+    sections: [
+      {
+        title: "Retour automatique en haut du lecteur",
+        items: [
+          "Les liens des episodes utilisent maintenant une ancre stable pour revenir automatiquement en haut de la page lors du changement de contenu.",
+          "Les films et series proposes sous le lecteur appliquent le meme retour fluide afin d'afficher immediatement la nouvelle video selectionnee.",
+          "Dans la fenetre d'une saga, choisir un contenu ferme automatiquement la fenetre avant de remonter vers le lecteur.",
+          "Les liens conservent l'ancre dans leur adresse et le defilement doux reste limite aux navigations internes de la page de lecture.",
+        ],
+      },
+    ],
+  },
+  {
     version: "7.11.0",
     title: "Lecteur immersif, apercus sociaux et gestion des personnes",
     date: "14 aout 2026",

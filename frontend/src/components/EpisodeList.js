@@ -1,7 +1,13 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
-const EpisodeList = ({ episodes, currentEpisode, canAccessPremium = false }) => {
+const EpisodeList = ({
+  episodes,
+  currentEpisode,
+  canAccessPremium = false,
+  linkAnchor = "",
+  onEpisodeClick,
+}) => {
   const [durations, setDurations] = useState({});
 
   useEffect(() => {
@@ -102,7 +108,11 @@ const EpisodeList = ({ episodes, currentEpisode, canAccessPremium = false }) => 
           return isLocked ? (
             card
           ) : (
-            <Link key={episode.VideoID} to={`/lecture/${episode.VideoID}`}>
+            <Link
+              key={episode.VideoID}
+              to={`/lecture/${episode.VideoID}${linkAnchor}`}
+              onClick={() => onEpisodeClick?.(episode)}
+            >
               {card}
             </Link>
           );

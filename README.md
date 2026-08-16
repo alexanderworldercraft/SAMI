@@ -2,7 +2,7 @@
 
 SAMI (**Système d’Archivage Multimédia Intégré**) est une médiathèque web privée permettant d’organiser, diffuser et suivre des films, séries et musiques depuis une seule interface.
 
-La version actuelle est la **7.11.0**. Elle repose sur un backend Fastify, une interface React, Prisma avec MySQL, un pipeline vidéo FFmpeg/HLS et Socket.IO pour le retour en temps réel des traitements.
+La version actuelle est la **7.11.1**. Elle repose sur un backend Fastify, une interface React, Prisma avec MySQL, un pipeline vidéo FFmpeg/HLS et Socket.IO pour le retour en temps réel des traitements.
 
 ## Fonctionnalités
 
@@ -39,17 +39,13 @@ La version actuelle est la **7.11.0**. Elle repose sur un backend Fastify, une i
 - journalisation des actions et sauvegardes manuelles ou planifiées de MySQL ;
 - limitations de requêtes, contrôle CORS et en-têtes de sécurité.
 
-## Nouveautés de la version 7.11.0
+## Nouveautés de la version 7.11.1
 
-- préférences d’éclairage d’ambiance enregistrées par compte, avec activation, mode et cadence de 3 à 60 actualisations par seconde ;
-- nouveau mode avancé de 3 × 3 à 9 × 9, fondé sur les couleurs pondérées du pourtour de la vidéo et projeté sans zone noire vers l’intérieur du dôme ;
-- menu de réglages du lecteur réorganisé pour les sous-titres, les pistes audio, l’ambiance et la qualité, avec identification visuelle des langues ;
-- aperçus sociaux rendus dans le HTML initial des pages `/lecture/:id`, avec priorité à l’affiche de la série pour les épisodes ;
-- administration complète des personnes, photos, suppression réversible, restauration et suppression définitive depuis la corbeille ;
-- imports contrôlés des crédits CSV et des photos Wikidata/Wikimedia, avec simulation, vérification d’identité et conservation des attributions ;
-- tri des contenus des gestionnaires de sagas et d’univers par date d’ajout la plus récente.
+- retour automatique et fluide en haut de la page lorsqu’un épisode ou un contenu proposé est sélectionné ;
+- fermeture automatique de la fenêtre d’une saga avant l’ouverture de son film ou du premier épisode de sa série ;
+- ajout d’une ancre stable aux liens internes concernés sur les pages `/lecture/:id`.
 
-L’historique complet des versions, de la 6.1.0 à la 7.11.0, est disponible dans l’application à l’adresse `/updates` et dans `frontend/src/components/UpdatesPage.js`.
+L’historique complet des versions, de la 6.1.0 à la 7.11.1, est disponible dans l’application à l’adresse `/updates` et dans `frontend/src/components/UpdatesPage.js`.
 
 ## Stack technique
 
