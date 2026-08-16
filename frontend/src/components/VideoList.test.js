@@ -1,4 +1,4 @@
-import { fireEvent, render } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import api from "../services/api";
 import VideoList from "./VideoList";
 
@@ -47,5 +47,25 @@ describe("VideoList - navigation vers la lecture", () => {
 
     fireEvent.click(link);
     expect(onContentClick).toHaveBeenCalledWith(video);
+  });
+
+  test("affiche un cadre explicite lorsqu'une carte personne n'a pas de photo", () => {
+    const { container } = render(
+      <VideoList
+        videos={[{
+          id: 42,
+          type: "person",
+          Titre: "Tom Hanks",
+          CheminImage: null,
+          MissingImageLabel: "Photo manquante pour cette personne",
+        }]}
+      />
+    );
+
+    expect(screen.getByRole("img", { name: "Photo manquante pour Tom Hanks" })).toHaveTextContent(
+      "Photo manquante pour cette personne"
+    );
+    expect(container.querySelector('a[href="/personnes/42"]')).toBeInTheDocument();
+    expect(screen.getByText("Tom Hanks")).toBeInTheDocument();
   });
 });

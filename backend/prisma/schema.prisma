@@ -481,34 +481,35 @@ model UtilisateurGenre {
 }
 
 model Utilisateur {
-  UtilisateurID        Int                    @id @default(autoincrement())
-  Surnom               String                 @unique
-  MotDePasse           String                 @db.VarChar(255)
-  CheminImage          String?                @db.VarChar(255)
-  Email                String                 @db.VarChar(100)
-  Salt                 String                 @db.VarChar(255)
-  GradeID              Int
-  EtatID               Int
-  CreateDate           DateTime?              @default(now())
-  LastLogin            DateTime?
-  PremiumEndDate       DateTime?
-  Log                  Log[]
-  Albums               Album[]
-  AlbumMusiques        AlbumMusique[]
-  Musiques             Musique[]
-  MusiqueGenres        MusiqueGenre[]
-  MusiqueGenreAlbums   MusiqueGenreAlbum[]
-  MusiqueGenreMusiques MusiqueGenreMusique[]
-  Saisons              Saison[]
-  Seriess              Series[]
-  Etat                 Etat                   @relation(fields: [EtatID], references: [EtatID])
-  Grade                Grade                  @relation(fields: [GradeID], references: [GradeID])
-  UtilisateurGenre     UtilisateurGenre[]
-  Videos               Video[]
-  UserVideoProgress    UserVideoProgress[]
-  UserSeriesWatchReset UserSeriesWatchReset[]
-  UserFavoriteContent  UserFavoriteContent[]
-  PlayerPreference     UserPlayerPreference?
+  UtilisateurID          Int                     @id @default(autoincrement())
+  Surnom                 String                  @unique
+  MotDePasse             String                  @db.VarChar(255)
+  CheminImage            String?                 @db.VarChar(255)
+  Email                  String                  @db.VarChar(100)
+  Salt                   String                  @db.VarChar(255)
+  GradeID                Int
+  EtatID                 Int
+  CreateDate             DateTime?               @default(now())
+  LastLogin              DateTime?
+  PremiumEndDate         DateTime?
+  Log                    Log[]
+  Albums                 Album[]
+  AlbumMusiques          AlbumMusique[]
+  Musiques               Musique[]
+  MusiqueGenres          MusiqueGenre[]
+  MusiqueGenreAlbums     MusiqueGenreAlbum[]
+  MusiqueGenreMusiques   MusiqueGenreMusique[]
+  Saisons                Saison[]
+  Seriess                Series[]
+  Etat                   Etat                    @relation(fields: [EtatID], references: [EtatID])
+  Grade                  Grade                   @relation(fields: [GradeID], references: [GradeID])
+  UtilisateurGenre       UtilisateurGenre[]
+  Videos                 Video[]
+  UserVideoProgress      UserVideoProgress[]
+  UserSeriesWatchReset   UserSeriesWatchReset[]
+  UserFavoriteContent    UserFavoriteContent[]
+  PlayerPreference       UserPlayerPreference?
+  PersonDuplicateReviews PersonDuplicateReview[]
 
   @@index([GradeID], map: "Utilisateur_GradeID_fkey")
   @@index([EtatID], map: "Utilisateur_EtatID_fkey")
@@ -764,19 +765,39 @@ model Action {
 }
 
 model Personne {
-  PersonneID  Int              @id @default(autoincrement())
-  Nom         String
-  Prenom      String
-  Surnom      String?
-  CheminImage String?
-  ImageStatut StatutImage      @default(DEFAULT)
-  EtatID      Int              @default(1)
-  CreateDate  DateTime?        @default(now())
-  Etat        Etat             @relation(fields: [EtatID], references: [EtatID])
-  Series      SeriesPersonne[]
-  Videos      VideoPersonne[]
+  PersonneID          Int                     @id @default(autoincrement())
+  Nom                 String
+  Prenom              String
+  Surnom              String?
+  CheminImage         String?
+  ImageStatut         StatutImage             @default(DEFAULT)
+  EtatID              Int                     @default(1)
+  CreateDate          DateTime?               @default(now())
+  Etat                Etat                    @relation(fields: [EtatID], references: [EtatID])
+  Series              SeriesPersonne[]
+  Videos              VideoPersonne[]
+  DuplicateReviewsAsA PersonDuplicateReview[] @relation("PersonDuplicateReviewA")
+  DuplicateReviewsAsB PersonDuplicateReview[] @relation("PersonDuplicateReviewB")
 
   @@index([EtatID], map: "Personne_EtatID_fkey")
+}
+
+model PersonDuplicateReview {
+  PersonDuplicateReviewID Int                         @id @default(autoincrement())
+  PersonneAID             Int
+  PersonneBID             Int
+  Decision                PersonDuplicateReviewStatus
+  MergedPersonneID        Int?
+  ReviewedByID            Int
+  CreateDate              DateTime                    @default(now())
+  UpdateDate              DateTime                    @updatedAt
+  PersonneA               Personne                    @relation("PersonDuplicateReviewA", fields: [PersonneAID], references: [PersonneID], onDelete: Cascade)
+  PersonneB               Personne                    @relation("PersonDuplicateReviewB", fields: [PersonneBID], references: [PersonneID], onDelete: Cascade)
+  ReviewedBy              Utilisateur                 @relation(fields: [ReviewedByID], references: [UtilisateurID], onDelete: Restrict)
+
+  @@unique([PersonneAID, PersonneBID], map: "uniq_person_duplicate_pair")
+  @@index([Decision], map: "idx_person_duplicate_decision")
+  @@index([ReviewedByID], map: "idx_person_duplicate_reviewer")
 }
 
 model VideoPersonne {
@@ -812,4 +833,10 @@ model SeriesPersonne {
 enum StatutImage {
   DEFAULT
   CUSTOM
+}
+
+enum PersonDuplicateReviewStatus {
+  DOUBT
+  DISTINCT
+  MERGED
 }

@@ -9,6 +9,7 @@ import UniverseManager from "./UniverseManager";
 import UniverseSagaManager from "./UniverseSagaManager";
 import AddGenre from "./AddGenre";
 import PeopleQuickAdd from "./PeopleQuickAdd";
+import PeopleCreditImportManager from "./PeopleCreditImportManager";
 import { io } from "socket.io-client";
 import api from "../services/api";
 import {
@@ -26,6 +27,7 @@ import { ChevronDownIcon } from "@heroicons/react/16/solid";
 import {
   BuildingOfficeIcon,
   CreditCardIcon,
+  UserPlusIcon,
   UserIcon,
   UsersIcon,
 } from "@heroicons/react/20/solid";
@@ -93,6 +95,7 @@ const tabs = [
   { id: "seasons", name: "Saisons", icon: BuildingOfficeIcon },
   { id: "genres", name: "Genres", icon: UsersIcon },
   { id: "people", name: "Acteurs / Réalisateurs", icon: CreditCardIcon },
+  { id: "people-import", name: "Import personnes", icon: UserPlusIcon },
   { id: "series", name: "Séries", icon: UsersIcon }, // tu pourras changer l'icône si tu veux
   { id: "sagas", name: "Sagas", icon: UsersIcon },
   { id: "saga-content", name: "Contenus saga", icon: BuildingOfficeIcon },
@@ -411,6 +414,8 @@ const FormNewVideoPage = () => {
         return <AddGenre />;
       case "people":
         return <PeopleQuickAdd />;
+      case "people-import":
+        return <PeopleCreditImportManager />;
       case "series":
         return <SeriesManager />;
       case "sagas":

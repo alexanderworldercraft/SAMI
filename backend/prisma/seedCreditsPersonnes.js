@@ -39,20 +39,6 @@ export const DEFAULT_CSV_SOURCES = [
     peopleColumn: "Réalisateurs",
     role: "director",
   },
-  {
-    relativePath: "outputs/series_credits_remaining/series_acteurs_principaux_restants.csv",
-    contentType: "series",
-    idColumn: "SeriesID",
-    peopleColumn: "ActeursPrincipaux",
-    role: "actor",
-  },
-  {
-    relativePath: "outputs/series_credits_remaining/series_realisateurs_restants.csv",
-    contentType: "series",
-    idColumn: "SeriesID",
-    peopleColumn: "Réalisateurs",
-    role: "director",
-  },
 ];
 
 export function parseSemicolonCsv(text) {
@@ -141,24 +127,14 @@ function requireColumn(headers, column, filePath) {
   return index;
 }
 
-function addContentTitle(contentTitles, contentType, contentId, title, sourcePath) {
-  const key = `${contentType}:${contentId}`;
-  const existing = contentTitles.get(key);
-  if (existing && normalizePersonName(existing.title) !== normalizePersonName(title)) {
-    throw new Error(
-      `${sourcePath} : le contenu ${key} porte deux titres différents (« ${existing.title} » et « ${title} »).`,
-    );
-  }
-  if (!existing) contentTitles.set(key, { contentType, contentId, title, sourcePath });
-}
-
 export async function buildImportPlan({
   repositoryRoot = DEFAULT_REPOSITORY_ROOT,
   sources = DEFAULT_CSV_SOURCES,
 } = {}) {
   const people = new Map();
   const links = new Map();
-  const contentTitles = new Map();
+  const videoIds = new Set();
+  const seriesIds = new Set();
   const sourceStats = [];
 
   for (const source of sources) {
@@ -168,7 +144,6 @@ export async function buildImportPlan({
 
     const headers = rows[0].map((value) => value.trim());
     const idIndex = requireColumn(headers, source.idColumn, absolutePath);
-    const titleIndex = requireColumn(headers, "Titre", absolutePath);
     const peopleIndex = requireColumn(headers, source.peopleColumn, absolutePath);
     const expectedWidth = headers.length;
     const seenIds = new Set();
@@ -182,14 +157,12 @@ export async function buildImportPlan({
       }
 
       const contentId = Number(values[idIndex]);
-      const title = values[titleIndex].trim();
       if (!Number.isInteger(contentId) || contentId <= 0) {
         throw new Error(`${absolutePath}:${lineNumber} : identifiant invalide « ${values[idIndex]} ».`);
       }
-      if (!title) throw new Error(`${absolutePath}:${lineNumber} : titre vide.`);
       if (seenIds.has(contentId)) throw new Error(`${absolutePath}:${lineNumber} : identifiant ${contentId} dupliqué.`);
       seenIds.add(contentId);
-      addContentTitle(contentTitles, source.contentType, contentId, title, absolutePath);
+      (source.contentType === "video" ? videoIds : seriesIds).add(contentId);
 
       const rowPeople = values[peopleIndex].split("|").map((name) => name.trim()).filter(Boolean);
       if (!rowPeople.length) emptyCreditRows += 1;
@@ -203,7 +176,6 @@ export async function buildImportPlan({
         const link = links.get(linkKey) ?? {
           contentType: source.contentType,
           contentId,
-          title,
           personKey,
           displayName: people.get(personKey),
           EstActeur: false,
@@ -227,10 +199,9 @@ export async function buildImportPlan({
   return {
     people,
     links,
-    contentTitles,
     sourceStats,
-    videoIds: [...new Set([...contentTitles.values()].filter((item) => item.contentType === "video").map((item) => item.contentId))],
-    seriesIds: [...new Set([...contentTitles.values()].filter((item) => item.contentType === "series").map((item) => item.contentId))],
+    videoIds: [...videoIds],
+    seriesIds: [...seriesIds],
   };
 }
 
@@ -442,7 +413,7 @@ async function runCli() {
 const isMainModule = process.argv[1] && pathToFileURL(path.resolve(process.argv[1])).href === import.meta.url;
 if (isMainModule) {
   runCli().catch((error) => {
-    console.error("Échec du seed temporaire :", error);
+    console.error("Échec du seed des crédits personnes :", error);
     process.exitCode = 1;
   });
 }

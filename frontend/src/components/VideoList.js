@@ -186,11 +186,23 @@ const VideoList = ({
           >
             <div className="min-h-full h-max max-h-max">
               <div className="rounded-xl overflow-hidden border border-neutral-400 bg-gradient-to-br from-slate-950 to-slate-900 mb-2 relative transition duration-300 ease-in-out group-hover:border-blue-500">
-                <img
-                  src={getImageUrl(item.CheminImage)}
-                  alt={item.Titre} // ici Titre = "Prénom Nom"
-                  className="object-cover w-full h-full aspect-2/3 dark:text-white group-hover:scale-110 duration-300"
-                />
+                {item.CheminImage || !item.MissingImageLabel ? (
+                  <img
+                    src={getImageUrl(item.CheminImage, item.type)}
+                    alt={item.Titre} // ici Titre = "Prénom Nom"
+                    className="object-cover w-full h-full aspect-2/3 dark:text-white group-hover:scale-110 duration-300"
+                  />
+                ) : (
+                  <div
+                    role="img"
+                    aria-label={`Photo manquante pour ${item.Titre}`}
+                    className="flex aspect-2/3 w-full items-center justify-center bg-[radial-gradient(circle_at_50%_30%,rgba(14,165,233,0.18),transparent_42%)] px-4 text-center"
+                  >
+                    <span className="text-xs font-black uppercase leading-5 tracking-wide text-slate-300">
+                      {item.MissingImageLabel}
+                    </span>
+                  </div>
+                )}
                 {typeof overlayActions === "function" && (
                   <div
                     className="absolute top-2 right-2 z-10"

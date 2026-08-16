@@ -1,0 +1,27 @@
+INSERT INTO `Action` (`Nom`, `Description`, `Criticite`, `CreateDate`) VALUES
+  ('admin_create', 'Le super administrateur crée un compte administrateur.', 2, CURRENT_TIMESTAMP(3)),
+  ('multi_audio_toggle', 'Un administrateur modifie l''activation des imports vidéo multi-audio.', 1, CURRENT_TIMESTAMP(3)),
+  ('distributed_encoding_toggle', 'Le super administrateur modifie l''activation de l''encodage distribué.', 2, CURRENT_TIMESTAMP(3)),
+  ('distributed_encoding_worker_updated', 'Le super administrateur ajoute, modifie ou retire un worker d''encodage distribué.', 2, CURRENT_TIMESTAMP(3)),
+  ('distributed_encoding_job_started', 'Le super administrateur démarre un job d''encodage distribué.', 2, CURRENT_TIMESTAMP(3)),
+  ('distributed_encoding_job_resumed', 'Le super administrateur reprend un job d''encodage distribué.', 2, CURRENT_TIMESTAMP(3)),
+  ('distributed_encoding_job_cancel_requested', 'Le super administrateur demande l''annulation d''un job d''encodage distribué.', 2, CURRENT_TIMESTAMP(3)),
+  ('distributed_encoding_job_completed', 'Un job d''encodage distribué est terminé avec succès.', 1, CURRENT_TIMESTAMP(3)),
+  ('distributed_encoding_job_failed', 'Un job d''encodage distribué a échoué.', 3, CURRENT_TIMESTAMP(3)),
+  ('distributed_encoding_job_cancelled', 'Un job d''encodage distribué a été annulé.', 2, CURRENT_TIMESTAMP(3)),
+  ('universe_content_add', 'Un administrateur ajoute directement un film ou une série à un univers.', 1, CURRENT_TIMESTAMP(3)),
+  ('universe_content_remove', 'Un administrateur retire un film ou une série d''un univers.', 1, CURRENT_TIMESTAMP(3)),
+  ('universe_items_reorder', 'Un administrateur modifie l''ordre des éléments d''un univers.', 1, CURRENT_TIMESTAMP(3)),
+  ('player_preferences_update', 'Un utilisateur modifie ses préférences du lecteur vidéo.', 0, CURRENT_TIMESTAMP(3)),
+  ('person_update', 'Un administrateur modifie l''identité d''une personne.', 1, CURRENT_TIMESTAMP(3)),
+  ('person_photo_update', 'Un administrateur ajoute ou remplace la photo d''une personne.', 1, CURRENT_TIMESTAMP(3)),
+  ('person_photo_delete', 'Un administrateur retire la photo d''une personne.', 1, CURRENT_TIMESTAMP(3)),
+  ('person_bulk_link', 'Un administrateur importe et lie une liste de personnes à un film ou une série.', 1, CURRENT_TIMESTAMP(3)),
+  ('person_soft_delete', 'Un administrateur place une personne dans la corbeille.', 2, CURRENT_TIMESTAMP(3)),
+  ('person_restore', 'Le super administrateur restaure une personne depuis la corbeille.', 2, CURRENT_TIMESTAMP(3)),
+  ('person_delete', 'Le super administrateur supprime définitivement une personne.', 3, CURRENT_TIMESTAMP(3)),
+  ('person_duplicate_review', 'Le super administrateur classe une paire de personnes comme douteuse ou distincte.', 1, CURRENT_TIMESTAMP(3)),
+  ('person_duplicate_merge', 'Le super administrateur fusionne deux fiches de personnes.', 3, CURRENT_TIMESTAMP(3))
+ON DUPLICATE KEY UPDATE
+  `Description` = VALUES(`Description`),
+  `Criticite` = VALUES(`Criticite`);

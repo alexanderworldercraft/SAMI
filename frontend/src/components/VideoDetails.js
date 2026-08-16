@@ -218,16 +218,15 @@ const VideoDetails = ({
   };
 
   const toPersonCards = (arr = []) =>
-    arr
-      .filter(p => p.CheminImage) // on n’affiche que si on a un visuel
-      .map(p => ({
-        type: "person",
-        id: p.PersonneID,
-        Titre: [p.Prenom, p.Nom].filter(Boolean).join(" "), // "Prénom Nom"
-        Surnom: p.Surnom,
-        CheminImage: p.CheminImage,
-        Genres: [], // inutilisé
-      }));
+    arr.map(p => ({
+      type: "person",
+      id: p.PersonneID,
+      Titre: [p.Prenom, p.Nom].filter(Boolean).join(" ") || p.Surnom || "Personne sans nom",
+      Surnom: p.Surnom,
+      CheminImage: p.CheminImage,
+      MissingImageLabel: p.CheminImage ? null : "Photo manquante pour cette personne",
+      Genres: [], // inutilisé
+    }));
 
   const realisateurCards = toPersonCards(video?.Realisateurs);
   const acteurCards = toPersonCards(video?.Acteurs);

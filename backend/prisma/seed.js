@@ -1,5 +1,6 @@
 import { PrismaClient } from '@prisma/client'; // Import pour Prisma
 import bcrypt from 'bcrypt'; // Import pour bcrypt
+import { RECENT_LOG_ACTIONS } from "./recentLogActions.js";
 
 const prisma = new PrismaClient();
 
@@ -310,6 +311,7 @@ async function main() {
         Description: "Le transfert inter-serveurs d'une vidéo a été annulé.",
         Criticite: 2,
       },
+      ...RECENT_LOG_ACTIONS,
     ]),
     skipDuplicates: true, // Évite les erreurs si les grades existent déjà
   });

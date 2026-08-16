@@ -175,16 +175,15 @@ const SerieDetails = ({
   };
 
   const toPersonCards = (arr = []) =>
-    arr
-      .filter(p => p.CheminImage)
-      .map(p => ({
-        type: "person",
-        id: p.PersonneID,
-        Titre: [p.Prenom, p.Nom].filter(Boolean).join(" "),
-        Surnom: p.Surnom,
-        CheminImage: p.CheminImage,
-        Genres: [],
-      }));
+    arr.map(p => ({
+      type: "person",
+      id: p.PersonneID,
+      Titre: [p.Prenom, p.Nom].filter(Boolean).join(" ") || p.Surnom || "Personne sans nom",
+      Surnom: p.Surnom,
+      CheminImage: p.CheminImage,
+      MissingImageLabel: p.CheminImage ? null : "Photo manquante pour cette personne",
+      Genres: [],
+    }));
 
   const realisateurCards = toPersonCards(series?.Realisateurs);
   const acteurCards = toPersonCards(series?.Acteurs);

@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowPathIcon, TrashIcon } from "@heroicons/react/24/outline";
 import api from "../services/api";
+import PersonDuplicateChecker from "./PersonDuplicateChecker";
 
 const apiUrl = process.env.REACT_APP_URL_LOCAL;
 const fieldClass = "block w-full rounded-xl border border-sky-500/20 bg-white/85 px-4 py-3 text-sm font-semibold text-slate-900 shadow-sm transition duration-200 hover:border-sky-400/60 focus:outline-none focus:ring-2 focus:ring-sky-400 dark:bg-slate-950/65 dark:text-white";
@@ -200,7 +201,8 @@ const AdminPersonManager = () => {
   const imageSrc = imagePreview || (form.CheminImage ? `${apiUrl}/${form.CheminImage}` : "");
 
   return (
-    <section className="mx-auto my-8 max-w-4xl overflow-hidden rounded-2xl border border-sky-500/10 bg-white/80 shadow-xl shadow-slate-950/5 backdrop-blur dark:bg-slate-950/70 dark:shadow-sky-950/20">
+    <>
+      <section className="mx-auto my-8 max-w-4xl overflow-hidden rounded-2xl border border-sky-500/10 bg-white/80 shadow-xl shadow-slate-950/5 backdrop-blur dark:bg-slate-950/70 dark:shadow-sky-950/20">
       <div className="border-b border-sky-500/10 bg-gradient-to-r from-sky-500/15 via-blue-500/10 to-transparent px-6 py-5">
         <p className="text-sm font-bold uppercase text-sky-500 dark:text-sky-400">Administration</p>
         <h2 className="mt-1 text-2xl font-black text-slate-950 dark:text-white">Gestion des personnes</h2>
@@ -267,6 +269,10 @@ const AdminPersonManager = () => {
         </div>
       </div>
 
+      </section>
+
+      <PersonDuplicateChecker onPeopleChanged={() => loadPeople()} />
+
       {pendingDelete && selectedPerson && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 px-4">
           <div className="w-full max-w-md rounded-2xl border border-red-300/20 bg-white p-6 shadow-2xl dark:bg-slate-950 dark:text-white">
@@ -279,7 +285,7 @@ const AdminPersonManager = () => {
           </div>
         </div>
       )}
-    </section>
+    </>
   );
 };
 

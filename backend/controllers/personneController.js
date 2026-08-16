@@ -6,6 +6,18 @@ import { fileURLToPath } from "url";
 import { ensureAdmin, ensureSuperAdmin } from "../services/authz.js";
 import { ETAT, MULTIPART_LIMITS } from "../constants.js";
 import { isMultipartFileTooLargeError, sendMultipartFileTooLarge } from "../utils/multipartErrors.js";
+import { createWikimediaClient, runPersonImageSeed } from "../prisma/seedPersonneImages.js";
+import {
+  importPeopleCredits,
+  PersonCreditImportError,
+} from "../services/personCreditImportService.js";
+import {
+  getPotentialDuplicatePairs,
+  mergeDuplicatePeople,
+  PersonDuplicateError,
+  reviewDuplicatePair,
+} from "../services/personDuplicateService.js";
+import { createLog } from "./logController.js";
 
 // Util
 const __filename = fileURLToPath(import.meta.url);
@@ -209,6 +221,15 @@ export const updatePersonnePhoto = async (request, reply) => {
       data: { CheminImage: savedPath, ImageStatut: "CUSTOM" },
       select: { CheminImage: true },
     });
+    await createLog({
+      request,
+      UtilisateurID: admin.userId,
+      ActionNom: "person_photo_update",
+      Champ: "person_photo",
+      AncienneValeur: old.CheminImage,
+      NouvelleValeur: updated.CheminImage,
+      Meta: { personId },
+    });
 
     return reply.send(updated);
   } catch (e) {
@@ -301,6 +322,173 @@ export const getDeletedPeople = async (request, reply) => {
   }
 };
 
+/**
+ * POST /api/people/bulk-link
+ * body: { type: "video"|"series", contenuId: number, role: "actor"|"director", names: string }
+ */
+export const bulkLinkPeople = async (request, reply) => {
+  const admin = await ensureAdmin(request, reply);
+  if (!admin) return;
+
+  try {
+    const importResult = await importPeopleCredits({
+      prisma,
+      type: request.body?.type,
+      contentId: request.body?.contenuId,
+      role: request.body?.role,
+      names: request.body?.names,
+    });
+
+    let imageSearch;
+    try {
+      const client = createWikimediaClient({ userAgent: process.env.WIKIMEDIA_USER_AGENT });
+      const imageResult = await runPersonImageSeed({
+        prisma,
+        client,
+        options: {
+          dryRun: false,
+          refresh: false,
+          retryMisses: false,
+          limit: null,
+          personId: null,
+          personIds: importResult.results.map((person) => person.PersonneID),
+          concurrency: 2,
+          writeReports: false,
+        },
+        logger: { log: () => {} },
+      });
+      const imageByPersonId = new Map(
+        imageResult.results.map((result) => [result.PersonneID, result]),
+      );
+      imageSearch = {
+        status: "completed",
+        summary: imageResult.summary,
+        results: importResult.results.map((person) => ({
+          PersonneID: person.PersonneID,
+          name: person.name,
+          status: person.hadImage
+            ? "existing"
+            : imageByPersonId.get(person.PersonneID)?.status ?? "existing",
+          ...(imageByPersonId.get(person.PersonneID)?.error
+            ? { error: imageByPersonId.get(person.PersonneID).error }
+            : {}),
+        })),
+      };
+    } catch (error) {
+      console.error("bulkLinkPeople image search:", error);
+      imageSearch = {
+        status: "unavailable",
+        error: error.message,
+        results: importResult.results.map((person) => ({
+          PersonneID: person.PersonneID,
+          name: person.name,
+          status: person.hadImage ? "existing" : "error",
+        })),
+      };
+    }
+
+    await createLog({
+      request,
+      UtilisateurID: admin.userId,
+      ActionNom: "person_bulk_link",
+      VideoID: importResult.content.type === "video" ? importResult.content.id : null,
+      SeriesID: importResult.content.type === "series" ? importResult.content.id : null,
+      Champ: "person_credits",
+      NouvelleValeur: String(importResult.summary?.requested ?? importResult.results.length),
+      Meta: {
+        content: importResult.content,
+        role: importResult.role,
+        summary: importResult.summary,
+        personIds: importResult.results.map((person) => person.PersonneID),
+        imageSearchStatus: imageSearch.status,
+        imageSearchSummary: imageSearch.summary ?? null,
+      },
+    });
+
+    return reply.send({ ...importResult, imageSearch });
+  } catch (error) {
+    if (error instanceof PersonCreditImportError) {
+      return reply.code(error.statusCode).send({ error: error.message, code: error.code });
+    }
+    console.error("bulkLinkPeople:", error);
+    return reply.code(500).send({ error: "Impossible d'importer cette liste de personnes." });
+  }
+};
+
+export const getPersonDuplicateCandidates = async (request, reply) => {
+  const admin = await ensureAdmin(request, reply);
+  if (!admin) return;
+
+  try {
+    return reply.send(await getPotentialDuplicatePairs(prisma));
+  } catch (error) {
+    console.error("getPersonDuplicateCandidates:", error);
+    return reply.code(500).send({ error: "Impossible de vérifier les doublons de personnes." });
+  }
+};
+
+export const reviewPersonDuplicate = async (request, reply) => {
+  const admin = await ensureSuperAdmin(request, reply);
+  if (!admin) return;
+
+  try {
+    const review = await reviewDuplicatePair(prisma, {
+      personAId: request.body?.personAId,
+      personBId: request.body?.personBId,
+      decision: request.body?.decision,
+      reviewedById: admin.userId,
+    });
+    await createLog({
+      request,
+      UtilisateurID: admin.userId,
+      ActionNom: "person_duplicate_review",
+      Champ: "person_duplicate_review",
+      NouvelleValeur: review.Decision,
+      Meta: {
+        personAId: Number(request.body?.personAId),
+        personBId: Number(request.body?.personBId),
+        decision: review.Decision,
+      },
+    });
+    return reply.send({ ok: true, decision: review.Decision });
+  } catch (error) {
+    if (error instanceof PersonDuplicateError) {
+      return reply.code(error.statusCode).send({ error: error.message, code: error.code });
+    }
+    console.error("reviewPersonDuplicate:", error);
+    return reply.code(500).send({ error: "Impossible d'enregistrer cette décision." });
+  }
+};
+
+export const mergePersonDuplicates = async (request, reply) => {
+  const admin = await ensureSuperAdmin(request, reply);
+  if (!admin) return;
+
+  try {
+    const result = await mergeDuplicatePeople(prisma, {
+      keepPersonId: request.body?.keepPersonId,
+      mergePersonId: request.body?.mergePersonId,
+      reviewedById: admin.userId,
+    });
+    await createLog({
+      request,
+      UtilisateurID: admin.userId,
+      ActionNom: "person_duplicate_merge",
+      Champ: "person_duplicate_merge",
+      AncienneValeur: String(result.mergedPersonId),
+      NouvelleValeur: String(result.keptPersonId),
+      Meta: result,
+    });
+    return reply.send({ ok: true, ...result });
+  } catch (error) {
+    if (error instanceof PersonDuplicateError) {
+      return reply.code(error.statusCode).send({ error: error.message, code: error.code });
+    }
+    console.error("mergePersonDuplicates:", error);
+    return reply.code(500).send({ error: "Impossible de fusionner ces personnes." });
+  }
+};
+
 export const updatePersonne = async (request, reply) => {
   const admin = await ensureAdmin(request, reply);
   if (!admin) return;
@@ -316,13 +504,22 @@ export const updatePersonne = async (request, reply) => {
   try {
     const existing = await prisma.personne.findFirst({
       where: { PersonneID: personId, EtatID: ACTIVE_ETAT_ID },
-      select: { PersonneID: true },
+      select: { PersonneID: true, Nom: true, Prenom: true, Surnom: true },
     });
     if (!existing) return reply.code(404).send({ error: "Personne introuvable." });
 
     const updated = await prisma.personne.update({
       where: { PersonneID: personId },
       data: { Nom, Prenom, Surnom },
+    });
+    await createLog({
+      request,
+      UtilisateurID: admin.userId,
+      ActionNom: "person_update",
+      Champ: "person_identity",
+      AncienneValeur: JSON.stringify({ Nom: existing.Nom, Prenom: existing.Prenom, Surnom: existing.Surnom }),
+      NouvelleValeur: JSON.stringify({ Nom, Prenom, Surnom }),
+      Meta: { personId },
     });
     return reply.send(updated);
   } catch (error) {
@@ -351,6 +548,15 @@ export const deletePersonnePhoto = async (request, reply) => {
       data: { CheminImage: null, ImageStatut: "DEFAULT" },
       select: { CheminImage: true, ImageStatut: true },
     });
+    await createLog({
+      request,
+      UtilisateurID: admin.userId,
+      ActionNom: "person_photo_delete",
+      Champ: "person_photo",
+      AncienneValeur: person.CheminImage,
+      NouvelleValeur: null,
+      Meta: { personId },
+    });
     return reply.send(updated);
   } catch (error) {
     console.error("deletePersonnePhoto:", error);
@@ -371,6 +577,15 @@ export const softDeletePersonne = async (request, reply) => {
       data: { EtatID: DELETED_ETAT_ID },
     });
     if (!result.count) return reply.code(404).send({ error: "Personne introuvable." });
+    await createLog({
+      request,
+      UtilisateurID: admin.userId,
+      ActionNom: "person_soft_delete",
+      Champ: "person_state",
+      AncienneValeur: String(ACTIVE_ETAT_ID),
+      NouvelleValeur: String(DELETED_ETAT_ID),
+      Meta: { personId },
+    });
     return reply.send({ ok: true });
   } catch (error) {
     console.error("softDeletePersonne:", error);
@@ -386,11 +601,30 @@ export const restorePersonne = async (request, reply) => {
   if (!personId) return reply.code(400).send({ error: "PersonneID invalide." });
 
   try {
+    const mergedReview = await prisma.personDuplicateReview.findFirst({
+      where: { MergedPersonneID: personId, Decision: "MERGED" },
+      select: { PersonDuplicateReviewID: true },
+    });
+    if (mergedReview) {
+      return reply.code(409).send({
+        error: "Cette personne a été fusionnée et ne peut pas être restaurée.",
+        code: "MERGED_PERSON_CANNOT_BE_RESTORED",
+      });
+    }
     const result = await prisma.personne.updateMany({
       where: { PersonneID: personId, EtatID: DELETED_ETAT_ID },
       data: { EtatID: ACTIVE_ETAT_ID },
     });
     if (!result.count) return reply.code(404).send({ error: "Personne introuvable dans la corbeille." });
+    await createLog({
+      request,
+      UtilisateurID: admin.userId,
+      ActionNom: "person_restore",
+      Champ: "person_state",
+      AncienneValeur: String(DELETED_ETAT_ID),
+      NouvelleValeur: String(ACTIVE_ETAT_ID),
+      Meta: { personId },
+    });
     return reply.send({ ok: true });
   } catch (error) {
     console.error("restorePersonne:", error);
@@ -418,6 +652,14 @@ export const permanentlyDeletePersonne = async (request, reply) => {
       prisma.personne.delete({ where: { PersonneID: personId } }),
     ]);
     removePersonDirectory(personId);
+    await createLog({
+      request,
+      UtilisateurID: admin.userId,
+      ActionNom: "person_delete",
+      Champ: "person",
+      AncienneValeur: String(personId),
+      Meta: { personId, permanent: true },
+    });
     return reply.send({ ok: true });
   } catch (error) {
     console.error("permanentlyDeletePersonne:", error);

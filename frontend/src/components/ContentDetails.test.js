@@ -18,7 +18,16 @@ jest.mock("../services/api", () => ({
 jest.mock("./FavoriteButton", () => () => null);
 jest.mock("./GenreList", () => () => null);
 jest.mock("./ImageUploader", () => () => null);
-jest.mock("./VideoList", () => () => null);
+jest.mock("./VideoList", () => ({ videos = [] }) => (
+  <div>
+    {videos.map((item) => (
+      <div key={item.id}>
+        <span>{item.Titre}</span>
+        {item.MissingImageLabel && <span>{item.MissingImageLabel}</span>}
+      </div>
+    ))}
+  </div>
+));
 
 const createContent = (overrides = {}) => ({
   Titre: "Titre de test",
@@ -83,5 +92,28 @@ describe("champs d'édition des détails de contenu", () => {
       "resize-y",
       "focus:ring-2"
     );
+  });
+
+  test("conserve les acteurs et réalisateurs sans photo dans les crédits du film", () => {
+    render(<VideoDetails video={createContent({
+      VideoID: 12,
+      Realisateurs: [{ PersonneID: 1, Prenom: "Steven", Nom: "Spielberg", CheminImage: null }],
+      Acteurs: [{ PersonneID: 2, Prenom: "Tom", Nom: "Hanks", CheminImage: null }],
+    })} />);
+
+    expect(screen.getByText("Steven Spielberg")).toBeInTheDocument();
+    expect(screen.getByText("Tom Hanks")).toBeInTheDocument();
+    expect(screen.getAllByText("Photo manquante pour cette personne")).toHaveLength(2);
+  });
+
+  test("conserve aussi les personnes sans photo dans les crédits de la série", () => {
+    render(<SerieDetails series={createContent({
+      SeriesID: 34,
+      Realisateurs: [],
+      Acteurs: [{ PersonneID: 3, Prenom: "Catherine", Nom: "Zeta-Jones", CheminImage: null }],
+    })} />);
+
+    expect(screen.getByText("Catherine Zeta-Jones")).toBeInTheDocument();
+    expect(screen.getByText("Photo manquante pour cette personne")).toBeInTheDocument();
   });
 });

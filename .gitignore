@@ -18,7 +18,17 @@ frontend/.env.*
 build/
 dist/
 frontend/build/
-outputs/
+outputs/*
+
+# Permanent inputs for the people credits seed
+!outputs/film_credits/
+outputs/film_credits/*
+!outputs/film_credits/film_acteurs_principaux.csv
+!outputs/film_credits/film_realisateurs.csv
+!outputs/series_credits/
+outputs/series_credits/*
+!outputs/series_credits/series_acteurs_principaux.csv
+!outputs/series_credits/series_realisateurs.csv
 
 # Local media and generated user data
 backend/uploads/

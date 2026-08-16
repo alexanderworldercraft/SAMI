@@ -2,6 +2,7 @@ import { prisma } from "../services/db.js";
 import { ensureAdmin, ensureSuperAdmin as ensureSharedSuperAdmin } from "../services/authz.js";
 import { ETAT } from "../constants.js";
 import { parsePositiveInt } from "../utils/requestParsing.js";
+import { createLog } from "./logController.js";
 
 const ACTIVE_ETAT_ID = ETAT.ACTIVE;
 const DELETED_ETAT_ID = ETAT.DELETED;
@@ -700,6 +701,22 @@ export const addUniverseContent = async (request, reply) => {
       },
       include: universeContentInclude,
     });
+    await createLog({
+      request,
+      UtilisateurID: admin.userId,
+      ActionNom: "universe_content_add",
+      VideoID: isVideo ? contentId : null,
+      SeriesID: isVideo ? null : contentId,
+      Champ: "universe_content",
+      NouvelleValeur: String(created.UniverseContentID),
+      Meta: {
+        universeId,
+        universeContentId: created.UniverseContentID,
+        contentType,
+        contentId,
+        order: created.Ordre,
+      },
+    });
 
     return reply.status(201).send(formatUniverseContent(created));
   } catch (error) {
@@ -748,6 +765,14 @@ export const updateUniverseSagaOrder = async (request, reply) => {
         })
       )
     );
+    await createLog({
+      request,
+      UtilisateurID: admin.userId,
+      ActionNom: "universe_items_reorder",
+      Champ: "universe_items_order",
+      NouvelleValeur: JSON.stringify(updates),
+      Meta: { universeId, itemType: "saga", items: updates },
+    });
 
     return reply.send({ ok: true });
   } catch (error) {
@@ -826,6 +851,14 @@ export const updateUniverseItemsOrder = async (request, reply) => {
             data: { Ordre: item.Ordre },
           })
     )));
+    await createLog({
+      request,
+      UtilisateurID: admin.userId,
+      ActionNom: "universe_items_reorder",
+      Champ: "universe_items_order",
+      NouvelleValeur: JSON.stringify(items),
+      Meta: { universeId, itemType: "mixed", items },
+    });
 
     return reply.send({ ok: true });
   } catch (error) {
@@ -867,10 +900,31 @@ export const removeUniverseContent = async (request, reply) => {
   }
 
   try {
+    const link = await prisma.universeContent.findFirst({
+      where: { UniverseID: universeId, UniverseContentID: universeContentId },
+      select: { VideoID: true, SeriesID: true },
+    });
+    if (!link) return reply.status(404).send({ error: "Liaison introuvable." });
+
     const result = await prisma.universeContent.deleteMany({
       where: { UniverseID: universeId, UniverseContentID: universeContentId },
     });
     if (result.count === 0) return reply.status(404).send({ error: "Liaison introuvable." });
+    await createLog({
+      request,
+      UtilisateurID: admin.userId,
+      ActionNom: "universe_content_remove",
+      VideoID: link.VideoID,
+      SeriesID: link.SeriesID,
+      Champ: "universe_content",
+      AncienneValeur: String(universeContentId),
+      Meta: {
+        universeId,
+        universeContentId,
+        contentType: link.VideoID ? "video" : "series",
+        contentId: link.VideoID || link.SeriesID,
+      },
+    });
     return reply.send({ ok: true });
   } catch (error) {
     console.error("Erreur lors du retrait du contenu de l'univers :", error);

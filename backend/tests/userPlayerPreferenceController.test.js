@@ -12,12 +12,14 @@ vi.mock("../services/db.js", () => ({
     userPlayerPreference: playerPreferenceRepository,
   },
 }));
+vi.mock("../controllers/logController.js", () => ({ createLog: vi.fn() }));
 
 const {
   DEFAULT_PLAYER_PREFERENCES,
   userPlayerPreferenceController,
   validatePlayerPreferences,
 } = await import("../controllers/userPlayerPreferenceController.js");
+const { createLog } = await import("../controllers/logController.js");
 
 const createReply = () => ({
   status: vi.fn().mockReturnThis(),
@@ -58,6 +60,13 @@ describe("userPlayerPreferenceController", () => {
       AmbientLightRefreshRate: 24,
       AmbientLightGridSize: 7,
     });
+    playerPreferenceRepository.findUnique.mockResolvedValue({
+      UtilisateurID: 14,
+      AmbientLightEnabled: true,
+      AmbientLightMode: "classic",
+      AmbientLightRefreshRate: 6,
+      AmbientLightGridSize: 3,
+    });
     const reply = createReply();
 
     await userPlayerPreferenceController.update(
@@ -82,6 +91,13 @@ describe("userPlayerPreferenceController", () => {
       },
     });
     expect(reply.send).toHaveBeenCalledWith({ preferences });
+    expect(createLog).toHaveBeenCalledWith(expect.objectContaining({
+      UtilisateurID: 14,
+      ActionNom: "player_preferences_update",
+      Champ: "player_preferences",
+      AncienneValeur: JSON.stringify(DEFAULT_PLAYER_PREFERENCES),
+      NouvelleValeur: JSON.stringify(preferences),
+    }));
   });
 
   it("refuse les fréquences et tailles de grille hors contrat", () => {

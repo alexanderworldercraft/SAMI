@@ -1,9 +1,12 @@
 // backend/routes/personneRoutes.js
 import {
   createPersonne,
+  bulkLinkPeople,
   deletePersonnePhoto,
   getAdminPeople,
   getDeletedPeople,
+  getPersonDuplicateCandidates,
+  mergePersonDuplicates,
   updatePersonnePhoto,
   updatePersonne,
   searchPeople,
@@ -14,6 +17,7 @@ import {
   getPeopleForSeries,
   permanentlyDeletePersonne,
   restorePersonne,
+  reviewPersonDuplicate,
   softDeletePersonne,
 } from "../controllers/personneController.js";
 import { authMiddleware } from "../middlewares/authMiddleware.js";
@@ -21,8 +25,12 @@ import { authMiddleware } from "../middlewares/authMiddleware.js";
 export default async function (fastify) {
   // CRUD minimal
   fastify.post("/", { preHandler: authMiddleware }, createPersonne);           // multipart
+  fastify.post("/bulk-link", { preHandler: authMiddleware }, bulkLinkPeople);
   fastify.get("/admin", { preHandler: authMiddleware }, getAdminPeople);
   fastify.get("/admin/deleted", { preHandler: authMiddleware }, getDeletedPeople);
+  fastify.get("/admin/duplicates", { preHandler: authMiddleware }, getPersonDuplicateCandidates);
+  fastify.put("/admin/duplicates/review", { preHandler: authMiddleware }, reviewPersonDuplicate);
+  fastify.post("/admin/duplicates/merge", { preHandler: authMiddleware }, mergePersonDuplicates);
   fastify.put("/:id", { preHandler: authMiddleware }, updatePersonne);
   fastify.put("/:id/photo", { preHandler: authMiddleware }, updatePersonnePhoto); // multipart
   fastify.put("/:id/restore", { preHandler: authMiddleware }, restorePersonne);

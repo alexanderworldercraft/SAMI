@@ -237,8 +237,19 @@ export const getVideoEncodingJob = async (request, reply) => {
 
 export const resumeVideoEncodingJob = async (request, reply) => {
   try {
-    if (!(await requireSuperAdmin(request, reply))) return;
+    const admin = await requireSuperAdmin(request, reply);
+    if (!admin) return;
     const job = await resumeDistributedVideoJob(request.params?.jobId);
+    const videoId = Number(job?.videoId ?? job?.VideoID);
+    await createLog({
+      request,
+      UtilisateurID: admin.userId,
+      ActionNom: "distributed_encoding_job_resumed",
+      VideoID: Number.isSafeInteger(videoId) && videoId > 0 ? videoId : null,
+      Champ: "distributed_encoding_job",
+      NouvelleValeur: job?.id || job?.VideoEncodingJobID || request.params?.jobId || null,
+      Meta: { status: job?.status || job?.Status || null },
+    });
     return reply.status(202).send({ job });
   } catch (error) {
     return sendError(reply, error, "Impossible de reprendre le job d'encodage.");
@@ -247,10 +258,21 @@ export const resumeVideoEncodingJob = async (request, reply) => {
 
 export const cancelVideoEncodingJob = async (request, reply) => {
   try {
-    if (!(await requireSuperAdmin(request, reply))) return;
+    const admin = await requireSuperAdmin(request, reply);
+    if (!admin) return;
     const job = await requestDistributedVideoJobCancellation(
       request.params?.jobId
     );
+    const videoId = Number(job?.videoId ?? job?.VideoID);
+    await createLog({
+      request,
+      UtilisateurID: admin.userId,
+      ActionNom: "distributed_encoding_job_cancel_requested",
+      VideoID: Number.isSafeInteger(videoId) && videoId > 0 ? videoId : null,
+      Champ: "distributed_encoding_job",
+      NouvelleValeur: job?.id || job?.VideoEncodingJobID || request.params?.jobId || null,
+      Meta: { status: job?.status || job?.Status || null },
+    });
     return reply.status(202).send({ job });
   } catch (error) {
     return sendError(reply, error, "Impossible d'annuler le job d'encodage.");

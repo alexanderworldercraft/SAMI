@@ -41,12 +41,14 @@ vi.mock("../services/distributedEncoding/jobService.js", () => ({
 }));
 
 import {
+  cancelVideoEncodingJob,
   createVideoEncodingWorker,
   createVideoEncodingJob,
   getVideoEncodingConfig,
   getVideoEncodingJob,
   getVideoEncodingJobs,
   removeVideoEncodingWorker,
+  resumeVideoEncodingJob,
   updateVideoEncodingWorker,
   updateVideoEncodingConfig,
 } from "../controllers/videoEncodingController.js";
@@ -300,5 +302,41 @@ describe("videoEncodingController", () => {
       error: "Job d'encodage introuvable.",
       code: "VIDEO_ENCODING_JOB_NOT_FOUND",
     });
+  });
+
+  it("journalise la reprise et la demande d'annulation d'un job", async () => {
+    mocks.resumeJob.mockResolvedValue({
+      id: "job-42",
+      videoId: 42,
+      status: "QUEUED",
+    });
+    mocks.cancelJob.mockResolvedValue({
+      VideoEncodingJobID: "job-42",
+      VideoID: 42,
+      Status: "RUNNING",
+      CancelRequested: true,
+    });
+
+    await resumeVideoEncodingJob(
+      { params: { jobId: "job-42" }, headers: {} },
+      createReply()
+    );
+    await cancelVideoEncodingJob(
+      { params: { jobId: "job-42" }, headers: {} },
+      createReply()
+    );
+
+    expect(mocks.createLog).toHaveBeenNthCalledWith(1, expect.objectContaining({
+      UtilisateurID: 7,
+      ActionNom: "distributed_encoding_job_resumed",
+      VideoID: 42,
+      NouvelleValeur: "job-42",
+    }));
+    expect(mocks.createLog).toHaveBeenNthCalledWith(2, expect.objectContaining({
+      UtilisateurID: 7,
+      ActionNom: "distributed_encoding_job_cancel_requested",
+      VideoID: 42,
+      NouvelleValeur: "job-42",
+    }));
   });
 });

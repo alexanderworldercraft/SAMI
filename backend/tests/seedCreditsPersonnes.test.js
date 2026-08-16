@@ -7,7 +7,7 @@ import {
   normalizePersonName,
   parseSemicolonCsv,
   splitPersonName,
-} from "../prisma/seedTempo.js";
+} from "../prisma/seedCreditsPersonnes.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const repositoryRoot = path.resolve(path.dirname(__filename), "../..");
@@ -65,7 +65,7 @@ function createFakePrisma() {
   };
 }
 
-describe("seedTempo", () => {
+describe("seedCreditsPersonnes", () => {
   it("lit les séparateurs, les guillemets et le BOM des CSV", () => {
     const rows = parseSemicolonCsv('\uFEFFA;B;C\r\n1;"Titre; étendu";"Nom ""public"""\r\n');
     expect(rows).toEqual([
@@ -81,14 +81,30 @@ describe("seedTempo", () => {
     expect(splitPersonName("Zendaya")).toEqual({ Prenom: "", Nom: "Zendaya", Surnom: null });
   });
 
-  it("valide et fusionne les six fichiers réels", async () => {
+  it("valide et fusionne les quatre fichiers réels sans colonne Titre", async () => {
     const plan = await buildImportPlan({ repositoryRoot });
-    expect(plan.sourceStats).toHaveLength(6);
+    expect(plan.sourceStats).toHaveLength(4);
     expect(plan.sourceStats.reduce((total, source) => total + source.rows, 0)).toBe(1682);
     expect(plan.videoIds).toHaveLength(623);
     expect(plan.seriesIds).toHaveLength(218);
     expect(plan.people.size).toBe(4497);
     expect(plan.links.size).toBe(7697);
+  });
+
+  it("n'exige pas de colonne Titre", async () => {
+    const plan = await buildImportPlan({
+      repositoryRoot,
+      sources: [{
+        relativePath: "outputs/film_credits/film_realisateurs.csv",
+        contentType: "video",
+        idColumn: "VideoID",
+        peopleColumn: "Réalisateurs",
+        role: "director",
+      }],
+    });
+
+    expect(plan.videoIds).toContain(1);
+    expect(plan.people.get(normalizePersonName("Shawn Levy"))).toBe("Shawn Levy");
   });
 
   it("crée les absents, complète les rôles et reste idempotent", async () => {

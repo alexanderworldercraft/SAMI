@@ -10,6 +10,7 @@ vi.mock("../services/db.js", () => ({
     universeContent: {
       aggregate: vi.fn(),
       create: vi.fn(),
+      deleteMany: vi.fn(),
       findFirst: vi.fn(),
       findMany: vi.fn(),
       update: vi.fn(),
@@ -18,6 +19,7 @@ vi.mock("../services/db.js", () => ({
     series: { findFirst: vi.fn(), findMany: vi.fn() },
   },
 }));
+vi.mock("../controllers/logController.js", () => ({ createLog: vi.fn() }));
 
 import {
   addUniverseContent,
@@ -25,10 +27,12 @@ import {
   getUniverseAdminCatalog,
   getUniverses,
   getUniversesForContent,
+  removeUniverseContent,
   sortUniverseItems,
   updateUniverseItemsOrder,
 } from "../controllers/universeController.js";
 import { prisma } from "../services/db.js";
+import { createLog } from "../controllers/logController.js";
 
 const createReply = () => {
   const reply = {
@@ -218,6 +222,12 @@ describe("universeController - contenus mixtes", () => {
       },
     }));
     expect(reply.status).toHaveBeenCalledWith(201);
+    expect(createLog).toHaveBeenCalledWith(expect.objectContaining({
+      UtilisateurID: 3,
+      ActionNom: "universe_content_add",
+      VideoID: 42,
+      Meta: expect.objectContaining({ universeId: 12, contentId: 42 }),
+    }));
   });
 
   it("refuse les épisodes individuels", async () => {
@@ -283,6 +293,36 @@ describe("universeController - contenus mixtes", () => {
       data: { Ordre: 2 },
     });
     expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+    expect(createLog).toHaveBeenCalledWith(expect.objectContaining({
+      UtilisateurID: 3,
+      ActionNom: "universe_items_reorder",
+      Meta: expect.objectContaining({ universeId: 12, itemType: "mixed" }),
+    }));
+    expect(reply.send).toHaveBeenCalledWith({ ok: true });
+  });
+
+  it("journalise le retrait direct d'un contenu d'un univers", async () => {
+    prisma.universeContent.findFirst.mockResolvedValue({ VideoID: 42, SeriesID: null });
+    prisma.universeContent.deleteMany.mockResolvedValue({ count: 1 });
+    const reply = createReply();
+
+    await removeUniverseContent({
+      user: { userId: 3 },
+      params: { id: "12", universeContentId: "9" },
+    }, reply);
+
+    expect(createLog).toHaveBeenCalledWith(expect.objectContaining({
+      UtilisateurID: 3,
+      ActionNom: "universe_content_remove",
+      VideoID: 42,
+      AncienneValeur: "9",
+      Meta: {
+        universeId: 12,
+        universeContentId: 9,
+        contentType: "video",
+        contentId: 42,
+      },
+    }));
     expect(reply.send).toHaveBeenCalledWith({ ok: true });
   });
 

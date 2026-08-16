@@ -1,4 +1,5 @@
 import { prisma } from "../services/db.js";
+import { createLog } from "./logController.js";
 
 export const AMBIENT_LIGHT_MODES = ["classic", "advanced"];
 export const AMBIENT_LIGHT_REFRESH_RATES = [3, 6, 12, 24, 48, 60];
@@ -84,13 +85,27 @@ export const userPlayerPreferenceController = {
         AmbientLightRefreshRate: preferences.ambientLightRefreshRate,
         AmbientLightGridSize: preferences.ambientLightGridSize,
       };
+      const previousPreferences = await prisma.userPlayerPreference.findUnique({
+        where: { UtilisateurID: userId },
+      });
       const storedPreferences = await prisma.userPlayerPreference.upsert({
         where: { UtilisateurID: userId },
         create: { UtilisateurID: userId, ...data },
         update: data,
       });
+      const serializedPreferences = serializePreferences(storedPreferences);
+      await createLog({
+        request,
+        UtilisateurID: userId,
+        ActionNom: "player_preferences_update",
+        Champ: "player_preferences",
+        AncienneValeur: previousPreferences
+          ? JSON.stringify(serializePreferences(previousPreferences))
+          : null,
+        NouvelleValeur: JSON.stringify(serializedPreferences),
+      });
 
-      return reply.send({ preferences: serializePreferences(storedPreferences) });
+      return reply.send({ preferences: serializedPreferences });
     } catch (error) {
       console.error("Erreur lors de l'enregistrement des préférences du lecteur :", error);
       return reply.status(500).send({ error: "Impossible d'enregistrer les préférences du lecteur." });

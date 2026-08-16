@@ -586,12 +586,20 @@ export async function runPersonImageSeed({ prisma, client, options, logger = con
   await fs.mkdir(PEOPLE_ROOT, { recursive: true });
   const cache = await loadCache();
   const knownWikidataIds = await loadKnownWikidataIds();
+  const hasPersonIdsFilter = Array.isArray(options.personIds);
+  const personIds = hasPersonIdsFilter
+    ? [...new Set(options.personIds.filter((id) => Number.isInteger(id) && id > 0))]
+    : [];
   const people = await prisma.personne.findMany({
     where: {
       EtatID: ACTIVE_ETAT_ID,
       ImageStatut: "DEFAULT",
       OR: [{ CheminImage: null }, { CheminImage: "" }],
-      ...(options.personId ? { PersonneID: options.personId } : {}),
+      ...(options.personId
+        ? { PersonneID: options.personId }
+        : hasPersonIdsFilter
+          ? { PersonneID: { in: personIds } }
+          : {}),
     },
     orderBy: { PersonneID: "asc" },
     select: {
@@ -687,28 +695,32 @@ export async function runPersonImageSeed({ prisma, client, options, logger = con
     }
   });
 
-  const reportPath = path.join(PEOPLE_ROOT, `wikimedia-image-report-${new Date().toISOString().replace(/[:.]/g, "-")}.json`);
-  await fs.writeFile(reportPath, `${JSON.stringify({ summary, results }, null, 2)}\n`, "utf8");
-  const missesReportPath = reportPath.replace("wikimedia-image-report-", "wikimedia-image-misses-").replace(/\.json$/, ".csv");
-  const misses = results.filter((result) => ["not-found", "no-image", "ambiguous", "error"].includes(result.status));
-  const peopleById = new Map(selectedPeople.map((person) => [person.PersonneID, person]));
-  await fs.writeFile(missesReportPath, toCsv([
-    ["PersonneID", "Nom", "Statut", "Rôles", "Œuvres liées", "WikidataID", "Candidats", "Erreur"],
-    ...misses.map((result) => {
-      const person = peopleById.get(result.PersonneID);
-      const roles = personRoles(person ?? {});
-      return [
-        result.PersonneID,
-        result.name,
-        result.status,
-        [roles.actor ? "acteur" : "", roles.director ? "réalisateur" : ""].filter(Boolean).join(" | "),
-        personTitles(person ?? {}).join(" | "),
-        result.candidate?.wikidataId ?? "",
-        (result.candidates ?? []).map((candidate) => `${candidate.wikidataId}:${candidate.label}`).join(" | "),
-        result.error ?? "",
-      ];
-    }),
-  ]), "utf8");
+  let reportPath = null;
+  let missesReportPath = null;
+  if (options.writeReports !== false) {
+    reportPath = path.join(PEOPLE_ROOT, `wikimedia-image-report-${new Date().toISOString().replace(/[:.]/g, "-")}.json`);
+    await fs.writeFile(reportPath, `${JSON.stringify({ summary, results }, null, 2)}\n`, "utf8");
+    missesReportPath = reportPath.replace("wikimedia-image-report-", "wikimedia-image-misses-").replace(/\.json$/, ".csv");
+    const misses = results.filter((result) => ["not-found", "no-image", "ambiguous", "error"].includes(result.status));
+    const peopleById = new Map(selectedPeople.map((person) => [person.PersonneID, person]));
+    await fs.writeFile(missesReportPath, toCsv([
+      ["PersonneID", "Nom", "Statut", "Rôles", "Œuvres liées", "WikidataID", "Candidats", "Erreur"],
+      ...misses.map((result) => {
+        const person = peopleById.get(result.PersonneID);
+        const roles = personRoles(person ?? {});
+        return [
+          result.PersonneID,
+          result.name,
+          result.status,
+          [roles.actor ? "acteur" : "", roles.director ? "réalisateur" : ""].filter(Boolean).join(" | "),
+          personTitles(person ?? {}).join(" | "),
+          result.candidate?.wikidataId ?? "",
+          (result.candidates ?? []).map((candidate) => `${candidate.wikidataId}:${candidate.label}`).join(" | "),
+          result.error ?? "",
+        ];
+      }),
+    ]), "utf8");
+  }
   return { summary, results, reportPath, missesReportPath, cachePath: CACHE_PATH, attributionPath: ATTRIBUTION_PATH };
 }
 
