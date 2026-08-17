@@ -153,6 +153,9 @@ const PersonDuplicateChecker = ({ onPeopleChanged }) => {
   const renderPair = (pair) => {
     const busy = pendingKey === pair.key;
     const selectedKeeper = Number(keepers[pair.key] || 0);
+    const commonVideoCount = Number(pair.commonVideoCount || 0);
+    const commonSeriesCount = Number(pair.commonSeriesCount || 0);
+    const commonContentCount = commonVideoCount + commonSeriesCount;
     return (
       <li key={pair.key} className="rounded-2xl border border-sky-500/10 bg-white/60 p-5 shadow-sm dark:bg-slate-950/40">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -161,6 +164,11 @@ const PersonDuplicateChecker = ({ onPeopleChanged }) => {
               {pair.status === "doubt" ? "Doute à revoir" : "Doublon possible"}
             </span>
             <span className="text-xs font-bold text-slate-500 dark:text-slate-400">Similarité {pair.score}%</span>
+            {commonContentCount > 0 && (
+              <span className="rounded-full bg-violet-500/15 px-2.5 py-1 text-xs font-bold text-violet-700 dark:text-violet-200">
+                En commun : {commonVideoCount} film/vidéo · {commonSeriesCount} série
+              </span>
+            )}
           </div>
           <span className="text-xs text-slate-500 dark:text-slate-400">Prénom {pair.firstNameScore}% · Nom {pair.lastNameScore}%</span>
         </div>

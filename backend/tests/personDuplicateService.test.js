@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ETAT } from "../constants.js";
 import {
   findPotentialDuplicatePairs,
+  getPotentialDuplicatePairs,
   identitySimilarity,
   mergeDuplicatePeople,
   reviewDuplicatePair,
@@ -15,6 +16,8 @@ const person = (PersonneID, Prenom, Nom, overrides = {}) => ({
   CheminImage: null,
   ImageStatut: "DEFAULT",
   EtatID: ETAT.ACTIVE,
+  Videos: [],
+  Series: [],
   _count: { Videos: 0, Series: 0 },
   ...overrides,
 });
@@ -53,6 +56,53 @@ describe("personDuplicateService - détection", () => {
     ]);
   });
 
+  it("priorise les contenus en commun sans exclure les variantes liées à des contenus différents", () => {
+    const pairs = findPotentialDuplicatePairs([
+      person(10, "Zoe", "Saldaña", {
+        Videos: [{ VideoID: 50 }],
+        _count: { Videos: 1, Series: 0 },
+      }),
+      person(11, "Zoe", "Sandalia", {
+        Videos: [{ VideoID: 50 }],
+        _count: { Videos: 1, Series: 0 },
+      }),
+      person(20, "Aoi", "Yūki", {
+        Videos: [{ VideoID: 70 }],
+        _count: { Videos: 1, Series: 0 },
+      }),
+      person(21, "Aoi", "Yuuki", {
+        Series: [{ SeriesID: 80 }],
+        _count: { Videos: 0, Series: 1 },
+      }),
+    ]);
+
+    expect(pairs.map((pair) => pair.key)).toEqual(["10:11", "20:21"]);
+    expect(pairs[0]).toEqual(expect.objectContaining({
+      score: 81,
+      firstNameScore: 100,
+      lastNameScore: 63,
+      commonContentCount: 1,
+      commonVideoCount: 1,
+      commonSeriesCount: 0,
+    }));
+    expect(pairs[1]).toEqual(expect.objectContaining({
+      commonContentCount: 0,
+      commonVideoCount: 0,
+      commonSeriesCount: 0,
+    }));
+  });
+
+  it("utilise un contenu en commun comme signal complémentaire sans comparer les rôles", () => {
+    const pairs = findPotentialDuplicatePairs([
+      person(30, "Nina", "Martin", { Videos: [{ VideoID: 90 }] }),
+      person(31, "Nina", "Martel", { Videos: [{ VideoID: 90 }] }),
+      person(32, "Nina", "Martel", { Videos: [{ VideoID: 91 }] }),
+    ]);
+
+    expect(pairs.map((pair) => pair.key)).toContain("30:31");
+    expect(pairs.map((pair) => pair.key)).not.toContain("30:32");
+  });
+
   it("masque les paires déclarées différentes et conserve les doutes", () => {
     const people = [person(8, "Yuki", "Belge"), person(3, "Yuuki", "Belge")];
 
@@ -69,6 +119,22 @@ describe("personDuplicateService - détection", () => {
     }])).toEqual([
       expect.objectContaining({ key: "3:8", status: "doubt" }),
     ]);
+  });
+
+  it("charge seulement les identifiants des films et séries, sans rôle", async () => {
+    const prisma = {
+      personne: { findMany: vi.fn().mockResolvedValue([]) },
+      personDuplicateReview: { findMany: vi.fn().mockResolvedValue([]) },
+    };
+
+    await getPotentialDuplicatePairs(prisma);
+
+    expect(prisma.personne.findMany).toHaveBeenCalledWith(expect.objectContaining({
+      select: expect.objectContaining({
+        Videos: { select: { VideoID: true } },
+        Series: { select: { SeriesID: true } },
+      }),
+    }));
   });
 });
 

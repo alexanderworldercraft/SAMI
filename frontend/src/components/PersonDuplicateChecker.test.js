@@ -18,6 +18,9 @@ const duplicateResult = {
     score: 90,
     firstNameScore: 80,
     lastNameScore: 100,
+    commonContentCount: 2,
+    commonVideoCount: 1,
+    commonSeriesCount: 1,
     personA: {
       PersonneID: 1,
       Prenom: "Yuki",
@@ -67,6 +70,7 @@ describe("PersonDuplicateChecker", () => {
     expect(await screen.findByText("Yuki Belge")).toBeInTheDocument();
     expect(screen.getByText("Yuūki Belge")).toBeInTheDocument();
     expect(screen.getByText("Similarité 90%")).toBeInTheDocument();
+    expect(screen.getByText("En commun : 1 film/vidéo · 1 série")).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("radio", { name: "Conserver Yuki Belge (#1)" }));
     fireEvent.click(screen.getByRole("button", { name: "Fusionner" }));

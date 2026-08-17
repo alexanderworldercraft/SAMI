@@ -36,9 +36,64 @@ function levenshteinDistance(left, right) {
   return previous[right.length];
 }
 
+function compactPersonName(value) {
+  return normalizePersonName(value).replaceAll(" ", "");
+}
+
+function jaroWinklerSimilarity(leftValue, rightValue) {
+  const left = compactPersonName(leftValue);
+  const right = compactPersonName(rightValue);
+  if (!left && !right) return 1;
+  if (!left || !right) return 0;
+  if (left === right) return 1;
+
+  const matchDistance = Math.max(0, Math.floor(Math.max(left.length, right.length) / 2) - 1);
+  const leftMatches = Array(left.length).fill(false);
+  const rightMatches = Array(right.length).fill(false);
+  let matches = 0;
+
+  for (let leftIndex = 0; leftIndex < left.length; leftIndex += 1) {
+    const start = Math.max(0, leftIndex - matchDistance);
+    const end = Math.min(right.length, leftIndex + matchDistance + 1);
+    for (let rightIndex = start; rightIndex < end; rightIndex += 1) {
+      if (rightMatches[rightIndex] || left[leftIndex] !== right[rightIndex]) continue;
+      leftMatches[leftIndex] = true;
+      rightMatches[rightIndex] = true;
+      matches += 1;
+      break;
+    }
+  }
+  if (matches === 0) return 0;
+
+  const leftMatched = leftMatches
+    .map((matched, index) => (matched ? left[index] : ""))
+    .join("");
+  const rightMatched = rightMatches
+    .map((matched, index) => (matched ? right[index] : ""))
+    .join("");
+  let mismatches = 0;
+  for (let index = 0; index < leftMatched.length; index += 1) {
+    if (leftMatched[index] !== rightMatched[index]) mismatches += 1;
+  }
+  const transpositions = mismatches / 2;
+  const jaro = (
+    (matches / left.length)
+    + (matches / right.length)
+    + ((matches - transpositions) / matches)
+  ) / 3;
+  let commonPrefixLength = 0;
+  while (
+    commonPrefixLength < Math.min(4, left.length, right.length)
+    && left[commonPrefixLength] === right[commonPrefixLength]
+  ) {
+    commonPrefixLength += 1;
+  }
+  return jaro + (commonPrefixLength * 0.1 * (1 - jaro));
+}
+
 export function identitySimilarity(leftValue, rightValue) {
-  const left = normalizePersonName(leftValue).replaceAll(" ", "");
-  const right = normalizePersonName(rightValue).replaceAll(" ", "");
+  const left = compactPersonName(leftValue);
+  const right = compactPersonName(rightValue);
   if (!left && !right) return 1;
   if (!left || !right) return 0;
   if (left === right) return 1;
@@ -63,20 +118,77 @@ function normalizedIdentity(person) {
   };
 }
 
+function relationIds(person, relationName, idColumn) {
+  return new Set(
+    (person?.[relationName] ?? [])
+      .map((relation) => Number(relation?.[idColumn]))
+      .filter((id) => Number.isInteger(id) && id > 0),
+  );
+}
+
+function countSharedIds(leftIds, rightIds) {
+  let count = 0;
+  for (const id of leftIds) {
+    if (rightIds.has(id)) count += 1;
+  }
+  return count;
+}
+
+function sharedContentSummary(left, right) {
+  const commonVideoCount = countSharedIds(
+    relationIds(left, "Videos", "VideoID"),
+    relationIds(right, "Videos", "VideoID"),
+  );
+  const commonSeriesCount = countSharedIds(
+    relationIds(left, "Series", "SeriesID"),
+    relationIds(right, "Series", "SeriesID"),
+  );
+  return {
+    commonVideoCount,
+    commonSeriesCount,
+    commonContentCount: commonVideoCount + commonSeriesCount,
+  };
+}
+
 function scorePair(left, right) {
   const leftIdentity = normalizedIdentity(left);
   const rightIdentity = normalizedIdentity(right);
   const firstNameScore = identitySimilarity(leftIdentity.firstName, rightIdentity.firstName);
   const lastNameScore = identitySimilarity(leftIdentity.lastName, rightIdentity.lastName);
+  const firstNameTypoScore = Math.max(
+    firstNameScore,
+    jaroWinklerSimilarity(leftIdentity.firstName, rightIdentity.firstName),
+  );
+  const lastNameTypoScore = Math.max(
+    lastNameScore,
+    jaroWinklerSimilarity(leftIdentity.lastName, rightIdentity.lastName),
+  );
   const score = (firstNameScore * 0.5) + (lastNameScore * 0.5);
-  const isCandidate = (
-    lastNameScore === 1 && firstNameScore >= 0.6
+  const sharedContents = sharedContentSummary(left, right);
+  const isNameCandidate = (
+    lastNameScore === 1 && firstNameScore >= 0.7
   ) || (
-    firstNameScore === 1 && lastNameScore >= 0.6
+    firstNameScore === 1 && lastNameScore >= 0.7
   ) || (
     lastNameScore >= 0.8 && firstNameScore >= 0.8 && score >= DUPLICATE_THRESHOLD
   );
-  return { firstNameScore, lastNameScore, score, isCandidate };
+  const isStrongTypoCandidate = (
+    lastNameScore === 1 && firstNameTypoScore >= 0.9
+  ) || (
+    firstNameScore === 1 && lastNameTypoScore >= 0.9
+  );
+  const isSharedContentCandidate = sharedContents.commonContentCount > 0 && (
+    (lastNameScore === 1 && firstNameScore >= 0.5)
+    || (firstNameScore === 1 && lastNameScore >= 0.5)
+    || (firstNameTypoScore >= 0.78 && lastNameTypoScore >= 0.78 && score >= 0.65)
+  );
+  return {
+    firstNameScore,
+    lastNameScore,
+    score,
+    ...sharedContents,
+    isCandidate: isNameCandidate || isStrongTypoCandidate || isSharedContentCandidate,
+  };
 }
 
 function serializePerson(person) {
@@ -102,21 +214,35 @@ export function findPotentialDuplicatePairs(people, reviews = []) {
   const pairs = new Map();
   const buckets = new Map();
 
-  for (const person of activePeople) {
-    const lastName = normalizePersonName(person.Nom).replaceAll(" ", "");
-    if (!lastName) continue;
-    const bucketKey = lastName[0];
-    const bucket = buckets.get(bucketKey) ?? [];
+  const addToBucket = (key, person) => {
+    if (!key) return;
+    const bucket = buckets.get(key) ?? [];
     bucket.push(person);
-    buckets.set(bucketKey, bucket);
+    buckets.set(key, bucket);
+  };
+
+  for (const person of activePeople) {
+    const firstName = compactPersonName(person.Prenom);
+    const lastName = compactPersonName(person.Nom);
+    if (lastName) addToBucket(`last-initial:${lastName[0]}`, person);
+    if (firstName) addToBucket(`first-exact:${firstName}`, person);
+    for (const videoId of relationIds(person, "Videos", "VideoID")) {
+      addToBucket(`video:${videoId}`, person);
+    }
+    for (const seriesId of relationIds(person, "Series", "SeriesID")) {
+      addToBucket(`series:${seriesId}`, person);
+    }
   }
 
+  const comparedPairs = new Set();
   for (const bucket of buckets.values()) {
     for (let leftIndex = 0; leftIndex < bucket.length; leftIndex += 1) {
       for (let rightIndex = leftIndex + 1; rightIndex < bucket.length; rightIndex += 1) {
         const left = bucket[leftIndex];
         const right = bucket[rightIndex];
         const pair = canonicalPair(left.PersonneID, right.PersonneID);
+        if (comparedPairs.has(pair.key)) continue;
+        comparedPairs.add(pair.key);
         const review = reviewByKey.get(pair.key);
         if (["DISTINCT", "MERGED"].includes(review?.Decision)) continue;
 
@@ -128,6 +254,9 @@ export function findPotentialDuplicatePairs(people, reviews = []) {
           score: Math.round(scores.score * 100),
           firstNameScore: Math.round(scores.firstNameScore * 100),
           lastNameScore: Math.round(scores.lastNameScore * 100),
+          commonContentCount: scores.commonContentCount,
+          commonVideoCount: scores.commonVideoCount,
+          commonSeriesCount: scores.commonSeriesCount,
           personA: serializePerson(left),
           personB: serializePerson(right),
         });
@@ -148,6 +277,9 @@ export function findPotentialDuplicatePairs(people, reviews = []) {
       score: Math.round(scores.score * 100),
       firstNameScore: Math.round(scores.firstNameScore * 100),
       lastNameScore: Math.round(scores.lastNameScore * 100),
+      commonContentCount: scores.commonContentCount,
+      commonVideoCount: scores.commonVideoCount,
+      commonSeriesCount: scores.commonSeriesCount,
       personA: serializePerson(left),
       personB: serializePerson(right),
     });
@@ -155,7 +287,9 @@ export function findPotentialDuplicatePairs(people, reviews = []) {
 
   return [...pairs.values()].sort((left, right) => {
     if (left.status !== right.status) return left.status === "doubt" ? -1 : 1;
-    return right.score - left.score || left.key.localeCompare(right.key);
+    return right.commonContentCount - left.commonContentCount
+      || right.score - left.score
+      || left.key.localeCompare(right.key);
   });
 }
 
@@ -172,6 +306,8 @@ export async function getPotentialDuplicatePairs(prisma) {
         CheminImage: true,
         ImageStatut: true,
         EtatID: true,
+        Videos: { select: { VideoID: true } },
+        Series: { select: { SeriesID: true } },
         _count: { select: { Videos: true, Series: true } },
       },
     }),
