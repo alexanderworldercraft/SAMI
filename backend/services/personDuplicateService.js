@@ -70,11 +70,11 @@ function scorePair(left, right) {
   const lastNameScore = identitySimilarity(leftIdentity.lastName, rightIdentity.lastName);
   const score = (firstNameScore * 0.5) + (lastNameScore * 0.5);
   const isCandidate = (
-    lastNameScore === 1 && firstNameScore >= 0.72
+    lastNameScore === 1 && firstNameScore >= 0.6
   ) || (
-    firstNameScore === 1 && lastNameScore >= 0.8
+    firstNameScore === 1 && lastNameScore >= 0.6
   ) || (
-    lastNameScore >= 0.82 && firstNameScore >= 0.82 && score >= DUPLICATE_THRESHOLD
+    lastNameScore >= 0.8 && firstNameScore >= 0.8 && score >= DUPLICATE_THRESHOLD
   );
   return { firstNameScore, lastNameScore, score, isCandidate };
 }
