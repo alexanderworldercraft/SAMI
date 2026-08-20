@@ -166,7 +166,7 @@ Les principales variables du backend sont :
 | `SAMI_DISTRIBUTED_ENCODING_STAGING_ROOT` | Staging privé optionnel des artefacts et tentatives |
 | `FFMPEG_PATH`, `FFPROBE_PATH` | Chemins optionnels des exécutables, utiles notamment sous Windows |
 | `BACKUP_DAY_OF_WEEK`, `BACKUP_TIME` | Planification de la sauvegarde MySQL |
-| `SMTP_*` | Envoi d’e-mails |
+| `SMTP_*` | Envoi d’e-mails ; le port 465 active SSL/TLS, les autres ports utilisent STARTTLS |
 | `USERNAMESUPERADMIN`, `PASSWORDSUPERADMIN`, `EMAILSUPERADMIN` | Compte super administrateur créé par le seed |
 
 Le frontend utilise principalement `REACT_APP_URL_LOCAL`, `REACT_APP_NAME` et `REACT_APP_VER`.

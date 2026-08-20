@@ -7,7 +7,6 @@ import dotenv from 'dotenv';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import nodemailer from 'nodemailer';
 import { subDays } from 'date-fns';
 import { createLog, getClientIp } from "./logController.js";
 import { prisma } from "../services/db.js";
@@ -27,6 +26,7 @@ import {
   getFavoriteStatus,
   toggleFavoriteContent,
 } from "../services/favoriteContentService.js";
+import { sendPasswordResetEmail } from "../services/mailService.js";
 
 // Durée de vie des tokens par GradeID
 // 1 = SuperAdmin, 2 = Admin, 3 = Utilisateur
@@ -511,43 +511,6 @@ function generateTemporaryPassword(length = 12) {
     .split("")
     .sort(() => Math.random() - 0.5)
     .join("");
-}
-
-// Envoi de l'email avec le mot de passe temporaire
-async function sendPasswordResetEmail(to, surnom, tempPassword) {
-  // ⚠️ Nécessite la config SMTP dans le .env :
-  // SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM
-  const transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
-    port: parseInt(process.env.SMTP_PORT || "587", 10),
-    secure: false, // passe à true si tu utilises le port 465
-    auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASS,
-    },
-  });
-
-  const from = process.env.SMTP_FROM || `"SAMI" <no-reply@sami.local>`;
-  const subject = "Réinitialisation de votre mot de passe SAMI";
-  const text =
-    `Bonjour ${surnom},
-
-Un nouveau mot de passe temporaire a été généré pour votre compte SAMI.
-
-Nouveau mot de passe temporaire : ${tempPassword}
-
-Connectez-vous avec ce mot de passe puis changez-le dans vos paramètres dès que possible.
-
-Si vous n'êtes pas à l'origine de cette demande, il est conseillé de prévenir l'administrateur.
-
-— SAMI`;
-
-  await transporter.sendMail({
-    from,
-    to,
-    subject,
-    text,
-  });
 }
 
 export const userController = {

@@ -8198,6 +8198,10 @@
   }
 
   @media (min-width: 80rem) {
+    .xl\:static {
+      position: static;
+    }
+
     .xl\:col-span-1 {
       grid-column: span 1 / span 1;
     }
@@ -8236,6 +8240,10 @@
 
     .xl\:row-start-2 {
       grid-row-start: 2;
+    }
+
+    .xl\:aspect-2\/3 {
+      aspect-ratio: 2 / 3;
     }
 
     .xl\:grid-cols-3 {

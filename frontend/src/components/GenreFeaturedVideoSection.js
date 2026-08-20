@@ -51,15 +51,15 @@ const GenreFeaturedVideoSection = ({
   const renderSmallCard = (item, className = "") => {
     if (!item) {
       return (
-        <div className={`min-h-[116px] rounded-xl border border-white/10 bg-white/5 ${className}`} />
+        <div className={`h-full min-h-[116px] rounded-xl border border-white/10 bg-white/5 ${className}`} />
       );
     }
 
     return (
-      <ContentPreviewTooltip item={item} title={item.Titre} className={className}>
+      <ContentPreviewTooltip item={item} title={item.Titre} className={`h-full ${className}`}>
         <Link
           to={getTargetUrl(item)}
-          className="group relative block min-h-[116px] overflow-hidden rounded-xl border border-white/15 bg-slate-950 transition duration-300 hover:-translate-y-1 hover:border-sky-300/70"
+          className="group relative block h-full min-h-[116px] overflow-hidden rounded-xl border border-white/15 bg-slate-950 transition duration-300 hover:-translate-y-1 hover:border-sky-300/70"
         >
           <img
             src={getImageUrl(item.CheminImage)}
@@ -81,15 +81,19 @@ const GenreFeaturedVideoSection = ({
   const renderFeaturedCard = () => {
     if (!featured) {
       return (
-        <div className="min-h-[260px] rounded-xl border border-white/10 bg-white/5 xl:col-start-2 xl:row-span-2" />
+        <div className="col-span-2 min-h-[260px] rounded-xl border border-white/10 bg-white/5 xl:col-span-1 xl:col-start-2 xl:row-span-2 xl:row-start-1" />
       );
     }
 
     return (
-      <ContentPreviewTooltip item={featured} title={featured.Titre} className="xl:col-start-2 xl:row-span-2">
+      <ContentPreviewTooltip
+        item={featured}
+        title={featured.Titre}
+        className="col-span-2 h-full xl:col-span-1 xl:col-start-2 xl:row-span-2 xl:row-start-1"
+      >
         <Link
           to={getTargetUrl(featured)}
-          className="group relative block min-h-[260px] overflow-hidden rounded-xl border border-sky-200/40 bg-slate-950 shadow-2xl shadow-sky-950/40 transition duration-300 hover:-translate-y-1 hover:border-sky-300/80"
+          className="group relative block h-full min-h-[260px] overflow-hidden rounded-xl border border-sky-200/40 bg-slate-950 shadow-2xl shadow-sky-950/40 transition duration-300 hover:-translate-y-1 hover:border-sky-300/80"
         >
           <img
             src={getImageUrl(featured.CheminImage)}
@@ -136,26 +140,26 @@ const GenreFeaturedVideoSection = ({
           </button>
         </aside>
 
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-[minmax(150px,1fr)_minmax(280px,1.75fr)_minmax(150px,1fr)_minmax(145px,0.95fr)] xl:grid-rows-2">
+        <div className="grid grid-cols-2 gap-4 xl:grid-cols-[minmax(150px,1fr)_minmax(280px,1.75fr)_minmax(150px,1fr)_minmax(145px,0.95fr)] xl:grid-rows-2">
+          {renderFeaturedCard()}
           {renderSmallCard(standardVideos[0], "xl:col-start-1 xl:row-start-1")}
           {renderSmallCard(standardVideos[1], "xl:col-start-1 xl:row-start-2")}
-          {renderFeaturedCard()}
           {renderSmallCard(standardVideos[2], "xl:col-start-3 xl:row-start-1")}
           {renderSmallCard(standardVideos[3], "xl:col-start-3 xl:row-start-2")}
           {standardVideos[4] ? (
             <ContentPreviewTooltip
               item={standardVideos[4]}
               title={standardVideos[4].Titre}
-              className="sm:col-span-2 xl:col-start-4 xl:row-span-2 xl:col-span-1"
+              className="h-full xl:col-start-4 xl:row-span-2 xl:row-start-1"
             >
               <Link
                 to={getTargetUrl(standardVideos[4])}
-                className="group relative block h-full overflow-hidden rounded-xl border border-white/15 bg-slate-950 transition duration-300 hover:-translate-y-1 hover:border-sky-300/70"
+                className="group relative block h-full min-h-[116px] overflow-hidden rounded-xl border border-white/15 bg-slate-950 transition duration-300 hover:-translate-y-1 hover:border-sky-300/70"
               >
                 <img
                   src={getImageUrl(standardVideos[4].CheminImage)}
                   alt={standardVideos[4].Titre}
-                  className="aspect-2/3 h-full w-full object-cover transition duration-500 group-hover:scale-105"
+                  className="absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-105 xl:static xl:aspect-2/3"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/35 to-transparent" />
                 <div className="absolute inset-x-0 bottom-0 p-3">
@@ -167,7 +171,7 @@ const GenreFeaturedVideoSection = ({
               </Link>
             </ContentPreviewTooltip>
           ) : (
-            <div className="rounded-xl border border-white/10 bg-white/5 sm:col-span-2 xl:col-start-4 xl:row-span-2 xl:col-span-1" />
+            <div className="min-h-[116px] rounded-xl border border-white/10 bg-white/5 xl:col-start-4 xl:row-span-2 xl:row-start-1" />
           )}
         </div>
       </div>
