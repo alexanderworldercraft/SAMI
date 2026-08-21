@@ -17,6 +17,7 @@ import {
   editButtonClass,
   saveButtonClass,
 } from "./contentDetailStyles";
+import { scrollToPageTop } from "../utils/scrollToPageTop";
 
 const apiUrl = process.env.REACT_APP_URL_LOCAL;
 
@@ -600,7 +601,7 @@ const VideoDetails = ({
           {realisateurCards.length > 0 && (
             <div className="mt-6">
               <h3 className="mb-3 text-lg font-black text-slate-950 dark:text-white">Réalisation</h3>
-              <VideoList videos={realisateurCards} />
+              <VideoList videos={realisateurCards} onPersonClick={scrollToPageTop} />
             </div>
           )}
 
@@ -608,7 +609,7 @@ const VideoDetails = ({
             <div className="mt-6">
               <h3 className="mb-3 text-lg font-black text-slate-950 dark:text-white">Distribution</h3>
               {/* même grille que VideoListPage: les cartes s’alignent par lignes */}
-              <VideoList videos={acteurCards} />
+              <VideoList videos={acteurCards} onPersonClick={scrollToPageTop} />
             </div>
           )}
             </div>

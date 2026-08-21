@@ -31,6 +31,7 @@ import { MusicPlayerProvider, useMusicPlayer } from "./context/MusicPlayerContex
 import PrivacyPolicyPage from "./components/PrivacyPolicyPage";
 import TermsOfUsePage from "./components/TermsOfUsePage";
 import DataCompliancePage from "./components/DataCompliancePage";
+import StatsPage from "./components/StatsPage";
 
 const NameApp = process.env.REACT_APP_NAME + " " + process.env.REACT_APP_VER;
 
@@ -104,6 +105,10 @@ const routesMeta = {
   "/updates": {
     title: `Mises à jour - ${NameApp}`,
     description: `Historique des mises à jour de ${NameApp}.`,
+  },
+  "/stats": {
+    title: `Statistiques - ${NameApp}`,
+    description: `Statistiques, calendrier des ajouts et cookies utilisés par ${NameApp}.`,
   },
   "/politique-confidentialite": {
     title: `Politique de confidentialité - ${NameApp}`,
@@ -267,6 +272,16 @@ export default function App() {
             <NotProtectedRoute>
               <AppShell>
                 <UpdatesPage />
+              </AppShell>
+            </NotProtectedRoute>
+          }
+        />
+        <Route
+          path="/stats"
+          element={
+            <NotProtectedRoute>
+              <AppShell>
+                <StatsPage />
               </AppShell>
             </NotProtectedRoute>
           }

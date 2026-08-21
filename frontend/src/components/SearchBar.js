@@ -23,7 +23,9 @@ const SearchBar = () => {
         return;
       }
       try {
-        const res = await fetch(`${apiUrl}/api/videos?search=${encodeURIComponent(searchQuery)}&take=6`);
+        const res = await fetch(
+          `${apiUrl}/api/videos/search?search=${encodeURIComponent(searchQuery)}&limit=6`
+        );
         const data = await res.json();
         setSuggestions(data.items || []);
       } catch (err) {

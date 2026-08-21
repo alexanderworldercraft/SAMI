@@ -38,6 +38,10 @@ import {
   attachFavoriteStatus,
   getFavoriteKeysForItems,
 } from "../services/favoriteContentService.js";
+import {
+  getVideoContentSearchMatch,
+  getVideoTitleSearchMatch,
+} from "../services/video/videoSearchService.js";
 
 export {
   getAdditionsByDate,
@@ -704,7 +708,7 @@ export const getVideosAndSeries = async (request, reply) => {
   // ⬇️ NOUVEAU: on supporte sort= 'az' | 'za' | 'recent' | 'ancien' | 'most' | 'least' | 'trending'
   // - rétro-compatibilité: si 'sort' est absent, on garde 'order' (asc/desc) pour A-Z / Z-A
   const {
-    page = 1,
+    page: rawPage = 1,
     order = "asc",
     genres = "",
     search = "",
@@ -716,8 +720,10 @@ export const getVideosAndSeries = async (request, reply) => {
     favorites: rawFavorites,
   } = request.query;
 
-  const take = 40; // Nombre d'éléments par page
+  const page = Math.max(Number.parseInt(rawPage, 10) || 1, 1);
+  const take = 40;
   const skip = (page - 1) * take;
+  const searchText = String(search || "").trim();
 
   // Normalise le paramètre sort
   const sort = (rawSort || "").toLowerCase();
@@ -749,15 +755,6 @@ export const getVideosAndSeries = async (request, reply) => {
   const excludedGenreIds = [
     ...new Set(rawGenreIds.filter((id) => id < 0).map((id) => Math.abs(id))),
   ].filter((id) => !genreIds.includes(id));
-
-  const searchCondition = search
-    ? {
-      OR: [
-        { Titre: { contains: search.toLowerCase() } },
-        { Resumer: { contains: search.toLowerCase() } },
-      ],
-    }
-    : {};
 
   const videoGenreFilters = [
     ...genreIds.map((id) => ({
@@ -792,7 +789,7 @@ export const getVideosAndSeries = async (request, reply) => {
     // ---- VIDEOS (films) ----
     const videos = await prisma.video.findMany({
       where: {
-        AND: [{ SaisonID: null }, { EtatID: ACTIVE_ETAT_ID }, genreCondition, searchCondition],
+        AND: [{ SaisonID: null }, { EtatID: ACTIVE_ETAT_ID }, genreCondition],
       },
       orderBy: orderByVideos,
       include: {
@@ -809,7 +806,6 @@ export const getVideosAndSeries = async (request, reply) => {
           seriesGenreFilters.length > 0
             ? { AND: seriesGenreFilters }
             : {},
-          searchCondition,
         ],
       },
       orderBy: orderBySeries,
@@ -1037,6 +1033,15 @@ export const getVideosAndSeries = async (request, reply) => {
         );
     }
 
+    if (searchText) {
+      allItems = allItems.flatMap((item) => {
+        const match = getVideoContentSearchMatch(item, searchText);
+        return match
+          ? [{ ...item, SearchRank: match.rank, SearchScore: match.score }]
+          : [];
+      });
+    }
+
     // ---- OPTIONS SUPPLEMENTAIRES (filtres globaux avant pagination) ----
     if (shouldHidePremium) {
       allItems = allItems.filter((item) => !item.Premium);
@@ -1070,44 +1075,77 @@ export const getVideosAndSeries = async (request, reply) => {
 
     // ---- TRI ----
     // sort a priorité si fourni, sinon on retombe sur order asc/desc (titre)
+    const compareSearchRelevance = (a, b) =>
+      searchText
+        ? b.SearchRank - a.SearchRank || b.SearchScore - a.SearchScore
+        : 0;
     let sorted;
     if (sort === "az") {
-      sorted = allItems.sort((a, b) => a.Titre.localeCompare(b.Titre));
+      sorted = allItems.sort(
+        (a, b) => compareSearchRelevance(a, b) || a.Titre.localeCompare(b.Titre)
+      );
     } else if (sort === "za") {
-      sorted = allItems.sort((a, b) => b.Titre.localeCompare(a.Titre));
+      sorted = allItems.sort(
+        (a, b) => compareSearchRelevance(a, b) || b.Titre.localeCompare(a.Titre)
+      );
     } else if (sort === "recent") {
       // Récent → Ancien. Pour les séries, un épisode ajouté récemment remonte la série.
       sorted = allItems.sort(
         (a, b) =>
+          compareSearchRelevance(a, b) ||
           safeEpoch(b.RecentSortDate || b.CreateDate) -
             safeEpoch(a.RecentSortDate || a.CreateDate) ||
           a.Titre.localeCompare(b.Titre)
       );
     } else if (sort === "ancien") {
       // Ancien → Récent (dates nulles = très anciennes => en haut)
-      sorted = allItems.sort((a, b) => safeEpoch(a.CreateDate) - safeEpoch(b.CreateDate));
+      sorted = allItems.sort(
+        (a, b) =>
+          compareSearchRelevance(a, b) ||
+          safeEpoch(a.CreateDate) - safeEpoch(b.CreateDate) ||
+          a.Titre.localeCompare(b.Titre)
+      );
     } else if (sort === "most") {
       sorted = allItems.sort(
-        (a, b) => getWatchScore(b) - getWatchScore(a) || a.Titre.localeCompare(b.Titre)
+        (a, b) =>
+          compareSearchRelevance(a, b) ||
+          getWatchScore(b) - getWatchScore(a) ||
+          a.Titre.localeCompare(b.Titre)
       );
     } else if (sort === "trending") {
       sorted = allItems.sort(
-        (a, b) => getWatchScore(b) - getWatchScore(a) || a.Titre.localeCompare(b.Titre)
+        (a, b) =>
+          compareSearchRelevance(a, b) ||
+          getWatchScore(b) - getWatchScore(a) ||
+          a.Titre.localeCompare(b.Titre)
       );
     } else if (sort === "least") {
       sorted = allItems.sort(
-        (a, b) => getWatchScore(a) - getWatchScore(b) || a.Titre.localeCompare(b.Titre)
+        (a, b) =>
+          compareSearchRelevance(a, b) ||
+          getWatchScore(a) - getWatchScore(b) ||
+          a.Titre.localeCompare(b.Titre)
       );
     } else {
       // Rétro-compatibilité avec ?order=asc|desc
       sorted =
         order === "asc"
-          ? allItems.sort((a, b) => a.Titre.localeCompare(b.Titre))
-          : allItems.sort((a, b) => b.Titre.localeCompare(a.Titre));
+          ? allItems.sort(
+              (a, b) => compareSearchRelevance(a, b) || a.Titre.localeCompare(b.Titre)
+            )
+          : allItems.sort(
+              (a, b) => compareSearchRelevance(a, b) || b.Titre.localeCompare(a.Titre)
+            );
     }
 
     // Pagination
-    const paginatedItems = sorted.slice(skip, skip + take);
+    const paginatedItems = sorted.slice(skip, skip + take).map((item) => {
+      if (!searchText) return item;
+      const cleanItem = { ...item };
+      delete cleanItem.SearchRank;
+      delete cleanItem.SearchScore;
+      return cleanItem;
+    });
 
     // ---- WATCH STATUS (optionnel, par utilisateur) ----
     const itemsWithFavorite = userId
@@ -2053,38 +2091,79 @@ export const updateVideoResumer = async (request, reply) => {
   }
 };
 
-// Recherche rapide FILMS (SaisonID null), par titre, limite réglable
+// Recherche rapide des films et séries par titre, avec limite réglable
 export const quickSearchVideos = async (request, reply) => {
   try {
-    const q = (request.query.q || request.query.search || "").toString().trim().toLowerCase();
-    const limit = Math.min(parseInt(request.query.limit || "100", 10) || 100, 200); // cap 200
+    const q = (request.query.q || request.query.search || "").toString().trim();
+    const limit = Math.min(
+      Math.max(Number.parseInt(request.query.limit || "100", 10) || 100, 1),
+      200
+    );
 
-    const where = q
-      ? {
-        AND: [
-          { SaisonID: null },
-          { EtatID: ACTIVE_ETAT_ID },
-          { Titre: { contains: q } }, // match par Titre
-        ],
-      }
-      : { SaisonID: null, EtatID: ACTIVE_ETAT_ID };
+    const [videos, series] = await Promise.all([
+      prisma.video.findMany({
+        where: { SaisonID: null, EtatID: ACTIVE_ETAT_ID },
+        orderBy: { Titre: "asc" },
+        ...(q ? {} : { take: limit }),
+        select: {
+          VideoID: true,
+          Titre: true,
+          CheminImage: true,
+        },
+      }),
+      prisma.series.findMany({
+        where: { EtatID: ACTIVE_ETAT_ID },
+        orderBy: { Titre: "asc" },
+        ...(q ? {} : { take: limit }),
+        select: {
+          SeriesID: true,
+          Titre: true,
+          CheminImage: true,
+          Saisons: {
+            orderBy: { Numero: "asc" },
+            take: 1,
+            select: {
+              Episodes: {
+                where: { EtatID: ACTIVE_ETAT_ID },
+                orderBy: { Titre: "asc" },
+                take: 1,
+                select: { VideoID: true },
+              },
+            },
+          },
+        },
+      }),
+    ]);
 
-    const rows = await prisma.video.findMany({
-      where,
-      orderBy: { Titre: "asc" }, // tri A→Z pour lisibilité
-      take: limit,
-      select: {
-        VideoID: true,
-        Titre: true,
-        CheminImage: true,
-      },
-    });
+    const candidates = [
+      ...videos.map((video) => ({
+        id: video.VideoID,
+        type: "video",
+        Titre: video.Titre,
+        CheminImage: video.CheminImage || null,
+      })),
+      ...series.map((serie) => ({
+        id: serie.SeriesID,
+        type: "series",
+        Titre: serie.Titre,
+        CheminImage: serie.CheminImage || null,
+        FirstVideoID: serie.Saisons[0]?.Episodes[0]?.VideoID || null,
+      })),
+    ];
 
-    const items = rows.map((v) => ({
-      id: v.VideoID,
-      titre: v.Titre,
-      image: v.CheminImage || null,
-    }));
+    const items = candidates
+      .flatMap((item) => {
+        const match = q ? getVideoTitleSearchMatch(item.Titre, q) : { rank: 0, score: 0 };
+        return match ? [{ item, match }] : [];
+      })
+      .sort(
+        (a, b) =>
+          b.match.rank - a.match.rank ||
+          b.match.score - a.match.score ||
+          a.item.Titre.localeCompare(b.item.Titre)
+      )
+      .slice(0, limit)
+      .map(({ item }) => item);
 
     return reply.send({ items, total: items.length });
   } catch (err) {

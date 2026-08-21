@@ -50,22 +50,61 @@ describe("VideoList - navigation vers la lecture", () => {
   });
 
   test("affiche un cadre explicite lorsqu'une carte personne n'a pas de photo", () => {
+    const onPersonClick = jest.fn();
+    const person = {
+      id: 42,
+      type: "person",
+      Titre: "Tom Hanks",
+      CheminImage: null,
+      MissingImageLabel: "Photo manquante pour cette personne",
+    };
     const { container } = render(
       <VideoList
-        videos={[{
-          id: 42,
-          type: "person",
-          Titre: "Tom Hanks",
-          CheminImage: null,
-          MissingImageLabel: "Photo manquante pour cette personne",
-        }]}
+        videos={[person]}
+        onPersonClick={onPersonClick}
       />
     );
 
     expect(screen.getByRole("img", { name: "Photo manquante pour Tom Hanks" })).toHaveTextContent(
       "Photo manquante pour cette personne"
     );
-    expect(container.querySelector('a[href="/personnes/42"]')).toBeInTheDocument();
+    const link = container.querySelector('a[href="/personnes/42"]');
+    expect(link).toBeInTheDocument();
     expect(screen.getByText("Tom Hanks")).toBeInTheDocument();
+
+    fireEvent.click(link);
+    expect(onPersonClick).toHaveBeenCalledWith(person);
+  });
+
+  test("masque un bouton non favori au repos et conserve un favori visible", () => {
+    render(
+      <VideoList
+        videos={[
+          {
+            id: 10,
+            type: "video",
+            Titre: "Film non favori",
+            Genres: [],
+            IsFavorite: false,
+          },
+          {
+            id: 11,
+            type: "video",
+            Titre: "Film favori",
+            Genres: [],
+            IsFavorite: true,
+          },
+        ]}
+      />
+    );
+
+    expect(screen.getByTitle("Ajouter aux favoris")).toHaveClass(
+      "opacity-0",
+      "pointer-events-none",
+      "group-hover:opacity-100",
+      "group-focus-within:opacity-100"
+    );
+    expect(screen.getByTitle("Retirer des favoris")).toHaveClass("opacity-100");
+    expect(screen.getByTitle("Retirer des favoris")).not.toHaveClass("opacity-0");
   });
 });

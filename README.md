@@ -2,7 +2,7 @@
 
 SAMI (**Système d’Archivage Multimédia Intégré**) est une médiathèque web privée permettant d’organiser, diffuser et suivre des films, séries et musiques depuis une seule interface.
 
-La version actuelle est la **7.12.0**. Elle repose sur un backend Fastify, une interface React, Prisma avec MySQL, un pipeline vidéo FFmpeg/HLS et Socket.IO pour le retour en temps réel des traitements.
+La version actuelle est la **7.13.0**. Elle repose sur un backend Fastify, une interface React, Prisma avec MySQL, un pipeline vidéo FFmpeg/HLS et Socket.IO pour le retour en temps réel des traitements.
 
 ## Fonctionnalités
 
@@ -18,8 +18,9 @@ La version actuelle est la **7.12.0**. Elle repose sur un backend Fastify, une i
 - encodage multi-server expérimental : une résolution par worker, redistribution dynamique et publication finale sur le serveur principal ;
 - export sécurisé et reprenable d’une vidéo traitée depuis un clone vers l’instance principale ;
 - historique de lecture, reprise intelligente et remise à zéro d’une série ;
-- tendances, calendrier des ajouts et contenus mis en avant par genre ;
-- favoris, sagas et univers.
+- recherche tolérante aux accents, séparateurs et petites fautes de saisie pour les films et les séries ;
+- tendances, calendrier des ajouts et contenus mis en avant par genre, avec une grille adaptée aux smartphones ;
+- favoris, sagas et univers, avec des actions allégées au repos sur les affiches.
 
 ### Musique
 
@@ -34,22 +35,27 @@ La version actuelle est la **7.12.0**. Elle repose sur un backend Fastify, une i
 - profils utilisateur, grades, premium et préférences de genres ;
 - espaces protégés pour les administrateurs et super administrateurs ;
 - gestion des vidéos, séries, genres, personnes, sagas, univers et musiques ;
+- annuaire et fiches publiques des personnes avec recherche du nom complet à 80 %, filmographie regroupée et aperçus de partage dédiés ;
 - édition des personnes avec photos, suppression réversible et corbeille réservée au super administrateur ;
 - association semi-automatique d’acteurs et réalisateurs à un film ou une série, avec création contrôlée et recherche des photos manquantes ;
-- détection des personnes potentiellement dupliquées, classement des doutes et fusion réservée au super administrateur ;
+- détection des personnes potentiellement dupliquées, enrichie par les contenus partagés, classement des doutes et fusion réservée au super administrateur ;
 - messages généraux, fonctionnalités expérimentales et statistiques ;
 - journalisation des actions et sauvegardes manuelles ou planifiées de MySQL ;
 - limitations de requêtes, contrôle CORS et en-têtes de sécurité.
 
-## Nouveautés de la version 7.12.0
+## Nouveautés de la version 7.13.0
 
-- ajout semi-automatique des acteurs et réalisateurs depuis la page Nouvelle vidéo, avec réutilisation ou création des personnes, association au contenu et recherche des photos manquantes ;
-- affichage des personnes sans photo sur les pages de lecture avec une indication explicite à la place de l’image ;
-- vérification des doublons depuis l’administration avec gestion des doutes, confirmation des personnes distinctes et fusion contrôlée par le super administrateur ;
-- comparaison améliorée des accents, variantes Unicode et translittérations proches comme `Yūki` et `Yuuki` ;
-- pérennisation des outils de crédits, simplification des quatre listes CSV et extension des actions journalisées.
+- recherche de films et de séries normalisée et classée par pertinence, avec une tolérance de 80 % permettant notamment de rapprocher `Spider-Man` et `spider man` ;
+- recherche des personnes par prénom et nom complets, dans les deux ordres, avec normalisation et similitude minimale de 80 % ;
+- navigation plus fluide avec retour en haut sur les accès principaux, les liens du pied de page, les contenus aléatoires, les cartes de personnes et la fenêtre des sagas ;
+- nouvelle page `/stats` regroupant les statistiques, le calendrier des ajouts et les cookies, avec la version affichée dans la sidebar ;
+- boutons de favoris masqués au repos lorsqu’un contenu n’est pas encore favori et ralentissement des affiches de prévisualisation ;
+- refonte responsive de l’annuaire et des fiches des personnes, avec films et séries regroupés entre réalisation et distribution, outils administrateur repliables et métadonnées sociales complètes ;
+- grille des sélections par genre adaptée aux smartphones, avec la vedette en premier puis deux cartes par ligne ;
+- détection des doublons enrichie par les contenus partagés et les petites fautes de saisie ;
+- configuration SMTP contrôlée avec SSL/TLS sur le port 465 ou STARTTLS sur les autres ports.
 
-L’historique complet des versions, de la 6.1.0 à la 7.12.0, est disponible dans l’application à l’adresse `/updates` et dans `frontend/src/components/UpdatesPage.js`.
+L’historique complet des versions, de la 6.1.0 à la 7.13.0, est disponible dans l’application à l’adresse `/updates` et dans `frontend/src/components/UpdatesPage.js`.
 
 ## Stack technique
 
@@ -413,6 +419,7 @@ https://<hôte>:<port>/documentation
 | `/sagas` | authentifié | Sagas |
 | `/musique` | authentifié | Musique et lecteur persistant |
 | `/personnes` | authentifié | Personnes associées aux contenus |
+| `/personnes/:id` | authentifié | Fiche, filmographie et aperçu de partage d’une personne |
 | `/profile`, `/settings` | authentifié | Profil et préférences |
 | `/administration` | administrateur | Gestion de la plateforme |
 | `/nouvelle-video` | administrateur | Import vidéo |

@@ -1,5 +1,6 @@
 // backend/controllers/personneController.js
 import { prisma } from "../services/db.js";
+import { filterPeopleBySearch } from "../services/personSearchService.js";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
@@ -241,31 +242,18 @@ export const updatePersonnePhoto = async (request, reply) => {
 
 /**
  * GET /api/people?search=
- * recherche simple par nom/prenom/surnom
+ * recherche par nom, prénom, nom complet ou surnom, avec similarité à 80 %
  */
 export const searchPeople = async (request, reply) => {
   const q = (request.query.search || "").trim();
   try {
-    const where = {
-      EtatID: ACTIVE_ETAT_ID,
-      ...(q
-      ? {
-        OR: [
-          { Nom: { contains: q } },
-          { Prenom: { contains: q } },
-          { Surnom: { contains: q } }
-        ]
-      }
-      : {}),
-    };
-
     const people = await prisma.personne.findMany({
-      where,
+      where: { EtatID: ACTIVE_ETAT_ID },
       orderBy: [{ Prenom: "asc" }, { Nom: "asc" }],
       // take: 50
     });
 
-    return reply.send(people);
+    return reply.send(filterPeopleBySearch(people, q));
   } catch (e) {
     console.error("searchPeople:", e);
     return reply.code(500).send({ error: "Erreur lors de la recherche." });

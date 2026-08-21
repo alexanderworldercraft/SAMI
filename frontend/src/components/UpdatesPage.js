@@ -2,6 +2,69 @@ import React, { useEffect, useState } from "react";
 
 const updates = [
   {
+    version: "7.13.0",
+    title: "Recherche plus souple, navigation fluide et pages personnes modernisees",
+    date: "21 aout 2026",
+    sections: [
+      {
+        title: "Recherche de films et series plus tolerante",
+        items: [
+          "La recherche normalise maintenant les accents, les espaces et les separateurs afin que Spider-Man soit propose lorsque spider man est saisi.",
+          "Les petites fautes de frappe sont acceptees lorsque la similitude du titre atteint au moins quatre-vingts pour cent, sans afficher les contenus sans rapport.",
+          "Les correspondances exactes, les inclusions puis les titres similaires sont classes par pertinence avant le tri choisi dans le catalogue.",
+          "Les suggestions de la barre de recherche comprennent desormais les films et les series, avec un acces direct au premier episode disponible pour une serie.",
+          "Le filtrage similaire est applique avant la pagination afin de conserver un nombre de pages et de resultats coherent.",
+        ],
+      },
+      {
+        title: "Navigation coherente et cartes plus lisibles",
+        items: [
+          "Les acces Accueil, Videos, Musique, Sagas et Acteur/realisateur de la barre laterale remontent maintenant en haut de la page apres la navigation.",
+          "Les choix Film aleatoire et Serie aleatoire ferment la barre laterale puis replacent le lecteur en haut de l'ecran.",
+          "Les liens du pied de page vers les mises a jour, la confidentialite, les conditions d'utilisation et la conformite des donnees appliquent le meme retour fluide.",
+          "Les statistiques, le calendrier des ajouts et la liste des cookies quittent le pied de page pour une nouvelle page /stats, accessible juste apres le lien des mises a jour.",
+          "La barre laterale affiche maintenant la version de SAMI a cote du nom de l'application sur ordinateur comme sur mobile.",
+          "Depuis une page de lecture, les cartes des personnes ouvrent leur fiche en haut ; depuis une fiche personne, les films et series reviennent en haut du lecteur.",
+          "Choisir un film ou une serie dans la fenetre d'une saga ferme la fenetre avant d'ouvrir le contenu au niveau du lecteur.",
+          "Sur smartphone, le modal de reprise reste maintenant au-dessus des menus du lecteur afin que ses deux choix restent toujours accessibles.",
+          "Le defilement des images dans les infobulles de previsualisation est ralenti afin de rendre chaque affiche plus facile a observer.",
+          "Le bouton de favoris reste visible pour un contenu deja favori et apparait au survol ou au focus pour les autres contenus, ce qui allege les affiches au repos.",
+        ],
+      },
+      {
+        title: "Annuaire et fiches des personnes harmonises",
+        items: [
+          "La page Personnes adopte les panneaux, couleurs, ombres et etats de chargement du reste de SAMI, avec un compteur de resultats et une presentation adaptee aux ecrans etroits.",
+          "La recherche par prenom, nom, nom complet ou surnom est temporisee et accepte les correspondances similaires a au moins quatre-vingts pour cent.",
+          "Le nom complet fonctionne dans les deux ordres, les accents et separateurs sont normalises, tandis que le tri A-Z ou Z-A et la pagination a quarante cartes sont preserves.",
+          "Une personne sans photo dispose d'un cadre explicite et chaque carte ouvre correctement l'adresse /personnes/:id.",
+          "La fiche d'une personne regroupe maintenant films et series dans deux panneaux uniques : Realisation et Distribution.",
+          "Le partage d'une fiche personne fournit son nom, sa description, sa photo, son adresse canonique et les balises Open Graph et Twitter Card directement dans le HTML initial.",
+          "Les administrateurs conservent la modification de la photo et disposent d'un panneau repliable pour lier un film ou une serie sans surcharger la fiche.",
+          "Le retrait d'un role demande une confirmation, met la liste a jour sans recharger toute la page et affiche le resultat de l'operation.",
+        ],
+      },
+      {
+        title: "Accueil par genres mieux adapte aux smartphones",
+        items: [
+          "Dans chaque selection par genre, le contenu A la une apparait maintenant en premier et conserve une grande carte sur smartphone.",
+          "Les autres contenus sont disposes sur une grille de deux cartes par ligne sur les petits ecrans.",
+          "La hauteur des petites cartes reste flexible tandis que la composition en quatre colonnes et la grande vedette centrale sont preservees sur ordinateur.",
+        ],
+      },
+      {
+        title: "Doublons de personnes et envoi d'e-mails fiabilises",
+        items: [
+          "La detection des personnes proches prend maintenant en compte les films et series partages afin de faire remonter en priorite les homonymes lies aux memes contenus.",
+          "Une comparaison adaptee aux inversions et petites fautes de saisie complete les scores de prenom et de nom sans remplacer les controles existants.",
+          "L'administration affiche le nombre de films et de series communs pour aider a verifier chaque proposition avant une decision ou une fusion.",
+          "L'envoi des mots de passe temporaires utilise un service SMTP controle qui refuse une configuration incomplete et valide le port avant toute connexion.",
+          "Le port 465 active automatiquement SSL/TLS ; les autres ports utilisent STARTTLS avec TLS 1.2 minimum, et la connexion est toujours fermee apres l'envoi ou un echec.",
+        ],
+      },
+    ],
+  },
+  {
     version: "7.12.0",
     title: "Credits semi-automatiques et qualite des personnes",
     date: "16 aout 2026",

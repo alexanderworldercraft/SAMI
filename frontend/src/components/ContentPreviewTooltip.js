@@ -5,6 +5,7 @@ import api from "../services/api";
 const apiUrl = process.env.REACT_APP_URL_LOCAL;
 const TOOLTIP_OPEN_DELAY_MS = 200;
 const TOOLTIP_FADE_MS = 300;
+export const PREVIEW_FRAME_INTERVAL_MS = 1200;
 
 let settingPromise = null;
 const getPreviewSetting = () => {
@@ -146,7 +147,7 @@ const ContentPreviewTooltip = ({ item, title, className = "", children }) => {
 
     const interval = window.setInterval(() => {
       setFrameIndex((current) => (current + 1) % frames.length);
-    }, 650);
+    }, PREVIEW_FRAME_INTERVAL_MS);
 
     return () => window.clearInterval(interval);
   }, [hovered, frames.length]);

@@ -146,3 +146,74 @@ describe("GET /lecture/:id social preview", () => {
     );
   });
 });
+
+describe("GET /personnes/:id social preview", () => {
+  it("sert le shell React enrichi avec le profil avant le fallback statique", async () => {
+    const roots = await createStaticRoots();
+    const loadPersonSocialPreviewMetadata = vi.fn().mockResolvedValue({
+      personId: 7,
+      firstName: "Dwayne",
+      lastName: "Johnson",
+      nickname: "The Rock",
+      image: "uploads/people/7/portrait.webp",
+    });
+    server = createServer({
+      ...roots,
+      appName: "Mon SAMI",
+      publicUrl: "https://sami.example",
+      publicHost: "sami.example",
+      loadPersonSocialPreviewMetadata,
+    });
+    await server.ready();
+
+    const response = await server.inject({
+      method: "GET",
+      url: "/personnes/7",
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.headers["content-type"]).toContain("text/html");
+    expect(response.headers["cache-control"]).toBe("no-cache");
+    expect(loadPersonSocialPreviewMetadata).toHaveBeenCalledWith(7);
+    expect(response.body).toContain(
+      '<meta data-rh="true" property="og:type" content="profile" />'
+    );
+    expect(response.body).toContain(
+      '<meta data-rh="true" property="og:title" content="Dwayne Johnson “The Rock” - Mon SAMI" />'
+    );
+    expect(response.body).toContain(
+      '<meta data-rh="true" property="og:image" content="https://sami.example/uploads/people/7/portrait.webp" />'
+    );
+    expect(response.body).toContain(
+      '<link data-rh="true" rel="canonical" href="https://sami.example/personnes/7" />'
+    );
+    expect(response.body).not.toContain("Métadonnées génériques");
+  });
+
+  it("n'interroge pas la base et revient sur l'annuaire pour un identifiant invalide", async () => {
+    const roots = await createStaticRoots();
+    const loadPersonSocialPreviewMetadata = vi.fn();
+    server = createServer({
+      ...roots,
+      appName: "Mon SAMI",
+      publicUrl: "https://sami.example",
+      publicHost: "sami.example",
+      loadPersonSocialPreviewMetadata,
+    });
+    await server.ready();
+
+    const response = await server.inject({
+      method: "GET",
+      url: "/personnes/1e3",
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(loadPersonSocialPreviewMetadata).not.toHaveBeenCalled();
+    expect(response.body).toContain(
+      '<link data-rh="true" rel="canonical" href="https://sami.example/personnes" />'
+    );
+    expect(response.body).toContain(
+      '<meta data-rh="true" property="og:image" content="https://sami.example/logo512.png" />'
+    );
+  });
+});

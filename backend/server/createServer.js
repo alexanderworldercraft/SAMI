@@ -207,6 +207,7 @@ export function createServer({
   frontendBuildRootPath = frontendBuildRoot,
   https,
   loadSocialPreviewMetadata,
+  loadPersonSocialPreviewMetadata,
   trustProxy = false,
   publicUrl = process.env.PUBLIC_URL,
   publicHost = process.env.PUBLIC_HOST,
@@ -257,6 +258,9 @@ export function createServer({
     frontendBuildRoot: frontendBuildRootPath,
     ...(loadSocialPreviewMetadata
       ? { loadMetadata: loadSocialPreviewMetadata }
+      : {}),
+    ...(loadPersonSocialPreviewMetadata
+      ? { loadPersonMetadata: loadPersonSocialPreviewMetadata }
       : {}),
     publicUrl,
   });

@@ -81,21 +81,21 @@ describe("personneController - administration et corbeille", () => {
     });
   });
 
-  it("exclut les personnes supprimées de la recherche publique", async () => {
+  it("recherche un nom complet similaire parmi les personnes actives", async () => {
+    prisma.personne.findMany.mockResolvedValue([
+      { PersonneID: 12, Prenom: "Ada", Nom: "Lovelace", Surnom: null, EtatID: 1 },
+      { PersonneID: 13, Prenom: "Grace", Nom: "Hopper", Surnom: null, EtatID: 1 },
+    ]);
     const reply = createReply();
-    await searchPeople({ query: { search: "Ada" } }, reply);
+    await searchPeople({ query: { search: "Ada Lovelac" } }, reply);
 
     expect(prisma.personne.findMany).toHaveBeenCalledWith({
-      where: {
-        EtatID: 1,
-        OR: [
-          { Nom: { contains: "Ada" } },
-          { Prenom: { contains: "Ada" } },
-          { Surnom: { contains: "Ada" } },
-        ],
-      },
+      where: { EtatID: 1 },
       orderBy: [{ Prenom: "asc" }, { Nom: "asc" }],
     });
+    expect(reply.send).toHaveBeenCalledWith([
+      expect.objectContaining({ PersonneID: 12, Prenom: "Ada", Nom: "Lovelace" }),
+    ]);
   });
 
   it("réserve la liste de corbeille aux personnes supprimées", async () => {

@@ -3,9 +3,12 @@ import { describe, expect, it, vi } from "vitest";
 import { ETAT } from "../constants.js";
 import {
   buildLectureSocialMeta,
+  buildPersonSocialMeta,
   getLectureSocialMetadata,
+  getPersonSocialMetadata,
   injectSocialMetaBlock,
   parseLectureVideoId,
+  parsePersonId,
   renderSocialMetaBlock,
   resolvePublicOrigin,
   SOCIAL_META_END,
@@ -90,6 +93,78 @@ describe("socialPreviewService", () => {
     await expect(
       getLectureSocialMetadata(73, { database })
     ).resolves.toBeNull();
+  });
+
+  it("charge uniquement les données publiques nécessaires au partage d'une personne", async () => {
+    const findFirst = vi.fn().mockResolvedValue({
+      PersonneID: 7,
+      Prenom: "Dwayne",
+      Nom: "Johnson",
+      Surnom: "The Rock",
+      CheminImage: "uploads/people/7/portrait.webp",
+    });
+
+    const metadata = await getPersonSocialMetadata(7, {
+      database: { personne: { findFirst } },
+    });
+
+    expect(findFirst).toHaveBeenCalledWith({
+      where: { PersonneID: 7, EtatID: ETAT.ACTIVE },
+      select: {
+        PersonneID: true,
+        Prenom: true,
+        Nom: true,
+        Surnom: true,
+        CheminImage: true,
+      },
+    });
+    expect(metadata).toEqual({
+      personId: 7,
+      firstName: "Dwayne",
+      lastName: "Johnson",
+      nickname: "The Rock",
+      image: "uploads/people/7/portrait.webp",
+    });
+  });
+
+  it("construit les métadonnées sociales complètes d'une personne", () => {
+    const meta = buildPersonSocialMeta({
+      personId: 7,
+      appName: "Mon SAMI",
+      publicOrigin: "https://sami.example",
+      person: {
+        firstName: "Dwayne",
+        lastName: "Johnson",
+        nickname: "The Rock",
+        image: "uploads/people/7/portrait.webp",
+      },
+    });
+
+    expect(meta).toEqual({
+      type: "profile",
+      siteName: "Mon SAMI",
+      title: "Dwayne Johnson “The Rock” - Mon SAMI",
+      description: "Découvrez la filmographie de Dwayne Johnson “The Rock” sur Mon SAMI : films et séries en réalisation et distribution.",
+      imageUrl: "https://sami.example/uploads/people/7/portrait.webp",
+      imageAlt: "Portrait de Dwayne Johnson “The Rock”",
+      canonicalUrl: "https://sami.example/personnes/7",
+    });
+  });
+
+  it("utilise le logo pour une personne sans photo publique exploitable", () => {
+    const meta = buildPersonSocialMeta({
+      personId: 8,
+      appName: "SAMI",
+      publicOrigin: "https://sami.example",
+      person: {
+        firstName: "Tom",
+        lastName: "Hanks",
+        image: "uploads/people/8/../secret.jpg",
+      },
+    });
+
+    expect(meta.imageUrl).toBe("https://sami.example/logo512.png");
+    expect(meta.imageAlt).toBe("Logo de SAMI");
   });
 
   it("préfère l'affiche de série même lorsque l'épisode a sa propre affiche", () => {
@@ -288,6 +363,8 @@ describe("socialPreviewService", () => {
       expect(parseLectureVideoId(value)).toBeNull();
     }
     expect(parseLectureVideoId("2147483647")).toBe(2_147_483_647);
+    expect(parsePersonId("42")).toBe(42);
+    expect(parsePersonId("1e3")).toBeNull();
 
     expect(
       resolvePublicOrigin("javascript:alert(1)", {

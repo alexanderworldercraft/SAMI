@@ -38,7 +38,7 @@ const parseCookies = () => {
     });
 };
 
-export default function CookieList() {
+export default function CookieList({ embedded = false }) {
     const cookies = parseCookies();
     const [currentPage, setCurrentPage] = useState(1);
     const itemsPerPage = 20;
@@ -56,7 +56,7 @@ export default function CookieList() {
     }, [cookies, currentPage]);
 
     return (
-        <div className="container mx-auto px-4 py-10 sm:px-6 lg:px-8">
+        <div className={embedded ? "" : "container mx-auto px-4 py-10 sm:px-6 lg:px-8"}>
             <div className="relative max-w-full overflow-hidden rounded-2xl border border-sky-500/10 bg-white/80 p-6 shadow-xl shadow-slate-950/5 backdrop-blur dark:bg-slate-950/70 dark:shadow-sky-950/20">
             <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_12%_20%,rgba(14,165,233,0.12),transparent_26%),radial-gradient(circle_at_88%_0%,rgba(139,92,246,0.10),transparent_22%)]" />
             <div className="relative px-0 py-2 sm:p-2">
@@ -64,7 +64,7 @@ export default function CookieList() {
                     <div className="sm:flex sm:items-center">
                         <div className="sm:flex-auto">
                             <p className="text-sm font-bold uppercase text-sky-500 dark:text-sky-400">SAMI</p>
-                            <h1 className="mt-2 text-2xl font-black text-slate-950 dark:text-white">Cookies</h1>
+                            <h2 className="mt-2 text-2xl font-black text-slate-950 dark:text-white">Cookies</h2>
                             <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600 dark:text-slate-300">
                                 Liste des cookies utilisés par SAMI de votre usage (Il est possible que vous ne voyiez pas tous les cookies disponibles, car ils ne sont pas utilisés dans votre configuration).
                             </p>

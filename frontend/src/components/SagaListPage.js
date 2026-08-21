@@ -5,6 +5,7 @@ import { XMarkIcon } from "@heroicons/react/24/outline";
 import api from "../services/api";
 import PaginationPage from "./PaginationPage";
 import VideoList from "./VideoList";
+import { scrollToPageTop } from "../utils/scrollToPageTop";
 
 const ITEMS_PER_PAGE = 8;
 const sortOptions = [
@@ -88,6 +89,12 @@ const SagaListPage = () => {
     } finally {
       setDetailsLoading(false);
     }
+  };
+
+  const handleModalContentClick = () => {
+    setSelectedSaga(null);
+    setSagaDetails(null);
+    scrollToPageTop();
   };
 
   return (
@@ -236,7 +243,11 @@ const SagaListPage = () => {
                   Aucun contenu dans cette saga.
                 </p>
               ) : (
-                <VideoList videos={modalContents} />
+                <VideoList
+                  videos={modalContents}
+                  linkAnchor="#lecture-top"
+                  onContentClick={handleModalContentClick}
+                />
               )}
             </div>
           </div>

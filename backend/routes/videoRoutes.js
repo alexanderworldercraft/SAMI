@@ -70,7 +70,7 @@ export default async function (fastify) {
   fastify.get("/calendar/items-by-day", getAdditionsForDate); // ?date=2025-06-14
   fastify.get("/stats/overview", getStatisticsOverview);
   fastify.get("/stats/timeline", getStatisticsTimeline);
-  fastify.get("/search", quickSearchVideos); // ⬅️ nouveau endpoint de recherche films
+  fastify.get("/search", quickSearchVideos);
   fastify.get("/popular-30-days", getMostWatchedLast30Days);
   fastify.get("/progress/resume", { preHandler: authMiddleware }, getResumeProgressOverview);
   fastify.get("/:id/progress", { preHandler: authMiddleware }, getVideoProgress);

@@ -30,8 +30,22 @@ import ThemeToggle from './ThemeToggle'
 import NavVisibilityToggle from './NavVisibilityToggle'
 import { useNav } from '../context/NavContext'
 import UserAvatar from "./UserAvatar";
+import { scrollToPageTop } from '../utils/scrollToPageTop'
 
 const apiBaseUrl = process.env.REACT_APP_URL_LOCAL
+const appName = process.env.REACT_APP_NAME || 'SAMI'
+const appVersion = process.env.REACT_APP_VER
+
+const AppBrand = () => (
+  <span className="flex items-baseline gap-2">
+    <span className="text-sm font-semibold text-gray-900 dark:text-white">{appName}</span>
+    {appVersion && (
+      <span className="rounded-full border border-sky-500/20 bg-sky-500/10 px-2 py-0.5 text-[10px] font-black text-sky-700 dark:text-sky-300">
+        v{appVersion}
+      </span>
+    )}
+  </span>
+)
 
 function classNames(...classes) {
   return classes.filter(Boolean).join(' ')
@@ -85,11 +99,11 @@ export default function NavBar() {
   }, [])
 
   const navigation = [
-    { name: 'Accueil', href: '/', icon: HomeIcon },
-    { name: 'Vidéos', href: '/videos', icon: FilmIcon },
-    { name: 'Musique', href: '/musique', icon: MusicalNoteIcon },
-    { name: 'Sagas', href: '/sagas', icon: RectangleStackIcon },
-    { name: 'Acteur/réalisateur', href: '/personnes', icon: UserIcon },
+    { name: 'Accueil', href: '/', icon: HomeIcon, scrollToTop: true },
+    { name: 'Vidéos', href: '/videos', icon: FilmIcon, scrollToTop: true },
+    { name: 'Musique', href: '/musique', icon: MusicalNoteIcon, scrollToTop: true },
+    { name: 'Sagas', href: '/sagas', icon: RectangleStackIcon, scrollToTop: true },
+    { name: 'Acteur/réalisateur', href: '/personnes', icon: UserIcon, scrollToTop: true },
     ...(user?.GradeID === 1 || user?.GradeID === 2
       ? [
           { name: 'Nouveau contenu', href: '/nouvelle-video', icon: PlusCircleIcon },
@@ -114,7 +128,9 @@ export default function NavBar() {
       const res = await fetch(`${apiBaseUrl}/api/videos/${endpoint}`)
       const data = await res.json()
       if (data?.VideoID) {
+        setSidebarOpen(false)
         navigate(`/lecture/${data.VideoID}`)
+        scrollToPageTop()
       } else {
         alert('Aucun média trouvé.')
       }
@@ -149,6 +165,11 @@ export default function NavBar() {
     }
   }
 
+  const handleMainNavigation = (closeSidebar = false, shouldScrollToTop = false) => {
+    if (closeSidebar) setSidebarOpen(false)
+    if (shouldScrollToTop) scrollToPageTop()
+  }
+
   return (
     <>
       {/* Drawer mobile */}
@@ -176,7 +197,7 @@ export default function NavBar() {
               <div className="relative flex h-16 shrink-0 items-center">
                 <Link to="/" className="flex items-center gap-3">
                   <img src="/logo.png" alt="Logo" className="h-8 w-auto" />
-                  <span className="text-sm font-semibold text-gray-900 dark:text-white">SAMI</span>
+                  <AppBrand />
                 </Link>
               </div>
 
@@ -191,7 +212,7 @@ export default function NavBar() {
                           <li key={item.name}>
                             <Link
                               to={item.href}
-                              onClick={() => setSidebarOpen(false)}
+                              onClick={() => handleMainNavigation(true, item.scrollToTop)}
                               className={navItemClass(active)}
                             >
                               <item.icon
@@ -273,7 +294,7 @@ export default function NavBar() {
             <div className="flex h-16 shrink-0 items-center">
               <Link to="/" className="flex items-center gap-3">
                 <img src="/logo.png" alt="Logo" className="h-8 w-auto" />
-                <span className="text-sm font-semibold text-gray-900 dark:text-white">SAMI</span>
+                <AppBrand />
               </Link>
             </div>
 
@@ -288,6 +309,7 @@ export default function NavBar() {
                         <li key={item.name}>
                           <Link
                             to={item.href}
+                            onClick={() => handleMainNavigation(false, item.scrollToTop)}
                             className={navItemClass(active)}
                           >
                             <item.icon

@@ -18,8 +18,8 @@ jest.mock("../services/api", () => ({
 jest.mock("./FavoriteButton", () => () => null);
 jest.mock("./GenreList", () => () => null);
 jest.mock("./ImageUploader", () => () => null);
-jest.mock("./VideoList", () => ({ videos = [] }) => (
-  <div>
+jest.mock("./VideoList", () => ({ videos = [], onPersonClick }) => (
+  <div data-testid="credit-video-list" data-person-scroll={typeof onPersonClick === "function"}>
     {videos.map((item) => (
       <div key={item.id}>
         <span>{item.Titre}</span>
@@ -104,6 +104,9 @@ describe("champs d'édition des détails de contenu", () => {
     expect(screen.getByText("Steven Spielberg")).toBeInTheDocument();
     expect(screen.getByText("Tom Hanks")).toBeInTheDocument();
     expect(screen.getAllByText("Photo manquante pour cette personne")).toHaveLength(2);
+    screen.getAllByTestId("credit-video-list").forEach((list) => {
+      expect(list).toHaveAttribute("data-person-scroll", "true");
+    });
   });
 
   test("conserve aussi les personnes sans photo dans les crédits de la série", () => {
@@ -115,5 +118,6 @@ describe("champs d'édition des détails de contenu", () => {
 
     expect(screen.getByText("Catherine Zeta-Jones")).toBeInTheDocument();
     expect(screen.getByText("Photo manquante pour cette personne")).toBeInTheDocument();
+    expect(screen.getByTestId("credit-video-list")).toHaveAttribute("data-person-scroll", "true");
   });
 });

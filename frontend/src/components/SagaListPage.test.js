@@ -1,7 +1,8 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 
 import api from "../services/api";
 import SagaListPage from "./SagaListPage";
+import { scrollToPageTop } from "../utils/scrollToPageTop";
 
 jest.mock("../services/api", () => ({
   __esModule: true,
@@ -11,10 +12,21 @@ jest.mock("../services/api", () => ({
 }));
 
 jest.mock("./PaginationPage", () => () => <div data-testid="pagination" />);
-jest.mock("./VideoList", () => ({ videos = [] }) => (
-  <div data-testid="video-list">
+jest.mock("../utils/scrollToPageTop", () => ({ scrollToPageTop: jest.fn() }));
+jest.mock("./VideoList", () => ({ videos = [], onItemClick, linkAnchor, onContentClick }) => (
+  <div
+    data-testid="video-list"
+    data-link-anchor={linkAnchor}
+    data-content-scroll={typeof onContentClick === "function"}
+  >
     {videos.map((item) => (
-      <span key={`${item.type}-${item.id}`}>{`${item.type}:${item.Titre}`}</span>
+      <button
+        key={`${item.type}-${item.id}`}
+        type="button"
+        onClick={() => item.type === "saga" ? onItemClick?.(item) : onContentClick?.(item)}
+      >
+        {`${item.type}:${item.Titre}`}
+      </button>
     ))}
   </div>
 ));
@@ -85,5 +97,43 @@ describe("SagaListPage - univers mixtes", () => {
     window.requestAnimationFrame = originalRequestAnimationFrame;
     window.cancelAnimationFrame = originalCancelAnimationFrame;
     Element.prototype.scrollIntoView = originalScrollIntoView;
+  });
+
+  test("ferme le modal et remonte en haut après le choix d'un film ou d'une série", async () => {
+    api.get.mockImplementation((url) => {
+      if (url === "/sagas/1") {
+        return Promise.resolve({
+          data: {
+            Contents: [
+              { id: 42, type: "video", Titre: "Rogue One" },
+              { id: 6, type: "series", Titre: "The Mandalorian", FirstVideoID: 61 },
+            ],
+          },
+        });
+      }
+
+      return Promise.resolve({
+        data: {
+          items: [{
+            UniverseID: 12,
+            Titre: "Star Wars",
+            Items: [{ id: 1, SagaID: 1, type: "saga", Titre: "Prélogie" }],
+          }],
+        },
+      });
+    });
+
+    render(<SagaListPage />);
+    fireEvent.click(await screen.findByRole("button", { name: "saga:Prélogie" }));
+
+    const filmButton = await screen.findByRole("button", { name: "video:Rogue One" });
+    const modalList = filmButton.closest('[data-testid="video-list"]');
+    expect(modalList).toHaveAttribute("data-link-anchor", "#lecture-top");
+    expect(modalList).toHaveAttribute("data-content-scroll", "true");
+
+    fireEvent.click(filmButton);
+
+    expect(scrollToPageTop).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("button", { name: "video:Rogue One" })).not.toBeInTheDocument();
   });
 });

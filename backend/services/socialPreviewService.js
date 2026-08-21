@@ -20,6 +20,8 @@ export function parseLectureVideoId(value) {
   return Number.isSafeInteger(videoId) && videoId <= MAX_PRISMA_INT ? videoId : null;
 }
 
+export const parsePersonId = parseLectureVideoId;
+
 export function normalizeSocialText(value) {
   return String(value ?? "").replace(/\s+/g, " ").trim();
 }
@@ -174,6 +176,38 @@ export async function getLectureSocialMetadata(
   };
 }
 
+export async function getPersonSocialMetadata(
+  personId,
+  { database = prisma } = {}
+) {
+  const parsedPersonId = parsePersonId(personId);
+  if (!parsedPersonId) return null;
+
+  const person = await database.personne.findFirst({
+    where: {
+      PersonneID: parsedPersonId,
+      EtatID: ETAT.ACTIVE,
+    },
+    select: {
+      PersonneID: true,
+      Prenom: true,
+      Nom: true,
+      Surnom: true,
+      CheminImage: true,
+    },
+  });
+
+  if (!person) return null;
+
+  return {
+    personId: person.PersonneID,
+    firstName: person.Prenom,
+    lastName: person.Nom,
+    nickname: person.Surnom,
+    image: person.CheminImage,
+  };
+}
+
 export function buildLectureSocialMeta({
   content,
   videoId,
@@ -228,6 +262,55 @@ export function buildLectureSocialMeta({
     imageAlt: poster
       ? `Affiche de ${poster.source === "series" ? seriesTitle : videoTitle}`
       : `Logo de ${siteName}`,
+    canonicalUrl,
+  };
+}
+
+export function buildPersonSocialMeta({
+  person,
+  personId,
+  appName = DEFAULT_APP_NAME,
+  publicOrigin,
+}) {
+  const siteName = normalizeSocialText(appName) || DEFAULT_APP_NAME;
+  const parsedPersonId = parsePersonId(personId);
+  const canonicalPath = parsedPersonId ? `/personnes/${parsedPersonId}` : "/personnes";
+  const canonicalUrl = buildAbsoluteUrl(publicOrigin, canonicalPath);
+
+  if (!person) {
+    return {
+      type: "website",
+      siteName,
+      title: `Personnes - ${siteName}`,
+      description: `Découvrez les acteurs, actrices, réalisateurs et réalisatrices du catalogue ${siteName}.`,
+      imageUrl: buildAbsoluteUrl(publicOrigin, FALLBACK_IMAGE_PATH),
+      imageAlt: `Logo de ${siteName}`,
+      canonicalUrl,
+    };
+  }
+
+  const firstName = normalizeSocialText(person.firstName);
+  const lastName = normalizeSocialText(person.lastName);
+  const nickname = normalizeSocialText(person.nickname);
+  const legalName = [firstName, lastName].filter(Boolean).join(" ");
+  const displayName = nickname
+    ? legalName
+      ? `${legalName} “${nickname}”`
+      : nickname
+    : legalName || "Personne sans nom";
+  const imagePath = isPlaceholderImagePath(person.image)
+    ? null
+    : normalizePublicAssetPath(person.image);
+
+  return {
+    type: "profile",
+    siteName,
+    title: `${displayName} - ${siteName}`,
+    description: truncateSocialText(
+      `Découvrez la filmographie de ${displayName} sur ${siteName} : films et séries en réalisation et distribution.`
+    ),
+    imageUrl: buildAbsoluteUrl(publicOrigin, imagePath || FALLBACK_IMAGE_PATH),
+    imageAlt: imagePath ? `Portrait de ${displayName}` : `Logo de ${siteName}`,
     canonicalUrl,
   };
 }

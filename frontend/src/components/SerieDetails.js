@@ -17,6 +17,7 @@ import {
   editButtonClass,
   saveButtonClass,
 } from "./contentDetailStyles";
+import { scrollToPageTop } from "../utils/scrollToPageTop";
 
 const apiUrl = process.env.REACT_APP_URL_LOCAL;
 
@@ -536,14 +537,14 @@ const SerieDetails = ({
           {realisateurCards.length > 0 && (
             <div className="mt-6">
               <h3 className="mb-3 text-lg font-black text-slate-950 dark:text-white">Réalisation (série)</h3>
-              <VideoList videos={realisateurCards} />
+              <VideoList videos={realisateurCards} onPersonClick={scrollToPageTop} />
             </div>
           )}
 
           {acteurCards.length > 0 && (
             <div className="mt-6">
               <h3 className="mb-3 text-lg font-black text-slate-950 dark:text-white">Distribution (série)</h3>
-              <VideoList videos={acteurCards} />
+              <VideoList videos={acteurCards} onPersonClick={scrollToPageTop} />
             </div>
           )}
             </div>

@@ -24,6 +24,7 @@ const VideoList = ({
   onFavoriteChange,
   linkAnchor = "",
   onContentClick,
+  onPersonClick,
 }) => {
   const favoriteItems = useMemo(
     () =>
@@ -73,11 +74,15 @@ const VideoList = ({
     if (!["video", "series"].includes(item?.type) || !item?.id) return null;
 
     const key = `${item.type}:${item.id}`;
+    const isFavorite = favoriteMap[key] ?? !!item.IsFavorite;
+    const visibilityClass = isFavorite
+      ? "opacity-100"
+      : "pointer-events-none opacity-0 group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100";
     return (
       <FavoriteButton
         type={item.type}
         id={item.id}
-        isFavorite={!!favoriteMap[key]}
+        isFavorite={isFavorite}
         onChange={(nextValue) =>
           {
             setFavoriteMap((current) => ({
@@ -87,7 +92,7 @@ const VideoList = ({
             onFavoriteChange?.(item, nextValue);
           }
         }
-        className={className}
+        className={`${className} ${visibilityClass}`}
       />
     );
   };
@@ -182,6 +187,7 @@ const VideoList = ({
           <Link
             key={`person-${item.id}`}
             to={`/personnes/${item.id}`}
+            onClick={() => onPersonClick?.(item)}
             className="group hover:-translate-y-2 duration-300"
           >
             <div className="min-h-full h-max max-h-max">
