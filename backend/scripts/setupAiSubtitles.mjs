@@ -4,6 +4,8 @@ import path from "path";
 import { spawnSync } from "child_process";
 import { fileURLToPath } from "url";
 
+import { buildAiSubtitleProcessEnvironment } from "../services/aiSubtitles/processEnvironment.js";
+
 const backendRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const root = path.resolve(process.env.SAMI_AI_SUBTITLE_ROOT || path.join(backendRoot, "var", "ai-subtitles"));
 const manifestPath = path.join(root, "install.json");
@@ -16,7 +18,7 @@ const run = (command, args, options = {}) => {
     stdio: options.capture ? "pipe" : "inherit",
     windowsHide: true,
     shell: false,
-    env: process.env,
+    env: options.env || process.env,
   });
   if (result.status !== 0) {
     const details = options.capture ? String(result.stderr || result.stdout || "").trim() : "";
@@ -101,7 +103,10 @@ const status = () => {
         path.join(backendRoot, "scripts", "ai", "worker.py"),
         "--probe",
         "--manifest", manifestPath,
-      ], { capture: true }));
+      ], {
+        capture: true,
+        env: buildAiSubtitleProcessEnvironment({ install: manifest }),
+      }));
     } catch (error) {
       probe = { ready: false, error: error.message };
     }
@@ -135,8 +140,25 @@ if (checkOnly) {
     torchArgs.push("--index-url", "https://download.pytorch.org/whl/cpu");
   }
   run(pythonPath, torchArgs);
+  let cudaLibraryPaths = [];
   if (engine === "faster-whisper") {
     run(pythonPath, ["-m", "pip", "install", "faster-whisper>=1.1,<2"]);
+    if (process.platform === "linux") {
+      run(pythonPath, [
+        "-m", "pip", "install",
+        "nvidia-cublas-cu12",
+        "nvidia-cudnn-cu12==9.*",
+      ]);
+      cudaLibraryPaths = JSON.parse(run(pythonPath, [
+        "-c",
+        [
+          "import json",
+          "import nvidia.cublas.lib",
+          "import nvidia.cudnn.lib",
+          "print(json.dumps([str(next(iter(nvidia.cublas.lib.__path__))), str(next(iter(nvidia.cudnn.lib.__path__)))]))",
+        ].join("; "),
+      ], { capture: true }));
+    }
   }
 
   const model = String(process.env.SAMI_AI_SUBTITLE_MODEL || "large-v3").trim();
@@ -187,6 +209,7 @@ if (checkOnly) {
     translationModelPath: downloaded.translationModelPath,
     translationDevice: device === "cuda" ? "cuda" : device === "metal" ? "mps" : "cpu",
     pythonPath,
+    cudaLibraryPaths,
   };
   fs.writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, { mode: 0o600 });
   console.log(`Runtime IA installé dans ${root}.`);

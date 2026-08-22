@@ -777,6 +777,11 @@ export function startDistributedEncodingWorkerRuntime(options = {}) {
       });
       const claim = normalizeClaim(response);
       if (!claim) return { claimed: false };
+      safeLoggerCall(
+        logger,
+        "info",
+        `[distributed-encoding-worker:${claim.task.id}] tâche attribuée au clone (${claim.task.kind}, ${claim.task.key}, job ${claim.job.id}).`
+      );
       return processClaim(claim, controller);
     })().finally(() => {
       activeRun = null;

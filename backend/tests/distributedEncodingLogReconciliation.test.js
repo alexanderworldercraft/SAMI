@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   findActions: vi.fn(),
   findJobs: vi.fn(),
   findLogs: vi.fn(),
+  findVideos: vi.fn(),
 }));
 
 vi.mock("../controllers/logController.js", () => ({
@@ -15,6 +16,7 @@ vi.mock("../services/db.js", () => ({
   prisma: {
     action: { findMany: mocks.findActions },
     log: { findMany: mocks.findLogs },
+    video: { findMany: mocks.findVideos },
     videoEncodingJob: { findMany: mocks.findJobs },
   },
 }));
@@ -34,6 +36,9 @@ describe("distributedEncodingLogReconciliation", () => {
       { ActionID: 4, Nom: "distributed_encoding_job_cancelled" },
     ]);
     mocks.findLogs.mockResolvedValue([]);
+    mocks.findVideos.mockImplementation(async ({ where }) => (
+      where.VideoID.in.map((VideoID) => ({ VideoID }))
+    ));
     mocks.createLog.mockResolvedValue({ ok: true, deduped: false });
   });
 
@@ -112,5 +117,30 @@ describe("distributedEncodingLogReconciliation", () => {
       skipped: 2,
     });
     expect(mocks.createLog).not.toHaveBeenCalled();
+  });
+
+  it("conserve dans Meta la vidéo supprimée sans violer la clé étrangère du log", async () => {
+    mocks.findJobs.mockResolvedValue([{
+      VideoEncodingJobID: "job-cancelled",
+      VideoID: 404,
+      InitiatedByUserID: 7,
+      Status: "CANCELLED",
+      SourceOriginalName: "cancelled.mkv",
+      ErrorMessage: null,
+    }]);
+    mocks.findVideos.mockResolvedValue([]);
+
+    await expect(reconcileDistributedEncodingLogs()).resolves.toMatchObject({
+      created: 2,
+      failed: 0,
+    });
+    expect(mocks.createLog).toHaveBeenCalledTimes(2);
+    expect(mocks.createLog).toHaveBeenCalledWith(expect.objectContaining({
+      VideoID: null,
+      Meta: expect.objectContaining({
+        jobId: "job-cancelled",
+        deletedVideoId: 404,
+      }),
+    }));
   });
 });

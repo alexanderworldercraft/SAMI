@@ -4,6 +4,7 @@ import { execFile } from "child_process";
 
 import { withEncodingCapacity } from "../distributedEncoding/capacity.js";
 import { assertAiSubtitleConfig } from "./config.js";
+import { buildAiSubtitleProcessEnvironment } from "./processEnvironment.js";
 
 const MAX_OUTPUT_BYTES = 64 * 1024 * 1024;
 
@@ -18,7 +19,7 @@ const runPython = (config, args, { signal, timeout = 24 * 60 * 60 * 1000 } = {})
         signal,
         timeout,
         maxBuffer: MAX_OUTPUT_BYTES,
-        env: { ...process.env, PYTHONUNBUFFERED: "1" },
+        env: buildAiSubtitleProcessEnvironment({ install: config.install }),
       },
       (error, stdout, stderr) => {
         if (error) {

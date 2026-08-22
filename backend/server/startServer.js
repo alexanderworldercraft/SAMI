@@ -22,7 +22,10 @@ import { runDistributedEncodingMaintenance } from "../services/distributedEncodi
 import { reconcileDistributedEncodingLogs } from "../services/distributedEncoding/logReconciliation.js";
 import { startPrimaryDistributedEncodingRuntime } from "../services/distributedEncoding/primaryRuntime.js";
 import { startDistributedEncodingWorkerRuntime } from "../services/distributedEncoding/workerRuntime.js";
-import { isAiSubtitleEnvironmentEnabled } from "../services/aiSubtitles/config.js";
+import {
+  getAiSubtitleConfig,
+  isAiSubtitleEnvironmentEnabled,
+} from "../services/aiSubtitles/config.js";
 import { startAiSubtitleWorkerRuntime } from "../services/aiSubtitles/workerRuntime.js";
 import { createServer } from "./createServer.js";
 import {
@@ -190,9 +193,19 @@ function registerAiSubtitleRuntime(server) {
   return async function startAiSubtitles() {
     if (!isAiSubtitleEnvironmentEnabled()) return null;
     runtime = await startAiSubtitleWorkerRuntime();
-    console.info(
-      `Runtime de sous-titrage IA démarré pour ${getInstanceRole()}.`
-    );
+    const capabilities = await runtime.ready;
+    const score = getAiSubtitleConfig().performanceScore;
+    const state = capabilities.ready ? "prêt" : "indisponible";
+    const details = [
+      capabilities.engine || "moteur inconnu",
+      capabilities.device || "périphérique inconnu",
+      `score ${score}`,
+      state,
+    ].join(", ");
+    console.info(`Runtime de sous-titrage IA démarré pour ${getInstanceRole()} (${details}).`);
+    if (!capabilities.ready && capabilities.error) {
+      console.warn(`[ai-subtitles] worker hors du pool : ${capabilities.error}`);
+    }
     return runtime;
   };
 }

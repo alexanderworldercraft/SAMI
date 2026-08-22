@@ -72,6 +72,18 @@ export async function reconcileDistributedEncodingLogs() {
       jobId: log.NouvelleValeur,
     }))
   );
+  const referencedVideoIds = [...new Set(
+    jobs
+      .map((job) => Number(job.VideoID))
+      .filter((videoId) => Number.isSafeInteger(videoId) && videoId > 0)
+  )];
+  const existingVideos = referencedVideoIds.length > 0
+    ? await prisma.video.findMany({
+        where: { VideoID: { in: referencedVideoIds } },
+        select: { VideoID: true },
+      })
+    : [];
+  const existingVideoIds = new Set(existingVideos.map((video) => video.VideoID));
 
   let created = 0;
   let existing = 0;
@@ -80,6 +92,12 @@ export async function reconcileDistributedEncodingLogs() {
 
   for (const job of jobs) {
     const userId = Number(job.InitiatedByUserID);
+    const referencedVideoId = Number(job.VideoID);
+    const videoId = Number.isSafeInteger(referencedVideoId)
+      && referencedVideoId > 0
+      && existingVideoIds.has(referencedVideoId)
+      ? referencedVideoId
+      : null;
     const expectedActions = getExpectedDistributedEncodingJobActions(job);
     if (!Number.isSafeInteger(userId) || userId <= 0) {
       skipped += expectedActions.length;
@@ -105,7 +123,7 @@ export async function reconcileDistributedEncodingLogs() {
         request: null,
         UtilisateurID: userId,
         ActionNom: actionName,
-        VideoID: job.VideoID || null,
+        VideoID: videoId,
         Champ: "distributed_encoding_job",
         NouvelleValeur: job.VideoEncodingJobID,
         Meta: {
@@ -113,6 +131,9 @@ export async function reconcileDistributedEncodingLogs() {
           jobId: job.VideoEncodingJobID,
           status: job.Status,
           sourceOriginalName: job.SourceOriginalName,
+          ...(referencedVideoId > 0 && videoId === null
+            ? { deletedVideoId: referencedVideoId }
+            : {}),
           ...(job.ErrorMessage ? { error: job.ErrorMessage } : {}),
         },
         DedupeMs: 365 * 24 * 60 * 60 * 1000,

@@ -122,6 +122,7 @@ export async function startAiSubtitleWorkerRuntime(options = {}) {
   const config = options.config || assertAiSubtitleConfig();
   const logger = options.logger === undefined ? console : options.logger;
   const dependencies = {
+    runEngine: runAiSubtitleEngine,
     ...(config.role === "PRIMARY" ? localDependencies(config) : remoteDependencies(config)),
     ...(options.dependencies || {}),
   };
@@ -202,7 +203,7 @@ export async function startAiSubtitleWorkerRuntime(options = {}) {
       phase = claim.transcript ? AI_SUBTITLE_PHASE.TRANSLATING : AI_SUBTITLE_PHASE.TRANSCRIBING;
       progress = claim.transcript ? 60 : 15;
       await renew();
-      const result = await runAiSubtitleEngine({
+      const result = await dependencies.runEngine({
         jobId: claim.job.id,
         audioPath: sourcePath,
         transcript: claim.transcript,
@@ -250,6 +251,14 @@ export async function startAiSubtitleWorkerRuntime(options = {}) {
     try {
       const response = await dependencies.claim();
       if (!response?.lease) return;
+      const claim = response.lease;
+      const operation = claim.transcript ? "traduction" : "transcription";
+      const assignee = config.role === "CLONE" ? "au clone" : "au serveur principal";
+      safeLog(
+        logger,
+        "info",
+        `[ai-subtitles:${claim.job.id}] tâche attribuée ${assignee} (${operation}, vidéo ${claim.job.videoId}, langue ${claim.job.targetLanguage}).`
+      );
       const controller = new AbortController();
       activeController = controller;
       active = processLease(response, controller).finally(() => {

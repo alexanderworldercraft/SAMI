@@ -149,11 +149,12 @@ describe("runtime du worker d'encodage distribué", () => {
       completeTask: vi.fn().mockResolvedValue({ purgeSource: true }),
     });
     const config = createConfig(root);
+    const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
     const runtime = startDistributedEncodingWorkerRuntime({
       autoStart: false,
       config,
       dependencies,
-      logger: null,
+      logger,
     });
 
     const result = await runtime.runOneClaim();
@@ -203,6 +204,9 @@ describe("runtime du worker d'encodage distribué", () => {
     ))).rejects.toMatchObject({ code: "ENOENT" });
     expect(dependencies.failTask).not.toHaveBeenCalled();
     expect(dependencies.releaseTask).not.toHaveBeenCalled();
+    expect(logger.info).toHaveBeenCalledWith(
+      `[distributed-encoding-worker:${TASK_ID}] tâche attribuée au clone (VIDEO_PROFILE, video-720p, job ${JOB_ID}).`
+    );
     await runtime.stop();
   });
 

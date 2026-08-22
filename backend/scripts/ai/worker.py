@@ -1,4 +1,5 @@
 import argparse
+import ctypes
 import json
 import os
 import subprocess
@@ -53,6 +54,13 @@ def probe(manifest):
             import faster_whisper  # noqa: F401
             import ctranslate2
             if manifest.get("device") == "cuda":
+                cuda_libraries = (
+                    ("cublas64_12.dll", "cudnn64_9.dll", "cudnn_ops64_9.dll")
+                    if os.name == "nt"
+                    else ("libcublas.so.12", "libcudnn.so.9", "libcudnn_ops.so.9")
+                )
+                for library in cuda_libraries:
+                    ctypes.CDLL(library)
                 if ctranslate2.get_cuda_device_count() < 1:
                     raise RuntimeError("Aucun GPU CUDA utilisable par CTranslate2.")
                 if not torch.cuda.is_available():
