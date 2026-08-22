@@ -22,6 +22,8 @@ import { runDistributedEncodingMaintenance } from "../services/distributedEncodi
 import { reconcileDistributedEncodingLogs } from "../services/distributedEncoding/logReconciliation.js";
 import { startPrimaryDistributedEncodingRuntime } from "../services/distributedEncoding/primaryRuntime.js";
 import { startDistributedEncodingWorkerRuntime } from "../services/distributedEncoding/workerRuntime.js";
+import { isAiSubtitleEnvironmentEnabled } from "../services/aiSubtitles/config.js";
+import { startAiSubtitleWorkerRuntime } from "../services/aiSubtitles/workerRuntime.js";
 import { createServer } from "./createServer.js";
 import {
   buildBackupCronExpression,
@@ -177,6 +179,24 @@ function registerDistributedEncodingRuntime(server) {
   };
 }
 
+function registerAiSubtitleRuntime(server) {
+  let runtime = null;
+
+  server.addHook("onClose", async () => {
+    await runtime?.stop?.();
+    runtime = null;
+  });
+
+  return async function startAiSubtitles() {
+    if (!isAiSubtitleEnvironmentEnabled()) return null;
+    runtime = await startAiSubtitleWorkerRuntime();
+    console.info(
+      `Runtime de sous-titrage IA démarré pour ${getInstanceRole()}.`
+    );
+    return runtime;
+  };
+}
+
 export function loadTlsCredentials() {
   console.info("Lecture des certificats SSL...");
   const credentials = {
@@ -305,11 +325,13 @@ export async function startServer({
   try {
     const startBackgroundJobs = registerBackgroundJobs(server);
     const startDistributedEncoding = registerDistributedEncodingRuntime(server);
+    const startAiSubtitles = registerAiSubtitleRuntime(server);
     console.info(formatServerStartupBanner(startupInfo));
     await pingDatabase();
     await maintainVideoTransfers({ startup: true });
     await server.listen({ port, host });
     await startDistributedEncoding();
+    await startAiSubtitles();
     startBackgroundJobs();
     console.info("Serveur démarré avec succès.");
     return server;

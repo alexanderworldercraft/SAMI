@@ -4,6 +4,29 @@ import { RECENT_LOG_ACTIONS } from "./recentLogActions.js";
 
 const prisma = new PrismaClient();
 
+const AI_SUBTITLE_LOG_ACTIONS = Object.freeze([
+  {
+    Nom: "ai_subtitles_toggle",
+    Description: "Un administrateur modifie l'activation des sous-titres générés par IA.",
+    Criticite: 2,
+  },
+  {
+    Nom: "ai_subtitle_requested",
+    Description: "Un utilisateur demande la génération d'un sous-titre.",
+    Criticite: 1,
+  },
+  {
+    Nom: "ai_subtitle_completed",
+    Description: "Une génération locale de sous-titre est terminée.",
+    Criticite: 1,
+  },
+  {
+    Nom: "ai_subtitle_failed",
+    Description: "Une génération locale de sous-titre a échoué.",
+    Criticite: 2,
+  },
+]);
+
 const uniqueByNom = (items) => {
   const seen = new Set();
 
@@ -311,6 +334,7 @@ async function main() {
         Description: "Le transfert inter-serveurs d'une vidéo a été annulé.",
         Criticite: 2,
       },
+      ...AI_SUBTITLE_LOG_ACTIONS,
       ...RECENT_LOG_ACTIONS,
     ]),
     skipDuplicates: true, // Évite les erreurs si les grades existent déjà

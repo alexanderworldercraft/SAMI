@@ -15,6 +15,11 @@ const settingResponse = { data: { active: false } };
 const mockAdminApi = ({ gradeId = 1, role = "primary" } = {}) => {
   api.get.mockImplementation((url) => {
     if (url.startsWith("/app-settings/")) return Promise.resolve(settingResponse);
+    if (url === "/ai-subtitles/config") {
+      return Promise.resolve({
+        data: { active: false, environmentEnabled: true, languages: [] },
+      });
+    }
     if (url === "/users/me") return Promise.resolve({ data: { GradeID: gradeId } });
     if (url === "/video-encoding/config") {
       return Promise.resolve({
@@ -150,5 +155,31 @@ describe("AdminExperimentalFeatures - encodage multi-server", () => {
       });
     });
     expect(await screen.findByText("Aero 15 XC")).toBeInTheDocument();
+  });
+
+  test("active le sous-titrage IA via sa configuration dédiée", async () => {
+    mockAdminApi({ gradeId: 1, role: "primary" });
+    api.put.mockImplementation((url) => {
+      if (url === "/ai-subtitles/config") {
+        return Promise.resolve({
+          data: { active: true, environmentEnabled: true, languages: [] },
+        });
+      }
+      return Promise.resolve({ data: {} });
+    });
+    render(<AdminExperimentalFeatures />);
+
+    const toggle = await screen.findByRole("button", {
+      name: "Activer les sous-titres générés par IA",
+    });
+    await waitFor(() => expect(toggle).toBeEnabled());
+    fireEvent.click(toggle);
+
+    await waitFor(() => expect(api.put).toHaveBeenCalledWith(
+      "/ai-subtitles/config",
+      { active: true }
+    ));
+    expect(await screen.findByText("Génération locale des sous-titres IA activée."))
+      .toBeInTheDocument();
   });
 });

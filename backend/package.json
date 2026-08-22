@@ -10,6 +10,8 @@
     "seed:people-images": "node prisma/seedPersonneImages.js",
     "seed:people-images:dry-run": "node prisma/seedPersonneImages.js --dry-run",
     "seed:people-images:retry-misses": "node prisma/seedPersonneImages.js --retry-misses",
+    "setup:ai": "node scripts/setupAiSubtitles.mjs",
+    "setup:ai:check": "node scripts/setupAiSubtitles.mjs --check",
     "start": "node sami.js",
     "test": "vitest run"
   },

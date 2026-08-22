@@ -40,6 +40,7 @@ import {
   isMultiAudioActive,
   isPreviewLiveActive,
 } from "./appSettingController.js";
+import { queueAutomaticFrenchSubtitle } from "../services/aiSubtitles/jobService.js";
 
 const ensureVideoAdmin = async (request, reply) => {
   const admin = await ensureAdmin(request, reply);
@@ -275,6 +276,13 @@ export const addVideo = async (request, reply, fastify) => {
         error.message
       );
     }
+
+    queueAutomaticFrenchSubtitle(updatedVideo.VideoID).catch((error) => {
+      console.warn(
+        `[addVideo] Sous-titre IA non planifié pour la vidéo ${updatedVideo.VideoID} :`,
+        error.message
+      );
+    });
 
     fastify.io.emit("progress", {
       stage: "completed",

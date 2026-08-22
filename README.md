@@ -2,20 +2,21 @@
 
 SAMI (**Système d’Archivage Multimédia Intégré**) est une médiathèque web privée permettant d’organiser, diffuser et suivre des films, séries et musiques depuis une seule interface.
 
-La version actuelle est la **7.13.0**. Elle repose sur un backend Fastify, une interface React, Prisma avec MySQL, un pipeline vidéo FFmpeg/HLS et Socket.IO pour le retour en temps réel des traitements.
+La version actuelle est la **7.14.0**. Elle repose sur un backend Fastify, une interface React, Prisma avec MySQL, un pipeline vidéo FFmpeg/HLS et Socket.IO pour le retour en temps réel des traitements.
 
 ## Fonctionnalités
 
 ### Vidéo
 
 - catalogue de films et de séries, saisons et épisodes ;
-- lecture HLS avec choix de la qualité, sous-titres et éclairage d’ambiance classique ou avancé, personnalisé par compte ;
+- lecture HLS avec choix de la qualité, sous-titres personnalisés désactivés par défaut et éclairage d’ambiance classique ou avancé, personnalisé par compte ;
 - pistes audio multiples expérimentales pour les nouvelles vidéos importées, avec choix dans le lecteur ;
 - lecteur personnalisé avec progression lue, buffer, volume et plein écran ;
 - aperçus Open Graph et Twitter spécifiques aux pages `/lecture/:id`, y compris pour les épisodes ;
 - **Preview Live** expérimentale : aperçu au survol de la barre de lecture à partir de spritesheets et d’un fichier WebVTT ;
 - import et transcodage FFmpeg avec suivi de progression via Socket.IO ;
 - encodage multi-server expérimental : une résolution par worker, redistribution dynamique et publication finale sur le serveur principal ;
+- sous-titres IA locaux expérimentaux : français automatique pour les nouveaux imports qui en sont dépourvus, quinze langues à la demande, catalogue administratif paginé et affectation complète au meilleur worker disponible ;
 - export sécurisé et reprenable d’une vidéo traitée depuis un clone vers l’instance principale ;
 - historique de lecture, reprise intelligente et remise à zéro d’une série ;
 - recherche tolérante aux accents, séparateurs et petites fautes de saisie pour les films et les séries ;
@@ -43,19 +44,19 @@ La version actuelle est la **7.13.0**. Elle repose sur un backend Fastify, une i
 - journalisation des actions et sauvegardes manuelles ou planifiées de MySQL ;
 - limitations de requêtes, contrôle CORS et en-têtes de sécurité.
 
-## Nouveautés de la version 7.13.0
+## Nouveautés de la version 7.14.0
 
-- recherche de films et de séries normalisée et classée par pertinence, avec une tolérance de 80 % permettant notamment de rapprocher `Spider-Man` et `spider man` ;
-- recherche des personnes par prénom et nom complets, dans les deux ordres, avec normalisation et similitude minimale de 80 % ;
-- navigation plus fluide avec retour en haut sur les accès principaux, les liens du pied de page, les contenus aléatoires, les cartes de personnes et la fenêtre des sagas ;
-- nouvelle page `/stats` regroupant les statistiques, le calendrier des ajouts et les cookies, avec un badge de version cliquable vers les mises à jour dans la sidebar ;
-- boutons de favoris masqués au repos lorsqu’un contenu n’est pas encore favori et ralentissement des affiches de prévisualisation ;
-- refonte responsive de l’annuaire et des fiches des personnes, avec films et séries regroupés entre réalisation et distribution, outils administrateur repliables et métadonnées sociales complètes ;
-- grille des sélections par genre adaptée aux smartphones, avec la vedette en premier puis deux cartes par ligne ;
-- détection des doublons enrichie par les contenus partagés et les petites fautes de saisie ;
-- configuration SMTP contrôlée avec SSL/TLS sur le port 465 ou STARTTLS sur les autres ports.
+- génération locale expérimentale de sous-titres français pour les nouvelles vidéos qui en sont dépourvues et traduction à la demande dans quinze langues ;
+- nouvelle liste administrative paginée par quarante des films et épisodes sans sous-titre français complet ;
+- file IA indépendante attribuant une vidéo complète au meilleur worker disponible, avec priorités configurables et reprise automatique par la machine suivante ;
+- démarrage intégré à `npm run start`, installation réutilisable avec `npm run setup:ai` et contrôle matériel avec `npm run setup:ai:check` ;
+- accélération CUDA pour NVIDIA, Metal pour Apple Silicon et Vulkan pour AMD Linux lorsque les dépendances sont disponibles ;
+- lecteur WebVTT personnalisé avec sous-titres désactivés par défaut, position dynamique au-dessus des contrôles et repli natif pour le Picture-in-Picture et le plein écran iOS ;
+- drapeaux ajoutés pour l’arabe, le hindi, le russe, le turc, le polonais et le néerlandais ;
+- échanges primary/clone signés, sources vérifiées et runtime résilient lorsque le serveur principal est temporairement indisponible ou pas encore à jour ;
+- usage documenté comme strictement privé et non commercial jusqu’au remplacement ou à la relicence du modèle de traduction et au réaudit des composants IA.
 
-L’historique complet des versions, de la 6.1.0 à la 7.13.0, est disponible dans l’application à l’adresse `/updates` et dans `frontend/src/components/UpdatesPage.js`.
+L’historique complet des versions, de la 6.1.0 à la 7.14.0, est disponible dans l’application à l’adresse `/updates` et dans `frontend/src/components/UpdatesPage.js`.
 
 ## Stack technique
 
@@ -106,7 +107,8 @@ Le schéma Prisma décrit notamment :
 - les sagas, univers et leur ordre de lecture ;
 - les personnes associées aux films et séries ;
 - les morceaux, albums et genres musicaux ;
-- les messages administratifs et réglages globaux de l’application.
+- les messages administratifs et réglages globaux de l’application ;
+- le registre des workers IA, les jobs de sous-titrage, leurs tentatives et les transcriptions réutilisables ;
 - le registre, les jobs, les tâches, les leases, les tentatives et les artefacts de l’encodage vidéo distribué.
 
 Le fichier source est `backend/prisma/schema.prisma`. Un diagramme est également disponible dans `backend/prisma/ERD.svg`.
@@ -253,6 +255,71 @@ puis activez le réglage expérimental. La migration ne l’active jamais
 automatiquement. Utilisez un seul processus backend par instance dans cette
 version : la promotion locale des artefacts et la capacité FFmpeg sont
 coordonnées dans le processus Node.
+
+### Sous-titres IA locaux expérimentaux
+
+La fonctionnalité utilise une file indépendante de l’encodage vidéo. Une vidéo
+est traitée de bout en bout par un seul worker ; le coordinateur choisit le
+worker prêt ayant la priorité `SAMI_AI_SUBTITLE_PERFORMANCE_SCORE` la plus
+élevée. Tant qu’il reste en ligne et opérationnel, ce worker traite seul la file
+IA. Le suivant ne prend le relais que s’il devient indisponible. Si le worker
+prioritaire termine un encodage distribué, la file IA attend qu’il soit libre.
+Après une erreur moteur, le worker concerné sort temporairement du pool afin
+qu'une machine de priorité inférieure puisse retenter la tâche.
+La transcription source horodatée est conservée en base, ce qui permet de
+produire ensuite d’autres langues sans réanalyser l’audio.
+
+Sur chaque installation, préparez une seule fois les dépendances et les modèles :
+
+```bash
+cd backend
+npm run setup:ai
+npm run setup:ai:check
+```
+
+`npm run start` contrôle ensuite l’installation, publie le heartbeat IA et
+démarre automatiquement le coordinateur sur le primary ou le worker sur un
+clone. Il ne retélécharge jamais les modèles. Configuration minimale commune :
+
+```dotenv
+SAMI_AI_SUBTITLES_ENABLED="true"
+SAMI_AI_SUBTITLE_PIPELINE_VERSION="sami-ai-subtitles-v1"
+SAMI_AI_SUBTITLE_MODEL="large-v3"
+SAMI_AI_SUBTITLE_ENGINE="auto"
+SAMI_AI_SUBTITLE_PERFORMANCE_SCORE="100"
+```
+
+Les scores recommandés pour le parc actuel sont 100 pour la RTX 3090, 80 pour
+la RTX 3070, 60 pour le MacBook 24 Go et 40 pour la RX 6700 XT. Le mode `auto`
+sélectionne `faster-whisper`/CUDA lorsqu’un GPU NVIDIA est détecté,
+`whisper.cpp`/Metal sur macOS et `whisper.cpp`/Vulkan sur Linux sans NVIDIA.
+FFmpeg et Python 3 sont requis ; Git et CMake sont aussi nécessaires lorsque
+`whisper.cpp` doit être compilé. Sous Linux/AMD, les en-têtes et le runtime
+Vulkan doivent être installés. Sous NVIDIA, le pilote, CUDA et cuDNN doivent
+être compatibles avec les versions de PyTorch/CTranslate2 installées. La
+commande `npm run setup:ai:check` vérifie également que CUDA ou Metal est
+réellement visible avant de déclarer le worker prêt. Sur Linux sans NVIDIA,
+le setup installe automatiquement la variante CPU de PyTorch pour la traduction
+et réserve le GPU AMD au moteur Whisper Vulkan ; `SAMI_AI_TORCH_INDEX_URL`
+permet de remplacer explicitement l'index PyTorch si nécessaire.
+
+Sur un Mac Apple Silicon où CMake est absent, installez-le une fois avant de
+relancer le setup ; le venv et les modèles déjà présents seront réutilisés :
+
+```bash
+brew install cmake
+cd backend
+npm run setup:ai
+```
+
+Le modèle de traduction actuellement installé est
+[`facebook/nllb-200-distilled-600M`](https://huggingface.co/facebook/nllb-200-distilled-600M),
+distribué sous licence CC-BY-NC-4.0 et prévu ici uniquement pour une instance
+privée non commerciale. Avant toute commercialisation de SAMI, la priorité est
+de remplacer ou relicencier ce modèle, de réauditer les licences des moteurs et
+poids utilisés, puis de mettre à jour les informations légales et les règles de
+conservation. Cette version ne doit pas être présentée comme compatible avec un
+usage commercial.
 
 ### Transfert d’une vidéo depuis un clone
 

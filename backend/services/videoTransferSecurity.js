@@ -1197,6 +1197,28 @@ const normalizeMetadata = (metadata) => {
         "INVALID_TRANSFER_MANIFEST"
       );
     }
+    let language = null;
+    if (subtitle.language !== null && subtitle.language !== undefined && subtitle.language !== "") {
+      language = requireTrimmedString(
+        subtitle.language,
+        `metadata.subtitles[${index}].language`,
+        { maxLength: 35 }
+      );
+    }
+    const type = String(subtitle.type || "FULL").trim().toUpperCase();
+    if (!["FULL", "FORCED", "SDH"].includes(type)) {
+      throw securityError(
+        `metadata.subtitles[${index}].type est invalide.`,
+        "INVALID_TRANSFER_MANIFEST"
+      );
+    }
+    const origin = String(subtitle.origin || "IMPORTED").trim().toUpperCase();
+    if (!["IMPORTED", "AI"].includes(origin)) {
+      throw securityError(
+        `metadata.subtitles[${index}].origin est invalide.`,
+        "INVALID_TRANSFER_MANIFEST"
+      );
+    }
     return {
       ...subtitle,
       label: requireTrimmedString(
@@ -1204,6 +1226,9 @@ const normalizeMetadata = (metadata) => {
         `metadata.subtitles[${index}].label`,
         { maxLength: 100 }
       ),
+      language,
+      type,
+      origin,
       path: subtitlePath,
     };
   });

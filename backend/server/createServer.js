@@ -12,8 +12,10 @@ import path from "path";
 import adminBackupRoutes from "../routes/adminBackupRoutes.js";
 import adminMessageRoutes from "../routes/adminMessageRoutes.js";
 import appSettingRoutes from "../routes/appSettingRoutes.js";
+import aiSubtitleRoutes from "../routes/aiSubtitleRoutes.js";
 import genreRoutes from "../routes/genreRoutes.js";
 import internalVideoEncodingRoutes from "../routes/internalVideoEncodingRoutes.js";
+import internalAiSubtitleRoutes from "../routes/internalAiSubtitleRoutes.js";
 import internalVideoTransferRoutes from "../routes/internalVideoTransferRoutes.js";
 import logRoutes from "../routes/logRoutes.js";
 import musicRoutes from "../routes/musicRoutes.js";
@@ -43,8 +45,10 @@ const ROUTES = [
   [userRoutes, "/api/users"],
   [videoRoutes, "/api/videos"],
   [videoEncodingRoutes, "/api/video-encoding"],
+  [aiSubtitleRoutes, "/api/ai-subtitles"],
   [videoExportRoutes, "/api/video-exports"],
   [internalVideoEncodingRoutes, "/api/internal/video-encoding"],
+  [internalAiSubtitleRoutes, "/api/internal/ai-subtitles"],
   [internalVideoTransferRoutes, "/api/internal/video-transfers"],
   [genreRoutes, "/api/genres"],
   [seriesRoutes, "/api/series"],

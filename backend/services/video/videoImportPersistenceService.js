@@ -74,6 +74,8 @@ const moveImportedFiles = ({
       moveFileIfNeeded(subtitle.tempPath, finalPath);
       subtitles.push({
         label: subtitle.label,
+        language: subtitle.language || null,
+        type: subtitle.type || "FULL",
         path: toStoragePath(
           "uploads",
           "video",
@@ -271,6 +273,9 @@ export async function finalizeReservedImportedVideo({
         data: importedFiles.subtitles.map((subtitle, index) => ({
           Label: subtitle.label || `Subtitle ${index + 1}`,
           CheminSubtitle: subtitle.path,
+          Language: subtitle.language || null,
+          Type: subtitle.type || "FULL",
+          Origin: "IMPORTED",
           VideoID: parsedVideoId,
         })),
       });

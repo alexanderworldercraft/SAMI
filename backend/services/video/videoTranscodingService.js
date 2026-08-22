@@ -11,6 +11,10 @@ import {
 } from "../distributedEncoding/ffmpeg/index.js";
 import { withEncodingCapacity } from "../distributedEncoding/capacity.js";
 import {
+  normalizeAiLanguage,
+  subtitleTypeFromStream,
+} from "../aiSubtitles/language.js";
+import {
   ERROR_ROOT,
   TEMP_ROOT,
 } from "./videoPaths.js";
@@ -215,7 +219,13 @@ export async function extractVideoSubtitles({ videoPath, subtitleStreams, output
           .on("error", reject)
           .run();
       });
-      subtitleInfos.push({ tempPath: subtitlePath, filename, label });
+      subtitleInfos.push({
+        tempPath: subtitlePath,
+        filename,
+        label,
+        language: normalizeAiLanguage(language) || language || null,
+        type: subtitleTypeFromStream({ label, disposition: stream.disposition }),
+      });
     } catch (error) {
       console.warn(
         `[addVideo] Le sous-titre ${position + 1} n'a pas pu être extrait :`,

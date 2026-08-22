@@ -337,6 +337,9 @@ const createBlockedDestination = async ({
         VideoID: video.VideoID,
         Label: subtitle.label,
         CheminSubtitle: toStoragePath(...base, subtitle.path),
+        Language: subtitle.language || null,
+        Type: subtitle.type || "FULL",
+        Origin: subtitle.origin || "IMPORTED",
       })),
     });
   }

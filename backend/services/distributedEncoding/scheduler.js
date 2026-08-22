@@ -377,6 +377,17 @@ export async function claimNextEncodingTask({
     });
     if (!worker || !isEncodingWorkerOnline(worker, { now: instant })) return null;
 
+    const activeAiLeaseCount = typeof tx.aiSubtitleJob?.count === "function"
+      ? await tx.aiSubtitleJob.count({
+          where: {
+            AssignedWorkerID: worker.VideoEncodingWorkerID,
+            Status: "LEASED",
+            LeaseExpiresAt: { gt: instant },
+          },
+        })
+      : 0;
+    if (activeAiLeaseCount > 0) return null;
+
     const activeLeaseCount = await tx.videoEncodingTask.count({
       where: {
         AssignedWorkerID: worker.VideoEncodingWorkerID,
@@ -394,7 +405,7 @@ export async function claimNextEncodingTask({
     });
     if (tasks.length === 0) return null;
 
-    const [registeredWorkers, activeLeases] = await Promise.all([
+    const [registeredWorkers, activeLeases, activeAiLeases] = await Promise.all([
       tx.videoEncodingWorker.findMany({
         where: { Enabled: true },
       }),
@@ -405,8 +416,25 @@ export async function claimNextEncodingTask({
         },
         select: { AssignedWorkerID: true },
       }),
+      typeof tx.aiSubtitleJob?.findMany === "function"
+        ? tx.aiSubtitleJob.findMany({
+            where: {
+              Status: "LEASED",
+              LeaseExpiresAt: { gt: instant },
+            },
+            select: { AssignedWorkerID: true },
+          })
+        : [],
     ]);
-    const workers = attachActiveLeaseCounts(registeredWorkers, activeLeases);
+    const aiBusyWorkerIds = new Set(
+      activeAiLeases.map((lease) => lease.AssignedWorkerID).filter(Boolean)
+    );
+    const workers = attachActiveLeaseCounts(
+      registeredWorkers.filter((candidate) =>
+        !aiBusyWorkerIds.has(candidate.VideoEncodingWorkerID)
+      ),
+      activeLeases
+    );
     const cloneWorkers = workers.filter(
       (candidate) => workerRole(candidate) === ENCODING_WORKER_ROLE.CLONE
     );

@@ -1526,6 +1526,9 @@ export const getVideoDetails = async (request, reply) => {
           VideoSubtitles: video.VideoSubtitles.map((subtitle) => ({
             Label: subtitle.Label,
             CheminSubtitle: subtitle.CheminSubtitle,
+            Language: subtitle.Language,
+            Type: subtitle.Type,
+            Origin: subtitle.Origin,
           })),
           VideoAudioTracks: video.VideoAudioTracks.map((track) => ({
             VideoAudioTrackID: track.VideoAudioTrackID,
@@ -1566,6 +1569,9 @@ export const getVideoDetails = async (request, reply) => {
           VideoSubtitles: video.VideoSubtitles.map((subtitle) => ({
             Label: subtitle.Label,
             CheminSubtitle: subtitle.CheminSubtitle,
+            Language: subtitle.Language,
+            Type: subtitle.Type,
+            Origin: subtitle.Origin,
           })),
           VideoAudioTracks: video.VideoAudioTracks.map((track) => ({
             VideoAudioTrackID: track.VideoAudioTrackID,

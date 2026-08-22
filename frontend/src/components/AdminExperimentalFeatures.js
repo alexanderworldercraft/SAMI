@@ -15,6 +15,7 @@ const AdminExperimentalFeatures = () => {
   const [contentPreviewActive, setContentPreviewActive] = useState(false);
   const [previewLiveActive, setPreviewLiveActive] = useState(false);
   const [multiAudioActive, setMultiAudioActive] = useState(false);
+  const [aiSubtitlesConfig, setAiSubtitlesConfig] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
@@ -35,14 +36,16 @@ const AdminExperimentalFeatures = () => {
   useEffect(() => {
     const fetchSettings = async () => {
       try {
-        const [contentPreviewResponse, previewLiveResponse, multiAudioResponse] = await Promise.all([
+        const [contentPreviewResponse, previewLiveResponse, multiAudioResponse, aiSubtitlesResponse] = await Promise.all([
           api.get("/app-settings/content-preview"),
           api.get("/app-settings/preview-live"),
           api.get("/app-settings/multi-audio"),
+          api.get("/ai-subtitles/config"),
         ]);
         setContentPreviewActive(Boolean(contentPreviewResponse.data?.active));
         setPreviewLiveActive(Boolean(previewLiveResponse.data?.active));
         setMultiAudioActive(Boolean(multiAudioResponse.data?.active));
+        setAiSubtitlesConfig(aiSubtitlesResponse.data || null);
       } catch (error) {
         console.error("Erreur lors du chargement des fonctionnalités expérimentales :", error);
         setErrorMessage(error.response?.data?.error || "Impossible de charger les fonctionnalités expérimentales.");
@@ -205,6 +208,28 @@ const AdminExperimentalFeatures = () => {
       setMultiAudioActive(!nextActive);
       setErrorMessage(
         error.response?.data?.error || "Impossible de mettre à jour le multi-audio."
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleToggleAiSubtitles = async () => {
+    const nextActive = !aiSubtitlesConfig?.active;
+    setSaving(true);
+    setMessage("");
+    setErrorMessage("");
+    try {
+      const response = await api.put("/ai-subtitles/config", { active: nextActive });
+      setAiSubtitlesConfig(response.data);
+      setMessage(
+        response.data?.active
+          ? "Génération locale des sous-titres IA activée."
+          : "Génération locale des sous-titres IA désactivée."
+      );
+    } catch (error) {
+      setErrorMessage(
+        error.response?.data?.error || "Impossible de modifier les sous-titres IA."
       );
     } finally {
       setSaving(false);
@@ -611,6 +636,47 @@ const AdminExperimentalFeatures = () => {
               <span
                 className={`inline-block size-6 rounded-full bg-white shadow transition duration-200 ${
                   multiAudioActive ? "translate-x-9" : "translate-x-1"
+                }`}
+              />
+            </button>
+          </div>
+
+          <div className="mt-4 flex flex-col gap-4 rounded-xl border border-fuchsia-400/20 bg-fuchsia-500/5 p-5 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <h3 className="text-base font-black text-slate-950 dark:text-white">
+                  Sous-titres générés par IA
+                </h3>
+                <span className="rounded-full bg-fuchsia-500/15 px-2.5 py-1 text-xs font-black text-fuchsia-700 dark:text-fuchsia-200">
+                  Usage privé
+                </span>
+              </div>
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-300">
+                Génère automatiquement le français manquant sur les nouveaux imports et permet
+                aux utilisateurs connectés de demander d'autres langues. Les modèles restent
+                stockés et exécutés localement.
+              </p>
+              {aiSubtitlesConfig && !aiSubtitlesConfig.environmentEnabled && (
+                <p className="mt-2 text-xs font-bold text-amber-700 dark:text-amber-300">
+                  Le runtime doit d'abord être installé avec npm run setup:ai puis activé dans l'environnement.
+                </p>
+              )}
+            </div>
+
+            <button
+              type="button"
+              onClick={handleToggleAiSubtitles}
+              disabled={loading || saving || !aiSubtitlesConfig?.environmentEnabled}
+              className={`relative inline-flex h-8 w-16 shrink-0 items-center rounded-full border transition duration-200 ${
+                aiSubtitlesConfig?.active
+                  ? "border-emerald-300/70 bg-emerald-500/80"
+                  : "border-slate-300/70 bg-slate-300/70 dark:border-slate-700 dark:bg-slate-800"
+              } disabled:cursor-not-allowed disabled:opacity-60`}
+            >
+              <span className="sr-only">Activer les sous-titres générés par IA</span>
+              <span
+                className={`inline-block size-6 rounded-full bg-white shadow transition duration-200 ${
+                  aiSubtitlesConfig?.active ? "translate-x-9" : "translate-x-1"
                 }`}
               />
             </button>

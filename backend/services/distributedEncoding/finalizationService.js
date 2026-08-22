@@ -22,6 +22,7 @@ import {
   getDistributedJobPaths,
   resolveDistributedSourcePath,
 } from "./sourceService.js";
+import { queueAutomaticFrenchSubtitle } from "../aiSubtitles/jobService.js";
 import {
   getJobForLifecycle,
   recalculateEncodingJobProgress,
@@ -122,6 +123,8 @@ const buildFinalizationInputs = async (job) => {
   const subtitleInfos = (snapshot.subtitles || []).map((subtitle) => ({
     filename: subtitle.filename,
     label: subtitle.label,
+    language: subtitle.language || null,
+    type: subtitle.type || "FULL",
     tempPath: path.join(paths.sourceRoot, ...String(subtitle.relativePath).split("/")),
   }));
   const imageTempPath = snapshot.imageRelativePath
@@ -224,6 +227,12 @@ const finalizeCompletedJob = async (job) => {
         error.message
       );
     }
+    queueAutomaticFrenchSubtitle(fresh.VideoID).catch((error) => {
+      console.warn(
+        `[distributed-encoding] Sous-titre IA non planifié pour ${fresh.VideoID}:`,
+        error.message
+      );
+    });
     await cleanupDistributedJobFiles(job.VideoEncodingJobID);
     await updateEncodingJob(job.VideoEncodingJobID, {
       status: ENCODING_JOB_STATUS.COMPLETED,

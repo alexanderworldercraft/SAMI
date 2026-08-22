@@ -66,6 +66,26 @@ const formatPlaybackTime = (seconds) => {
     : `${minutes}:${String(remainingSeconds).padStart(2, "0")}`;
 };
 
+const subtitleCueText = (cue) => {
+  try {
+    const fragment = cue?.getCueAsHTML?.();
+    if (fragment?.textContent) return fragment.textContent.trim();
+  } catch {
+    // Certains navigateurs n'exposent pas getCueAsHTML pour toutes les pistes.
+  }
+  return String(cue?.text || "")
+    .replace(/<br\s*\/?\s*>/gi, "\n")
+    .replace(/<[^>]+>/g, "")
+    .trim();
+};
+
+const readActiveSubtitleCues = (textTrack) => Array.from(textTrack?.activeCues || [])
+  .map((cue, index) => ({
+    id: `${cue.startTime ?? "start"}-${cue.endTime ?? "end"}-${index}`,
+    text: subtitleCueText(cue),
+  }))
+  .filter((cue) => cue.text);
+
 const isInteractiveShortcutTarget = (target) => Boolean(target?.closest?.(
   'input, textarea, select, button, a[href], [contenteditable]:not([contenteditable="false"]), [role="button"], [role="link"], [role="menuitem"], [role="menuitemradio"], [role="slider"], [role="textbox"], [role="combobox"], [role="spinbutton"], [role="switch"], [role="checkbox"], [role="radio"], [role="tab"]'
 ));
@@ -128,6 +148,7 @@ const VideoPlayer = ({
   onVideoElement,
   skipFirstPlayLogKey = 0,
   multiAudioEnabled = false,
+  onSubtitlesUpdated,
 }) => {
   const videoRef = useRef(null);
   const fitContainerRef = useRef(null);
@@ -147,8 +168,9 @@ const VideoPlayer = ({
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [volume, setVolume] = useState(1);
   const [muted, setMuted] = useState(false);
-  const [captionsEnabled, setCaptionsEnabled] = useState(true);
+  const [captionsEnabled, setCaptionsEnabled] = useState(false);
   const [selectedSubtitleIndex, setSelectedSubtitleIndex] = useState(0);
+  const [activeSubtitleCues, setActiveSubtitleCues] = useState([]);
   const [availableAudioTracks, setAvailableAudioTracks] = useState([]);
   const [selectedAudioTrackIndex, setSelectedAudioTrackIndex] = useState(-1);
   const [settingsMenuOpen, setSettingsMenuOpen] = useState(false);
@@ -160,6 +182,11 @@ const VideoPlayer = ({
     DEFAULT_AMBIENT_LIGHT_PREFERENCES
   );
   const [ambientPreferencesError, setAmbientPreferencesError] = useState("");
+  const [aiSubtitleConfig, setAiSubtitleConfig] = useState(null);
+  const [aiSubtitleJobs, setAiSubtitleJobs] = useState([]);
+  const [aiSubtitleLanguage, setAiSubtitleLanguage] = useState("fr");
+  const [aiSubtitleLoading, setAiSubtitleLoading] = useState(false);
+  const [aiSubtitleMessage, setAiSubtitleMessage] = useState("");
 
   // Réfs internes
   const hlsRef = useRef(null);
@@ -175,8 +202,17 @@ const VideoPlayer = ({
   const componentMountedRef = useRef(true);
   const isFullscreenRef = useRef(false);
   const isPictureInPictureRef = useRef(false);
+  const isNativeVideoFullscreenRef = useRef(false);
+  const captionsEnabledRef = useRef(captionsEnabled);
+  const selectedSubtitleIndexRef = useRef(selectedSubtitleIndex);
   const pendingCenterClickRef = useRef(null);
   const controlsHideTimeoutRef = useRef(null);
+  const refreshedAiSubtitleJobsRef = useRef(new Set());
+  const aiSubtitleJobsRef = useRef([]);
+  const onSubtitlesUpdatedRef = useRef(onSubtitlesUpdated);
+  onSubtitlesUpdatedRef.current = onSubtitlesUpdated;
+  captionsEnabledRef.current = captionsEnabled;
+  selectedSubtitleIndexRef.current = selectedSubtitleIndex;
 
   // ✅ 1 seule fois par chargement de page (par vidéo affichée)
   const hasLoggedFirstPlayRef = useRef(false);
@@ -190,8 +226,11 @@ const VideoPlayer = ({
     setPlaying(false);
     setControlsVisible(false);
     setControlsDismissed(false);
-    setCaptionsEnabled(true);
+    captionsEnabledRef.current = false;
+    selectedSubtitleIndexRef.current = 0;
+    setCaptionsEnabled(false);
     setSelectedSubtitleIndex(0);
+    setActiveSubtitleCues([]);
     setAvailableAudioTracks([]);
     setSelectedAudioTrackIndex(-1);
     setSettingsMenuOpen(false);
@@ -199,6 +238,13 @@ const VideoPlayer = ({
     setKeyboardHelpOpen(false);
     setPreviewCues([]);
     setHoverPreview(null);
+    setAiSubtitleConfig(null);
+    setAiSubtitleJobs([]);
+    aiSubtitleJobsRef.current = [];
+    setAiSubtitleLanguage("fr");
+    setAiSubtitleLoading(false);
+    setAiSubtitleMessage("");
+    refreshedAiSubtitleJobsRef.current = new Set();
 
     if (pendingCenterClickRef.current) {
       clearTimeout(pendingCenterClickRef.current);
@@ -209,6 +255,76 @@ const VideoPlayer = ({
       controlsHideTimeoutRef.current = null;
     }
   }, [video?.VideoID]);
+
+  useEffect(() => {
+    if (!video?.VideoID) return undefined;
+    let cancelled = false;
+    const loadAiSubtitles = async () => {
+      try {
+        const [configResponse, jobsResponse] = await Promise.all([
+          api.get("/ai-subtitles/config"),
+          api.get(`/ai-subtitles/videos/${video.VideoID}`),
+        ]);
+        if (cancelled) return;
+        setAiSubtitleConfig(configResponse.data || null);
+        const jobs = jobsResponse.data?.jobs || [];
+        setAiSubtitleJobs(jobs);
+        aiSubtitleJobsRef.current = jobs;
+        const completedWithoutTrack = jobs.filter((job) =>
+          job.status === "COMPLETED"
+          && !(video.subtitles || []).some((subtitle) => subtitle.language === job.targetLanguage)
+          && !refreshedAiSubtitleJobsRef.current.has(job.id)
+        );
+        if (completedWithoutTrack.length > 0) {
+          completedWithoutTrack.forEach((job) => refreshedAiSubtitleJobsRef.current.add(job.id));
+          onSubtitlesUpdatedRef.current?.();
+        }
+      } catch {
+        if (!cancelled) setAiSubtitleConfig(null);
+      }
+    };
+    loadAiSubtitles();
+    const timer = window.setInterval(() => {
+      if (aiSubtitleJobsRef.current.some((job) => ["QUEUED", "PREPARING", "LEASED"].includes(job.status))) {
+        loadAiSubtitles();
+      }
+    }, 10_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [video?.VideoID, video?.subtitles]);
+
+  const requestAiSubtitle = async () => {
+    if (!video?.VideoID || !selectedAiSubtitleLanguage) return;
+    setAiSubtitleLoading(true);
+    setAiSubtitleMessage("");
+    try {
+      const response = await api.post(
+        `/ai-subtitles/videos/${video.VideoID}/requests`,
+        { language: selectedAiSubtitleLanguage }
+      );
+      if (response.data?.alreadyAvailable) {
+        setAiSubtitleMessage("Cette langue est déjà disponible.");
+      } else if (response.data?.job) {
+        setAiSubtitleJobs((current) => {
+          const next = [
+            ...current.filter((job) => job.id !== response.data.job.id),
+            response.data.job,
+          ];
+          aiSubtitleJobsRef.current = next;
+          return next;
+        });
+        setAiSubtitleMessage("La génération a été ajoutée à la file.");
+      }
+    } catch (error) {
+      setAiSubtitleMessage(
+        error.response?.data?.error || "La demande de sous-titre a échoué."
+      );
+    } finally {
+      setAiSubtitleLoading(false);
+    }
+  };
 
   useEffect(() => {
     componentMountedRef.current = true;
@@ -406,17 +522,48 @@ const VideoPlayer = ({
     // 2) Sous-titres
     // -------------------------
     if (video.subtitles && video.subtitles.length > 0) {
+      const textTrackCleanups = [];
       video.subtitles.forEach((subtitle, index) => {
         const track = document.createElement("track");
         track.kind = "subtitles";
         track.label = subtitle.label;
         track.src = subtitle.url;
-        track.default = index === 0;
-        track.addEventListener("load", () => {
-          track.track.mode = index === 0 ? "showing" : "hidden";
-        }, { once: true });
+        track.default = false;
+        let registeredTextTrack = null;
+        const syncActiveCues = () => {
+          if (
+            !captionsEnabledRef.current
+            || selectedSubtitleIndexRef.current !== index
+            || isPictureInPictureRef.current
+            || isNativeVideoFullscreenRef.current
+          ) return;
+          setActiveSubtitleCues(readActiveSubtitleCues(registeredTextTrack));
+        };
+        const registerTextTrack = () => {
+          const textTrack = track.track;
+          if (!textTrack || registeredTextTrack === textTrack) return;
+          registeredTextTrack = textTrack;
+          const selected = captionsEnabledRef.current
+            && selectedSubtitleIndexRef.current === index;
+          textTrack.mode = selected
+            ? (isPictureInPictureRef.current || isNativeVideoFullscreenRef.current
+              ? "showing"
+              : "hidden")
+            : "disabled";
+          textTrack.addEventListener?.("cuechange", syncActiveCues);
+          syncActiveCues();
+        };
+        track.addEventListener("load", registerTextTrack);
         videoElement.appendChild(track);
+        registerTextTrack();
+        textTrackCleanups.push(() => {
+          track.removeEventListener("load", registerTextTrack);
+          registeredTextTrack?.removeEventListener?.("cuechange", syncActiveCues);
+        });
       });
+      videoElement.__samiSubtitleTrackCleanup = () => {
+        textTrackCleanups.forEach((cleanup) => cleanup());
+      };
     }
 
     // -------------------------
@@ -514,23 +661,41 @@ const VideoPlayer = ({
 
     const handleEnterPictureInPicture = () => {
       isPictureInPictureRef.current = true;
+      applySubtitleSelection(
+        selectedSubtitleIndexRef.current,
+        captionsEnabledRef.current
+      );
       stopBackgroundUpdate();
       resetBackgroundColor();
     };
 
     const handleLeavePictureInPicture = () => {
       isPictureInPictureRef.current = false;
+      applySubtitleSelection(
+        selectedSubtitleIndexRef.current,
+        captionsEnabledRef.current
+      );
       startBackgroundUpdate();
     };
 
     const handleWebkitBeginFullscreen = () => {
       isFullscreenRef.current = true;
+      isNativeVideoFullscreenRef.current = true;
+      applySubtitleSelection(
+        selectedSubtitleIndexRef.current,
+        captionsEnabledRef.current
+      );
       stopBackgroundUpdate();
       resetBackgroundColor();
     };
 
     const handleWebkitEndFullscreen = () => {
       isFullscreenRef.current = false;
+      isNativeVideoFullscreenRef.current = false;
+      applySubtitleSelection(
+        selectedSubtitleIndexRef.current,
+        captionsEnabledRef.current
+      );
       startBackgroundUpdate();
     };
 
@@ -580,6 +745,8 @@ const VideoPlayer = ({
 
       // Nettoyage des tracks ajoutés dynamiquement
       try {
+        videoElement.__samiSubtitleTrackCleanup?.();
+        delete videoElement.__samiSubtitleTrackCleanup;
         const tracks = Array.from(videoElement.querySelectorAll("track"));
         tracks.forEach((t) => t.remove());
       } catch (e) {
@@ -593,6 +760,7 @@ const VideoPlayer = ({
       setSelectedAudioTrackIndex(-1);
       setSettingsMenuOpen(false);
       setSettingsPanel(SETTINGS_PANEL.MAIN);
+      setActiveSubtitleCues([]);
 
       if (onVideoElement) {
         onVideoElement(null);
@@ -924,19 +1092,31 @@ const VideoPlayer = ({
     setSelectedAudioTrackIndex(audioTrackIndex);
   };
 
-  const applySubtitleSelection = (subtitleIndex, enabled) => {
+  function applySubtitleSelection(subtitleIndex, enabled) {
     const tracks = Array.from(videoRef.current?.textTracks || []);
+    const nativeRendering = isPictureInPictureRef.current
+      || isNativeVideoFullscreenRef.current;
     tracks.forEach((track, index) => {
-      track.mode = enabled && index === subtitleIndex ? "showing" : "hidden";
+      track.mode = enabled && index === subtitleIndex
+        ? (nativeRendering ? "showing" : "hidden")
+        : "disabled";
     });
-  };
+    setActiveSubtitleCues(
+      enabled && !nativeRendering
+        ? readActiveSubtitleCues(tracks[subtitleIndex])
+        : []
+    );
+  }
 
   const disableCaptions = () => {
+    captionsEnabledRef.current = false;
     applySubtitleSelection(selectedSubtitleIndex, false);
     setCaptionsEnabled(false);
   };
 
   const selectSubtitle = (subtitleIndex) => {
+    selectedSubtitleIndexRef.current = subtitleIndex;
+    captionsEnabledRef.current = true;
     applySubtitleSelection(subtitleIndex, true);
     setSelectedSubtitleIndex(subtitleIndex);
     setCaptionsEnabled(true);
@@ -1193,6 +1373,15 @@ const VideoPlayer = ({
   const playedPercent = duration > 0 ? Math.min(100, (currentTime / duration) * 100) : 0;
   const bufferedPercent = duration > 0 ? Math.min(100, (bufferedTime / duration) * 100) : 0;
   const subtitleTracks = video?.subtitles || [];
+  const aiSubtitleLanguages = (aiSubtitleConfig?.languages || []).filter(
+    (language) => !subtitleTracks.some((subtitle) => subtitle.language === language.code)
+  );
+  const selectedAiSubtitleLanguage = aiSubtitleLanguages.some(
+    (language) => language.code === aiSubtitleLanguage
+  ) ? aiSubtitleLanguage : aiSubtitleLanguages[0]?.code || "";
+  const aiSubtitleAvailable = Boolean(
+    aiSubtitleConfig?.active && aiSubtitleConfig?.environmentEnabled
+  );
   const selectedSubtitle = subtitleTracks[selectedSubtitleIndex] || null;
   const selectedSubtitleFlag = captionsEnabled && selectedSubtitle
     ? resolvePlayerLanguageFlag({
@@ -1216,13 +1405,20 @@ const VideoPlayer = ({
     ? "Automatique"
     : availableLevels.find((level) => level.level === selectedLevel)?.resolution
       || "Automatique";
-  const playerChromeVisibilityClass = keyboardHelpOpen || settingsMenuOpen
+  const playerChromePinnedVisible = keyboardHelpOpen
+    || settingsMenuOpen
+    || (!controlsDismissed && (!playing || controlsVisible));
+  const playerChromeAutoReveal = !playerChromePinnedVisible && !controlsDismissed;
+  const playerChromeVisibilityClass = playerChromePinnedVisible
     ? "opacity-100"
-    : controlsDismissed
-      ? "opacity-0"
-      : playing && !controlsVisible
-        ? "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100"
-        : "opacity-100";
+    : playerChromeAutoReveal
+      ? "opacity-0 group-hover:opacity-100 group-focus-within:opacity-100"
+      : "opacity-0";
+  const subtitlePositionClass = playerChromePinnedVisible
+    ? "bottom-16"
+    : playerChromeAutoReveal
+      ? "bottom-4 group-hover:bottom-16 group-focus-within:bottom-16"
+      : "bottom-4";
 
   return (
     <div ref={fitContainerRef} className="relative w-full h-full flex items-center justify-center">
@@ -1248,6 +1444,23 @@ const VideoPlayer = ({
           onDoubleClick={handlePlayerDoubleClick}
           aria-hidden="true"
         />
+
+        {captionsEnabled && activeSubtitleCues.length > 0 && (
+          <div
+            data-testid="player-subtitles"
+            aria-label="Sous-titres"
+            className={`pointer-events-none absolute inset-x-0 z-30 flex flex-col items-center gap-1 px-4 text-center transition-[bottom] duration-300 ease-in-out ${subtitlePositionClass}`}
+          >
+            {activeSubtitleCues.map((cue) => (
+              <span
+                key={cue.id}
+                className="max-w-[92%] whitespace-pre-line rounded-lg bg-black/80 px-3 py-1.5 text-base font-semibold leading-snug text-white shadow-lg [text-shadow:0_2px_4px_rgba(0,0,0,0.95)] sm:text-xl lg:text-2xl"
+              >
+                {cue.text}
+              </span>
+            ))}
+          </div>
+        )}
 
         <div
           data-testid="player-controls"
@@ -1360,8 +1573,10 @@ const VideoPlayer = ({
                         title="Sous-titres"
                         value={captionsEnabled && selectedSubtitle
                           ? selectedSubtitle.label || `Sous-titre ${selectedSubtitleIndex + 1}`
-                          : subtitleTracks.length > 0 ? "Désactivés" : "Indisponible"}
-                        disabled={subtitleTracks.length === 0}
+                          : subtitleTracks.length > 0
+                            ? "Désactivés"
+                            : aiSubtitleAvailable ? "Génération disponible" : "Indisponible"}
+                        disabled={subtitleTracks.length === 0 && !aiSubtitleAvailable}
                         flag={captionsEnabled && selectedSubtitle ? selectedSubtitleFlag : undefined}
                         onClick={() => setSettingsPanel(SETTINGS_PANEL.SUBTITLES)}
                       />
@@ -1615,6 +1830,49 @@ const VideoPlayer = ({
                           </button>
                         );
                       })}
+                      {aiSubtitleAvailable && (
+                        <div className="mt-3 border-t border-white/10 pt-3">
+                          <p className="px-1 text-xs font-bold uppercase tracking-wide text-fuchsia-200">
+                            Génération locale par IA
+                          </p>
+                          {aiSubtitleLanguages.length > 0 ? (
+                            <div className="mt-2 grid gap-2">
+                              <select
+                                value={selectedAiSubtitleLanguage}
+                                onChange={(event) => setAiSubtitleLanguage(event.target.value)}
+                                aria-label="Langue du sous-titre à générer"
+                                className="w-full rounded-lg border border-white/10 bg-neutral-900 px-3 py-2 text-sm text-white"
+                              >
+                                {aiSubtitleLanguages.map((language) => (
+                                  <option key={language.code} value={language.code}>{language.label}</option>
+                                ))}
+                              </select>
+                              <button
+                                type="button"
+                                onClick={requestAiSubtitle}
+                                disabled={aiSubtitleLoading || !selectedAiSubtitleLanguage}
+                                className="rounded-lg border border-fuchsia-400/30 bg-fuchsia-500/15 px-3 py-2 text-sm font-bold text-fuchsia-100 hover:bg-fuchsia-500/25 disabled:opacity-50"
+                              >
+                                {aiSubtitleLoading ? "Planification…" : "Générer ce sous-titre"}
+                              </button>
+                            </div>
+                          ) : (
+                            <p className="mt-2 px-1 text-xs text-white/55">
+                              Toutes les langues proposées sont déjà disponibles.
+                            </p>
+                          )}
+                          {aiSubtitleJobs.some((job) => ["QUEUED", "PREPARING", "LEASED"].includes(job.status)) && (
+                            <p className="mt-2 px-1 text-xs font-semibold text-amber-200">
+                              Génération en cours ou en attente sur le meilleur worker disponible.
+                            </p>
+                          )}
+                          {aiSubtitleMessage && (
+                            <p className="mt-2 px-1 text-xs font-semibold text-white/70" role="status">
+                              {aiSubtitleMessage}
+                            </p>
+                          )}
+                        </div>
+                      )}
                     </div>
                   )}
 

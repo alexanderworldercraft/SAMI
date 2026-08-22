@@ -246,6 +246,9 @@ const VideoSeePage = () => {
           data.video.VideoSubtitles?.map((sub) => ({
             label: sub.Label,
             url: `${apiUrl}/${sub.CheminSubtitle}`,
+            language: sub.Language,
+            type: sub.Type,
+            origin: sub.Origin,
           })) || [],
         audioTracks:
           data.video.VideoAudioTracks?.map((track) => ({
@@ -742,6 +745,7 @@ const VideoSeePage = () => {
                 onVideoElement={setVideoElement}
                 skipFirstPlayLogKey={skipFirstPlayLogKey}
                 multiAudioEnabled={multiAudioEnabled}
+                onSubtitlesUpdated={fetchVideo}
               />
             </div>
           </section>

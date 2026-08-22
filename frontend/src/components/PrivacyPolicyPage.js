@@ -16,6 +16,14 @@ const sections = [
     ],
   },
   {
+    title: "Sous-titres générés par intelligence artificielle",
+    body: [
+      "Lorsque la fonctionnalité expérimentale est activée, la piste audio d'une vidéo peut être extraite temporairement et analysée localement par les machines privées rattachées à l'instance SAMI. Aucun service d'intelligence artificielle distant n'est appelé par ce pipeline.",
+      "SAMI conserve la transcription source horodatée, la langue détectée, les sous-titres traduits, l'état des traitements et des informations techniques sur les modèles utilisés. Le fichier audio intermédiaire est supprimé après la réussite du traitement ou après l'épuisement des tentatives automatiques.",
+      "Les demandes de langue effectuées par un utilisateur connecté sont associées à son compte pour gérer la file, limiter les demandes simultanées et assurer la traçabilité technique.",
+    ],
+  },
+  {
     title: "Cookies et stockage local",
     body: [
       "SAMI peut utiliser des cookies, le stockage local du navigateur et des jetons de session pour maintenir la connexion, appliquer les préférences d'affichage et sécuriser les appels API.",
@@ -64,7 +72,7 @@ const PrivacyPolicyPage = () => (
         l'application, à la sécurité des comptes et à l'administration des contenus.
       </p>
       <p className="text-sm text-slate-500 dark:text-neutral-400">
-        Dernière mise à jour : 8 juillet 2026
+        Dernière mise à jour : 22 août 2026
       </p>
     </header>
 

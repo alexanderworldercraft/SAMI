@@ -2,6 +2,54 @@ import React, { useEffect, useState } from "react";
 
 const updates = [
   {
+    version: "7.14.0",
+    title: "Sous-titres IA distribues et lecteur plus lisible",
+    date: "22 aout 2026",
+    sections: [
+      {
+        title: "Sous-titres generes localement par intelligence artificielle",
+        items: [
+          "La nouvelle fonctionnalite experimentale peut planifier automatiquement un sous-titre francais complet pour chaque nouvelle video qui n'en possede pas.",
+          "Depuis le lecteur, les utilisateurs autorises peuvent demander une traduction dans l'une des quinze langues disponibles sans remplacer les pistes deja importees.",
+          "La transcription source horodatee est conservee afin de produire ensuite d'autres langues sans recommencer l'analyse complete de la bande sonore.",
+          "Une section de l'administration recense par pages de quarante les films et episodes actifs sans sous-titre francais complet et permet de lancer leur generation.",
+          "Les demandes exposees dans le lecteur indiquent si une langue existe deja, si elle attend un worker ou si sa generation est en cours.",
+        ],
+      },
+      {
+        title: "Traitement attribue au meilleur worker disponible",
+        items: [
+          "Chaque video est traitee integralement par une seule machine ; le worker pret ayant la priorite la plus elevee conserve la file tant qu'il reste disponible.",
+          "La RTX 3090 peut ainsi etre prioritaire devant la RTX 3070, le Mac Apple Silicon puis le serveur AMD, avec reprise automatique par la machine suivante en cas d'absence ou d'erreur.",
+          "Le lancement npm run start demarre automatiquement le coordinateur sur le primary ou le worker sur un clone, en parallele de l'encodage distribue existant.",
+          "Le setup choisit faster-whisper avec CUDA sur NVIDIA, whisper.cpp avec Metal sur macOS ou Vulkan sur AMD Linux, puis verifie que l'acceleration attendue est reellement visible.",
+          "Les commandes npm run setup:ai et npm run setup:ai:check reutilisent l'environnement, les moteurs et les modeles deja installes au lieu de les telecharger a chaque demarrage.",
+          "Un clone reste maintenant actif lorsque le primary est absent ou n'a pas encore recu les routes IA ; un avertissement explicite est limite et les tentatives reprennent automatiquement.",
+        ],
+      },
+      {
+        title: "Sous-titres et langues mieux presentes dans le lecteur",
+        items: [
+          "Les sous-titres sont desactives par defaut a chaque ouverture de video et restent disponibles depuis le panneau de reglages.",
+          "Le lecteur affiche les textes WebVTT dans un rendu personnalise, lisible et adapte a la taille de l'ecran, tout en conservant le rendu natif en Picture-in-Picture et dans le plein ecran video iOS.",
+          "Lorsque les controles sont visibles, le texte reste juste au-dessus de la progression ; il redescend doucement lorsque la barre disparait puis remonte avec sa reapparition.",
+          "Les langues arabe, hindi, russe, turque, polonaise et neerlandaise disposent maintenant de leur drapeau, en plus des langues deja reconnues dans les pistes audio et les sous-titres.",
+          "Les codes de langue courts, ISO-3, les libelles et les noms historiques de fichiers restent pris en charge pour retrouver le bon drapeau.",
+        ],
+      },
+      {
+        title: "Activation privee, securite et preparation du deploiement",
+        items: [
+          "La fonctionnalite exige a la fois le kill switch d'environnement et son activation explicite dans les fonctionnalites experimentales de l'administration.",
+          "Les heartbeats, leases, sources audio et resultats echanges entre clones et primary utilisent des routes internes signees, des controles de taille et des empreintes SHA-256.",
+          "Une migration ajoute le registre des workers, les jobs, leurs tentatives, les transcriptions reutilisables et les metadonnees de langue et d'origine des pistes de sous-titres.",
+          "Le README decrit l'installation, les priorites conseillees pour le parc actuel, l'ordre primary puis clones et les dependances propres a macOS, NVIDIA et AMD Linux.",
+          "Cette integration reste strictement privee et non commerciale : la licence du modele de traduction et les priorites de remplacement ou de re-audit sont rappelees dans la documentation et les pages legales.",
+        ],
+      },
+    ],
+  },
+  {
     version: "7.13.0",
     title: "Recherche plus souple, navigation fluide et pages personnes modernisees",
     date: "21 aout 2026",

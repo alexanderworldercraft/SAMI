@@ -16,6 +16,20 @@ const sections = [
     ],
   },
   {
+    title: "Traitements d'intelligence artificielle locaux",
+    body: [
+      "Le pipeline expérimental de sous-titrage prépare un fichier audio mono temporaire, produit une transcription horodatée et peut traduire ses segments vers les langues demandées. Le traitement reste sur le serveur principal et les clones privés autorisés par signature et heartbeat.",
+      "La transcription source est conservée afin d'éviter une nouvelle analyse audio pour chaque traduction. Les fichiers audio de travail, espaces temporaires et baux expirés doivent être nettoyés automatiquement ; les fichiers VTT générés restent associés à la vidéo tant que celle-ci existe.",
+    ],
+  },
+  {
+    title: "Licences IA et évolution commerciale",
+    body: [
+      "Le modèle de traduction NLLB-200 actuellement prévu est soumis à une licence non commerciale. Son usage est limité à l'instance privée actuelle et cette limitation doit rester visible dans la documentation et les conditions d'utilisation.",
+      "Avant une mise à disposition commerciale, les priorités de conformité sont le remplacement ou la relicence du modèle de traduction, l'audit des moteurs et poids de transcription, la documentation des responsabilités, puis la révision des informations aux utilisateurs et des politiques de conservation.",
+    ],
+  },
+  {
     title: "Finalités",
     body: [
       "Les données sont utilisées pour authentifier les utilisateurs, appliquer les droits d'accès, afficher les contenus, reprendre la lecture, personnaliser l'accueil et sécuriser les opérations sensibles.",
@@ -85,7 +99,7 @@ const DataCompliancePage = () => (
         à la sécurité et à la traçabilité des données dans SAMI.
       </p>
       <p className="text-sm text-slate-500 dark:text-neutral-400">
-        Dernière mise à jour : 8 juillet 2026
+        Dernière mise à jour : 22 août 2026
       </p>
     </header>
 

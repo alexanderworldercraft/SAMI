@@ -275,6 +275,9 @@ const buildExportManifest = async ({
   );
   const subtitles = video.VideoSubtitles.map((subtitle) => ({
     label: subtitle.Label,
+    language: subtitle.Language || null,
+    type: subtitle.Type || "FULL",
+    origin: subtitle.Origin || "IMPORTED",
     path: normalizeStoredVideoPath(
       subtitle.CheminSubtitle,
       video.VideoID,

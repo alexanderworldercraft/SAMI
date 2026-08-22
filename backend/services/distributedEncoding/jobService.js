@@ -211,6 +211,8 @@ const sanitizeRequestSnapshot = ({
   subtitles: subtitleInfos.map((subtitle) => ({
     filename: subtitle.filename,
     label: subtitle.label,
+    language: subtitle.language || null,
+    type: subtitle.type || "FULL",
     relativePath: `subtitles/${subtitle.filename}`,
   })),
   audio: buildAddVideoAudioLabel(audioStream),

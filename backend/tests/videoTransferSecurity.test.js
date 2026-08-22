@@ -105,7 +105,13 @@ const buildManifest = (overrides = {}) => {
       posterPath: "affiche/poster.webp",
       destinationGenreIds: [2, 5],
       subtitles: [
-        { label: "Français", path: "sousTitre/fr.vtt" },
+        {
+          label: "Français",
+          language: "fr",
+          type: "FULL",
+          origin: "IMPORTED",
+          path: "sousTitre/fr.vtt",
+        },
       ],
       audioTracks: [
         {
@@ -731,6 +737,22 @@ describe("validation du manifeste", () => {
     });
     expectSecurityCode(
       () => validateVideoTransferManifest(duplicatedOrders),
+      "INVALID_TRANSFER_MANIFEST"
+    );
+  });
+
+  it("valide les métadonnées persistantes des sous-titres", () => {
+    const normalized = validateVideoTransferManifest(buildManifest());
+    expect(normalized.metadata.subtitles[0]).toMatchObject({
+      language: "fr",
+      type: "FULL",
+      origin: "IMPORTED",
+    });
+
+    const invalid = buildManifest();
+    invalid.metadata.subtitles[0].origin = "REMOTE_SCRIPT";
+    expectSecurityCode(
+      () => validateVideoTransferManifest(invalid),
       "INVALID_TRANSFER_MANIFEST"
     );
   });

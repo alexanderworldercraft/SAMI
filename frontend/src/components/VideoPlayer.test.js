@@ -65,7 +65,11 @@ beforeEach(() => {
   Hls.instances.length = 0;
   localStorage.clear();
   api.get.mockImplementation((url) => {
-    if (url === "/users/player-preferences") {
+    if (
+      url === "/users/player-preferences"
+      || url === "/ai-subtitles/config"
+      || url.startsWith("/ai-subtitles/videos/")
+    ) {
       return new Promise(() => {});
     }
     return Promise.reject({ response: { status: 403 } });
@@ -151,7 +155,13 @@ it("regroupe les sous-titres dans les réglages avec les drapeaux et l'option de
   expect(screen.getByRole("menuitem", { name: /Audio Par défaut/ })).toBeInTheDocument();
   expect(screen.getByRole("menuitem", { name: /Ambiance Classique/ })).toBeInTheDocument();
   expect(screen.getByRole("menuitem", { name: /Qualité Indisponible/ })).toBeInTheDocument();
-  fireEvent.click(screen.getByRole("menuitem", { name: /Sous-titres Français/ }));
+  fireEvent.click(screen.getByRole("menuitem", { name: /Sous-titres Désactivés/ }));
+  expect(screen.getByRole("menuitemradio", { name: "Désactivés" })).toHaveAttribute(
+    "aria-checked",
+    "true"
+  );
+
+  fireEvent.click(screen.getByRole("menuitemradio", { name: "Français" }));
   expect(screen.getByRole("menuitemradio", { name: "Français" })).toHaveAttribute(
     "aria-checked",
     "true"
@@ -170,6 +180,58 @@ it("regroupe les sous-titres dans les réglages avec les drapeaux et l'option de
     "aria-checked",
     "true"
   );
+});
+
+it("affiche les sous-titres personnalisés au-dessus de la barre de progression", () => {
+  const { container } = render(
+    <VideoPlayer
+      video={{
+        VideoID: 18,
+        CheminAcces: "uploads/video/18/hls/master.m3u8",
+        subtitles: [{ label: "Français", language: "fr", url: "/fr.vtt" }],
+      }}
+      backgroundBlur={{ current: null }}
+    />
+  );
+  const videoElement = container.querySelector("video");
+  const trackElement = container.querySelector("track");
+  const textTrack = new EventTarget();
+  textTrack.mode = "disabled";
+  textTrack.activeCues = [{ startTime: 1, endTime: 3, text: "Bonjour\nà tous" }];
+  Object.defineProperty(trackElement, "track", { configurable: true, value: textTrack });
+  Object.defineProperty(videoElement, "textTracks", { configurable: true, value: [textTrack] });
+
+  fireEvent.load(trackElement);
+  act(() => textTrack.dispatchEvent(new Event("cuechange")));
+
+  expect(textTrack.mode).toBe("disabled");
+  expect(screen.queryByTestId("player-subtitles")).not.toBeInTheDocument();
+
+  openSettings();
+  fireEvent.click(screen.getByRole("menuitem", { name: /Sous-titres Désactivés/ }));
+  fireEvent.click(screen.getByRole("menuitemradio", { name: "Français" }));
+
+  let subtitles = screen.getByTestId("player-subtitles");
+  expect(subtitles).toHaveClass("bottom-16", "transition-[bottom]", "duration-300");
+  expect(subtitles).toHaveTextContent("Bonjour à tous");
+  expect(textTrack.mode).toBe("hidden");
+
+  fireEvent.pointerDown(document.body);
+  fireEvent.play(videoElement);
+  fireEvent.click(screen.getByTestId("player-interaction-layer"));
+  subtitles = screen.getByTestId("player-subtitles");
+  expect(subtitles).toHaveClass("bottom-4");
+
+  fireEvent.click(screen.getByTestId("player-interaction-layer"));
+  expect(screen.getByTestId("player-subtitles")).toHaveClass("bottom-16");
+
+  fireEvent(videoElement, new Event("enterpictureinpicture"));
+  expect(textTrack.mode).toBe("showing");
+  expect(screen.queryByTestId("player-subtitles")).not.toBeInTheDocument();
+
+  fireEvent(videoElement, new Event("leavepictureinpicture"));
+  expect(textTrack.mode).toBe("hidden");
+  expect(screen.getByTestId("player-subtitles")).toBeInTheDocument();
 });
 
 it("affiche et change les pistes audio uniquement pour une vidéo multi-audio expérimentale", () => {
@@ -261,6 +323,48 @@ it("conserve l'entrée audio désactivée lorsque la fonctionnalité expériment
 
   openSettings();
   expect(screen.getByRole("menuitem", { name: "Audio Par défaut" })).toBeDisabled();
+});
+
+it("permet de demander un sous-titre IA lorsqu'aucune piste n'existe", async () => {
+  api.get.mockImplementation((url) => {
+    if (url === "/users/player-preferences") return new Promise(() => {});
+    if (url === "/ai-subtitles/config") {
+      return Promise.resolve({
+        data: {
+          active: true,
+          environmentEnabled: true,
+          languages: [
+            { code: "fr", label: "Français" },
+            { code: "en", label: "Anglais" },
+          ],
+        },
+      });
+    }
+    if (url === "/ai-subtitles/videos/14") {
+      return Promise.resolve({ data: { jobs: [] } });
+    }
+    return Promise.reject({ response: { status: 403 } });
+  });
+  api.post.mockResolvedValue({
+    data: {
+      job: { id: "ai-job-14-fr", targetLanguage: "fr", status: "QUEUED" },
+    },
+  });
+  renderPlayer();
+
+  await waitFor(() => expect(api.get).toHaveBeenCalledWith("/ai-subtitles/config"));
+  openSettings();
+  fireEvent.click(await screen.findByRole("menuitem", {
+    name: /Sous-titres Génération disponible/,
+  }));
+  fireEvent.click(screen.getByRole("button", { name: "Générer ce sous-titre" }));
+
+  await waitFor(() => expect(api.post).toHaveBeenCalledWith(
+    "/ai-subtitles/videos/14/requests",
+    { language: "fr" }
+  ));
+  expect(await screen.findByText("La génération a été ajoutée à la file."))
+    .toBeInTheDocument();
 });
 
 it("change la qualité depuis un sous-menu et conserve le mode automatique", () => {

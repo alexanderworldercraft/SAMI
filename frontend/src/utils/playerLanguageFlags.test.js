@@ -21,3 +21,14 @@ it("utilise directement le code normalisé d'une piste audio", () => {
 it("renvoie une valeur neutre lorsqu'aucune langue n'est identifiable", () => {
   expect(resolvePlayerLanguageFlag({ label: "Sous-titre 1" })).toBeNull();
 });
+
+it.each([
+  ["ara", "ar-saudi-arabia"],
+  ["hin", "hi-india"],
+  ["rus", "ru-russia"],
+  ["tur", "tr-turkey"],
+  ["pol", "pl-poland"],
+  ["nld", "nl-netherlands"],
+])("associe la langue %s à son nouveau drapeau", (language, expectedFlag) => {
+  expect(resolvePlayerLanguageFlag({ language })?.id).toBe(expectedFlag);
+});

@@ -117,6 +117,8 @@ model Video {
   UserVideoProgress    UserVideoProgress[]
   VideoSubtitles       VideoSubtitle[]
   VideoAudioTracks     VideoAudioTrack[]
+  AiSubtitleJobs       AiSubtitleJob[]
+  AiTranscript         AiVideoTranscript?
   GenreFeaturedContent GenreFeaturedContent[]
   UserFavoriteContent  UserFavoriteContent[]
 
@@ -138,12 +140,17 @@ model VideoGenre {
 }
 
 model VideoSubtitle {
-  VideoSubtitleID Int       @id @default(autoincrement())
-  Label           String    @db.VarChar(100)
-  CheminSubtitle  String    @db.VarChar(255)
+  VideoSubtitleID Int            @id @default(autoincrement())
+  Label           String         @db.VarChar(100)
+  CheminSubtitle  String         @db.VarChar(255)
+  Language        String?        @db.VarChar(35)
+  Type            String         @default("FULL") @db.VarChar(16)
+  Origin          String         @default("IMPORTED") @db.VarChar(16)
+  AiSubtitleJobID String?        @unique @db.VarChar(36)
   VideoID         Int
-  CreateDate      DateTime? @default(now())
-  Video           Video     @relation(fields: [VideoID], references: [VideoID])
+  CreateDate      DateTime?      @default(now())
+  Video           Video          @relation(fields: [VideoID], references: [VideoID])
+  AiSubtitleJob   AiSubtitleJob? @relation(fields: [AiSubtitleJobID], references: [AiSubtitleJobID], onDelete: SetNull)
 
   @@index([VideoID], map: "VideoSubtitle_VideoID_fkey")
 }
@@ -260,9 +267,85 @@ model VideoEncodingWorker {
   PreferredTasks        VideoEncodingTask[]         @relation("EncodingTaskPreferredWorker")
   Attempts              VideoEncodingTaskAttempt[]
   RequestNonces         VideoEncodingRequestNonce[]
+  AiSubtitleWorker      AiSubtitleWorker?
 
   @@index([Role, Enabled, LastHeartbeatAt], map: "idx_encoding_worker_availability")
   @@index([PipelineVersion, MaxNominalHeight], map: "idx_encoding_worker_capability")
+}
+
+model AiSubtitleWorker {
+  AiSubtitleWorkerID String              @id @db.VarChar(100)
+  Role               String              @db.VarChar(16)
+  Ready              Boolean             @default(false)
+  Engine             String?             @db.VarChar(64)
+  Device             String?             @db.VarChar(64)
+  Model              String?             @db.VarChar(120)
+  TranslationModel   String?             @db.VarChar(191)
+  PipelineVersion    String              @db.VarChar(64)
+  PerformanceScore   Float               @default(1)
+  MaxSlots           Int                 @default(1)
+  Capabilities       Json?
+  BootID             String?             @db.VarChar(100)
+  LastHeartbeatAt    DateTime?
+  LastError          String?             @db.Text
+  CreatedAt          DateTime            @default(now())
+  UpdatedAt          DateTime            @default(now()) @updatedAt
+  Registry           VideoEncodingWorker @relation(fields: [AiSubtitleWorkerID], references: [VideoEncodingWorkerID], onDelete: Cascade)
+  AssignedJobs       AiSubtitleJob[]
+
+  @@index([Ready, LastHeartbeatAt, PerformanceScore], map: "idx_ai_subtitle_worker_availability")
+}
+
+model AiSubtitleJob {
+  AiSubtitleJobID    String            @id @db.VarChar(36)
+  VideoID            Int
+  TargetLanguage     String            @db.VarChar(35)
+  RequestedByUserID  Int?
+  Automatic          Boolean           @default(false)
+  Status             String            @db.VarChar(24)
+  Phase              String?           @db.VarChar(32)
+  Progress           Int               @default(0)
+  SourceRelativePath String?           @db.VarChar(512)
+  SourceSize         BigInt?
+  SourceSha256       String?           @db.Char(64)
+  AssignedWorkerID   String?           @db.VarChar(100)
+  LeaseTokenHash     String?           @db.Char(64)
+  LeaseGeneration    Int               @default(0)
+  LeaseExpiresAt     DateTime?
+  AttemptCount       Int               @default(0)
+  MaxAttempts        Int               @default(4)
+  NextEligibleAt     DateTime?
+  SourceLanguage     String?           @db.VarChar(35)
+  TranscriptionModel String?           @db.VarChar(120)
+  TranslationModel   String?           @db.VarChar(191)
+  PipelineVersion    String            @db.VarChar(64)
+  ErrorMessage       String?           @db.Text
+  StartedAt          DateTime?
+  CompletedAt        DateTime?
+  CreatedAt          DateTime          @default(now())
+  UpdatedAt          DateTime          @default(now()) @updatedAt
+  Video              Video             @relation(fields: [VideoID], references: [VideoID], onDelete: Cascade)
+  RequestedBy        Utilisateur?      @relation(fields: [RequestedByUserID], references: [UtilisateurID], onDelete: SetNull)
+  AssignedWorker     AiSubtitleWorker? @relation(fields: [AssignedWorkerID], references: [AiSubtitleWorkerID], onDelete: SetNull)
+  GeneratedSubtitle  VideoSubtitle?
+
+  @@unique([VideoID, TargetLanguage], name: "VideoID_TargetLanguage", map: "uniq_ai_subtitle_video_language")
+  @@index([Status, NextEligibleAt, CreatedAt], map: "idx_ai_subtitle_job_queue")
+  @@index([AssignedWorkerID, Status], map: "idx_ai_subtitle_job_worker")
+  @@index([LeaseExpiresAt], map: "idx_ai_subtitle_job_lease")
+  @@index([RequestedByUserID], map: "idx_ai_subtitle_job_requester")
+}
+
+model AiVideoTranscript {
+  VideoID            Int      @id
+  SourceLanguage     String   @db.VarChar(35)
+  Segments           Json
+  PlainText          String?  @db.LongText
+  TranscriptionModel String   @db.VarChar(120)
+  PipelineVersion    String   @db.VarChar(64)
+  CreatedAt          DateTime @default(now())
+  UpdatedAt          DateTime @default(now()) @updatedAt
+  Video              Video    @relation(fields: [VideoID], references: [VideoID], onDelete: Cascade)
 }
 
 model VideoEncodingJob {
@@ -510,6 +593,7 @@ model Utilisateur {
   UserFavoriteContent    UserFavoriteContent[]
   PlayerPreference       UserPlayerPreference?
   PersonDuplicateReviews PersonDuplicateReview[]
+  AiSubtitleJobs         AiSubtitleJob[]
 
   @@index([GradeID], map: "Utilisateur_GradeID_fkey")
   @@index([EtatID], map: "Utilisateur_EtatID_fkey")
