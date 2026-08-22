@@ -23,7 +23,7 @@ const updates = [
           "Les choix Film aleatoire et Serie aleatoire ferment la barre laterale puis replacent le lecteur en haut de l'ecran.",
           "Les liens du pied de page vers les mises a jour, la confidentialite, les conditions d'utilisation et la conformite des donnees appliquent le meme retour fluide.",
           "Les statistiques, le calendrier des ajouts et la liste des cookies quittent le pied de page pour une nouvelle page /stats, accessible juste apres le lien des mises a jour.",
-          "La barre laterale affiche maintenant la version de SAMI a cote du nom de l'application sur ordinateur comme sur mobile.",
+          "La barre laterale affiche maintenant la version de SAMI a cote du nom de l'application sur ordinateur comme sur mobile ; son badge ouvre directement la page des mises a jour.",
           "Depuis une page de lecture, les cartes des personnes ouvrent leur fiche en haut ; depuis une fiche personne, les films et series reviennent en haut du lecteur.",
           "Choisir un film ou une serie dans la fenetre d'une saga ferme la fenetre avant d'ouvrir le contenu au niveau du lecteur.",
           "Sur smartphone, le modal de reprise reste maintenant au-dessus des menus du lecteur afin que ses deux choix restent toujours accessibles.",

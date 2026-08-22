@@ -48,7 +48,7 @@ La version actuelle est la **7.13.0**. Elle repose sur un backend Fastify, une i
 - recherche de films et de séries normalisée et classée par pertinence, avec une tolérance de 80 % permettant notamment de rapprocher `Spider-Man` et `spider man` ;
 - recherche des personnes par prénom et nom complets, dans les deux ordres, avec normalisation et similitude minimale de 80 % ;
 - navigation plus fluide avec retour en haut sur les accès principaux, les liens du pied de page, les contenus aléatoires, les cartes de personnes et la fenêtre des sagas ;
-- nouvelle page `/stats` regroupant les statistiques, le calendrier des ajouts et les cookies, avec la version affichée dans la sidebar ;
+- nouvelle page `/stats` regroupant les statistiques, le calendrier des ajouts et les cookies, avec un badge de version cliquable vers les mises à jour dans la sidebar ;
 - boutons de favoris masqués au repos lorsqu’un contenu n’est pas encore favori et ralentissement des affiches de prévisualisation ;
 - refonte responsive de l’annuaire et des fiches des personnes, avec films et séries regroupés entre réalisation et distribution, outils administrateur repliables et métadonnées sociales complètes ;
 - grille des sélections par genre adaptée aux smartphones, avec la vedette en premier puis deux cartes par ligne ;

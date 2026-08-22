@@ -82,10 +82,19 @@ describe("NavBar - retour en haut", () => {
     expect(scrollToPageTop).toHaveBeenCalledTimes(10);
   });
 
-  test("affiche la version de l'application sur les sidebars mobile et bureau", () => {
+  test("relie le badge de version aux mises à jour sur mobile et ordinateur", () => {
     render(<NavBar />);
 
-    expect(screen.getAllByText(`v${process.env.REACT_APP_VER}`)).toHaveLength(2);
+    const versionLinks = screen.getAllByRole("link", {
+      name: `Voir les mises à jour de la version ${process.env.REACT_APP_VER}`,
+    });
+
+    expect(versionLinks).toHaveLength(2);
+    versionLinks.forEach((link) => {
+      expect(link).toHaveAttribute("href", "/updates");
+      fireEvent.click(link);
+    });
+    expect(scrollToPageTop).toHaveBeenCalledTimes(2);
   });
 
   test("remonte en haut après chaque navigation aléatoire réussie", async () => {

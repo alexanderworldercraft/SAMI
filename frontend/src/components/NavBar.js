@@ -36,13 +36,22 @@ const apiBaseUrl = process.env.REACT_APP_URL_LOCAL
 const appName = process.env.REACT_APP_NAME || 'SAMI'
 const appVersion = process.env.REACT_APP_VER
 
-const AppBrand = () => (
-  <span className="flex items-baseline gap-2">
-    <span className="text-sm font-semibold text-gray-900 dark:text-white">{appName}</span>
+const AppBrand = ({ onVersionClick }) => (
+  <span className="flex items-center gap-3">
+    <Link to="/" className="flex items-center gap-3">
+      <img src="/logo.png" alt="Logo" className="h-8 w-auto" />
+      <span className="text-sm font-semibold text-gray-900 dark:text-white">{appName}</span>
+    </Link>
     {appVersion && (
-      <span className="rounded-full border border-sky-500/20 bg-sky-500/10 px-2 py-0.5 text-[10px] font-black text-sky-700 dark:text-sky-300">
+      <Link
+        to="/updates"
+        onClick={onVersionClick}
+        aria-label={`Voir les mises à jour de la version ${appVersion}`}
+        title="Voir les mises à jour"
+        className="rounded-full border border-sky-500/20 bg-sky-500/10 px-2 py-0.5 text-[10px] font-black text-sky-700 transition hover:border-sky-400/50 hover:bg-sky-500/20 hover:text-sky-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 dark:text-sky-300 dark:hover:text-sky-200"
+      >
         v{appVersion}
-      </span>
+      </Link>
     )}
   </span>
 )
@@ -195,10 +204,7 @@ export default function NavBar() {
             {/* Sidebar mobile */}
             <div className="relative flex grow flex-col gap-y-5 overflow-y-auto bg-white px-6 pb-4 dark:bg-gray-900 dark:ring dark:ring-white/10 dark:before:pointer-events-none dark:before:absolute dark:before:inset-0 dark:before:bg-black/10">
               <div className="relative flex h-16 shrink-0 items-center">
-                <Link to="/" className="flex items-center gap-3">
-                  <img src="/logo.png" alt="Logo" className="h-8 w-auto" />
-                  <AppBrand />
-                </Link>
+                <AppBrand onVersionClick={() => handleMainNavigation(true, true)} />
               </div>
 
               <nav className="relative flex flex-1 flex-col">
@@ -292,10 +298,7 @@ export default function NavBar() {
         >
           <div className="flex grow flex-col gap-y-5 overflow-y-auto border-r border-gray-200 bg-white px-6 pb-4 dark:border-white/10 dark:bg-black/50">
             <div className="flex h-16 shrink-0 items-center">
-              <Link to="/" className="flex items-center gap-3">
-                <img src="/logo.png" alt="Logo" className="h-8 w-auto" />
-                <AppBrand />
-              </Link>
+              <AppBrand onVersionClick={() => handleMainNavigation(false, true)} />
             </div>
 
             <nav className="flex flex-1 flex-col">
