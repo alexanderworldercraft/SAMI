@@ -2,6 +2,50 @@ import React, { useEffect, useState } from "react";
 
 const updates = [
   {
+    version: "7.15.0",
+    title: "Administration et correction avancee des sous-titres IA",
+    date: "23 aout 2026",
+    sections: [
+      {
+        title: "Administration reorganisee et recherche ciblee",
+        items: [
+          "Chaque section de l'administration dispose maintenant de son propre accordeon et ne charge son contenu qu'apres sa premiere ouverture.",
+          "Les listes de gestion et de correction temporelle n'affichent plus toutes les pistes IA par defaut : une recherche explicite est necessaire avant de charger des resultats.",
+          "La pagination porte sur quarante videos et toutes les langues generees pour une meme video sont regroupees dans un selecteur unique.",
+          "Les titres longs sont limites et reviennent correctement a la ligne afin de ne plus faire deborder les cartes de leur zone.",
+        ],
+      },
+      {
+        title: "Gestion complete des pistes generees",
+        items: [
+          "Les administrateurs peuvent corriger le texte d'une piste IA dans un editeur classique qui conserve ses horodatages en lecture seule.",
+          "Une piste peut etre supprimee avec son job et son fichier sans effacer la transcription source reutilisable de la video.",
+          "L'action Recreer efface volontairement la transcription memorisee et relance tout le processus, tout en maintenant l'ancienne piste disponible jusqu'a la reussite du remplacement.",
+          "Le lecteur recharge maintenant une piste deja presente lorsqu'une recreation se termine, sans exiger de fermer puis rouvrir la video.",
+        ],
+      },
+      {
+        title: "Atelier temporel reserve au super administrateur",
+        items: [
+          "L'editeur temporel s'ouvre directement dans la page sans bloquer son defilement et peut toujours basculer en vrai plein ecran a la demande.",
+          "La video HLS, le texte horodate et la timeline zoomable restent visibles dans un espace de travail dedie inspire d'un logiciel de montage.",
+          "Chaque cue possede une poignee de debut, une zone centrale pour deplacer l'ensemble et une poignee de fin pour ajuster precisement sa duree.",
+          "En plein ecran, un panneau sous la timeline affiche et permet de modifier le segment choisi manuellement en priorite, ou suit automatiquement la position de lecture.",
+          "Les heures de debut et de fin ainsi que le texte peuvent aussi etre corriges numeriquement avant l'enregistrement.",
+        ],
+      },
+      {
+        title: "Integrite des fichiers et tracabilite",
+        items: [
+          "Les modifications temporelles restent reservees au super administrateur tandis que la gestion classique utilise les droits administrateur existants.",
+          "Les fichiers WebVTT sont analyses et valides avant l'ecriture : texte obligatoire, duree minimale et absence de chevauchement entre deux segments.",
+          "Chaque sauvegarde utilise un fichier temporaire puis un remplacement atomique afin de ne pas laisser une piste partiellement ecrite.",
+          "Les corrections, suppressions et recreations disposent de nouvelles actions dans le journal d'administration.",
+        ],
+      },
+    ],
+  },
+  {
     version: "7.14.0",
     title: "Sous-titres IA distribues et lecteur plus lisible",
     date: "22 aout 2026",

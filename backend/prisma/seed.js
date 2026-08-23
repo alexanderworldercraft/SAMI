@@ -25,6 +25,21 @@ const AI_SUBTITLE_LOG_ACTIONS = Object.freeze([
     Description: "Une génération locale de sous-titre a échoué.",
     Criticite: 2,
   },
+  {
+    Nom: "ai_subtitle_updated",
+    Description: "Un administrateur corrige le texte ou les horodatages d'un sous-titre IA.",
+    Criticite: 2,
+  },
+  {
+    Nom: "ai_subtitle_deleted",
+    Description: "Un administrateur supprime un sous-titre généré par IA.",
+    Criticite: 2,
+  },
+  {
+    Nom: "ai_subtitle_recreated",
+    Description: "Un administrateur relance la transcription complète d'un sous-titre IA.",
+    Criticite: 2,
+  },
 ]);
 
 const uniqueByNom = (items) => {

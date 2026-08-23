@@ -2,7 +2,7 @@
 
 SAMI (**Système d’Archivage Multimédia Intégré**) est une médiathèque web privée permettant d’organiser, diffuser et suivre des films, séries et musiques depuis une seule interface.
 
-La version actuelle est la **7.14.0**. Elle repose sur un backend Fastify, une interface React, Prisma avec MySQL, un pipeline vidéo FFmpeg/HLS et Socket.IO pour le retour en temps réel des traitements.
+La version actuelle est la **7.15.0**. Elle repose sur un backend Fastify, une interface React, Prisma avec MySQL, un pipeline vidéo FFmpeg/HLS et Socket.IO pour le retour en temps réel des traitements.
 
 ## Fonctionnalités
 
@@ -16,7 +16,7 @@ La version actuelle est la **7.14.0**. Elle repose sur un backend Fastify, une i
 - **Preview Live** expérimentale : aperçu au survol de la barre de lecture à partir de spritesheets et d’un fichier WebVTT ;
 - import et transcodage FFmpeg avec suivi de progression via Socket.IO ;
 - encodage multi-server expérimental : une résolution par worker, redistribution dynamique et publication finale sur le serveur principal ;
-- sous-titres IA locaux expérimentaux : français automatique pour les nouveaux imports qui en sont dépourvus, quinze langues à la demande, catalogue administratif paginé et affectation complète au meilleur worker disponible ;
+- sous-titres IA locaux expérimentaux : français automatique pour les nouveaux imports qui en sont dépourvus, quinze langues à la demande, catalogue administratif recherché et regroupé par vidéo, correction textuelle ou temporelle et affectation complète au meilleur worker disponible ;
 - export sécurisé et reprenable d’une vidéo traitée depuis un clone vers l’instance principale ;
 - historique de lecture, reprise intelligente et remise à zéro d’une série ;
 - recherche tolérante aux accents, séparateurs et petites fautes de saisie pour les films et les séries ;
@@ -44,19 +44,19 @@ La version actuelle est la **7.14.0**. Elle repose sur un backend Fastify, une i
 - journalisation des actions et sauvegardes manuelles ou planifiées de MySQL ;
 - limitations de requêtes, contrôle CORS et en-têtes de sécurité.
 
-## Nouveautés de la version 7.14.0
+## Nouveautés de la version 7.15.0
 
-- génération locale expérimentale de sous-titres français pour les nouvelles vidéos qui en sont dépourvues et traduction à la demande dans quinze langues ;
-- nouvelle liste administrative paginée par quarante des films et épisodes sans sous-titre français complet ;
-- file IA indépendante attribuant une vidéo complète au meilleur worker disponible, avec priorités configurables et reprise automatique par la machine suivante ;
-- démarrage intégré à `npm run start`, installation réutilisable avec `npm run setup:ai` et contrôle matériel avec `npm run setup:ai:check` ;
-- accélération CUDA pour NVIDIA, Metal pour Apple Silicon et Vulkan pour AMD Linux lorsque les dépendances sont disponibles ;
-- lecteur WebVTT personnalisé avec sous-titres désactivés par défaut, position dynamique au-dessus des contrôles et repli natif pour le Picture-in-Picture et le plein écran iOS ;
-- drapeaux ajoutés pour l’arabe, le hindi, le russe, le turc, le polonais et le néerlandais ;
-- échanges primary/clone signés, sources vérifiées et runtime résilient lorsque le serveur principal est temporairement indisponible ou pas encore à jour ;
-- usage documenté comme strictement privé et non commercial jusqu’au remplacement ou à la relicence du modèle de traduction et au réaudit des composants IA.
+- sections de l’administration repliables indépendamment et chargées à leur première ouverture ;
+- recherche obligatoire avant l’affichage des pistes IA, avec pagination par quarante vidéos et regroupement de toutes leurs langues dans un sélecteur ;
+- correction classique du texte sans modifier les horodatages, suppression ciblée et recréation complète conservant l’ancienne piste jusqu’au succès ;
+- éditeur temporel super administrateur intégré à la page sans bloquer son défilement, avec plein écran à la demande ;
+- lecture HLS, timeline zoomable, poignées séparées pour le début, la fin et le déplacement complet de chaque segment ;
+- panneau plein écran sous la timeline suivant le segment sélectionné manuellement en priorité, puis la position de lecture ;
+- validation stricte et écriture atomique des fichiers WebVTT modifiés ;
+- journalisation des corrections, suppressions et recréations administratives ;
+- actualisation automatique du lecteur lorsqu’une piste existante termine sa recréation.
 
-L’historique complet des versions, de la 6.1.0 à la 7.14.0, est disponible dans l’application à l’adresse `/updates` et dans `frontend/src/components/UpdatesPage.js`.
+L’historique complet des versions, de la 6.1.0 à la 7.15.0, est disponible dans l’application à l’adresse `/updates` et dans `frontend/src/components/UpdatesPage.js`.
 
 ## Stack technique
 
@@ -268,6 +268,14 @@ Après une erreur moteur, le worker concerné sort temporairement du pool afin
 qu'une machine de priorité inférieure puisse retenter la tâche.
 La transcription source horodatée est conservée en base, ce qui permet de
 produire ensuite d’autres langues sans réanalyser l’audio.
+Dans l’administration, chaque bloc est repliable indépendamment. Les pistes IA
+ne sont chargées qu’après une recherche et les différentes langues d’une même
+vidéo sont regroupées dans un sélecteur. Elles peuvent être corrigées sans
+toucher à leurs horaires, supprimées ou recréées en forçant une nouvelle
+transcription tout en conservant l’ancienne piste jusqu’à la réussite. Le super
+administrateur dispose aussi d’un éditeur intégré et défilable, basculable en
+plein écran, avec lecture HLS, timeline zoomable, déplacement complet des cues
+et poignées séparées pour leurs heures de début et de fin.
 
 Sur chaque installation, préparez une seule fois les dépendances et les modèles :
 

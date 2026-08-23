@@ -2,7 +2,7 @@ import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
 
 import Hls from "hls.js";
 import api from "../services/api";
-import VideoPlayer from "./VideoPlayer";
+import VideoPlayer, { shouldRefreshAiSubtitleTrack } from "./VideoPlayer";
 
 jest.mock("hls.js", () => ({
   __esModule: true,
@@ -365,6 +365,22 @@ it("permet de demander un sous-titre IA lorsqu'aucune piste n'existe", async () 
   ));
   expect(await screen.findByText("La génération a été ajoutée à la file."))
     .toBeInTheDocument();
+});
+
+it("recharge une piste existante lorsqu'une recréation IA vient de se terminer", () => {
+  expect(shouldRefreshAiSubtitleTrack({
+    job: { id: "ai-job-14-fr", targetLanguage: "fr", status: "COMPLETED" },
+    previousJobs: [{ id: "ai-job-14-fr", targetLanguage: "fr", status: "LEASED" }],
+    subtitles: [{ language: "fr", url: "/fr_ai.vtt" }],
+    refreshedJobIds: new Set(),
+  })).toBe(true);
+
+  expect(shouldRefreshAiSubtitleTrack({
+    job: { id: "ai-job-14-fr", targetLanguage: "fr", status: "COMPLETED" },
+    previousJobs: [{ id: "ai-job-14-fr", targetLanguage: "fr", status: "COMPLETED" }],
+    subtitles: [{ language: "fr", url: "/fr_ai.vtt" }],
+    refreshedJobIds: new Set(),
+  })).toBe(false);
 });
 
 it("change la qualité depuis un sous-menu et conserve le mode automatique", () => {

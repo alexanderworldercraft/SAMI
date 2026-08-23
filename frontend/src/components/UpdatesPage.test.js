@@ -9,15 +9,15 @@ describe("UpdatesPage", () => {
     const navigation = screen.getByRole("navigation", {
       name: "Navigation des mises a jour",
     });
-    const latestVersionLink = screen.getByRole("link", { name: /Version 7\.14\.0/ });
+    const latestVersionLink = screen.getByRole("link", { name: /Version 7\.15\.0/ });
 
     expect(navigation).toContainElement(latestVersionLink);
-    expect(latestVersionLink).toHaveAttribute("href", "#version-7-14-0");
+    expect(latestVersionLink).toHaveAttribute("href", "#version-7-15-0");
     expect(
       screen.getByRole("article", {
-        name: /Sous-titres IA distribues et lecteur plus lisible/,
+        name: /Administration et correction avancee des sous-titres IA/,
       })
-    ).toHaveAttribute("data-version", "7.14.0");
+    ).toHaveAttribute("data-version", "7.15.0");
     expect(latestVersionLink).toHaveAttribute("aria-current", "location");
   });
 });

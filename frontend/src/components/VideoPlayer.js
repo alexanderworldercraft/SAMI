@@ -79,6 +79,22 @@ const subtitleCueText = (cue) => {
     .trim();
 };
 
+export const shouldRefreshAiSubtitleTrack = ({
+  job,
+  previousJobs = [],
+  subtitles = [],
+  refreshedJobIds = new Set(),
+}) => {
+  if (job?.status !== "COMPLETED" || refreshedJobIds.has(job.id)) return false;
+  const previousJob = previousJobs.find((candidate) => candidate.id === job.id);
+  const justFinishedRecreation = previousJob
+    && ["QUEUED", "PREPARING", "LEASED"].includes(previousJob.status);
+  const trackIsMissing = !subtitles.some(
+    (subtitle) => subtitle.language === job.targetLanguage
+  );
+  return Boolean(trackIsMissing || justFinishedRecreation);
+};
+
 const readActiveSubtitleCues = (textTrack) => Array.from(textTrack?.activeCues || [])
   .map((cue, index) => ({
     id: `${cue.startTime ?? "start"}-${cue.endTime ?? "end"}-${index}`,
@@ -268,15 +284,17 @@ const VideoPlayer = ({
         if (cancelled) return;
         setAiSubtitleConfig(configResponse.data || null);
         const jobs = jobsResponse.data?.jobs || [];
+        const previousJobs = aiSubtitleJobsRef.current;
         setAiSubtitleJobs(jobs);
         aiSubtitleJobsRef.current = jobs;
-        const completedWithoutTrack = jobs.filter((job) =>
-          job.status === "COMPLETED"
-          && !(video.subtitles || []).some((subtitle) => subtitle.language === job.targetLanguage)
-          && !refreshedAiSubtitleJobsRef.current.has(job.id)
-        );
-        if (completedWithoutTrack.length > 0) {
-          completedWithoutTrack.forEach((job) => refreshedAiSubtitleJobsRef.current.add(job.id));
+        const completedToRefresh = jobs.filter((job) => shouldRefreshAiSubtitleTrack({
+          job,
+          previousJobs,
+          subtitles: video.subtitles || [],
+          refreshedJobIds: refreshedAiSubtitleJobsRef.current,
+        }));
+        if (completedToRefresh.length > 0) {
+          completedToRefresh.forEach((job) => refreshedAiSubtitleJobsRef.current.add(job.id));
           onSubtitlesUpdatedRef.current?.();
         }
       } catch {

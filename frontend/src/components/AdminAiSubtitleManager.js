@@ -97,8 +97,8 @@ const AdminAiSubtitleManager = () => {
       </div>
 
       <div className="p-5">
-        {message && <p className="mb-4 rounded-lg bg-emerald-500/10 px-4 py-3 text-sm font-bold text-emerald-700 dark:text-emerald-200">{message}</p>}
-        {error && <p role="alert" className="mb-4 rounded-lg bg-red-500/10 px-4 py-3 text-sm font-bold text-red-700 dark:text-red-200">{error}</p>}
+        {message && <p className="mb-4 break-words rounded-lg bg-emerald-500/10 px-4 py-3 text-sm font-bold text-emerald-700 dark:text-emerald-200">{message}</p>}
+        {error && <p role="alert" className="mb-4 break-words rounded-lg bg-red-500/10 px-4 py-3 text-sm font-bold text-red-700 dark:text-red-200">{error}</p>}
         {loading && items.length === 0 ? (
           <p className="py-8 text-center text-sm font-semibold text-slate-500">Chargement…</p>
         ) : items.length === 0 ? (
@@ -110,9 +110,11 @@ const AdminAiSubtitleManager = () => {
             {items.map((video) => {
               const active = ACTIVE_STATUSES.has(video.job?.status);
               return (
-                <li key={video.videoId} className="flex flex-col gap-3 rounded-xl border border-fuchsia-500/10 bg-white/70 p-4 dark:bg-slate-950/45 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="min-w-0">
-                    <p className="truncate font-black text-slate-950 dark:text-white">{video.title}</p>
+                <li key={video.videoId} className="flex min-w-0 flex-col gap-3 overflow-hidden rounded-xl border border-fuchsia-500/10 bg-white/70 p-4 dark:bg-slate-950/45 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="w-full min-w-0 sm:flex-1">
+                    <p className="line-clamp-2 max-w-full break-words text-sm font-black leading-5 text-slate-950 dark:text-white" title={video.title}>
+                      {video.title}
+                    </p>
                     <p className="mt-1 text-xs font-semibold text-slate-500 dark:text-slate-400">
                       {video.seriesTitle
                         ? `${video.seriesTitle} · saison ${video.seasonNumber}`

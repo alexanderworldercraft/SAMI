@@ -23,6 +23,9 @@ import AdminBackupManager from "./AdminBackupManager";
 import AdminExperimentalFeatures from "./AdminExperimentalFeatures";
 import AdminDistributedEncodingDiagnostics from "./AdminDistributedEncodingDiagnostics";
 import AdminAiSubtitleManager from "./AdminAiSubtitleManager";
+import AdminAiSubtitleLibraryManager from "./AdminAiSubtitleLibraryManager";
+import SuperAdminAiSubtitleEditor from "./SuperAdminAiSubtitleEditor";
+import AdminAccordion from "./AdminAccordion";
 
 const tabButtonClass = (active) =>
     `rounded-lg px-4 py-2 text-sm font-bold transition duration-200 ${
@@ -124,7 +127,11 @@ const AdministrationPage = () => {
                 <p className="text-sm font-bold uppercase text-sky-500 dark:text-sky-400">SAMI</p>
                 <h1 className="mt-3 text-3xl font-black text-slate-950 dark:text-white">Gestion des administrateurs</h1>
             </header>
-            <section className="relative mx-auto mb-8 max-w-4xl overflow-hidden rounded-2xl border border-sky-500/10 bg-white/80 p-6 shadow-xl shadow-slate-950/5 backdrop-blur dark:bg-slate-950/70 dark:text-white dark:shadow-sky-950/20">
+            <AdminAccordion
+                title="Contenus à la une"
+                description="Force la rotation des contenus vedettes par genre."
+            >
+            <section className="relative mx-auto max-w-4xl overflow-hidden rounded-2xl border border-sky-500/10 bg-white/80 p-6 shadow-xl shadow-slate-950/5 backdrop-blur dark:bg-slate-950/70 dark:text-white dark:shadow-sky-950/20">
                 <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_12%_20%,rgba(14,165,233,0.14),transparent_26%),radial-gradient(circle_at_88%_0%,rgba(139,92,246,0.10),transparent_22%)]" />
                 <div className="relative">
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -148,12 +155,32 @@ const AdministrationPage = () => {
                 {featuredError && <p className="mt-4 text-sm font-semibold text-red-600 dark:text-red-300">{featuredError}</p>}
                 </div>
             </section>
-            <AdminMessageSettings />
-            <AdminExperimentalFeatures />
-            <AdminAiSubtitleManager />
-            <AdminDistributedEncodingDiagnostics />
-            <AdminHomepageGenreManager />
-            <AdminFavoriteContentManager />
+            </AdminAccordion>
+            <AdminAccordion title="Message général" description="Configure le message affiché à l'ensemble des utilisateurs.">
+                <AdminMessageSettings />
+            </AdminAccordion>
+            <AdminAccordion title="Fonctionnalités expérimentales" description="Active et configure les fonctionnalités encore en expérimentation.">
+                <AdminExperimentalFeatures />
+            </AdminAccordion>
+            <AdminAccordion title="Sous-titres français manquants" description="Planifie la génération française des vidéos qui n'en disposent pas.">
+                <AdminAiSubtitleManager />
+            </AdminAccordion>
+            <AdminAccordion title="Sous-titres IA" description="Modifie, supprime ou recrée les pistes produites par intelligence artificielle.">
+                <AdminAiSubtitleLibraryManager />
+            </AdminAccordion>
+            <AdminAccordion title="Éditeur temporel des sous-titres IA" description="Corrige précisément le texte et les horodatages avec un retour vidéo complet.">
+                <SuperAdminAiSubtitleEditor />
+            </AdminAccordion>
+            <AdminAccordion title="Diagnostic d'encodage distribué" description="Inspecte les traitements distribués et leur conservation.">
+                <AdminDistributedEncodingDiagnostics />
+            </AdminAccordion>
+            <AdminAccordion title="Genres de la page d'accueil" description="Organise les contenus mis en avant par genre.">
+                <AdminHomepageGenreManager />
+            </AdminAccordion>
+            <AdminAccordion title="Contenus favoris" description="Configure les contenus favoris présentés dans l'application.">
+                <AdminFavoriteContentManager />
+            </AdminAccordion>
+            <AdminAccordion title="Gestion des contenus" description="Genres, séries, vidéos, sagas, univers et personnes.">
             <TabbedAdminSection
                 title="Gestion des contenus"
                 description="Modifie les genres, séries, vidéos, sagas, univers et personnes depuis une seule zone."
@@ -161,6 +188,8 @@ const AdministrationPage = () => {
                 activeTab={activeContentTab}
                 onTabChange={setActiveContentTab}
             />
+            </AdminAccordion>
+            <AdminAccordion title="Gestion des contenus musicaux" description="Musiques, albums et genres dédiés à la musique.">
             <TabbedAdminSection
                 title="Gestion des contenus musicaux"
                 description="Modifie les musiques, albums et genres dédiés à la musique."
@@ -168,6 +197,8 @@ const AdministrationPage = () => {
                 activeTab={activeMusicContentTab}
                 onTabChange={setActiveMusicContentTab}
             />
+            </AdminAccordion>
+            <AdminAccordion title="Corbeilles" description="Restaure ou supprime définitivement les contenus supprimés.">
             <TabbedAdminSection
                 title="Corbeilles"
                 description="Restaure ou supprime définitivement les contenus supprimés."
@@ -179,12 +210,19 @@ const AdministrationPage = () => {
                 activeTab={activeTrashTab}
                 onTabChange={setActiveTrashTab}
             />
-            <AdminBackupManager />
-            <FormNewAdmin />
-
-            <AdminList />
-
-            <UserManagerCard onStateChange={handleStateChange} />
+            </AdminAccordion>
+            <AdminAccordion title="Sauvegardes" description="Crée et télécharge les sauvegardes administratives.">
+                <AdminBackupManager />
+            </AdminAccordion>
+            <AdminAccordion title="Ajouter un administrateur" description="Crée un nouveau compte d'administration.">
+                <FormNewAdmin />
+            </AdminAccordion>
+            <AdminAccordion title="Liste des administrateurs" description="Consulte et gère les comptes administrateurs.">
+                <AdminList />
+            </AdminAccordion>
+            <AdminAccordion title="Gestion des utilisateurs" description="Consulte et modifie les comptes utilisateurs.">
+                <UserManagerCard onStateChange={handleStateChange} />
+            </AdminAccordion>
             {/* Ajoutez d'autres composants ou fonctionnalités ici */}
         </div>
     );

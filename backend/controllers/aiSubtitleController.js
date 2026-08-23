@@ -10,9 +10,17 @@ import {
   getAiSubtitleSetting,
   setAiSubtitleSetting,
 } from "../services/aiSubtitles/settingService.js";
+import {
+  deleteGeneratedAiSubtitle,
+  getGeneratedAiSubtitle,
+  listGeneratedAiSubtitles,
+  recreateGeneratedAiSubtitle,
+  updateGeneratedAiSubtitleSegments,
+  updateGeneratedAiSubtitleText,
+} from "../services/aiSubtitles/adminService.js";
 import { sendAiSubtitleError } from "../services/aiSubtitles/error.js";
 import { prisma } from "../services/db.js";
-import { ensureAdmin } from "../services/authz.js";
+import { ensureAdmin, ensureSuperAdmin } from "../services/authz.js";
 import { canAccessPremium, isVideoPremium } from "../services/video/videoAccess.js";
 import { createLog } from "./logController.js";
 
@@ -105,6 +113,113 @@ export const getAdminVideosWithoutFrenchSubtitles = async (request, reply) => {
     return reply.send(await listVideosWithoutFrenchSubtitles({ page: request.query?.page }));
   } catch (error) {
     return sendAiSubtitleError(reply, error, "Liste des vidéos sans sous-titres français indisponible.");
+  }
+};
+
+export const getAdminGeneratedAiSubtitles = async (request, reply) => {
+  try {
+    const admin = await ensureAdmin(request, reply);
+    if (!admin) return;
+    return reply.send(await listGeneratedAiSubtitles({
+      page: request.query?.page,
+      search: request.query?.search,
+    }));
+  } catch (error) {
+    return sendAiSubtitleError(reply, error, "Liste des sous-titres IA indisponible.");
+  }
+};
+
+export const getAdminGeneratedAiSubtitle = async (request, reply) => {
+  try {
+    const admin = await ensureAdmin(request, reply);
+    if (!admin) return;
+    return reply.send(await getGeneratedAiSubtitle(request.params?.subtitleId));
+  } catch (error) {
+    return sendAiSubtitleError(reply, error, "Sous-titre IA indisponible.");
+  }
+};
+
+export const updateAdminGeneratedAiSubtitleText = async (request, reply) => {
+  try {
+    const admin = await ensureAdmin(request, reply);
+    if (!admin) return;
+    const subtitle = await updateGeneratedAiSubtitleText(
+      request.params?.subtitleId,
+      request.body?.texts
+    );
+    await createLog({
+      request,
+      UtilisateurID: admin.userId,
+      ActionNom: "ai_subtitle_updated",
+      VideoID: subtitle.video.id,
+      Champ: "text",
+      NouvelleValeur: `${subtitle.segments.length} segments`,
+    });
+    return reply.send(subtitle);
+  } catch (error) {
+    return sendAiSubtitleError(reply, error, "Modification du sous-titre IA impossible.");
+  }
+};
+
+export const updateAdminGeneratedAiSubtitleSegments = async (request, reply) => {
+  try {
+    const admin = await ensureSuperAdmin(request, reply);
+    if (!admin) return;
+    const subtitle = await updateGeneratedAiSubtitleSegments(
+      request.params?.subtitleId,
+      request.body?.segments
+    );
+    await createLog({
+      request,
+      UtilisateurID: admin.userId,
+      ActionNom: "ai_subtitle_updated",
+      VideoID: subtitle.video.id,
+      Champ: "segments",
+      NouvelleValeur: `${subtitle.segments.length} segments`,
+    });
+    return reply.send(subtitle);
+  } catch (error) {
+    return sendAiSubtitleError(reply, error, "Correction temporelle du sous-titre IA impossible.");
+  }
+};
+
+export const deleteAdminGeneratedAiSubtitle = async (request, reply) => {
+  try {
+    const admin = await ensureAdmin(request, reply);
+    if (!admin) return;
+    const subtitle = await deleteGeneratedAiSubtitle(request.params?.subtitleId);
+    await createLog({
+      request,
+      UtilisateurID: admin.userId,
+      ActionNom: "ai_subtitle_deleted",
+      VideoID: subtitle.video.id,
+      Champ: "language",
+      AncienneValeur: String(subtitle.language || ""),
+    });
+    return reply.send({ deleted: true, subtitle });
+  } catch (error) {
+    return sendAiSubtitleError(reply, error, "Suppression du sous-titre IA impossible.");
+  }
+};
+
+export const recreateAdminGeneratedAiSubtitle = async (request, reply) => {
+  try {
+    const admin = await ensureAdmin(request, reply);
+    if (!admin) return;
+    const result = await recreateGeneratedAiSubtitle(request.params?.subtitleId, {
+      requestedByUserId: admin.userId,
+    });
+    await createLog({
+      request,
+      UtilisateurID: admin.userId,
+      ActionNom: "ai_subtitle_recreated",
+      VideoID: result.job.videoId,
+      Champ: "language",
+      NouvelleValeur: result.job.targetLanguage,
+    });
+    return reply.status(202).send(result);
+  } catch (error) {
+    return sendAiSubtitleError(reply, error, "Recréation du sous-titre IA impossible.");
   }
 };
 

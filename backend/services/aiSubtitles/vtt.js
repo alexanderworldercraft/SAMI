@@ -8,6 +8,31 @@ const timestamp = (seconds) => {
     + `.${String(ms).padStart(3, "0")}`;
 };
 
+const parseTimestamp = (value) => {
+  const parts = String(value || "").trim().replace(",", ".").split(":");
+  if (parts.length < 2 || parts.length > 3) return Number.NaN;
+  const seconds = Number(parts.pop());
+  const minutes = Number(parts.pop());
+  const hours = parts.length ? Number(parts.pop()) : 0;
+  if (
+    !Number.isFinite(hours)
+    || !Number.isFinite(minutes)
+    || !Number.isFinite(seconds)
+    || hours < 0
+    || minutes < 0
+    || minutes >= 60
+    || seconds < 0
+    || seconds >= 60
+  ) return Number.NaN;
+  return (hours * 3600) + (minutes * 60) + seconds;
+};
+
+const decodeVttText = (value) => String(value || "")
+  .replace(/&lt;/g, "<")
+  .replace(/&gt;/g, ">")
+  .replace(/&amp;/g, "&")
+  .replace(/&nbsp;/g, " ");
+
 export const normalizeAiSegments = (segments) => {
   if (!Array.isArray(segments) || segments.length === 0) {
     throw new TypeError("Le moteur IA n'a retourné aucun segment.");
@@ -21,6 +46,46 @@ export const normalizeAiSegments = (segments) => {
     }
     return { start, end, text };
   });
+};
+
+export const normalizeEditedAiSegments = (segments) => {
+  if (!Array.isArray(segments) || segments.length > 20_000) {
+    throw new TypeError("La liste des segments de sous-titres est invalide.");
+  }
+  const normalized = normalizeAiSegments(segments);
+  normalized.forEach((segment, index) => {
+    if (segment.text.length > 4_000) {
+      throw new TypeError(`Le texte du segment ${index + 1} est trop long.`);
+    }
+    if (index > 0 && segment.start < normalized[index - 1].end) {
+      throw new TypeError(`Le segment ${index + 1} chevauche le segment précédent.`);
+    }
+  });
+  return normalized;
+};
+
+export const parseWebVtt = (content) => {
+  const source = String(content || "").replace(/^\uFEFF/, "").replace(/\r\n?/g, "\n");
+  if (!/^WEBVTT(?:\s|$)/.test(source)) {
+    throw new TypeError("Le fichier de sous-titres n'est pas un WebVTT valide.");
+  }
+  const blocks = source.split(/\n{2,}/).slice(1);
+  const segments = [];
+  blocks.forEach((block) => {
+    const lines = block.split("\n").map((line) => line.trimEnd());
+    if (!lines.length || /^(NOTE|STYLE|REGION)(?:\s|$)/.test(lines[0])) return;
+    const timingIndex = lines.findIndex((line) => line.includes("-->"));
+    if (timingIndex < 0) return;
+    const match = lines[timingIndex].match(
+      /^([^\s]+)\s+-->\s+([^\s]+)(?:\s+.*)?$/
+    );
+    if (!match) throw new TypeError(`Horodatage WebVTT invalide : ${lines[timingIndex]}`);
+    const start = parseTimestamp(match[1]);
+    const end = parseTimestamp(match[2]);
+    const text = decodeVttText(lines.slice(timingIndex + 1).join(" ")).trim();
+    segments.push({ start, end, text });
+  });
+  return normalizeEditedAiSegments(segments);
 };
 
 export const buildWebVtt = (segments) => {
