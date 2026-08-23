@@ -296,8 +296,13 @@ sélectionne `faster-whisper`/CUDA lorsqu’un GPU NVIDIA est détecté,
 FFmpeg et Python 3 sont requis ; Git et CMake sont aussi nécessaires lorsque
 `whisper.cpp` doit être compilé. Sous Linux/AMD, les en-têtes et le runtime
 Vulkan doivent être installés. Sous NVIDIA, le pilote doit être compatible avec
-CUDA 12. Sous Linux/NVIDIA, le setup installe cuBLAS CUDA 12 et cuDNN 9 dans le
-venv puis transmet automatiquement leurs chemins à CTranslate2. La commande
+CUDA 12. Sous Linux ou Windows avec NVIDIA, le setup installe cuBLAS CUDA 12,
+cuDNN 9, CUDA Runtime et NVRTC dans le venv puis transmet automatiquement leurs
+chemins à CTranslate2 sans modifier le `PATH` global. Sous Windows, il choisit
+également la variante CUDA de PyTorch compatible avec la version maximale
+annoncée par `nvidia-smi` (par exemple `cu130` pour un pilote annonçant CUDA
+13.2), remplace automatiquement une éventuelle variante CPU et interrompt le
+setup si CUDA reste indisponible. La commande
 `npm run setup:ai:check` vérifie également que CUDA, cuBLAS, cuDNN ou Metal sont
 réellement utilisables avant de déclarer le worker prêt. Sur Linux sans NVIDIA,
 le setup installe automatiquement la variante CPU de PyTorch pour la traduction

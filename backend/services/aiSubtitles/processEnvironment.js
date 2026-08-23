@@ -6,7 +6,7 @@ export function buildAiSubtitleProcessEnvironment({
   env = process.env,
   platform = process.platform,
 } = {}) {
-  const result = { ...env, PYTHONUNBUFFERED: "1" };
+  const result = { ...env, PYTHONUNBUFFERED: "1", PYTHONUTF8: "1" };
   const configuredPaths = Array.isArray(install?.cudaLibraryPaths)
     ? install.cudaLibraryPaths
     : [];

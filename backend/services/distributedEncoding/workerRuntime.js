@@ -6,6 +6,7 @@ import {
   assertDistributedWorkerConfig,
 } from "./config.js";
 import {
+  DISTRIBUTED_ENCODING_LEASE_DURATION_MS,
   ENCODING_TASK_KIND,
   ENCODING_TASK_PHASE,
   ENCODING_WORKER_ROLE,
@@ -46,6 +47,7 @@ const SHA256_PATTERN = /^[a-f0-9]{64}$/i;
 const MAX_ERROR_LENGTH = 4_000;
 const DEFAULT_CLAIM_POLL_INTERVAL_MS = 15_000;
 const SHUTDOWN_NOTIFICATION_TIMEOUT_MS = 5_000;
+const LEASE_RENEW_RETRY_DELAY_MS = 5_000;
 const CLAIM_ERROR_BACKOFF_MS = Object.freeze([15_000, 60_000, 5 * 60_000]);
 
 const defaultDependencies = Object.freeze({
@@ -258,14 +260,77 @@ const createLeaseKeeper = ({
   controller,
   dependencies,
   intervalMs,
+  leaseDurationMs,
   logger,
 }) => {
   let phase = ENCODING_TASK_PHASE.DOWNLOADING;
   let progress = 0;
-  let timer = null;
+  let intervalTimer = null;
+  let retryTimer = null;
+  let expiryTimer = null;
   let renewal = Promise.resolve();
   let fatalError = null;
+  let lastRenewalError = null;
+  let leaseExpiresAtMs = null;
   let stopped = false;
+  const configuredLeaseDurationMs = Number(leaseDurationMs);
+  const normalizedLeaseDurationMs =
+    Number.isFinite(configuredLeaseDurationMs) && configuredLeaseDurationMs > 0
+      ? configuredLeaseDurationMs
+      : DISTRIBUTED_ENCODING_LEASE_DURATION_MS;
+
+  const clearRetryTimer = () => {
+    if (retryTimer) clearTimeout(retryTimer);
+    retryTimer = null;
+  };
+
+  const clearExpiryTimer = () => {
+    if (expiryTimer) clearTimeout(expiryTimer);
+    expiryTimer = null;
+  };
+
+  const stopTimers = () => {
+    if (intervalTimer) clearInterval(intervalTimer);
+    intervalTimer = null;
+    clearRetryTimer();
+    clearExpiryTimer();
+  };
+
+  const fail = (error) => {
+    if (fatalError || stopped) return;
+    fatalError = error;
+    stopTimers();
+    if (!controller.signal.aborted) controller.abort(error);
+  };
+
+  const refreshLeaseDeadline = (
+    value,
+    { fallback = true, renewedAtMs = null } = {}
+  ) => {
+    const parsed = value ? new Date(value).getTime() : Number.NaN;
+    // Une échéance recalculée depuis le début local de la requête reste sûre
+    // même si les horloges du clone et du primary ont un léger décalage.
+    if (Number.isFinite(renewedAtMs)) {
+      leaseExpiresAtMs = renewedAtMs + normalizedLeaseDurationMs;
+    } else if (Number.isFinite(parsed)) {
+      leaseExpiresAtMs = parsed;
+    } else if (fallback) {
+      leaseExpiresAtMs = Date.now() + normalizedLeaseDurationMs;
+    }
+    if (!Number.isFinite(leaseExpiresAtMs)) return;
+
+    clearExpiryTimer();
+    expiryTimer = setTimeout(() => {
+      const error = lastRenewalError || distributedEncodingError(
+        "Le lease d'encodage a expiré faute de renouvellement confirmé.",
+        "DISTRIBUTED_LEASE_RENEWAL_EXPIRED",
+        503,
+        { retryable: true }
+      );
+      fail(error);
+    }, Math.max(0, leaseExpiresAtMs - Date.now()));
+    expiryTimer.unref?.();
+  };
 
   const update = (nextPhase, nextProgress) => {
     if (nextPhase) phase = nextPhase;
@@ -277,10 +342,24 @@ const createLeaseKeeper = ({
     }
   };
 
+  const scheduleRetry = () => {
+    if (stopped || fatalError || controller.signal.aborted || retryTimer) return;
+    const remainingMs = Number.isFinite(leaseExpiresAtMs)
+      ? leaseExpiresAtMs - Date.now()
+      : LEASE_RENEW_RETRY_DELAY_MS;
+    if (remainingMs <= 0) return;
+    retryTimer = setTimeout(() => {
+      retryTimer = null;
+      void renewNow();
+    }, Math.min(LEASE_RENEW_RETRY_DELAY_MS, remainingMs));
+    retryTimer.unref?.();
+  };
+
   const renewNow = () => {
     if (stopped || fatalError || controller.signal.aborted) return renewal;
     renewal = renewal.then(async () => {
       if (stopped || fatalError || controller.signal.aborted) return null;
+      const renewedAtMs = Date.now();
       try {
         const response = await dependencies.renewTask({
           taskId: claim.task.id,
@@ -296,10 +375,23 @@ const createLeaseKeeper = ({
             409
           );
         }
+        lastRenewalError = null;
+        clearRetryTimer();
+        refreshLeaseDeadline(null, { renewedAtMs });
         return response;
       } catch (error) {
-        fatalError = error;
-        if (!controller.signal.aborted) controller.abort(error);
+        if (error?.retryable) {
+          lastRenewalError = error;
+          safeLoggerCall(
+            logger,
+            "warn",
+            "[distributed-encoding-worker] renouvellement de lease temporairement impossible, nouvelle tentative programmée",
+            error
+          );
+          scheduleRetry();
+          return null;
+        }
+        fail(error);
         throw error;
       }
     });
@@ -315,17 +407,18 @@ const createLeaseKeeper = ({
   };
 
   const start = async () => {
+    refreshLeaseDeadline(claim.leaseExpiresAt, { fallback: false });
     await renewNow();
     if (stopped || fatalError) return;
-    timer = setInterval(() => {
+    intervalTimer = setInterval(() => {
       void renewNow();
     }, intervalMs);
-    timer.unref?.();
+    intervalTimer.unref?.();
   };
 
   const stop = async () => {
     stopped = true;
-    if (timer) clearInterval(timer);
+    stopTimers();
     await renewal.catch(() => {});
   };
 
@@ -610,6 +703,7 @@ export function startDistributedEncodingWorkerRuntime(options = {}) {
         controller,
         dependencies,
         intervalMs: renewIntervalMs,
+        leaseDurationMs: config.leaseDurationMs,
         logger,
       });
       await keeper.start();

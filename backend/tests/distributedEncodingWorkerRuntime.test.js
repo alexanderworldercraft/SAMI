@@ -31,6 +31,7 @@ const createConfig = (root, overrides = {}) => ({
   cacheRoot: path.join(root, "cache"),
   stagingRoot: path.join(root, "staging"),
   heartbeatIntervalMs: 15_000,
+  leaseDurationMs: 120_000,
   leaseRenewIntervalMs: 30_000,
   ...overrides,
 });
@@ -372,6 +373,143 @@ describe("runtime du worker d'encodage distribué", () => {
       status: "RELEASED",
     });
     expect(dependencies.releaseTask).toHaveBeenCalledOnce();
+  });
+
+  it("retente un renouvellement réseau transitoire sans annuler FFmpeg", async () => {
+    vi.useFakeTimers();
+    const root = await createTemporaryRoot();
+    const sourcePath = path.join(root, "source.mkv");
+    await fs.promises.writeFile(sourcePath, "fake-source");
+    let encodingStarted;
+    let finishEncoding;
+    let encodingAborted = false;
+    const started = new Promise((resolve) => {
+      encodingStarted = resolve;
+    });
+    const finish = new Promise((resolve) => {
+      finishEncoding = resolve;
+    });
+    let renewalCount = 0;
+    const transientError = Object.assign(new Error("primary indisponible"), {
+      code: "DISTRIBUTED_PRIMARY_UNAVAILABLE",
+      retryable: true,
+    });
+    const dependencies = createDependencies({
+      claim: createVideoClaim({
+        leaseExpiresAt: new Date(Date.now() + 120_000).toISOString(),
+      }),
+      sourcePath,
+      renewTask: vi.fn(async () => {
+        renewalCount += 1;
+        if (renewalCount === 3) throw transientError;
+        return {
+          task: {
+            leaseExpiresAt: new Date(Date.now() + 120_000).toISOString(),
+          },
+        };
+      }),
+      encodeVideo: vi.fn(async ({ outputDir, signal }) => {
+        encodingStarted();
+        signal.addEventListener("abort", () => {
+          encodingAborted = true;
+        }, { once: true });
+        await finish;
+        await writeTaskOutput(outputDir, "720p");
+      }),
+    });
+    const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
+    const runtime = startDistributedEncodingWorkerRuntime({
+      autoStart: false,
+      config: createConfig(root),
+      dependencies,
+      logger,
+    });
+
+    const execution = runtime.runOneClaim();
+    await started;
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(dependencies.renewTask).toHaveBeenCalledTimes(3);
+    expect(encodingAborted).toBe(false);
+
+    await vi.advanceTimersByTimeAsync(5_000);
+    expect(dependencies.renewTask).toHaveBeenCalledTimes(4);
+    expect(encodingAborted).toBe(false);
+    expect(logger.warn).toHaveBeenCalledWith(
+      expect.stringContaining("nouvelle tentative programmée"),
+      transientError
+    );
+
+    finishEncoding();
+    await expect(execution).resolves.toMatchObject({
+      claimed: true,
+      completed: true,
+    });
+    expect(dependencies.releaseTask).not.toHaveBeenCalled();
+    await runtime.stop();
+  });
+
+  it("arrête la tâche si aucun retry ne renouvelle le lease avant son échéance", async () => {
+    vi.useFakeTimers();
+    const root = await createTemporaryRoot();
+    const sourcePath = path.join(root, "source.mkv");
+    await fs.promises.writeFile(sourcePath, "fake-source");
+    let encodingStarted;
+    const started = new Promise((resolve) => {
+      encodingStarted = resolve;
+    });
+    let renewalCount = 0;
+    const transientError = Object.assign(new Error("primary indisponible"), {
+      code: "DISTRIBUTED_PRIMARY_UNAVAILABLE",
+      retryable: true,
+    });
+    const dependencies = createDependencies({
+      claim: createVideoClaim({
+        leaseExpiresAt: new Date(Date.now() + 120_000).toISOString(),
+      }),
+      sourcePath,
+      renewTask: vi.fn(async () => {
+        renewalCount += 1;
+        if (renewalCount > 2) throw transientError;
+        return {
+          task: {
+            leaseExpiresAt: new Date(Date.now() + 120_000).toISOString(),
+          },
+        };
+      }),
+      encodeVideo: vi.fn(({ signal }) => new Promise((resolve, reject) => {
+        encodingStarted();
+        signal.addEventListener("abort", () => {
+          const error = new Error("annulé");
+          error.name = "AbortError";
+          error.code = "ABORT_ERR";
+          reject(error);
+        }, { once: true });
+      })),
+    });
+    const runtime = startDistributedEncodingWorkerRuntime({
+      autoStart: false,
+      config: createConfig(root),
+      dependencies,
+      logger: null,
+    });
+
+    const execution = runtime.runOneClaim();
+    await started;
+    await vi.advanceTimersByTimeAsync(120_000);
+
+    await expect(execution).resolves.toMatchObject({
+      claimed: true,
+      completed: false,
+      status: "RELEASED",
+      error: transientError,
+    });
+    expect(dependencies.releaseTask).toHaveBeenCalledWith(
+      expect.objectContaining({
+        code: "DISTRIBUTED_PRIMARY_UNAVAILABLE",
+        retryable: true,
+      })
+    );
+    await runtime.stop();
   });
 
   it("publie un heartbeat FFmpeg/OS/disque toutes les 15 secondes avec un slot", async () => {

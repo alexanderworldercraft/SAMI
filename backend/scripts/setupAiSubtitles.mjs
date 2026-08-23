@@ -5,6 +5,7 @@ import { spawnSync } from "child_process";
 import { fileURLToPath } from "url";
 
 import { buildAiSubtitleProcessEnvironment } from "../services/aiSubtitles/processEnvironment.js";
+import { buildWindowsTorchIndex } from "./ai/torch_index.mjs";
 
 const backendRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const root = path.resolve(process.env.SAMI_AI_SUBTITLE_ROOT || path.join(backendRoot, "var", "ai-subtitles"));
@@ -30,6 +31,33 @@ const run = (command, args, options = {}) => {
 const commandWorks = (command, args = ["--version"]) => {
   const result = spawnSync(command, args, { encoding: "utf8", windowsHide: true, shell: false });
   return result.status === 0;
+};
+
+const detectWindowsTorchIndex = () => {
+  const result = spawnSync("nvidia-smi", [], {
+    encoding: "utf8",
+    windowsHide: true,
+    shell: false,
+  });
+  const match = String(result.stdout || result.stderr || "")
+    .match(/CUDA Version:\s*([0-9]+\.[0-9]+)/i);
+  return buildWindowsTorchIndex(match?.[1]);
+};
+
+const inspectTorchRuntime = (pythonPath) => {
+  const output = run(pythonPath, [
+    "-c",
+    "import json, torch; print(json.dumps({"
+      + "'version': torch.__version__, "
+      + "'cudaVersion': torch.version.cuda, "
+      + "'cudaAvailable': bool(torch.cuda.is_available())"
+      + "}))",
+  ], { capture: true });
+  try {
+    return JSON.parse(output);
+  } catch (error) {
+    throw new Error(`Impossible de contrôler l'installation PyTorch : ${output}`, { cause: error });
+  }
 };
 
 const existingPython = () => {
@@ -134,29 +162,49 @@ if (checkOnly) {
   run(pythonPath, ["-m", "pip", "install", "-r", path.join(backendRoot, "scripts", "ai", "requirements.txt")]);
   const torchArgs = ["-m", "pip", "install", "torch>=2.5,<3"];
   const configuredTorchIndex = String(process.env.SAMI_AI_TORCH_INDEX_URL || "").trim();
-  if (configuredTorchIndex) {
-    torchArgs.push("--index-url", configuredTorchIndex);
-  } else if (process.platform === "linux" && engine !== "faster-whisper") {
-    torchArgs.push("--index-url", "https://download.pytorch.org/whl/cpu");
+  const automaticTorchIndex = process.platform === "win32" && engine === "faster-whisper"
+    ? detectWindowsTorchIndex()
+    : process.platform === "linux" && engine !== "faster-whisper"
+      ? "https://download.pytorch.org/whl/cpu"
+      : "";
+  const torchIndex = configuredTorchIndex || automaticTorchIndex;
+  if (torchIndex) {
+    torchArgs.push("--index-url", torchIndex);
   }
   run(pythonPath, torchArgs);
+  let torchRuntime = inspectTorchRuntime(pythonPath);
+  if (
+    process.platform === "win32"
+    && engine === "faster-whisper"
+    && !torchRuntime.cudaVersion
+  ) {
+    console.log(`La variante CPU de PyTorch est remplacée par la variante CUDA (${torchIndex}).`);
+    run(pythonPath, [...torchArgs, "--upgrade", "--force-reinstall"]);
+    torchRuntime = inspectTorchRuntime(pythonPath);
+  }
+  if (
+    process.platform === "win32"
+    && engine === "faster-whisper"
+    && (!torchRuntime.cudaVersion || !torchRuntime.cudaAvailable)
+  ) {
+    throw new Error(
+      `PyTorch CUDA reste indisponible après installation `
+      + `(torch ${torchRuntime.version}, CUDA ${torchRuntime.cudaVersion || "absent"}, index ${torchIndex}).`
+    );
+  }
   let cudaLibraryPaths = [];
   if (engine === "faster-whisper") {
     run(pythonPath, ["-m", "pip", "install", "faster-whisper>=1.1,<2"]);
-    if (process.platform === "linux") {
+    if (["linux", "win32"].includes(process.platform)) {
       run(pythonPath, [
         "-m", "pip", "install",
         "nvidia-cublas-cu12",
         "nvidia-cudnn-cu12==9.*",
+        "nvidia-cuda-runtime-cu12",
+        "nvidia-cuda-nvrtc-cu12",
       ]);
       cudaLibraryPaths = JSON.parse(run(pythonPath, [
-        "-c",
-        [
-          "import json",
-          "import nvidia.cublas.lib",
-          "import nvidia.cudnn.lib",
-          "print(json.dumps([str(next(iter(nvidia.cublas.lib.__path__))), str(next(iter(nvidia.cudnn.lib.__path__)))]))",
-        ].join("; "),
+        path.join(backendRoot, "scripts", "ai", "discover_cuda_library_paths.py"),
       ], { capture: true }));
     }
   }

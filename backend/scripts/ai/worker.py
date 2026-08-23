@@ -18,6 +18,9 @@ NLLB_LANGUAGES = {
     "th": "tha_Thai", "vi": "vie_Latn",
 }
 
+_DLL_DIRECTORY_HANDLES = []
+_CONFIGURED_CUDA_PATHS = None
+
 
 def load_json(filename):
     with open(filename, "r", encoding="utf-8") as handle:
@@ -41,15 +44,60 @@ def normalize_language(value):
     return aliases.get(value, value.split("-")[0])
 
 
+def configure_cuda_library_paths(manifest):
+    global _CONFIGURED_CUDA_PATHS
+    if _CONFIGURED_CUDA_PATHS is not None:
+        return _CONFIGURED_CUDA_PATHS
+    paths = []
+    seen = set()
+    for configured_path in manifest.get("cudaLibraryPaths") or []:
+        directory = Path(str(configured_path)).resolve()
+        if not directory.is_dir() or str(directory) in seen:
+            continue
+        seen.add(str(directory))
+        paths.append(directory)
+
+    if (
+        os.name == "nt"
+        and manifest.get("engine") == "faster-whisper"
+        and manifest.get("device") == "cuda"
+        and not paths
+    ):
+        raise RuntimeError(
+            "Les chemins des DLL CUDA sont absents du manifeste. "
+            "Relancez npm run setup:ai."
+        )
+
+    if os.name == "nt":
+        for directory in paths:
+            _DLL_DIRECTORY_HANDLES.append(os.add_dll_directory(str(directory)))
+    _CONFIGURED_CUDA_PATHS = paths
+    return paths
+
+
+def load_cuda_library(manifest, filename):
+    for directory in configure_cuda_library_paths(manifest):
+        candidate = directory / filename
+        if candidate.is_file():
+            return ctypes.CDLL(str(candidate))
+    return ctypes.CDLL(filename)
+
+
 def probe(manifest):
     engine = manifest.get("engine")
     python_ready = True
     error = None
     torch_module = None
+    torch_version = None
+    torch_cuda_version = None
+    torch_cuda_available = False
     try:
         import torch
         import transformers  # noqa: F401
         torch_module = torch
+        torch_version = str(torch.__version__)
+        torch_cuda_version = torch.version.cuda
+        torch_cuda_available = bool(torch.cuda.is_available())
         if engine == "faster-whisper":
             import faster_whisper  # noqa: F401
             import ctranslate2
@@ -60,10 +108,10 @@ def probe(manifest):
                     else ("libcublas.so.12", "libcudnn.so.9", "libcudnn_ops.so.9")
                 )
                 for library in cuda_libraries:
-                    ctypes.CDLL(library)
+                    load_cuda_library(manifest, library)
                 if ctranslate2.get_cuda_device_count() < 1:
                     raise RuntimeError("Aucun GPU CUDA utilisable par CTranslate2.")
-                if not torch.cuda.is_available():
+                if not torch_cuda_available:
                     raise RuntimeError("CUDA est indisponible pour le modèle de traduction.")
     except Exception as exc:  # pragma: no cover - dépend de l'installation locale
         python_ready = False
@@ -99,7 +147,12 @@ def probe(manifest):
         "model": manifest.get("model"),
         "translationModel": manifest.get("translationModel"),
         "error": error,
-        "capabilities": {"translationDevice": manifest.get("translationDevice", "auto")},
+        "capabilities": {
+            "translationDevice": manifest.get("translationDevice", "auto"),
+            "torchVersion": torch_version,
+            "torchCudaVersion": torch_cuda_version,
+            "torchCudaAvailable": torch_cuda_available,
+        },
     }
 
 
@@ -273,6 +326,7 @@ def main():
     parser.add_argument("--output")
     args = parser.parse_args()
     manifest = load_json(args.manifest)
+    configure_cuda_library_paths(manifest)
     if args.probe:
         print(json.dumps(probe(manifest), ensure_ascii=False))
         return

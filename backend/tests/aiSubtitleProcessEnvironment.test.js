@@ -12,6 +12,7 @@ describe("environnement du moteur de sous-titrage IA", () => {
 
     expect(env.LD_LIBRARY_PATH).toBe("/venv/cublas:/venv/cudnn:/system/lib");
     expect(env.PYTHONUNBUFFERED).toBe("1");
+    expect(env.PYTHONUTF8).toBe("1");
   });
 
   it("évite les doublons et utilise PATH sous Windows", () => {
@@ -31,6 +32,10 @@ describe("environnement du moteur de sous-titrage IA", () => {
       platform: "linux",
     });
 
-    expect(env).toEqual({ PATH: "/usr/bin", PYTHONUNBUFFERED: "1" });
+    expect(env).toEqual({
+      PATH: "/usr/bin",
+      PYTHONUNBUFFERED: "1",
+      PYTHONUTF8: "1",
+    });
   });
 });
