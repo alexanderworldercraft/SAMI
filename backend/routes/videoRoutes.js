@@ -1,3 +1,4 @@
+import { listVideoCredits, listCreditQueue, createVideoCredit, updateVideoCredit, deleteVideoCredit } from "../controllers/videoCreditController.js";
 import { 
   updateVideoTitle, 
   updateVideoResumer,
@@ -42,6 +43,11 @@ import {
 import { authMiddleware } from "../middlewares/authMiddleware.js";
 
 export default async function (fastify) {
+  fastify.get("/credits/review", { preHandler: authMiddleware }, listCreditQueue);
+  fastify.get("/:id/credits", { preHandler: authMiddleware }, listVideoCredits);
+  fastify.post("/:id/credits", { preHandler: authMiddleware }, createVideoCredit);
+  fastify.patch("/:id/credits/:segmentId", { preHandler: authMiddleware }, updateVideoCredit);
+  fastify.delete("/:id/credits/:segmentId", { preHandler: authMiddleware }, deleteVideoCredit);
   fastify.post("/episodes", { preHandler: authMiddleware }, addEpisode); // Ajouter un épisode
   fastify.post("/add", { preHandler: authMiddleware }, async (req, reply) => addVideo(req, reply, fastify));
   fastify.post("/", { preHandler: authMiddleware }, async (req, reply) => addVideo(req, reply, fastify));

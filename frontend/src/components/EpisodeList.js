@@ -1,3 +1,4 @@
+import { loadHlsDuration } from "../utils/hlsDuration";
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
@@ -11,34 +12,23 @@ const EpisodeList = ({
   const [durations, setDurations] = useState({});
 
   useEffect(() => {
-    episodes.forEach((episode) => {
-      if (!durations[episode.VideoID] && episode.CheminAcces) {
-        const masterUrl = `${process.env.REACT_APP_URL_LOCAL}/${episode.CheminAcces}`;
-        fetch(masterUrl)
-          .then(res => res.text())
-          .then(master => {
-            const lines = master.split("\n");
-            const resolutionPath = lines.find(line => line.includes("240p/playlist.m3u8"));
-            if (!resolutionPath) throw new Error("Pas de 240p");
-
-            const fullUrl = masterUrl.replace("master.m3u8", resolutionPath.trim());
-            return fetch(fullUrl).then(res => res.text());
-          })
-          .then(playlist => {
-            const total = playlist
-              .split("\n")
-              .filter(line => line.startsWith("#EXTINF:"))
-              .map(line => parseFloat(line.replace("#EXTINF:", "").replace(",", "")))
-              .reduce((acc, val) => acc + val, 0);
-            setDurations(prev => ({ ...prev, [episode.VideoID]: total }));
-          })
-          .catch(err => {
-            console.warn(`Erreur de chargement HLS pour ${episode.Titre}`, err.message);
-            setDurations(prev => ({ ...prev, [episode.VideoID]: null }));
-          });
+    let active = true;
+    const controller = new AbortController();
+    episodes.forEach(async episode => {
+      if (!episode.CheminAcces || (episode.Premium && !canAccessPremium)) return;
+      try {
+        const apiBase = new URL(`${(process.env.REACT_APP_URL_LOCAL || window.location.origin).replace(/\/+$/, "")}/`);
+        const masterUrl = new URL(episode.CheminAcces, apiBase).href;
+        const total = await loadHlsDuration(masterUrl, { signal: controller.signal });
+        if (active) setDurations(prev => ({ ...prev, [episode.VideoID]: total }));
+      } catch (error) {
+        if (!active || error.name === "AbortError") return;
+        console.warn(`Durée HLS indisponible pour ${episode.Titre}`, error.message);
+        setDurations(prev => ({ ...prev, [episode.VideoID]: null }));
       }
     });
-  }, [episodes]);
+    return () => { active = false; controller.abort(); };
+  }, [episodes, canAccessPremium]);
 
   return (
     <div>

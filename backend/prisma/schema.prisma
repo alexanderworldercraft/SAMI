@@ -110,6 +110,7 @@ model Video {
   Etat                 Etat                   @relation(fields: [EtatID], references: [EtatID])
   Saison               Saison?                @relation(fields: [SaisonID], references: [SaisonID])
   Utilisateur          Utilisateur?           @relation(fields: [UtilisateurID], references: [UtilisateurID])
+  CreditSegments       VideoCreditSegment[]
   VideoGenres          VideoGenre[]
   VideoPersonne        VideoPersonne[]
   SagaContents         SagaContent[]
@@ -624,6 +625,8 @@ model Utilisateur {
   UserVideoProgress       UserVideoProgress[]
   UserSeriesWatchReset    UserSeriesWatchReset[]
   UserFavoriteContent     UserFavoriteContent[]
+  CreditProposals         VideoCreditSegment[] @relation("CreditAuthor")
+  CreditReviews           VideoCreditSegment[] @relation("CreditReviewer")
   PlayerPreference        UserPlayerPreference?
   AiPreference            UserAiPreference?
   PersonDuplicateReviews  PersonDuplicateReview[]
@@ -1075,4 +1078,26 @@ enum PersonDuplicateReviewStatus {
   DOUBT
   DISTINCT
   MERGED
+}
+
+// Only APPROVED segments affect playback. Reviewed proposals are immutable for their author.
+model VideoCreditSegment {
+  ID          Int         @id @default(autoincrement())
+  VideoID     Int
+  AuthorID    Int
+  ReviewerID  Int?
+  Start       Float
+  End         Float
+  Status      String      @default("PENDING") @db.VarChar(16)
+  CreatedAt   DateTime    @default(now())
+  UpdatedAt   DateTime    @updatedAt
+  ReviewedAt  DateTime?
+  Video       Video       @relation(fields: [VideoID], references: [VideoID], onDelete: Cascade)
+  Author      Utilisateur @relation("CreditAuthor", fields: [AuthorID], references: [UtilisateurID])
+  Reviewer    Utilisateur? @relation("CreditReviewer", fields: [ReviewerID], references: [UtilisateurID], onDelete: SetNull)
+
+  @@index([VideoID, Status, Start])
+  @@index([Status, CreatedAt])
+  @@index([AuthorID])
+  @@index([ReviewerID])
 }

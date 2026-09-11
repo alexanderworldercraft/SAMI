@@ -1,3 +1,4 @@
+import VideoCreditPanel from "./VideoCreditPanel";
 import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import {
@@ -23,6 +24,10 @@ const apiUrl = process.env.REACT_APP_URL_LOCAL;
 
 const VideoDetails = ({
   video,
+  videoElement,
+  creditData,
+  creditError,
+  onCreditsRefresh,
   isAdmin = false,
   onTitleUpdate,
   onResumerUpdate,
@@ -588,6 +593,7 @@ const VideoDetails = ({
 
 
       </div>
+        <div className="px-6 pb-6"><VideoCreditPanel key={video.VideoID} videoId={video.VideoID} videoElement={videoElement} data={creditData} error={creditError} onRefresh={onCreditsRefresh} /></div>
       </section>
       {(realisateurCards.length > 0 || acteurCards.length > 0) && (
         <section className="container mx-auto overflow-hidden rounded-2xl border border-sky-500/10 bg-white/80 shadow-xl shadow-slate-950/5 backdrop-blur dark:bg-slate-950/70 dark:shadow-sky-950/20">

@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useRef } from "react";
+import { getNextCreditEpisode } from "../utils/videoCredits";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { XMarkIcon } from "@heroicons/react/24/outline";
 import { Helmet } from "react-helmet-async";
 import api from '../services/api';
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import VideoPlayer from "./VideoPlayer";
 import VideoDetails from "./VideoDetails";
 import SerieDetails from "./SerieDetails";
@@ -34,6 +35,12 @@ L’activation est immédiate et ne nécessite aucun paiement réel : il s’agi
 const VideoSeePage = () => {
 
   const { id } = useParams();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [creditData, setCreditData] = useState(null);
+  const [creditError, setCreditError] = useState("");
+  const [creditRevision, setCreditRevision] = useState(0);
+  const refreshCredits = useCallback(() => setCreditRevision(n => n + 1), []);
   const [type, setType] = useState(null);
   const [video, setVideo] = useState(null);
   const [series, setSeries] = useState(null);
@@ -378,6 +385,36 @@ const VideoSeePage = () => {
 
   const NameApp = process.env.REACT_APP_NAME || "SAMI";
   const currentVideoId = video?.VideoID || null;
+  const nextCreditEpisode = getNextCreditEpisode(series, currentVideoId, isPremiumUser);
+  const startNextFromZero = location.state?.creditNextVideoId === currentVideoId;
+  const previewParam = new URLSearchParams(location.search).get("creditStart");
+  const creditPreview = isAdmin && previewParam !== null && Number.isFinite(Number(previewParam)) && Number(previewParam) >= 0 ? Number(previewParam) : null;
+
+  useEffect(() => {
+    let cancelled = false;
+    setCreditData(null); setCreditError("");
+    if (!currentVideoId) return undefined;
+    api.get(`/videos/${currentVideoId}/credits`).then(response => {
+      if (!cancelled) setCreditData({ ...response.data, videoId: currentVideoId });
+    }).catch(error => { if (!cancelled) setCreditError(error.response?.data?.error || "Chargement des génériques impossible."); });
+    return () => { cancelled = true; };
+  }, [currentVideoId, creditRevision]);
+
+  useEffect(() => {
+    window.addEventListener("focus", refreshCredits);
+    return () => window.removeEventListener("focus", refreshCredits);
+  }, [refreshCredits]);
+
+  useEffect(() => {
+    if (creditPreview !== null) setShowDetails(true);
+  }, [creditPreview, currentVideoId]);
+
+  const playNextCreditEpisode = () => {
+    if (!nextCreditEpisode) return;
+    videoElement?.pause();
+    navigate(`/lecture/${nextCreditEpisode.VideoID}`, { state: { creditNextVideoId: nextCreditEpisode.VideoID } });
+    scrollToLectureTop();
+  };
   const sagaItemsPerPage = 8;
   const pageOrigin = typeof window !== "undefined" ? window.location.origin : apiUrl;
   const metadataVideo = String(video?.VideoID || "") === String(id) ? video : null;
@@ -471,7 +508,7 @@ const VideoSeePage = () => {
     resumeProgressRef.current = null;
     activeProgressLogActionRef.current = "video_first_play";
     progressDeletedRef.current = false;
-    if (!currentVideoId) return;
+    if (!currentVideoId || startNextFromZero || creditPreview !== null) return;
 
     let cancelled = false;
 
@@ -497,7 +534,7 @@ const VideoSeePage = () => {
     return () => {
       cancelled = true;
     };
-  }, [currentVideoId]);
+  }, [currentVideoId, startNextFromZero, creditPreview]);
 
   useEffect(() => {
     if (!videoElement || !currentVideoId) return;
@@ -750,6 +787,11 @@ const VideoSeePage = () => {
                 skipFirstPlayLogKey={skipFirstPlayLogKey}
                 multiAudioEnabled={multiAudioEnabled}
                 onSubtitlesUpdated={fetchVideo}
+                creditSegments={creditData?.videoId === currentVideoId ? creditData.items : []}
+                nextEpisode={nextCreditEpisode}
+                onNextEpisode={playNextCreditEpisode}
+                initialPlaybackTime={creditPreview ?? (startNextFromZero ? 0 : null)}
+                autoPlayOnLoad={startNextFromZero}
               />
             </div>
           </section>
@@ -768,6 +810,10 @@ const VideoSeePage = () => {
               {(!isEpisode || showDetails) && (
                 <VideoDetails
                   video={video}
+                  videoElement={videoElement}
+                  creditData={creditData?.videoId === currentVideoId ? creditData : null}
+                  creditError={creditError}
+                  onCreditsRefresh={refreshCredits}
                   isAdmin={isAdmin}
                   onTitleUpdate={handleTitleUpdate}
                   onResumerUpdate={handleResumerUpdate}

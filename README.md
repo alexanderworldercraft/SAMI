@@ -2,7 +2,7 @@
 
 SAMI (**Système d’Archivage Multimédia Intégré**) est une médiathèque web privée permettant d’organiser, diffuser et suivre des films, séries et musiques depuis une seule interface.
 
-La version actuelle est la **8.2.0**. Elle repose sur un backend Fastify, une interface React, Prisma avec MySQL, un pipeline vidéo FFmpeg/HLS et Socket.IO pour le retour en temps réel des traitements.
+La version actuelle est la **8.3.0**. Elle repose sur un backend Fastify, une interface React, Prisma avec MySQL, un pipeline vidéo FFmpeg/HLS et Socket.IO pour le retour en temps réel des traitements.
 
 ## Fonctionnalités
 
@@ -45,6 +45,20 @@ La version actuelle est la **8.2.0**. Elle repose sur un backend Fastify, une in
 - journalisation des actions et sauvegardes manuelles ou planifiées de MySQL ;
 - limitations de requêtes, contrôle CORS et en-têtes de sécurité.
 
+## Nouveautés de la version 8.3.0
+
+- propositions de plusieurs génériques par vidéo, avec saisie des bornes et capture de la position actuelle du lecteur ;
+- modification ou suppression par leur auteur tant que les propositions sont en attente ;
+- vérification, correction, validation et refus par les admins et superadmins depuis la fiche vidéo ou la nouvelle section de modération ;
+- contrôle serveur de la durée et prévention des chevauchements entre génériques validés ;
+- bouton « Passer le générique » pendant chaque intervalle validé ;
+- bouton « Épisode suivant » à partir du dernier générique s’il commence après la moitié de la vidéo, avec passage entre saisons et démarrage à zéro ;
+- harmonisation des textes et formulaires des génériques et du doublage avec les thèmes clair et sombre ;
+- correction des URL des playlists HLS utilisées pour afficher la durée des épisodes.
+
+La migration `20260911220000_add_video_credit_segments` doit être appliquée avant
+le déploiement. Les détails sont dans la section « Génériques proposés par les utilisateurs » ci-dessous.
+
 ## Nouveautés de la version 8.2.0
 
 - arrivée de la branche Voix après la vidéo et la musique, avec une bibliothèque dédiée et une section sur les fiches personnes ;
@@ -58,7 +72,7 @@ La version actuelle est la **8.2.0**. Elle repose sur un backend Fastify, une in
 
 Les consignes de déploiement, la migration et les limites sont détaillées dans [la documentation de la bibliothèque de voix](backend/docs/voice-library.md).
 
-L’historique complet des versions, de la 6.1.0 à la 8.2.0, est disponible dans l’application à l’adresse `/updates` et dans `frontend/src/components/UpdatesPage.js`.
+L’historique complet des versions, de la 6.1.0 à la 8.3.0, est disponible dans l’application à l’adresse `/updates` et dans `frontend/src/components/UpdatesPage.js`.
 
 ## Stack technique
 
@@ -946,3 +960,38 @@ Les exemples `.env.exemple` doivent rester exempts de secrets réels.
 ## Licence
 
 Projet personnel. Aucune licence de redistribution spécifique n’est actuellement déclarée pour l’ensemble du dépôt.
+
+### Génériques proposés par les utilisateurs
+
+La fiche de chaque vidéo permet de proposer plusieurs intervalles de générique en
+`HH:MM:SS`, avec capture de la position actuelle du lecteur. Chaque utilisateur voit
+ses propositions et les intervalles validés. Il peut modifier ou supprimer ses
+propositions uniquement tant qu'elles sont en attente.
+
+Les admins et superadmins examinent toutes les propositions depuis la fiche vidéo
+ou **Administration → Validation des génériques** (listes paginées par statut).
+Ils peuvent vérifier le passage dans le lecteur, corriger les bornes, valider,
+refuser ou supprimer un intervalle depuis la fiche. Le serveur vérifie les droits,
+la durée du média HLS local et l'absence de chevauchement entre intervalles validés.
+Les décisions et corrections sont sérialisées par vidéo en transaction MySQL pour
+éviter qu'une validation concurrente accepte des intervalles incompatibles.
+
+Pendant un intervalle validé, **Passer le générique** amène la lecture à sa fin.
+Pour une série, **Épisode suivant** apparaît dès le début du dernier intervalle
+validé si ce début est strictement après 50 % de la vidéo, et reste visible jusqu'à
+la fin. Il suit l'ordre existant des saisons/épisodes, traverse les saisons et
+redémarre l'épisode suivant à zéro. Il reste masqué si l'épisode suivant est absent
+ou inaccessible. Ces boutons font partie du lecteur personnalisé, y compris son
+plein écran ; les interfaces vidéo natives du navigateur (PiP / plein écran natif
+sur certains appareils) ne permettent pas d'afficher ces boutons HTML.
+
+Avant de déployer cette fonctionnalité, exécuter depuis `backend` :
+
+```sh
+npx prisma migrate deploy
+npx prisma generate --generator client
+```
+
+La migration `20260911220000_add_video_credit_segments` crée uniquement la table
+`VideoCreditSegment` et ses relations. Les repères sont locaux à cette instance ;
+ils ne sont pas inclus dans les transferts vidéo entre instances.

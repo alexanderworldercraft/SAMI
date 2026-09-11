@@ -77,7 +77,7 @@ const PublishedGroup = ({ group, renderJob }) => {
     <h3><button type="button" aria-expanded={open} aria-controls={`dubbing-video-${group.video.id}`}
       onClick={() => setOpen(value => !value)} className="flex w-full items-center justify-between gap-4 p-5 text-left focus-visible:ring-2 focus-visible:ring-sky-500">
       <span><span className="block text-2xl font-black">{group.video.title || `Vidéo ${group.video.id}`}</span>
-        <span className="mt-1 block text-sm font-normal text-slate-500">Vidéo #{group.video.id} · {group.jobs.length} doublage(s) validé(s)</span></span>
+        <span className="mt-1 block text-sm font-normal text-slate-600 dark:text-slate-400">Vidéo #{group.video.id} · {group.jobs.length} doublage(s) validé(s)</span></span>
       <span aria-hidden="true">{open ? "−" : "+"}</span>
     </button></h3>
     {open && <div id={`dubbing-video-${group.video.id}`} className="grid gap-3 border-t border-sky-500/20 p-4">{group.jobs.map(renderJob)}</div>}
@@ -269,7 +269,7 @@ export default function AdminAiDubbingManager() {
     }
   };
 
-  if (loading) return <p className="text-sm text-slate-500">Chargement du doublage IA…</p>;
+  if (loading) return <p className="text-sm text-slate-600 dark:text-slate-400">Chargement du doublage IA…</p>;
 
   const availableWorkers = (config?.workers || []).filter((worker) => (
     worker.ready && worker.online && worker.enabled && !worker.draining
@@ -286,7 +286,7 @@ export default function AdminAiDubbingManager() {
                 <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">
                   Extrait de validation : {formatClock(job.previewStartSeconds)}–{formatClock(job.previewEndSeconds)}
                 </p>
-                <p className="mt-1 text-xs text-slate-500">
+                <p className="mt-1 text-xs text-slate-600 dark:text-slate-400">
                   Version : {job.id}
                   {job.models?.pipeline ? ` · Profil : ${job.models.pipeline}` : ""}
                   {job.publishedTrackLabel
@@ -430,7 +430,7 @@ export default function AdminAiDubbingManager() {
                           : sample.reviewStatus === "REJECTED" ? "Refusé" : "En attente"}
                       </span>
                     </div>
-                    <span className="text-xs text-slate-500">Repère source {formatClock(sample.sourceStart)}</span>
+                    <span className="text-xs text-slate-600 dark:text-slate-400">Repère source {formatClock(sample.sourceStart)}</span>
                     {sample.text && <p className="text-xs text-slate-600 dark:text-slate-300">« {sample.text} »</p>}
                     <audio
                       controls
@@ -557,7 +557,7 @@ export default function AdminAiDubbingManager() {
             document.getElementById(`dubbing-tab-${next}`)?.focus();
           }}
           onClick={() => { setActiveTab(id); setDeleteConfirmation(""); setPagination({ page: 1, totalPages: 1 }); }}
-          className={`rounded-xl px-4 py-3 text-sm font-bold focus-visible:ring-2 focus-visible:ring-sky-400 ${activeTab === id ? "bg-sky-500/20 text-sky-700 dark:text-sky-200" : "text-slate-500 hover:bg-sky-500/10"}`}>{label}</button>)}
+          className={`rounded-xl px-4 py-3 text-sm font-bold focus-visible:ring-2 focus-visible:ring-sky-400 ${activeTab === id ? "bg-sky-500/20 text-sky-700 dark:text-sky-200" : "text-slate-600 dark:text-slate-400 hover:bg-sky-500/10"}`}>{label}</button>)}
       </div>
       <div hidden={activeTab !== "ongoing"} className={activeTab === "ongoing" ? "grid gap-6" : "hidden"}>
       <div className="rounded-2xl border border-amber-400/30 bg-amber-500/10 p-5">
@@ -621,7 +621,7 @@ export default function AdminAiDubbingManager() {
             onChange={(event) => setExpectedSpeakerCount(event.target.value)}
             className="rounded-xl border border-slate-300 bg-white px-4 py-3 text-slate-950 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
           />
-          <span className="text-xs font-medium text-slate-500">
+          <span className="text-xs font-medium text-slate-600 dark:text-slate-400">
             Renseigné = choix des passages par voix · vide = mode automatique
           </span>
         </label>
@@ -650,7 +650,7 @@ export default function AdminAiDubbingManager() {
               className="min-w-0 flex-1 rounded-xl border border-slate-300 bg-white px-3 py-3 text-slate-950 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
             />
           </div>
-          <span className="text-xs font-medium text-slate-500">minutes : secondes · durée 45 s</span>
+          <span className="text-xs font-medium text-slate-600 dark:text-slate-400">minutes : secondes · durée 45 s</span>
         </fieldset>
         <button
           type="submit"
@@ -672,7 +672,7 @@ export default function AdminAiDubbingManager() {
       {error && <p role="alert" className="rounded-xl bg-red-500/10 px-4 py-3 text-sm font-semibold text-red-700 dark:text-red-200">{error}</p>}
 
       <div role="tabpanel" id={`dubbing-panel-${activeTab}`} aria-labelledby={`dubbing-tab-${activeTab}`} aria-busy={listLoading} className="grid gap-4">
-        {activeTab === "ongoing" && jobs.length === 0 && <p className="text-sm text-slate-500">Aucune tâche de doublage IA.</p>}
+        {activeTab === "ongoing" && jobs.length === 0 && <p className="text-sm text-slate-600 dark:text-slate-400">Aucune tâche de doublage IA.</p>}
         {activeTab === "ongoing" ? jobs.map(renderJob) : groups.map(group => <PublishedGroup key={group.video.id} group={group} renderJob={renderJob} />)}
         {!listLoading && activeTab === "published" && groups.length === 0 && <p>Aucun doublage terminé et validé.</p>}
         {pagination.totalPages > 1 && <nav aria-label="Pages des doublages" className="flex items-center justify-center gap-4">

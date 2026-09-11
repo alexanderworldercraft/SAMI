@@ -1,3 +1,4 @@
+import { getCreditActions } from "../utils/videoCredits";
 import React, { useEffect, useRef, useState } from "react";
 import Hls from "hls.js";
 import { redirectToLoginForExpiredSession } from "../utils/authSession";
@@ -167,8 +168,15 @@ const VideoPlayer = ({
   skipFirstPlayLogKey = 0,
   multiAudioEnabled = false,
   onSubtitlesUpdated,
+  creditSegments = [],
+  nextEpisode = null,
+  onNextEpisode,
+  initialPlaybackTime = null,
+  autoPlayOnLoad = false,
 }) => {
   const videoRef = useRef(null);
+  const readyMediaIdRef = useRef(null);
+  const initialPlaybackAppliedRef = useRef(null);
   const fitContainerRef = useRef(null);
   const playerContainerRef = useRef(null);
 
@@ -241,6 +249,7 @@ const VideoPlayer = ({
   // Reset du flag à chaque changement de vidéo (si le composant reste monté)
   useEffect(() => {
     hasLoggedFirstPlayRef.current = false;
+    initialPlaybackAppliedRef.current = null;
     setDuration(0);
     setCurrentTime(0);
     setBufferedTime(0);
@@ -504,6 +513,7 @@ const VideoPlayer = ({
   }, [ambientLightPreferences]);
 
   useEffect(() => {
+    readyMediaIdRef.current = null;
     if (onVideoElement) {
       onVideoElement(videoRef.current);
     }
@@ -639,6 +649,7 @@ const VideoPlayer = ({
     // 3) Events player
     // -------------------------
     const handleLoadedMetadata = () => {
+      readyMediaIdRef.current = video.VideoID;
       setDuration(Number.isFinite(videoElement.duration) ? videoElement.duration : 0);
       setCurrentTime(videoElement.currentTime || 0);
 
@@ -850,6 +861,24 @@ const VideoPlayer = ({
     // ⚠️ on dépend de video?.VideoID et video?.CheminAcces pour ne pas rebrancher en boucle
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [video?.VideoID, video?.CheminAcces, video?.mediaAccessToken, onVideoElement, mediaAccessRevision, aiAccessRevoked]);
+
+  useEffect(() => {
+    const media = videoRef.current;
+    if (!media || !Number.isFinite(initialPlaybackTime) || initialPlaybackTime < 0) return undefined;
+    const playbackKey = `${video?.VideoID}:${initialPlaybackTime}:${autoPlayOnLoad}`;
+    const applyInitialPlayback = () => {
+      // Wait for this source's metadata, even when the DOM element is reused.
+      if (readyMediaIdRef.current !== video?.VideoID || initialPlaybackAppliedRef.current === playbackKey || !Number.isFinite(media.duration) || media.duration <= 0) return;
+      initialPlaybackAppliedRef.current = playbackKey;
+      media.currentTime = Math.min(initialPlaybackTime, media.duration);
+      setCurrentTime(media.currentTime);
+      if (autoPlayOnLoad) media.play().catch(() => {});
+    };
+    applyInitialPlayback();
+    media.addEventListener("loadedmetadata", applyInitialPlayback);
+    return () => media.removeEventListener("loadedmetadata", applyInitialPlayback);
+  }, [video?.VideoID, initialPlaybackTime, autoPlayOnLoad]);
+
 
   useEffect(() => {
     const container = fitContainerRef.current;
@@ -1450,6 +1479,7 @@ const VideoPlayer = ({
     }
   };
 
+  const creditActions = getCreditActions(creditSegments, currentTime, duration);
   const playedPercent = duration > 0 ? Math.min(100, (currentTime / duration) * 100) : 0;
   const bufferedPercent = duration > 0 ? Math.min(100, (bufferedTime / duration) * 100) : 0;
   const subtitleTracks = (video?.subtitles || []).filter(
@@ -1513,6 +1543,7 @@ const VideoPlayer = ({
       >
         <video
           ref={videoRef}
+          data-video-id={video.VideoID}
           crossOrigin="use-credentials"
           className="relative z-10 w-full h-full rounded-xl xl:rounded-2xl object-contain block"
           preload="auto"
@@ -1526,6 +1557,13 @@ const VideoPlayer = ({
           onDoubleClick={handlePlayerDoubleClick}
           aria-hidden="true"
         />
+
+        {(creditActions.active || (creditActions.showNext && nextEpisode)) && (
+          <div className="pointer-events-none absolute inset-x-0 bottom-24 z-30 flex items-end justify-between gap-2 px-3 sm:px-5" data-testid="credit-actions">
+            <div>{creditActions.active && <button type="button" className="pointer-events-auto rounded-lg border border-white/40 bg-black/80 px-3 py-2 text-sm font-bold text-white shadow-lg hover:bg-black" onClick={() => seekTo(creditActions.active.End)}>Passer le générique</button>}</div>
+            {creditActions.showNext && nextEpisode && <button type="button" className="pointer-events-auto rounded-lg border border-white/40 bg-black/80 px-3 py-2 text-sm font-bold text-white shadow-lg hover:bg-black" onClick={onNextEpisode}>Épisode suivant</button>}
+          </div>
+        )}
 
         {captionsEnabled && activeSubtitleCues.length > 0 && (
           <div

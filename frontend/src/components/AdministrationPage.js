@@ -1,3 +1,4 @@
+import AdminVideoCreditManager from "./AdminVideoCreditManager";
 import React, { useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { activeAdminSection, adminSectionsFor } from "../constants/adminSections";
@@ -201,6 +202,7 @@ const AdministrationPage = () => {
             <AdminSection sectionId="favorites" activeId={activeId}>
                 <AdminFavoriteContentManager />
             </AdminSection>
+            <AdminSection sectionId="credits" activeId={activeId}><AdminVideoCreditManager /></AdminSection>
             <AdminSection sectionId="content" activeId={activeId}>
             <TabbedAdminSection
                 title="Gestion des contenus"

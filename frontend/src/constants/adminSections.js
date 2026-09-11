@@ -10,6 +10,7 @@ export const ADMIN_SECTIONS = [
   { id: "encoding", label: "Diagnostic d'encodage distribué", superAdmin: true },
   { id: "homepage-genres", label: "Genres de la page d'accueil" },
   { id: "favorites", label: "Contenus favoris" },
+  { id: "credits", label: "Validation des génériques" },
   { id: "content", label: "Gestion des contenus" },
   { id: "music", label: "Gestion des contenus musicaux" },
   { id: "trash", label: "Corbeilles", superAdmin: true },

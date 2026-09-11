@@ -2,6 +2,46 @@ import React, { useEffect, useState } from "react";
 
 const updates = [
   {
+    "version": "8.3.0",
+    "title": "Génériques participatifs et passage à l’épisode suivant",
+    "date": "11 septembre 2026",
+    "sections": [
+      {
+        "title": "Des génériques proposés depuis la fiche vidéo",
+        "items": [
+          "Chaque vidéo peut recevoir plusieurs repères de générique, proposés par les utilisateurs depuis une nouvelle section de sa fiche détaillée.",
+          "Le début et la fin se renseignent au format HH:MM:SS ; deux boutons permettent de reprendre directement la position actuelle du lecteur.",
+          "Chaque utilisateur retrouve ses propositions et les génériques validés. Il peut modifier ou supprimer ses propositions tant qu’elles n’ont été ni validées ni refusées."
+        ]
+      },
+      {
+        "title": "Une vérification avant activation",
+        "items": [
+          "Les administrateurs et super administrateurs peuvent vérifier les passages, corriger les bornes, valider ou refuser les propositions depuis la fiche vidéo.",
+          "Une nouvelle section de l’administration rassemble les propositions avec des listes paginées par statut et un accès au lecteur à la position proposée.",
+          "Les repères sont contrôlés par rapport à la durée de la vidéo. Deux génériques validés ne peuvent pas se chevaucher, y compris lorsque plusieurs décisions sont prises simultanément."
+        ]
+      },
+      {
+        "title": "Passer un générique ou poursuivre une série",
+        "items": [
+          "Le bouton « Passer le générique » apparaît en bas à gauche du lecteur pendant chaque intervalle validé et amène la lecture à sa fin.",
+          "Pour les séries, « Épisode suivant » apparaît en bas à droite dès le début du dernier générique validé, si celui-ci commence strictement après la moitié de la vidéo. Il reste disponible jusqu’à la fin.",
+          "Le passage suit l’ordre des épisodes de SAMI, rejoint la saison suivante si nécessaire et démarre l’épisode suivant à zéro. Le bouton reste masqué lorsqu’aucun épisode suivant n’est accessible.",
+          "Les deux boutons sont intégrés au lecteur personnalisé et à son plein écran."
+        ]
+      },
+      {
+        "title": "Une interface cohérente en clair comme en sombre",
+        "items": [
+          "Les formulaires, textes, statuts et actions des génériques adoptent les couleurs des deux thèmes de SAMI.",
+          "La recherche et la sélection des vidéos de doublage adaptent leurs fonds, textes, bordures et surbrillances au thème actif ; les textes secondaires du doublage gagnent aussi en lisibilité.",
+          "Le chargement des durées des épisodes résout correctement les chemins absolus et relatifs des playlists HLS, sans dupliquer le préfixe des API média."
+        ]
+      }
+    ]
+  },
+  {
     "version": "8.2.0",
     "title": "La branche Voix : originaux et répliques IA",
     "date": "11 septembre 2026",

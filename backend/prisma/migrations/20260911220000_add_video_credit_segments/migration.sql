@@ -1,0 +1,20 @@
+CREATE TABLE `VideoCreditSegment` (
+  `ID` INTEGER NOT NULL AUTO_INCREMENT,
+  `VideoID` INTEGER NOT NULL,
+  `AuthorID` INTEGER NOT NULL,
+  `ReviewerID` INTEGER NULL,
+  `Start` DOUBLE NOT NULL,
+  `End` DOUBLE NOT NULL,
+  `Status` VARCHAR(16) NOT NULL DEFAULT 'PENDING',
+  `CreatedAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  `UpdatedAt` DATETIME(3) NOT NULL,
+  `ReviewedAt` DATETIME(3) NULL,
+  PRIMARY KEY (`ID`),
+  INDEX `VideoCreditSegment_VideoID_Status_Start_idx` (`VideoID`, `Status`, `Start`),
+  INDEX `VideoCreditSegment_Status_CreatedAt_idx` (`Status`, `CreatedAt`),
+  INDEX `VideoCreditSegment_AuthorID_idx` (`AuthorID`),
+  INDEX `VideoCreditSegment_ReviewerID_idx` (`ReviewerID`),
+  CONSTRAINT `VideoCreditSegment_VideoID_fkey` FOREIGN KEY (`VideoID`) REFERENCES `Video` (`VideoID`) ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `VideoCreditSegment_AuthorID_fkey` FOREIGN KEY (`AuthorID`) REFERENCES `Utilisateur` (`UtilisateurID`) ON DELETE RESTRICT ON UPDATE CASCADE,
+  CONSTRAINT `VideoCreditSegment_ReviewerID_fkey` FOREIGN KEY (`ReviewerID`) REFERENCES `Utilisateur` (`UtilisateurID`) ON DELETE SET NULL ON UPDATE CASCADE
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;

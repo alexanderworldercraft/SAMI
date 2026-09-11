@@ -869,3 +869,49 @@ describe("zones de clic du lecteur", () => {
     expect(play).not.toHaveBeenCalled();
   });
 });
+
+it("saute les génériques validés et conserve le bouton suivant après le dernier", () => {
+  const onNextEpisode = jest.fn();
+  const { container } = render(<VideoPlayer
+    video={{ VideoID: 14, CheminAcces: "uploads/video/14/hls/master.m3u8", subtitles: [] }}
+    backgroundBlur={{ current: null }}
+    creditSegments={[{ Start: 10, End: 20, Status: "APPROVED" }, { Start: 80, End: 90, Status: "APPROVED" }, { Start: 95, End: 99, Status: "PENDING" }]}
+    nextEpisode={{ VideoID: 15 }} onNextEpisode={onNextEpisode}
+  />);
+  const media = container.querySelector("video");
+  Object.defineProperty(media, "duration", { configurable: true, value: 100 });
+  fireEvent.durationChange(media);
+  media.currentTime = 10; fireEvent.timeUpdate(media);
+  expect(screen.queryByText("Épisode suivant")).not.toBeInTheDocument();
+  fireEvent.click(screen.getByText("Passer le générique"));
+  expect(media.currentTime).toBe(20);
+  expect(screen.queryByText("Passer le générique")).not.toBeInTheDocument();
+  media.currentTime = 80; fireEvent.timeUpdate(media);
+  expect(screen.getByText("Passer le générique")).toBeInTheDocument();
+  expect(screen.getByText("Épisode suivant")).toBeInTheDocument();
+  media.currentTime = 95; fireEvent.timeUpdate(media);
+  expect(screen.queryByText("Passer le générique")).not.toBeInTheDocument();
+  fireEvent.click(screen.getByText("Épisode suivant"));
+  expect(onNextEpisode).toHaveBeenCalledTimes(1);
+  media.currentTime = 79; fireEvent.timeUpdate(media);
+  expect(screen.queryByText("Épisode suivant")).not.toBeInTheDocument();
+});
+
+it("attend les métadonnées du nouvel épisode avant de repartir de zéro", () => {
+  const mediaVideo = id => ({ VideoID: id, CheminAcces: `uploads/video/${id}/master.m3u8`, subtitles: [] });
+  const { container, rerender } = render(<VideoPlayer video={mediaVideo(14)} backgroundBlur={{ current: null }} />);
+  const media = container.querySelector("video");
+  Object.defineProperty(media, "duration", { configurable: true, value: 100 });
+  media.play = jest.fn().mockResolvedValue(undefined);
+  fireEvent.loadedMetadata(media);
+  media.currentTime = 90;
+  rerender(<VideoPlayer video={mediaVideo(15)} backgroundBlur={{ current: null }} initialPlaybackTime={0} autoPlayOnLoad />);
+  expect(media.play).not.toHaveBeenCalled();
+  fireEvent.loadedMetadata(media);
+  expect(media.currentTime).toBe(0);
+  expect(media.play).toHaveBeenCalledTimes(1);
+  media.currentTime = 15;
+  fireEvent.loadedMetadata(media);
+  expect(media.currentTime).toBe(15);
+  expect(media.play).toHaveBeenCalledTimes(1);
+});
