@@ -2,6 +2,55 @@ import React, { useEffect, useState } from "react";
 
 const updates = [
   {
+    "version": "8.2.0",
+    "title": "La branche Voix : originaux et répliques IA",
+    "date": "11 septembre 2026",
+    "sections": [
+      {
+        "title": "Une troisième branche pour SAMI",
+        "items": [
+          "Après la vidéo et la musique, SAMI accueille une page Voix dédiée à l’écoute des enregistrements originaux et des répliques générées par intelligence artificielle.",
+          "Un nouvel accès dans la barre latérale ouvre la bibliothèque ; les fiches des personnes regroupent également les voix qui leur sont associées.",
+          "Chaque audio identifie clairement sa personne, sa langue et sa nature : original ou IA."
+        ]
+      },
+      {
+        "title": "Des originaux conservés et réutilisables",
+        "items": [
+          "Les administrateurs et super administrateurs peuvent ajouter un enregistrement original à une personne sans devoir générer de réplique.",
+          "Un original peut provenir d’un fichier audio importé ou d’un passage sélectionné dans une vidéo SAMI, avec une référence et une autorisation renseignées.",
+          "Une même personne peut disposer de plusieurs références et de plusieurs langues. Les originaux enregistrés peuvent servir directement aux générations futures."
+        ]
+      },
+      {
+        "title": "Un atelier de génération vocale locale",
+        "items": [
+          "Les administrateurs et super administrateurs génèrent des répliques à partir d’une référence originale et d’un texte de 500 caractères maximum.",
+          "Une présentation par défaut, modifiable et adaptée à la langue choisie, explique que la voix est synthétique et ne constitue pas une déclaration réelle de la personne.",
+          "La génération réutilise les moteurs locaux, les contrôles qualité et le marquage audio du doublage. Le serveur principal confie les demandes aux clones compatibles.",
+          "La bibliothèque dispose d’un délai de 30 minutes par essai et de 100 minutes pour le traitement complet, afin de laisser davantage de temps aux générations longues, notamment sur Mac."
+        ]
+      },
+      {
+        "title": "Un accès soumis au choix IA de chaque utilisateur",
+        "items": [
+          "Le lien Voix, la page, la section des fiches personnes et l’écoute des originaux comme des répliques nécessitent une connexion et l’acceptation des conditions IA de SAMI.",
+          "Les originaux et les répliques sont privés à leur création. Les administrateurs choisissent indépendamment quels audios rendre accessibles aux utilisateurs autorisés.",
+          "Les utilisateurs peuvent écouter les audios publiés ; les fonctions d’ajout, de génération, de publication et de téléchargement restent réservées aux administrateurs et super administrateurs.",
+          "La notice IA intègre cette nouvelle branche et son acceptation est renouvelée pour respecter le choix de chacun."
+        ]
+      },
+      {
+        "title": "Des clones Mac et Windows mieux pris en charge",
+        "items": [
+          "Les Mac Apple Silicon peuvent réaliser les générations vocales localement grâce à Metal, en réutilisant l’installation de doublage.",
+          "L’installation contrôle les dépendances du moteur vocal et détecte les environnements incompatibles avant de poursuivre.",
+          "La vérification des fichiers de sortie tient compte des chemins Windows et de leur casse, tout en conservant le contrôle du dossier autorisé."
+        ]
+      }
+    ]
+  },
+  {
     version: "8.1.0",
     title: "Administration et correction avancee des sous-titres IA",
     date: "23 aout 2026",

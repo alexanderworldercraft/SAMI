@@ -2,7 +2,7 @@
 
 SAMI (**Système d’Archivage Multimédia Intégré**) est une médiathèque web privée permettant d’organiser, diffuser et suivre des films, séries et musiques depuis une seule interface.
 
-La version actuelle est la **8.1.0**. Elle repose sur un backend Fastify, une interface React, Prisma avec MySQL, un pipeline vidéo FFmpeg/HLS et Socket.IO pour le retour en temps réel des traitements.
+La version actuelle est la **8.2.0**. Elle repose sur un backend Fastify, une interface React, Prisma avec MySQL, un pipeline vidéo FFmpeg/HLS et Socket.IO pour le retour en temps réel des traitements.
 
 ## Fonctionnalités
 
@@ -45,19 +45,20 @@ La version actuelle est la **8.1.0**. Elle repose sur un backend Fastify, une in
 - journalisation des actions et sauvegardes manuelles ou planifiées de MySQL ;
 - limitations de requêtes, contrôle CORS et en-têtes de sécurité.
 
-## Nouveautés de la version 8.1.0
+## Nouveautés de la version 8.2.0
 
-- sections de l’administration repliables indépendamment et chargées à leur première ouverture ;
-- recherche obligatoire avant l’affichage des pistes IA, avec pagination par quarante vidéos et regroupement de toutes leurs langues dans un sélecteur ;
-- correction classique du texte sans modifier les horodatages, suppression ciblée et recréation complète conservant l’ancienne piste jusqu’au succès ;
-- éditeur temporel super administrateur intégré à la page sans bloquer son défilement, avec plein écran à la demande ;
-- lecture HLS, timeline zoomable, poignées séparées pour le début, la fin et le déplacement complet de chaque segment ;
-- panneau plein écran sous la timeline suivant le segment sélectionné manuellement en priorité, puis la position de lecture ;
-- validation stricte et écriture atomique des fichiers WebVTT modifiés ;
-- journalisation des corrections, suppressions et recréations administratives ;
-- actualisation automatique du lecteur lorsqu’une piste existante termine sa recréation.
+- arrivée de la branche Voix après la vidéo et la musique, avec une bibliothèque dédiée et une section sur les fiches personnes ;
+- ajout d’originaux indépendamment de toute génération, avec plusieurs références et langues par personne ;
+- réutilisation des originaux autorisés pour créer des répliques IA, avec une présentation par défaut modifiable ;
+- identification explicite des originaux et des audios IA, privés à la création et publiables séparément ;
+- accès et écoute réservés aux utilisateurs connectés ayant accepté les conditions IA ; ajout, génération, publication et téléchargement réservés aux administrateurs et super administrateurs ;
+- génération locale sur les clones compatibles, avec contrôles qualité et marquage audio ;
+- prise en charge des Mac Apple Silicon et correction de la validation des chemins Windows ;
+- texte limité à 500 caractères, avec 30 minutes par tentative et 100 minutes pour le traitement complet.
 
-L’historique complet des versions, de la 6.1.0 à la 8.1.0, est disponible dans l’application à l’adresse `/updates` et dans `frontend/src/components/UpdatesPage.js`.
+Les consignes de déploiement, la migration et les limites sont détaillées dans [la documentation de la bibliothèque de voix](backend/docs/voice-library.md).
+
+L’historique complet des versions, de la 6.1.0 à la 8.2.0, est disponible dans l’application à l’adresse `/updates` et dans `frontend/src/components/UpdatesPage.js`.
 
 ## Stack technique
 

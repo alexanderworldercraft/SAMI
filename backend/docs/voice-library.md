@@ -22,7 +22,7 @@ La migration n’est pas appliquée automatiquement par le serveur. Les tests un
 ## Limites initiales et exploitation
 
 - Référence : 3 à 30 secondes, une seule personne, transcription exacte, fichier importé de 50 Mo maximum. Le fichier importé est conservé à l’identique pour le téléchargement ; un WAV mono 24 kHz sert à l’écoute et au clonage. L’extraction vidéo conserve le passage vocal en WAV.
-- Réplique : 500 caractères, durée produite maximale de 180 secondes, exécution limitée à 15 minutes. Le contrôle vocal local et le watermark Perth du doublage sont réutilisés. Aucune synchronisation à une durée vidéo n’est imposée.
+- Réplique : 500 caractères, durée produite maximale de 180 secondes, exécution limitée à 100 minutes. Le contrôle vocal local et le watermark Perth du doublage sont réutilisés. Aucune synchronisation à une durée vidéo n’est imposée.
 - Les clones traitent les voix lorsqu’ils ne prennent pas un doublage. Les attributions voix, sous-titres et encodage vérifient les baux actifs pour éviter de superposer une génération vocale à un autre travail sur le même worker.
 - Un bail expiré passe en échec et nécessite une relance admin. Les sorties d’un ancien bail sont rejetées. Une publication exige une sortie prête et watermarquée.
 - La fusion de fiches personnes transfère les voix. La corbeille masque leurs audios ; la suppression définitive d’une personne ayant des voix est refusée afin de préserver les originaux et leur attribution.
