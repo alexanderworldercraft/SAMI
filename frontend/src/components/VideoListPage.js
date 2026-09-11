@@ -15,7 +15,7 @@ const VideoListPage = () => {
   const sortFromQuery = useMemo(() => {
     const params = new URLSearchParams(location.search);
     const value = params.get("sort") || "";
-    return VALID_SORTS.includes(value) ? value : "az";
+    return VALID_SORTS.includes(value) ? value : "recent";
   }, [location.search]);
 
   const genresFromQuery = useMemo(() => {

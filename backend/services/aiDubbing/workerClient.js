@@ -70,7 +70,7 @@ const nativeFetch = ({ url, method, headers, body, rawBody, signal, config }) =>
   }
 });
 
-async function signedFetch({
+export async function signedFetch({
   method = "GET",
   path,
   body,

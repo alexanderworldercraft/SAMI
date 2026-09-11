@@ -376,6 +376,7 @@ export async function claimNextEncodingTask({
       where: { VideoEncodingWorkerID: String(instanceId) },
     });
     if (!worker || !isEncodingWorkerOnline(worker, { now: instant })) return null;
+    if (await tx.voiceAudio.count({ where: { AssignedWorkerID: String(instanceId), Status: "PROCESSING", LeaseExpiresAt: { gt: instant } } })) return null;
 
     const activeAiLeaseCount = typeof tx.aiSubtitleJob?.count === "function"
       ? await tx.aiSubtitleJob.count({
@@ -595,7 +596,7 @@ export async function claimNextEncodingTask({
       };
     }
     return null;
-  });
+  }, { isolationLevel: "Serializable" });
 }
 
 export const reclaimExpiredEncodingLeases = (options) =>

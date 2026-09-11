@@ -47,9 +47,9 @@ def load_model(model_path, expected_sha256):
     import torch
     from nemo.collections.asr.models import SortformerEncLabelModel
 
-    if not torch.cuda.is_available():
-        raise RuntimeError("Sortformer V6 requiert un GPU NVIDIA CUDA disponible.")
-    device = torch.device("cuda:0")
+    # Same checkpoint and segmentation contract. CPU is the portable fallback;
+    # Metal is reserved for synthesis, whose memory use dominates on the Mac.
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     model = SortformerEncLabelModel.restore_from(
         restore_path=str(model_path), map_location=device, strict=False
     )
@@ -65,8 +65,8 @@ def probe(model_path, expected_sha256):
         "ready": model is not None,
         "model": MODEL_NAME,
         "modelPath": str(model_path),
-        "device": "cuda:0",
-        "cudaDevice": torch.cuda.get_device_name(0),
+        "device": str(model.device),
+        "cudaDevice": torch.cuda.get_device_name(0) if torch.cuda.is_available() else None,
         "nemoToolkitVersion": importlib.metadata.version("nemo-toolkit"),
         "offline": True,
         "maxSpeakersPerWindow": 4,

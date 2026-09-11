@@ -23,6 +23,7 @@ import { NavProvider } from './context/NavContext';
 import { useNav } from './context/NavContext';
 import PeopleListPage from "./components/PeopleListPage";
 import PersonDetailsPage from "./components/PersonDetailsPage";
+import VoiceLibraryPage from "./components/VoiceLibrary";
 import MaintenanceBanner from "./components/MaintenanceBanner";
 import UpdatesPage from "./components/UpdatesPage";
 import GeneralMessageBanner from "./components/GeneralMessageBanner";
@@ -207,6 +208,7 @@ export default function App() {
             </ProtectedRoute>
           }
         />
+        <Route path="/voix" element={<ProtectedRoute><AppShell><VoiceLibraryPage /></AppShell></ProtectedRoute>} />
         <Route
           path="/personnes"
           element={

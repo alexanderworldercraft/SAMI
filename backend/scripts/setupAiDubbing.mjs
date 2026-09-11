@@ -5,6 +5,7 @@ import { spawnSync } from "child_process";
 import { fileURLToPath } from "url";
 
 import { buildWindowsTorchIndex } from "./ai/torch_index.mjs";
+import { dubbingInstallationIssues, installedComponentsReady } from "./ai-dubbing/installation_checks.mjs";
 
 const backendRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const runtimeRoot = path.resolve(
@@ -154,10 +155,25 @@ const probe = () => {
     return { ready: false, error: "Runtime ou manifeste absent." };
   }
   try {
+    const installed = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+    const issues = installationIssues(installed.voiceEngine || "chatterbox");
+    if (issues.length) return { ready: false, error: issues.join("\n"), issues };
     return parseLastJsonLine(run(pythonPath, [runtimeScript, "--probe"], { capture: true }));
   } catch (error) {
     return { ready: false, error: error.message };
   }
+};
+
+const installationIssues = (engine = voiceEngine) => {
+  const installedEngines = fs.existsSync(pythonPath) ? parseLastJsonLine(run(pythonPath, [
+    "-c", "import importlib.metadata as m,json; names={d.metadata['Name'].lower() for d in m.distributions()}; print(json.dumps(sorted(names & {'qwen-tts','chatterbox-tts'})))",
+  ], { capture: true })) : [];
+  return dubbingInstallationIssues({
+    platform: process.platform,
+    voiceEngine: engine,
+    soxAvailable: commandWorks("sox"),
+    installedEngines,
+  });
 };
 
 if (checkOnly) {
@@ -236,9 +252,10 @@ if (checkOnly) {
   fs.writeFileSync(manifestPath, `${JSON.stringify(updated, null, 2)}\n`, { mode: 0o600 });
   const result = probe();
   console.log(JSON.stringify(result, null, 2));
-  if (!result.ready || result.components?.diarization?.ready !== true) {
+  if (!installedComponentsReady(result, ["diarization"])) {
     throw new Error(result.error || "Pyannote Community-1 ne passe pas le contrôle local.");
   }
+  if (!result.ready) console.warn(`Pyannote installé ; le clone reste indisponible : ${result.error || "autres composants à installer"}`);
 } else if (setupSortformer) {
   if (!fs.existsSync(manifestPath)) {
     throw new Error("Installez d'abord le runtime de doublage avec npm run setup:ai-dubbing.");
@@ -317,10 +334,13 @@ if (checkOnly) {
   fs.writeFileSync(manifestPath, `${JSON.stringify(updated, null, 2)}\n`, { mode: 0o600 });
   const result = probe();
   console.log(JSON.stringify(result, null, 2));
-  if (!result.ready || result.components?.sortformer?.ready !== true) {
-    throw new Error(result.error || "NVIDIA Sortformer ne passe pas le contrôle local CUDA.");
+  if (!installedComponentsReady(result, ["sortformer"])) {
+    throw new Error(result.error || "Sortformer ne passe pas le contrôle local (CUDA ou CPU).");
   }
+  if (!result.ready) console.warn(`Sortformer installé ; le clone reste indisponible : ${result.error || "autres composants à installer"}`);
 } else {
+  const issues = installationIssues();
+  if (issues.length) throw new Error(`Installation interrompue avant toute modification :\n- ${issues.join("\n- ")}`);
   fs.mkdirSync(runtimeRoot, { recursive: true, mode: 0o700 });
   fs.mkdirSync(path.join(runtimeRoot, "cache", "huggingface"), { recursive: true, mode: 0o700 });
   fs.mkdirSync(path.join(runtimeRoot, "models", "bandit"), { recursive: true, mode: 0o700 });
@@ -388,6 +408,9 @@ if (checkOnly) {
   if (process.platform !== "win32") fs.chmodSync(runtimeCommand, 0o755);
   const result = probe();
   console.log(JSON.stringify(result, null, 2));
-  if (!result.ready) throw new Error(result.error || "Le runtime installé ne passe pas le contrôle de santé.");
+  if (!installedComponentsReady(result, ["voice", "quality", ...(!skipBandit ? ["separation"] : [])])) {
+    throw new Error(result.error || "Le runtime installé ne passe pas le contrôle de santé.");
+  }
+  if (!result.ready) console.warn(`Moteur vocal installé ; le clone reste indisponible : ${result.error || "autres composants à installer"}. Complétez avec setup:ai-dubbing:diarization puis setup:ai-dubbing:sortformer.`);
   console.log(`Runtime de doublage IA installé dans ${runtimeRoot}.`);
 }

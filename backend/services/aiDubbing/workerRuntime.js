@@ -23,6 +23,8 @@ import {
 import { stableStringify } from "../videoTransferSecurity.js";
 import { preserveAiDubbingFailure } from "./diagnostics.js";
 import { flushAiDubbingDiagnostics } from "./diagnosticTransfer.js";
+import { runVoiceLease } from "../voices/worker.js";
+import { recoverVoiceLeases } from "../voices/leases.js";
 
 const safeLog = (logger, method, ...args) => {
   try { logger?.[method]?.(...args); } catch { /* aucun log ne bloque le worker */ }
@@ -229,6 +231,7 @@ export async function collectAiDubbingCapabilities({ config } = {}) {
         architecture: process.arch,
         languages: ["en", "fr", "ja"],
         ...(probe.components || {}),
+        voiceLibrary: probe.voiceLibrary === 1 ? 1 : 0,
         // Le probe matériel ne remplace pas l'identité du profil utilisée par le primary.
         profile: {
           id: runtimeConfig.profile.id,
@@ -258,7 +261,7 @@ export async function startAiDubbingWorkerRuntime(options = {}) {
     ? await Promise.resolve(options.capabilities)
     : await collectAiDubbingCapabilities({ config });
   const dependencies = {
-    prepare: () => prepareNextAiDubbingInput({ config }),
+    prepare: async () => { await recoverVoiceLeases(); return prepareNextAiDubbingInput({ config }); },
     heartbeat: sendRemoteDubbingHeartbeat,
     diagnostic: sendRemoteDubbingDiagnostic,
     claim: claimRemoteDubbingJob,
@@ -271,6 +274,7 @@ export async function startAiDubbingWorkerRuntime(options = {}) {
   };
   let stopped = false;
   let active = null;
+  let claiming = false;
   let activeController = null;
   let lastError = capabilities.error || null;
   let unavailableUntil = 0;
@@ -447,21 +451,27 @@ export async function startAiDubbingWorkerRuntime(options = {}) {
       || config.role !== "CLONE"
       || !config.workerEnabled
       || active
+      || claiming
       || !capabilities.ready
       || Date.now() < unavailableUntil
     ) return;
+    claiming = true;
     try {
       const response = await dependencies.claim({});
-      if (!response?.lease) return;
+      if (!response?.lease && capabilities.capabilities?.voiceLibrary !== 1) return;
       const controller = new AbortController();
       activeController = controller;
-      active = processLease(response.lease, controller).finally(() => {
+      active = (response?.lease
+        ? processLease(response.lease, controller)
+        : runVoiceLease({ config, signal: controller.signal })).finally(() => {
         active = null;
         if (activeController === controller) activeController = null;
       });
       await active;
     } catch (error) {
       recordConnectivityError("[ai-dubbing] attribution impossible, nouvelle tentative automatique", error);
+    } finally {
+      claiming = false;
     }
   };
 

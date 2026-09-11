@@ -267,6 +267,7 @@
     --radius-lg: .5rem;
     --radius-xl: .75rem;
     --radius-2xl: 1rem;
+    --radius-3xl: 1.5rem;
     --drop-shadow-xl: 0 9px 7px #0000001a;
     --ease-in: cubic-bezier(.4, 0, 1, 1);
     --ease-out: cubic-bezier(0, 0, .2, 1);
@@ -1058,6 +1059,10 @@
     margin-left: calc(var(--spacing) * 4);
   }
 
+  .ml-auto {
+    margin-left: auto;
+  }
+
   .box-border {
     box-sizing: border-box;
   }
@@ -1269,6 +1274,10 @@
 
   .h-8 {
     height: calc(var(--spacing) * 8);
+  }
+
+  .h-9 {
+    height: calc(var(--spacing) * 9);
   }
 
   .h-10 {
@@ -1509,6 +1518,10 @@
 
   .w-8 {
     width: calc(var(--spacing) * 8);
+  }
+
+  .w-9 {
+    width: calc(var(--spacing) * 9);
   }
 
   .w-10 {
@@ -2067,6 +2080,12 @@
     margin-block-end: calc(calc(var(--spacing) * 6) * calc(1 - var(--tw-space-y-reverse)));
   }
 
+  :where(.space-y-7 > :not(:last-child)) {
+    --tw-space-y-reverse: 0;
+    margin-block-start: calc(calc(var(--spacing) * 7) * var(--tw-space-y-reverse));
+    margin-block-end: calc(calc(var(--spacing) * 7) * calc(1 - var(--tw-space-y-reverse)));
+  }
+
   :where(.space-y-8 > :not(:last-child)) {
     --tw-space-y-reverse: 0;
     margin-block-start: calc(calc(var(--spacing) * 8) * var(--tw-space-y-reverse));
@@ -2214,6 +2233,10 @@
 
   .rounded-2xl {
     border-radius: var(--radius-2xl);
+  }
+
+  .rounded-3xl {
+    border-radius: var(--radius-3xl);
   }
 
   .rounded-full {
@@ -5264,6 +5287,10 @@
     padding: calc(var(--spacing) * 6);
   }
 
+  .p-7 {
+    padding: calc(var(--spacing) * 7);
+  }
+
   .p-8 {
     padding: calc(var(--spacing) * 8);
   }
@@ -5676,6 +5703,10 @@
 
   .whitespace-pre-line {
     white-space: pre-line;
+  }
+
+  .whitespace-pre-wrap {
+    white-space: pre-wrap;
   }
 
   .text-amber-200 {
@@ -7866,6 +7897,10 @@
       color: var(--color-white);
     }
 
+    .hover\:underline:hover {
+      text-decoration-line: underline;
+    }
+
     .hover\:shadow-lg:hover {
       --tw-shadow: 0 10px 15px -3px var(--tw-shadow-color, #0000001a), 0 4px 6px -4px var(--tw-shadow-color, #0000001a);
       box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow);
@@ -9139,6 +9174,10 @@
 
   .dark\:border-sky-400:is(.dark *) {
     border-color: var(--color-sky-400);
+  }
+
+  .dark\:border-slate-600:is(.dark *) {
+    border-color: var(--color-slate-600);
   }
 
   .dark\:border-slate-700:is(.dark *) {

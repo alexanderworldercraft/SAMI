@@ -471,6 +471,7 @@ export async function mergeDuplicatePeople(prisma, { keepPersonId, mergePersonId
         mergedId,
       });
 
+      await tx.voiceAudio.updateMany({ where: { PersonneID: mergedId }, data: { PersonneID: keeperId } });
       if (preparedPhoto) {
         await tx.personne.update({
           where: { PersonneID: keeperId },

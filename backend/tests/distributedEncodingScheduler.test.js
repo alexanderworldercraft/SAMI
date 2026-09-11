@@ -269,6 +269,7 @@ describe("scheduler d'encodage distribué", () => {
       return { count: 0 };
     };
     const tx = {
+      voiceAudio: { count: async () => 0 },
       videoEncodingWorker: {
         findUnique: async () => primary,
         findMany: async () => [primary],

@@ -14,6 +14,8 @@ import adminMessageRoutes from "../routes/adminMessageRoutes.js";
 import appSettingRoutes from "../routes/appSettingRoutes.js";
 import aiSubtitleRoutes from "../routes/aiSubtitleRoutes.js";
 import aiDubbingRoutes from "../routes/aiDubbingRoutes.js";
+import voiceRoutes from "../routes/voiceRoutes.js";
+import internalVoiceRoutes from "../routes/internalVoiceRoutes.js";
 import genreRoutes from "../routes/genreRoutes.js";
 import internalVideoEncodingRoutes from "../routes/internalVideoEncodingRoutes.js";
 import internalAiSubtitleRoutes from "../routes/internalAiSubtitleRoutes.js";
@@ -50,6 +52,8 @@ const ROUTES = [
   [videoEncodingRoutes, "/api/video-encoding"],
   [aiSubtitleRoutes, "/api/ai-subtitles"],
   [aiDubbingRoutes, "/api/ai-dubbing"],
+  [voiceRoutes, "/api/voices"],
+  [internalVoiceRoutes, "/api/internal/voices"],
   [videoExportRoutes, "/api/video-exports"],
   [internalVideoEncodingRoutes, "/api/internal/video-encoding"],
   [internalAiSubtitleRoutes, "/api/internal/ai-subtitles"],

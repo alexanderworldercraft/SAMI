@@ -25,6 +25,7 @@ const onlineWorker = (id, score) => ({
 const createDatabase = ({ workers, queuedJobs = [], encodingBusy = 0 }) => {
   let findManyCall = 0;
   const database = {
+    voiceAudio: { count: vi.fn(async () => 0) },
     aiSubtitleWorker: { findMany: vi.fn(async () => workers) },
     videoEncodingTask: { count: vi.fn(async () => encodingBusy) },
     aiSubtitleJob: {
@@ -49,6 +50,12 @@ const createDatabase = ({ workers, queuedJobs = [], encodingBusy = 0 }) => {
 };
 
 describe("ordonnanceur des sous-titres IA", () => {
+  it("attend la fin d'une réplique vocale sur le worker", async () => {
+    const { database } = createDatabase({ workers: [onlineWorker("rtx-3090", 100)] });
+    database.voiceAudio.count.mockResolvedValue(1);
+    expect(await claimNextAiSubtitleJob({ workerId: "rtx-3090", now: new Date("2026-08-22T08:00:10.000Z"), database, config })).toBeNull();
+    expect(database.aiSubtitleJob.updateMany).not.toHaveBeenCalled();
+  });
   it("réserve la première tâche au worker libre le plus performant", async () => {
     const { database } = createDatabase({
       workers: [onlineWorker("rtx-3090", 100), onlineWorker("rtx-3070", 80)],

@@ -1,13 +1,20 @@
 import { prisma } from "./db.js";
 
-export const AI_DISCLOSURE_VERSION = "2026-08-23-v1";
+export const AI_DISCLOSURE_VERSION = "2026-09-11-v2";
 
 export const AI_DISCLOSURE_TEXT = Object.freeze({
   title: "Fonctionnalités d'intelligence artificielle de SAMI",
   summary:
     "SAMI peut mettre à disposition des sous-titres et des pistes audio générés "
     + "localement par intelligence artificielle afin de faciliter la compréhension "
-    + "des vidéos. Ces contenus peuvent contenir des erreurs et les voix synthétiques "
+    + "des vidéos. SAMI propose également une bibliothèque de voix originales et de répliques "
+    + "synthétiques liées à des personnes. Seuls les administrateurs peuvent importer une voix, "
+    + "confirmer leur autorisation de l'utiliser, générer des répliques à partir de texte et les publier. "
+    + "Une réplique IA ne constitue pas un enregistrement authentique ni une déclaration de la personne. "
+    + "Les originaux sont conservés et chaque audio est identifié Original ou IA. "
+    + "La bibliothèque est réservée aux utilisateurs connectés ayant accepté ces conditions ; "
+    + "les téléchargements sont réservés aux administrateurs. "
+    + "Ces contenus peuvent contenir des erreurs et les voix synthétiques "
     + "ne constituent pas des doublages officiels. Tous les éléments générés par IA "
     + "sont clairement identifiés. Vous pouvez choisir d'y accéder ou non et modifier "
     + "ce choix à tout moment dans Paramètres → Intelligence artificielle.",

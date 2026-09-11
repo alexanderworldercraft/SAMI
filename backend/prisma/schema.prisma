@@ -962,6 +962,7 @@ model Action {
 }
 
 model Personne {
+  VoiceAudios        VoiceAudio[]
   PersonneID          Int                     @id @default(autoincrement())
   Nom                 String
   Prenom              String
@@ -977,6 +978,44 @@ model Personne {
   DuplicateReviewsAsB PersonDuplicateReview[] @relation("PersonDuplicateReviewB")
 
   @@index([EtatID], map: "Personne_EtatID_fkey")
+}
+
+model VoiceAudio {
+  VoiceAudioID       String   @id @db.VarChar(36)
+  PersonneID         Int
+  Personne           Personne @relation(fields: [PersonneID], references: [PersonneID], onDelete: Restrict)
+  OriginalID         String?  @db.VarChar(36)
+  Original           VoiceAudio? @relation("VoiceReplicas", fields: [OriginalID], references: [VoiceAudioID], onDelete: Restrict)
+  Replicas           VoiceAudio[] @relation("VoiceReplicas")
+  Kind               String   @db.VarChar(16)
+  Title              String   @db.VarChar(191)
+  Language           String   @db.VarChar(8)
+  Text               String   @db.Text
+  IsPublic           Boolean  @default(false)
+  Status             String   @default("READY") @db.VarChar(16)
+  SourceVideoID      Int?
+  SourceStart        Float?
+  SourceEnd          Float?
+  UploadName         String?  @db.VarChar(191)
+  Duration           Float?
+  AuthorizedBy       Int
+  AuthorizationNote  String   @db.Text
+  AuthorizedAt       DateTime @default(now())
+  CreatedBy          Int
+  PublishedBy        Int?
+  PublishedAt        DateTime?
+  Models             Json?
+  Watermarked        Boolean  @default(false)
+  ErrorMessage       String?  @db.Text
+  AssignedWorkerID   String?  @db.VarChar(100)
+  LeaseToken         String?  @db.VarChar(64)
+  LeaseExpiresAt     DateTime?
+  CreatedAt          DateTime @default(now())
+  UpdatedAt          DateTime @default(now()) @updatedAt
+
+  @@index([PersonneID, IsPublic, Status])
+  @@index([Status, CreatedAt])
+  @@index([AssignedWorkerID, Status, LeaseExpiresAt])
 }
 
 model PersonDuplicateReview {

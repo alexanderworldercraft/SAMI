@@ -504,6 +504,7 @@ export async function claimNextAiSubtitleJob({
       );
     const preferredWorker = onlineWorkers[0];
     if (preferredWorker?.AiSubtitleWorkerID !== String(workerId)) return null;
+    if (await tx.voiceAudio.count({ where: { AssignedWorkerID: String(workerId), Status: "PROCESSING", LeaseExpiresAt: { gt: instant } } })) return null;
     const [activeAiJobs, encodingBusy] = await Promise.all([
       tx.aiSubtitleJob.count({
         where: {
@@ -586,7 +587,7 @@ export async function claimNextAiSubtitleJob({
       leaseExpiresAt,
       renewAfterMs: runtimeConfig.leaseRenewIntervalMs,
     };
-  });
+  }, { isolationLevel: "Serializable" });
 }
 
 const assertActiveLease = async ({ jobId, workerId, leaseToken, leaseGeneration, database }) => {

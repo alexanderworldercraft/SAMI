@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../services/db.js", () => ({
   prisma: {
+    voiceAudio: { count: vi.fn(async () => 0) },
     $transaction: vi.fn(async (operations) => Promise.all(operations)),
     personne: {
       delete: vi.fn(),
@@ -211,5 +212,13 @@ describe("personneController - administration et corbeille", () => {
       ActionNom: "person_delete",
       Meta: { personId: 12, permanent: true },
     }));
+  });
+  it("préserve une personne ayant encore des originaux ou répliques", async () => {
+    prisma.voiceAudio.count.mockResolvedValueOnce(2);
+    const reply = createReply();
+    await permanentlyDeletePersonne({ user: { userId: 1 }, params: { id: "12" } }, reply);
+    expect(reply.code).toHaveBeenCalledWith(409);
+    expect(prisma.personne.delete).not.toHaveBeenCalled();
+    expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 });

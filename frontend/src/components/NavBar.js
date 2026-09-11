@@ -18,6 +18,7 @@ import {
   UserIcon,
   FilmIcon,
   MusicalNoteIcon,
+  MicrophoneIcon,
   RectangleStackIcon,
   PlusCircleIcon,
   Cog6ToothIcon,
@@ -32,6 +33,7 @@ import { useNav } from '../context/NavContext'
 import UserAvatar from "./UserAvatar";
 import { scrollToPageTop } from '../utils/scrollToPageTop'
 import { activeAdminSection, adminSectionsFor } from '../constants/adminSections'
+import { useAiFeaturePreference } from '../context/AiFeaturePreferenceContext'
 
 const apiBaseUrl = process.env.REACT_APP_URL_LOCAL
 const appName = process.env.REACT_APP_NAME || 'SAMI'
@@ -93,6 +95,7 @@ const AdminLinks = ({ grade, search, onNavigate }) => (
 )
 
 export default function NavBar() {
+  const aiPreference = useAiFeaturePreference()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [user, setUser] = useState(null)
   // Nouvel état : pour savoir si on est encore en train de charger /users/me
@@ -128,6 +131,8 @@ export default function NavBar() {
     { name: 'Accueil', href: '/', icon: HomeIcon, scrollToTop: true },
     { name: 'Vidéos', href: '/videos', icon: FilmIcon, scrollToTop: true },
     { name: 'Musique', href: '/musique', icon: MusicalNoteIcon, scrollToTop: true },
+    ...(aiPreference.authenticated && aiPreference.preference?.accepted && !aiPreference.loading
+      ? [{ name: 'Voix', href: '/voix', icon: MicrophoneIcon, scrollToTop: true }] : []),
     { name: 'Sagas', href: '/sagas', icon: RectangleStackIcon, scrollToTop: true },
     { name: 'Acteur/réalisateur', href: '/personnes', icon: UserIcon, scrollToTop: true },
     ...(user?.GradeID === 1 || user?.GradeID === 2

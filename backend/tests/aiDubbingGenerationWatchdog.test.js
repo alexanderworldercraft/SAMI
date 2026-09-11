@@ -63,6 +63,18 @@ describe("limites indépendantes de la synthèse Python/CUDA", () => {
     f.watchdog.handle(event); f.watchdog.clear();
     expect(vi.getTimerCount()).toBe(0);
   });
+  it("laisse la bibliothèque dépasser 600 s puis interrompt à 1800 s", () => {
+    const f = fixture(); f.watchdog.handle({ ...event, kind: "library" });
+    vi.advanceTimersByTime(600_000);
+    expect(f.onTimeout).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(1_199_000);
+    expect(f.onTimeout).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(1000);
+    expect(f.onTimeout).toHaveBeenCalledOnce();
+    expect(f.onTimeout.mock.calls[0][0].message).toContain("1800s");
+    f.watchdog.clear();
+    expect(vi.getTimerCount()).toBe(0);
+  });
   it("refuse les événements invalides sans accepter de délais fournis par le runtime", () => {
     const f = fixture();
     f.watchdog.handle({ ...event, speaker: "arbitrary" });

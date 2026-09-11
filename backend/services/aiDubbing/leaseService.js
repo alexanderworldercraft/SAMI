@@ -304,6 +304,7 @@ export async function claimNextAiDubbingJob({
       include: { Registry: true },
     });
     if (!requester || !workerIsOnline(requester, instant, runtimeConfig)) return null;
+    if (await tx.voiceAudio.count({ where: { AssignedWorkerID: String(workerId), Status: "PROCESSING", LeaseExpiresAt: { gt: instant } } })) return null;
     const [dubbingBusy, subtitleBusy, encodingBusy] = await Promise.all([
       tx.aiDubbingJob.count({
         where: { AssignedWorkerID: String(workerId), Status: { in: processingStatuses }, LeaseExpiresAt: { gt: instant } },
@@ -378,7 +379,7 @@ export async function claimNextAiDubbingJob({
       leaseExpiresAt,
       renewAfterMs: runtimeConfig.leaseRenewIntervalMs,
     };
-  });
+  }, { isolationLevel: "Serializable" });
 }
 
 export async function assertActiveAiDubbingLease({

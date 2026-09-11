@@ -124,7 +124,7 @@ const installIsReady = (install, requireHybridDiarization = false) => {
     && fs.existsSync(qualityPath)
     && (install?.separationRequired !== true || (banditPath && fs.existsSync(banditPath)))
     && (
-      install?.diarizationRequired !== true
+      (install?.diarizationRequired !== true && !requireHybridDiarization)
       || (
         diarizationPath
         && fs.existsSync(diarizationPath)

@@ -20,6 +20,29 @@ SPEC.loader.exec_module(RUNTIME)
 
 
 class VoiceProfileContractTest(unittest.TestCase):
+    def test_qwen_uses_cuda_without_changing_existing_precision(self):
+        torch = mock.Mock()
+        torch.cuda.is_available.return_value = True
+        options = RUNTIME.qwen_device_options(torch)
+        self.assertEqual(options["device_map"], "cuda:0")
+        self.assertEqual(options["dtype"], torch.bfloat16)
+
+    def test_qwen_uses_metal_float32_on_apple_silicon(self):
+        torch = mock.Mock()
+        torch.cuda.is_available.return_value = False
+        torch.backends.mps.is_available.return_value = True
+        options = RUNTIME.qwen_device_options(torch)
+        self.assertEqual(options["device_map"], "mps")
+        self.assertEqual(options["dtype"], torch.float32)
+        self.assertEqual(options["attn_implementation"], "eager")
+
+    def test_qwen_does_not_announce_an_unavailable_accelerator(self):
+        torch = mock.Mock()
+        torch.cuda.is_available.return_value = False
+        torch.backends.mps.is_available.return_value = False
+        with self.assertRaisesRegex(RuntimeError, "Metal"):
+            RUNTIME.qwen_device_options(torch)
+
     def test_full_generation_feedback_is_identical_for_fr_en_ja(self):
         with tempfile.TemporaryDirectory() as directory, mock.patch.dict(os.environ, {"SAMI_DUBBING_WATCHDOG_PROTOCOL": "1"}):
             root = Path(directory)

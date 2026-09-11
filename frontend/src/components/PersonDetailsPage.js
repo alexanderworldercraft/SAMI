@@ -18,6 +18,7 @@ import Notification from "./Notification";
 import { cancelButtonClass, saveButtonClass } from "./contentDetailStyles";
 import { scrollToPageTop } from "../utils/scrollToPageTop";
 import { buildPersonPageMetadata } from "../utils/personPageMetadata";
+import { PersonVoiceSection } from "./VoiceLibrary";
 
 const apiUrl = process.env.REACT_APP_URL_LOCAL;
 
@@ -414,6 +415,8 @@ export default function PersonDetailsPage() {
           </div>
         </div>
       </section>
+
+      <PersonVoiceSection personId={id} />
 
       {canEdit ? (
         <section className="relative z-30 overflow-visible rounded-2xl border border-sky-500/10 bg-white/80 shadow-lg shadow-slate-950/5 dark:bg-slate-900/80">

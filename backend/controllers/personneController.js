@@ -634,6 +634,9 @@ export const permanentlyDeletePersonne = async (request, reply) => {
     });
     if (!person) return reply.code(404).send({ error: "Personne introuvable dans la corbeille." });
 
+    if (await prisma.voiceAudio.count({ where: { PersonneID: personId } })) {
+      return reply.code(409).send({ error: "Cette personne possède des voix conservées. Restaurez-la ou fusionnez-la avec sa fiche principale avant toute suppression définitive." });
+    }
     await prisma.$transaction([
       prisma.videoPersonne.deleteMany({ where: { PersonneID: personId } }),
       prisma.seriesPersonne.deleteMany({ where: { PersonneID: personId } }),

@@ -195,6 +195,7 @@ describe("personDuplicateService - fusion", () => {
       }),
     });
     const tx = {
+      voiceAudio: { updateMany: vi.fn(async () => ({ count: 1 })) },
       videoPersonne: createLinkDelegate(videoLinks, "VideoPersonneID"),
       seriesPersonne: createLinkDelegate(seriesLinks, "SeriesPersonneID"),
       personne: { update: vi.fn() },
@@ -215,6 +216,7 @@ describe("personDuplicateService - fusion", () => {
       mergePersonId: 2,
       reviewedById: 7,
     });
+    expect(tx.voiceAudio.updateMany).toHaveBeenCalledWith({ where: { PersonneID: 2 }, data: { PersonneID: 1 } });
 
     expect(videoLinks).toEqual([
       expect.objectContaining({

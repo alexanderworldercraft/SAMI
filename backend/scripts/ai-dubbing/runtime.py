@@ -2042,25 +2042,33 @@ def separate_bandit(source, destination, install):
     return speech_path
 
 
+def qwen_device_options(torch):
+    if torch.cuda.is_available():
+        return {"device_map": "cuda:0", "dtype": torch.bfloat16, "attn_implementation": "sdpa"}
+    if torch.backends.mps.is_available():
+        # FP32 avoids unsupported/unstable low-precision codec operations on Metal.
+        # torch 2.6 SDPA/GQA on MPS aborts in Metal with mismatched KV heads.
+        # Eager attention expands the KV heads explicitly and preserves the model.
+        return {"device_map": "mps", "dtype": torch.float32, "attn_implementation": "eager"}
+    raise RuntimeError("Qwen3-TTS nécessite NVIDIA CUDA ou Apple Silicon avec Metal (MPS) accessible.")
+
+
 def load_voice_model(install, references=None):
     import torch
 
     engine = str(install.get("voiceEngine") or "chatterbox").lower()
     voice = install.get("models", {}).get("voice") or install.get("models", {}).get("chatterbox") or {}
     if engine == "qwen3-tts":
-        if not torch.cuda.is_available():
-            raise RuntimeError("Qwen3-TTS est configuré par SAMI pour une carte NVIDIA CUDA.")
+        device_options = qwen_device_options(torch)
         from qwen_tts import Qwen3TTSModel
 
         model_path = Path(str(voice.get("path") or ""))
         if not model_path.is_dir():
             raise RuntimeError("Le checkpoint Qwen3-TTS local est absent.")
-        log(f"Chargement {voice.get('repo')} sur cuda:0 (bfloat16, SDPA).")
+        log(f"Chargement {voice.get('repo')} sur {device_options['device_map']} ({device_options['dtype']}, {device_options['attn_implementation']}).")
         model = Qwen3TTSModel.from_pretrained(
             str(model_path),
-            device_map="cuda:0",
-            dtype=torch.bfloat16,
-            attn_implementation="sdpa",
+            **device_options,
         )
         prompts = {}
         for speaker, reference in (references or {}).items():
@@ -2096,7 +2104,7 @@ def guarded_voice_operation(operation, *, workspace, profile, speaker, source_st
     """The Node supervisor owns the deadline, even if Python/CUDA stops responding."""
     if os.environ.get("SAMI_DUBBING_WATCHDOG_PROTOCOL") != "1":
         raise DubbingInputQualityError("R5-R1 nécessite le superviseur SAMI mis à jour ; génération directe non protégée refusée.")
-    timeout_seconds = {"sample": 180, "cue": 600, "watermark": 60}[kind]
+    timeout_seconds = {"sample": 180, "cue": 600, "library": 1800, "watermark": 60}[kind]
     identity = uuid.uuid4().hex
     report = {
         "schemaVersion": 1, "pipelineVersion": profile, "id": identity,
@@ -3477,7 +3485,7 @@ def probe(root):
             "offline": True,
         }
         result["components"]["voice"] = {
-            "ready": voice_path.is_dir() and (engine != "qwen3-tts" or torch.cuda.is_available()),
+            "ready": voice_path.is_dir() and (engine != "qwen3-tts" or torch.cuda.is_available() or torch.backends.mps.is_available()),
             "engine": engine,
             "model": voice.get("repo"),
             "revision": voice.get("revision"),
@@ -3560,8 +3568,11 @@ def probe(root):
             result["ready"] = result["ready"] and result["components"]["sortformer"]["ready"]
         if not is_v5_profile(configured_profile):
             result["ready"] = result["ready"] and result["components"]["sortformer"]["ready"]
+            result["ready"] = result["ready"] and result["components"]["diarization"]["ready"]
             if not result["components"]["sortformer"]["ready"]:
-                result["error"] = "Le pipeline V6 configuré exige NVIDIA Sortformer local."
+                result["error"] = "Le pipeline V6 configuré exige le modèle Sortformer local (CUDA ou CPU sur Mac). Exécutez npm run setup:ai-dubbing:sortformer."
+            elif not result["components"]["diarization"]["ready"]:
+                result["error"] = "Le pipeline V6 configuré exige Pyannote Community-1 local. Exécutez npm run setup:ai-dubbing:diarization."
     except Exception as error:
         result["error"] = str(error)
     return result
@@ -4097,7 +4108,7 @@ def process(phase, input_path, output_path, root):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--phase", choices=["preview", "full"])
+    parser.add_argument("--phase", choices=["preview", "full", "voice"])
     parser.add_argument("--input")
     parser.add_argument("--output")
     parser.add_argument("--probe", action="store_true")
@@ -4106,6 +4117,7 @@ def main():
     root = Path(os.environ.get("SAMI_AI_DUBBING_ROOT") or Path(__file__).parents[2] / "var" / "ai-dubbing").resolve()
     if args.probe:
         result = probe(root)
+        result["voiceLibrary"] = 1
         print(json.dumps(result, ensure_ascii=False))
         raise SystemExit(0 if result.get("ready") else 1)
     if args.smoke_test:
@@ -4114,7 +4126,11 @@ def main():
         raise SystemExit(0 if result.get("ready") else 1)
     if not args.phase or not args.input or not args.output:
         parser.error("--phase, --input et --output sont requis.")
-    process(args.phase, args.input, args.output, root)
+    if args.phase == "voice":
+        from voice_library import process_voice
+        process_voice(args.input, args.output, root, sys.modules[__name__])
+    else:
+        process(args.phase, args.input, args.output, root)
 
 
 if __name__ == "__main__":

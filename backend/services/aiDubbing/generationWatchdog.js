@@ -1,4 +1,4 @@
-const LIMITS = Object.freeze({ sample: 180, cue: 600, watermark: 60 });
+const LIMITS = Object.freeze({ sample: 180, cue: 600, library: 1800, watermark: 60 });
 const OBSERVED = Object.freeze({ quality: ["VC", "QC"], fitting: ["VC", "FIT"], assembly: ["VF", "ASM"], mixing: ["VF", "MIX"], finalWatermark: ["VF", "WM"] });
 
 // A live heartbeat is not proof that a CUDA generation is making progress.
