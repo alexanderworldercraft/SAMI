@@ -91,7 +91,7 @@ const TimelineWorkspace = ({ initialSubtitle, onClose, onSaved }) => {
     const url = sourceUrl(subtitle.video.path);
     let hls = null;
     if (Hls.isSupported()) {
-      hls = new Hls();
+      hls = new Hls({ xhrSetup: (xhr) => { xhr.withCredentials = true; } });
       hls.loadSource(url);
       hls.attachMedia(video);
     } else if (video.canPlayType("application/vnd.apple.mpegurl")) {
@@ -260,7 +260,7 @@ const TimelineWorkspace = ({ initialSubtitle, onClose, onSaved }) => {
 
       <div className="grid min-h-0 flex-1 grid-rows-[minmax(220px,42vh)_auto_minmax(220px,1fr)] xl:grid-cols-[minmax(0,1.25fr)_minmax(360px,0.75fr)] xl:grid-rows-[minmax(300px,55vh)_minmax(220px,1fr)]">
         <section className="relative min-h-0 bg-black xl:col-start-1 xl:row-start-1">
-          <video ref={videoRef} controls className="size-full object-contain" preload="metadata" />
+          <video ref={videoRef} controls crossOrigin="use-credentials" className="size-full object-contain" preload="metadata" />
           {activeIndex >= 0 && (
             <div className="pointer-events-none absolute inset-x-0 bottom-14 flex justify-center px-6 text-center">
               <p className="max-w-[90%] rounded-md bg-black/75 px-3 py-1.5 text-lg font-bold leading-snug text-white shadow-lg">
@@ -554,6 +554,18 @@ const SuperAdminAiSubtitleEditor = () => {
                   <div className="min-w-0 flex-1">
                     <p className="line-clamp-2 break-words text-sm font-black leading-5 text-slate-950 dark:text-white" title={group.video.title}>{group.video.title}</p>
                     <p className="mt-1 truncate text-xs font-semibold text-slate-500 dark:text-slate-400">{group.video.seriesTitle ? `${group.video.seriesTitle} · saison ${group.video.seasonNumber}` : "Film"}</p>
+                    {item.job?.qualityReport && (
+                      <p className={`mt-1 text-xs font-semibold ${item.job.qualityReport.warningCount > 0
+                        ? "text-amber-700 dark:text-amber-300"
+                        : "text-emerald-700 dark:text-emerald-300"}`}
+                      >
+                        Traduction contextuelle : {item.job.qualityReport.segmentCount || 0} phrase(s)
+                        {` · ${item.job.qualityReport.warningCount || 0} passage(s) à contrôler`}
+                        {item.job.qualityReport.criticalWarningCount > 0
+                          ? ` · ${item.job.qualityReport.criticalWarningCount} critique(s) isolée(s)`
+                          : ""}
+                      </p>
+                    )}
                     <label className="mt-3 block text-xs font-black text-slate-600 dark:text-slate-300">
                       Sous-titre IA
                       <select

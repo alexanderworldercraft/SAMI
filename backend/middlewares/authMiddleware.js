@@ -3,6 +3,7 @@
 import jwt from 'jsonwebtoken';
 import dotenv from 'dotenv';
 import { AUTH_COOKIE_NAME } from "../constants.js";
+import { isVideoMediaAccessToken } from "../services/videoMediaAccessToken.js";
 
 dotenv.config();
 const secretKey = process.env.JWT_SECRET;
@@ -42,6 +43,9 @@ export const authMiddleware = async (request, reply) => {
 
     // Vérification du token (mode sync pour éviter double-callback)
     const decoded = jwt.verify(token, secretKey);
+    if (isVideoMediaAccessToken(decoded)) {
+      return reply.status(401).send({ error: "Invalid token scope" });
+    }
     request.user = decoded;
   } catch (err) {
     if (err?.name === "TokenExpiredError") {

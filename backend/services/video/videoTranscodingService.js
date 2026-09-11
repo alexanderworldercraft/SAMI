@@ -352,7 +352,7 @@ async function transcodeVideoToHlsSequential({
 
   if (useAlternateAudio && errors.length === 0) {
     for (const track of audioTracks) {
-      const audioDir = path.join(outputDir, "audio", String(track.order));
+      const audioDir = path.join(outputDir, "audio", "classic", String(track.order));
       const playlistPath = path.join(audioDir, "playlist.m3u8");
       const segmentPath = path.join(audioDir, "segment_%05d.ts");
       const profile = { label: `Audio ${track.label}` };

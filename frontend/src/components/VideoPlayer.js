@@ -1,8 +1,10 @@
 import React, { useEffect, useRef, useState } from "react";
 import Hls from "hls.js";
+import { redirectToLoginForExpiredSession } from "../utils/authSession";
 import { ArrowLeftIcon, GlobeAltIcon } from "@heroicons/react/24/outline";
 import { CheckIcon, Cog6ToothIcon } from "@heroicons/react/24/solid";
 import api from "../services/api";
+import { AI_PREFERENCE_CHANGED_EVENT } from "../constants/aiFeatures";
 import {
   parsePreviewLiveVtt,
   toAbsoluteAssetUrl,
@@ -203,6 +205,8 @@ const VideoPlayer = ({
   const [aiSubtitleLanguage, setAiSubtitleLanguage] = useState("fr");
   const [aiSubtitleLoading, setAiSubtitleLoading] = useState(false);
   const [aiSubtitleMessage, setAiSubtitleMessage] = useState("");
+  const [aiAccessRevoked, setAiAccessRevoked] = useState(video?.aiFeaturesAccepted !== true);
+  const [mediaAccessRevision, setMediaAccessRevision] = useState(0);
 
   // Réfs internes
   const hlsRef = useRef(null);
@@ -224,6 +228,7 @@ const VideoPlayer = ({
   const pendingCenterClickRef = useRef(null);
   const controlsHideTimeoutRef = useRef(null);
   const refreshedAiSubtitleJobsRef = useRef(new Set());
+  const playbackRestoreRef = useRef(null);
   const aiSubtitleJobsRef = useRef([]);
   const onSubtitlesUpdatedRef = useRef(onSubtitlesUpdated);
   onSubtitlesUpdatedRef.current = onSubtitlesUpdated;
@@ -261,6 +266,8 @@ const VideoPlayer = ({
     setAiSubtitleLoading(false);
     setAiSubtitleMessage("");
     refreshedAiSubtitleJobsRef.current = new Set();
+    setAiAccessRevoked(video?.aiFeaturesAccepted !== true);
+    setMediaAccessRevision(0);
 
     if (pendingCenterClickRef.current) {
       clearTimeout(pendingCenterClickRef.current);
@@ -270,10 +277,36 @@ const VideoPlayer = ({
       clearTimeout(controlsHideTimeoutRef.current);
       controlsHideTimeoutRef.current = null;
     }
-  }, [video?.VideoID]);
+  }, [video?.VideoID, video?.aiFeaturesAccepted]);
 
   useEffect(() => {
-    if (!video?.VideoID) return undefined;
+    const handleAiPreferenceChanged = (event) => {
+      const accepted = event.detail?.status === "ACCEPTED" && event.detail?.accepted === true;
+      const videoElement = videoRef.current;
+      playbackRestoreRef.current = videoElement ? {
+        time: Number(videoElement.currentTime || 0),
+        shouldPlay: !videoElement.paused,
+      } : null;
+      setAiAccessRevoked(!accepted);
+      if (!accepted) {
+        captionsEnabledRef.current = false;
+        setCaptionsEnabled(false);
+        setActiveSubtitleCues([]);
+        setSelectedAudioTrackIndex(0);
+      }
+      setMediaAccessRevision((current) => current + 1);
+    };
+    window.addEventListener(AI_PREFERENCE_CHANGED_EVENT, handleAiPreferenceChanged);
+    return () => window.removeEventListener(AI_PREFERENCE_CHANGED_EVENT, handleAiPreferenceChanged);
+  }, []);
+
+  useEffect(() => {
+    if (!video?.VideoID || aiAccessRevoked || video?.aiFeaturesAccepted !== true) {
+      setAiSubtitleConfig(null);
+      setAiSubtitleJobs([]);
+      aiSubtitleJobsRef.current = [];
+      return undefined;
+    }
     let cancelled = false;
     const loadAiSubtitles = async () => {
       try {
@@ -311,7 +344,7 @@ const VideoPlayer = ({
       cancelled = true;
       window.clearInterval(timer);
     };
-  }, [video?.VideoID, video?.subtitles]);
+  }, [video?.VideoID, video?.subtitles, video?.aiFeaturesAccepted, aiAccessRevoked]);
 
   const requestAiSubtitle = async () => {
     if (!video?.VideoID || !selectedAiSubtitleLanguage) return;
@@ -482,23 +515,33 @@ const VideoPlayer = ({
     // -------------------------
     // 1) HLS setup
     // -------------------------
-    const sourceUrl = `${process.env.REACT_APP_URL_LOCAL}/${video.CheminAcces}`;
+    const sourceBase = `${process.env.REACT_APP_URL_LOCAL}/${String(video.CheminAcces).replace(/^\/+/, "")}`;
+    const sourceUrl = `${sourceBase}${sourceBase.includes("?") ? "&" : "?"}access=${mediaAccessRevision}`;
 
     if (Hls.isSupported()) {
       const hls = new Hls({
-        // debug: true,
+        xhrSetup: (xhr) => {
+          xhr.withCredentials = true;
+          if (video.mediaAccessToken) {
+            xhr.setRequestHeader("X-SAMI-Media-Token", video.mediaAccessToken);
+          }
+        },
       });
 
       hls.on(Hls.Events.AUDIO_TRACKS_UPDATED, (_event, data) => {
-        const tracks = (data.audioTracks || []).map((track, index) => ({
-          index,
-          label:
-            track.name
-            || video.audioTracks?.[index]?.label
-            || track.lang
-            || `Audio ${index + 1}`,
-          language: track.lang || video.audioTracks?.[index]?.language || null,
-        }));
+        const tracks = (data.audioTracks || []).map((track, index) => {
+          const metadata = (video.audioTracks || []).find((item) => (
+            item.label === track.name
+            || (item.language && track.lang && item.language === track.lang && item.origin === "AI_DUB" && /\bIA\b/i.test(track.name || ""))
+          ));
+          return {
+            index,
+            label: track.name || metadata?.label || track.lang || `Audio ${index + 1}`,
+            language: track.lang || metadata?.language || null,
+            origin: metadata?.origin || (/\bIA\b/i.test(track.name || "") ? "AI_DUB" : "IMPORTED"),
+            synthetic: Boolean(metadata?.synthetic || /\bIA\b/i.test(track.name || "")),
+          };
+        });
         setAvailableAudioTracks(tracks);
 
         const defaultIndex = tracks.findIndex(
@@ -526,6 +569,11 @@ const VideoPlayer = ({
       });
 
       hls.on(Hls.Events.ERROR, (_event, data) => {
+        if (data?.response?.code === 401) {
+          hls.destroy();
+          redirectToLoginForExpiredSession();
+          return;
+        }
         console.warn("Erreur HLS:", data);
       });
 
@@ -539,9 +587,12 @@ const VideoPlayer = ({
     // -------------------------
     // 2) Sous-titres
     // -------------------------
-    if (video.subtitles && video.subtitles.length > 0) {
+    const accessibleSubtitles = (video.subtitles || []).filter(
+      (subtitle) => !aiAccessRevoked || subtitle.origin !== "AI"
+    );
+    if (accessibleSubtitles.length > 0) {
       const textTrackCleanups = [];
-      video.subtitles.forEach((subtitle, index) => {
+      accessibleSubtitles.forEach((subtitle, index) => {
         const track = document.createElement("track");
         track.kind = "subtitles";
         track.label = subtitle.label;
@@ -591,21 +642,32 @@ const VideoPlayer = ({
       setDuration(Number.isFinite(videoElement.duration) ? videoElement.duration : 0);
       setCurrentTime(videoElement.currentTime || 0);
 
+      const restore = playbackRestoreRef.current;
+      if (restore) {
+        videoElement.currentTime = Math.min(
+          Math.max(0, restore.time),
+          Number.isFinite(videoElement.duration) ? videoElement.duration : restore.time
+        );
+        playbackRestoreRef.current = null;
+        if (restore.shouldPlay) videoElement.play().catch(() => {});
+      }
+
       if (!hlsRef.current && videoElement.audioTracks?.length > 0) {
         const nativeTracks = Array.from(
           { length: videoElement.audioTracks.length },
           (_unused, index) => videoElement.audioTracks[index]
         );
         setAvailableAudioTracks(
-          nativeTracks.map((track, index) => ({
-            index,
-            label:
-              track.label
-              || video.audioTracks?.[index]?.label
-              || track.language
-              || `Audio ${index + 1}`,
-            language: track.language || video.audioTracks?.[index]?.language || null,
-          }))
+          nativeTracks.map((track, index) => {
+            const metadata = (video.audioTracks || []).find((item) => item.label === track.label);
+            return {
+              index,
+              label: track.label || metadata?.label || track.language || `Audio ${index + 1}`,
+              language: track.language || metadata?.language || null,
+              origin: metadata?.origin || (/\bIA\b/i.test(track.label || "") ? "AI_DUB" : "IMPORTED"),
+              synthetic: Boolean(metadata?.synthetic || /\bIA\b/i.test(track.label || "")),
+            };
+          })
         );
         const enabledIndex = nativeTracks.findIndex((track) => track.enabled);
         setSelectedAudioTrackIndex(enabledIndex >= 0 ? enabledIndex : 0);
@@ -787,7 +849,7 @@ const VideoPlayer = ({
 
     // ⚠️ on dépend de video?.VideoID et video?.CheminAcces pour ne pas rebrancher en boucle
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [video?.VideoID, video?.CheminAcces, onVideoElement]);
+  }, [video?.VideoID, video?.CheminAcces, video?.mediaAccessToken, onVideoElement, mediaAccessRevision, aiAccessRevoked]);
 
   useEffect(() => {
     const container = fitContainerRef.current;
@@ -1390,7 +1452,9 @@ const VideoPlayer = ({
 
   const playedPercent = duration > 0 ? Math.min(100, (currentTime / duration) * 100) : 0;
   const bufferedPercent = duration > 0 ? Math.min(100, (bufferedTime / duration) * 100) : 0;
-  const subtitleTracks = video?.subtitles || [];
+  const subtitleTracks = (video?.subtitles || []).filter(
+    (subtitle) => !aiAccessRevoked || subtitle.origin !== "AI"
+  );
   const aiSubtitleLanguages = (aiSubtitleConfig?.languages || []).filter(
     (language) => !subtitleTracks.some((subtitle) => subtitle.language === language.code)
   );
@@ -1410,7 +1474,6 @@ const VideoPlayer = ({
     : null;
   const hasAudioOptions = Boolean(
     multiAudioEnabled
-    && video?.audioTracks?.length > 1
     && availableAudioTracks.length > 1
   );
   const selectedAudioTrack = availableAudioTracks.find(
@@ -1450,6 +1513,7 @@ const VideoPlayer = ({
       >
         <video
           ref={videoRef}
+          crossOrigin="use-credentials"
           className="relative z-10 w-full h-full rounded-xl xl:rounded-2xl object-contain block"
           preload="auto"
         />
@@ -1896,6 +1960,11 @@ const VideoPlayer = ({
 
                   {settingsPanel === SETTINGS_PANEL.AUDIO && (
                     <div className="max-h-[48vh] space-y-1 overflow-y-auto pr-1">
+                      {selectedAudioTrack?.synthetic && (
+                        <p className="mb-2 rounded-lg border border-fuchsia-400/30 bg-fuchsia-500/15 px-3 py-2 text-xs font-semibold leading-5 text-fuchsia-100">
+                          Voix synthétiques générées localement par IA. Cette piste n'est pas un doublage officiel et peut contenir des erreurs.
+                        </p>
+                      )}
                       {availableAudioTracks.map((track) => {
                         const isSelected = selectedAudioTrackIndex === track.index;
                         const flag = resolvePlayerLanguageFlag(track);

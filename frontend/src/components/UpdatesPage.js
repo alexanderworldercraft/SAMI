@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 
 const updates = [
   {
-    version: "7.15.0",
+    version: "8.1.0",
     title: "Administration et correction avancee des sous-titres IA",
     date: "23 aout 2026",
     sections: [
@@ -46,8 +46,8 @@ const updates = [
     ],
   },
   {
-    version: "7.14.0",
-    title: "Sous-titres IA distribues et lecteur plus lisible",
+    version: "8.0.0",
+    title: "L’ère de l’intelligence artificielle : sous-titres IA distribués",
     date: "22 aout 2026",
     sections: [
       {

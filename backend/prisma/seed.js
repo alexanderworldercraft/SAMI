@@ -42,6 +42,64 @@ const AI_SUBTITLE_LOG_ACTIONS = Object.freeze([
   },
 ]);
 
+const AI_DUBBING_AND_CONSENT_LOG_ACTIONS = Object.freeze([
+  {
+    Nom: "ai_features_preference_update",
+    Description: "Un utilisateur accepte ou refuse l'accès aux fonctionnalités IA.",
+    Criticite: 1,
+  },
+  {
+    Nom: "ai_dubbing_preview_requested",
+    Description: "Un administrateur demande un extrait de doublage IA local.",
+    Criticite: 2,
+  },
+  {
+    Nom: "ai_dubbing_preview_approved",
+    Description: "Un administrateur valide l'extrait d'un doublage IA.",
+    Criticite: 2,
+  },
+  {
+    Nom: "ai_dubbing_rejected",
+    Description: "Un administrateur refuse un doublage IA avant publication.",
+    Criticite: 2,
+  },
+  {
+    Nom: "ai_dubbing_published",
+    Description: "Un administrateur valide et publie une piste de doublage IA.",
+    Criticite: 3,
+  },
+  {
+    Nom: "ai_dubbing_deleted",
+    Description: "Un administrateur supprime une version de doublage IA et sa piste synthétique.",
+    Criticite: 3,
+  },
+  {
+    Nom: "ai_dubbing_voice_profile_accepted",
+    Description: "Un administrateur accepte explicitement un profil vocal de doublage IA.",
+    Criticite: 2,
+  },
+  {
+    Nom: "ai_dubbing_voice_profile_rejected",
+    Description: "Un administrateur refuse explicitement un profil vocal de doublage IA.",
+    Criticite: 2,
+  },
+  {
+    Nom: "ai_dubbing_voice_profile_regenerated",
+    Description: "Un administrateur exclut une référence vocale et relance l'analyse du doublage IA.",
+    Criticite: 2,
+  },
+  {
+    Nom: "ai_dubbing_speaker_added",
+    Description: "Un administrateur ajoute un intervenant attendu et relance l'analyse du doublage IA.",
+    Criticite: 2,
+  },
+  {
+    Nom: "ai_dubbing_analysis_retried",
+    Description: "Un administrateur relance manuellement l'analyse d'un doublage IA en échec.",
+    Criticite: 2,
+  },
+]);
+
 const uniqueByNom = (items) => {
   const seen = new Set();
 
@@ -350,6 +408,7 @@ async function main() {
         Criticite: 2,
       },
       ...AI_SUBTITLE_LOG_ACTIONS,
+      ...AI_DUBBING_AND_CONSENT_LOG_ACTIONS,
       ...RECENT_LOG_ACTIONS,
     ]),
     skipDuplicates: true, // Évite les erreurs si les grades existent déjà

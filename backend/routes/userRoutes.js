@@ -8,6 +8,8 @@ import {
 } from "../middlewares/rateLimitMiddleware.js";
 import { userRepository } from '../models/user.js';
 import { userPlayerPreferenceController } from "../controllers/userPlayerPreferenceController.js";
+import { userAiPreferenceController } from "../controllers/userAiPreferenceController.js";
+import { getUserAiPreference } from "../services/userAiPreferenceService.js";
 
 // petite fonction utilitaire
 function isUserPremium(user) {
@@ -34,6 +36,8 @@ export default async function userRoutes(fastify, options) {
 
   fastify.get('/player-preferences', { preHandler: authMiddleware }, userPlayerPreferenceController.get);
   fastify.put('/player-preferences', { preHandler: authMiddleware }, userPlayerPreferenceController.update);
+  fastify.get('/ai-preference', { preHandler: authMiddleware }, userAiPreferenceController.get);
+  fastify.put('/ai-preference', { preHandler: authMiddleware }, userAiPreferenceController.update);
 
   fastify.put('/update', { preHandler: authMiddleware }, userController.updateUser);
   fastify.put('/delete-account', { preHandler: authMiddleware }, userController.deleteAccount);
@@ -60,9 +64,11 @@ export default async function userRoutes(fastify, options) {
       return reply.status(404).send({ error: "Utilisateur introuvable" });
     }
 
+    const aiPreference = await getUserAiPreference(userId);
     reply.send({
       ...user,
       isPremium: isUserPremium(user),
+      aiPreference,
     });
   } catch (err) {
     console.error('Error fetching user profile:', err);

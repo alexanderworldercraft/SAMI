@@ -2174,6 +2174,10 @@
     justify-self: flex-end;
   }
 
+  .justify-self-start {
+    justify-self: flex-start;
+  }
+
   .truncate {
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -2482,6 +2486,26 @@
     }
   }
 
+  .border-emerald-500\/20 {
+    border-color: #00bb7f33;
+  }
+
+  @supports (color: color-mix(in lab, red, red)) {
+    .border-emerald-500\/20 {
+      border-color: color-mix(in oklab, var(--color-emerald-500) 20%, transparent);
+    }
+  }
+
+  .border-emerald-500\/40 {
+    border-color: #00bb7f66;
+  }
+
+  @supports (color: color-mix(in lab, red, red)) {
+    .border-emerald-500\/40 {
+      border-color: color-mix(in oklab, var(--color-emerald-500) 40%, transparent);
+    }
+  }
+
   .border-emerald-700 {
     border-color: var(--color-emerald-700);
   }
@@ -2659,6 +2683,16 @@
   @supports (color: color-mix(in lab, red, red)) {
     .border-red-400\/40 {
       border-color: color-mix(in oklab, var(--color-red-400) 40%, transparent);
+    }
+  }
+
+  .border-red-500\/40 {
+    border-color: #fb2c3666;
+  }
+
+  @supports (color: color-mix(in lab, red, red)) {
+    .border-red-500\/40 {
+      border-color: color-mix(in oklab, var(--color-red-500) 40%, transparent);
     }
   }
 
@@ -2860,6 +2894,16 @@
     }
   }
 
+  .border-sky-400\/40 {
+    border-color: #00bcfe66;
+  }
+
+  @supports (color: color-mix(in lab, red, red)) {
+    .border-sky-400\/40 {
+      border-color: color-mix(in oklab, var(--color-sky-400) 40%, transparent);
+    }
+  }
+
   .border-sky-400\/60 {
     border-color: #00bcfe99;
   }
@@ -2921,6 +2965,16 @@
   @supports (color: color-mix(in lab, red, red)) {
     .border-sky-500\/30 {
       border-color: color-mix(in oklab, var(--color-sky-500) 30%, transparent);
+    }
+  }
+
+  .border-sky-500\/40 {
+    border-color: #00a5ef66;
+  }
+
+  @supports (color: color-mix(in lab, red, red)) {
+    .border-sky-500\/40 {
+      border-color: color-mix(in oklab, var(--color-sky-500) 40%, transparent);
     }
   }
 
@@ -3043,6 +3097,16 @@
   @supports (color: color-mix(in lab, red, red)) {
     .border-violet-400\/30 {
       border-color: color-mix(in oklab, var(--color-violet-400) 30%, transparent);
+    }
+  }
+
+  .border-violet-500\/40 {
+    border-color: #8d54ff66;
+  }
+
+  @supports (color: color-mix(in lab, red, red)) {
+    .border-violet-500\/40 {
+      border-color: color-mix(in oklab, var(--color-violet-500) 40%, transparent);
     }
   }
 
@@ -3310,6 +3374,16 @@
     background-color: var(--color-emerald-500);
   }
 
+  .bg-emerald-500\/5 {
+    background-color: #00bb7f0d;
+  }
+
+  @supports (color: color-mix(in lab, red, red)) {
+    .bg-emerald-500\/5 {
+      background-color: color-mix(in oklab, var(--color-emerald-500) 5%, transparent);
+    }
+  }
+
   .bg-emerald-500\/10 {
     background-color: #00bb7f1a;
   }
@@ -3338,6 +3412,10 @@
     .bg-emerald-500\/80 {
       background-color: color-mix(in oklab, var(--color-emerald-500) 80%, transparent);
     }
+  }
+
+  .bg-emerald-600 {
+    background-color: var(--color-emerald-600);
   }
 
   .bg-emerald-600\/25 {
@@ -3989,6 +4067,16 @@
   @supports (color: color-mix(in lab, red, red)) {
     .bg-slate-950\/80 {
       background-color: color-mix(in oklab, var(--color-slate-950) 80%, transparent);
+    }
+  }
+
+  .bg-slate-950\/85 {
+    background-color: #020618d9;
+  }
+
+  @supports (color: color-mix(in lab, red, red)) {
+    .bg-slate-950\/85 {
+      background-color: color-mix(in oklab, var(--color-slate-950) 85%, transparent);
     }
   }
 
@@ -5622,6 +5710,10 @@
     color: var(--color-amber-900);
   }
 
+  .text-amber-950 {
+    color: var(--color-amber-950);
+  }
+
   .text-black {
     color: var(--color-black);
   }
@@ -5862,6 +5954,10 @@
 
   .text-sky-800 {
     color: var(--color-sky-800);
+  }
+
+  .text-sky-900 {
+    color: var(--color-sky-900);
   }
 
   .text-sky-950 {
@@ -6838,6 +6934,12 @@
     transition-duration: var(--tw-duration, var(--default-transition-duration));
   }
 
+  .transition-\[width\] {
+    transition-property: width;
+    transition-timing-function: var(--tw-ease, var(--default-transition-timing-function));
+    transition-duration: var(--tw-duration, var(--default-transition-duration));
+  }
+
   .transition-all {
     transition-property: all;
     transition-timing-function: var(--tw-ease, var(--default-transition-timing-function));
@@ -7464,6 +7566,10 @@
 
     .hover\:bg-sky-400:hover {
       background-color: var(--color-sky-400);
+    }
+
+    .hover\:bg-sky-500:hover {
+      background-color: var(--color-sky-500);
     }
 
     .hover\:bg-sky-500\/5:hover {
@@ -8133,6 +8239,10 @@
     background-color: var(--color-gray-50);
   }
 
+  .data-\[focus\]\:bg-sky-100[data-focus] {
+    background-color: var(--color-sky-100);
+  }
+
   .data-\[focus\]\:bg-sky-500\/10[data-focus] {
     background-color: #00a5ef1a;
   }
@@ -8161,6 +8271,11 @@
   .data-\[leave\]\:ease-in[data-leave] {
     --tw-ease: var(--ease-in);
     transition-timing-function: var(--ease-in);
+  }
+
+  .data-\[selected\]\:font-bold[data-selected] {
+    --tw-font-weight: var(--font-weight-bold);
+    font-weight: var(--font-weight-bold);
   }
 
   .data-\[selected\]\:text-sky-700[data-selected] {
@@ -8426,6 +8541,10 @@
 
     .sm\:p-7 {
       padding: calc(var(--spacing) * 7);
+    }
+
+    .sm\:p-8 {
+      padding: calc(var(--spacing) * 8);
     }
 
     .sm\:px-4 {
@@ -8930,6 +9049,10 @@
       grid-template-columns: repeat(8, minmax(0, 1fr));
     }
 
+    .xl\:grid-cols-\[1fr_1fr_1fr_1fr_auto\] {
+      grid-template-columns: 1fr 1fr 1fr 1fr auto;
+    }
+
     .xl\:grid-cols-\[220px_minmax\(0\,1fr\)_auto\] {
       grid-template-columns: 220px minmax(0, 1fr) auto;
     }
@@ -9382,6 +9505,10 @@
     }
   }
 
+  .dark\:bg-white:is(.dark *) {
+    background-color: var(--color-white);
+  }
+
   .dark\:bg-white\/5:is(.dark *) {
     background-color: #ffffff0d;
   }
@@ -9580,6 +9707,10 @@
     color: var(--color-rose-300);
   }
 
+  .dark\:text-sky-100:is(.dark *) {
+    color: var(--color-sky-100);
+  }
+
   .dark\:text-sky-200:is(.dark *) {
     color: var(--color-sky-200);
   }
@@ -9610,6 +9741,10 @@
 
   .dark\:text-slate-500:is(.dark *) {
     color: var(--color-slate-500);
+  }
+
+  .dark\:text-slate-950:is(.dark *) {
+    color: var(--color-slate-950);
   }
 
   .dark\:text-violet-200:is(.dark *) {

@@ -13,13 +13,16 @@ import adminBackupRoutes from "../routes/adminBackupRoutes.js";
 import adminMessageRoutes from "../routes/adminMessageRoutes.js";
 import appSettingRoutes from "../routes/appSettingRoutes.js";
 import aiSubtitleRoutes from "../routes/aiSubtitleRoutes.js";
+import aiDubbingRoutes from "../routes/aiDubbingRoutes.js";
 import genreRoutes from "../routes/genreRoutes.js";
 import internalVideoEncodingRoutes from "../routes/internalVideoEncodingRoutes.js";
 import internalAiSubtitleRoutes from "../routes/internalAiSubtitleRoutes.js";
+import internalAiDubbingRoutes from "../routes/internalAiDubbingRoutes.js";
 import internalVideoTransferRoutes from "../routes/internalVideoTransferRoutes.js";
 import logRoutes from "../routes/logRoutes.js";
 import musicRoutes from "../routes/musicRoutes.js";
 import personneRoutes from "../routes/personneRoutes.js";
+import protectedMediaRoutes from "../routes/protectedMediaRoutes.js";
 import sagaRoutes from "../routes/sagaRoutes.js";
 import seriesRoutes from "../routes/seriesRoutes.js";
 import universeRoutes from "../routes/universeRoutes.js";
@@ -46,9 +49,11 @@ const ROUTES = [
   [videoRoutes, "/api/videos"],
   [videoEncodingRoutes, "/api/video-encoding"],
   [aiSubtitleRoutes, "/api/ai-subtitles"],
+  [aiDubbingRoutes, "/api/ai-dubbing"],
   [videoExportRoutes, "/api/video-exports"],
   [internalVideoEncodingRoutes, "/api/internal/video-encoding"],
   [internalAiSubtitleRoutes, "/api/internal/ai-subtitles"],
+  [internalAiDubbingRoutes, "/api/internal/ai-dubbing"],
   [internalVideoTransferRoutes, "/api/internal/video-transfers"],
   [genreRoutes, "/api/genres"],
   [seriesRoutes, "/api/series"],
@@ -60,6 +65,7 @@ const ROUTES = [
   [sagaRoutes, "/api/sagas"],
   [universeRoutes, "/api/universes"],
   [musicRoutes, "/api/music"],
+  [protectedMediaRoutes, "/api/media"],
 ];
 
 function getSocketCorsOrigin(publicUrl) {
@@ -151,6 +157,11 @@ function registerStaticFiles(
       return reply.status(404).send({ error: "Not found" });
     }
     if (!decodedPath.startsWith("/uploads/")) return;
+    const isPublicImage = /\.(?:avif|gif|jpe?g|png|webp)$/i.test(decodedPath);
+    const isPrivateVideoImage = /^\/uploads\/video\/[1-9][0-9]*\/(?:preview|preview-live)(?:\/|$)/.test(decodedPath);
+    if (!isPublicImage || isPrivateVideoImage) {
+      return reply.status(404).send({ error: "Not found" });
+    }
     if (!decodedPath.startsWith("/uploads/video/")) return;
     if (
       decodedPath === "/uploads/video/.transfers"

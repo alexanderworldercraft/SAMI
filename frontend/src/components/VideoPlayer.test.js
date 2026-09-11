@@ -2,7 +2,12 @@ import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
 
 import Hls from "hls.js";
 import api from "../services/api";
+import { redirectToLoginForExpiredSession } from "../utils/authSession";
 import VideoPlayer, { shouldRefreshAiSubtitleTrack } from "./VideoPlayer";
+
+jest.mock("../utils/authSession", () => ({
+  redirectToLoginForExpiredSession: jest.fn(),
+}));
 
 jest.mock("hls.js", () => ({
   __esModule: true,
@@ -20,14 +25,17 @@ jest.mock("hls.js", () => ({
       return true;
     }
 
-    constructor() {
+    constructor(config = {}) {
       this.audioTrack = -1;
       this.levels = [];
       this.listeners = new Map();
+      this.config = config;
       MockHls.instances.push(this);
     }
 
-    loadSource() {}
+    loadSource(source) {
+      this.source = source;
+    }
 
     attachMedia() {}
 
@@ -90,6 +98,7 @@ const renderPlayer = () => render(
       VideoID: 14,
       CheminAcces: "uploads/video/14/hls/master.m3u8",
       subtitles: [],
+      aiFeaturesAccepted: true,
     }}
     backgroundBlur={{ current: null }}
   />
@@ -134,6 +143,77 @@ it("remplace les contrôles natifs par la barre de progression personnalisée", 
   expect(screen.getByRole("button", { name: "Ouvrir les réglages du lecteur" })).toBeInTheDocument();
   expect(container.querySelector(".resolution-selector")).not.toBeInTheDocument();
   expect(container.querySelector(".ambient-light-selector")).not.toBeInTheDocument();
+});
+
+it("recharge un manifeste sans IA et désactive les sous-titres lors d'un refus en lecture", async () => {
+  const { container } = render(
+    <VideoPlayer
+      video={{
+        VideoID: 91,
+        CheminAcces: "api/media/videos/91/master.m3u8",
+        aiFeaturesAccepted: true,
+        subtitles: [
+          { label: "Français classique", url: "/classic.vtt", origin: "IMPORTED" },
+          { label: "Japanese IA", url: "/ai.vtt", origin: "AI" },
+        ],
+      }}
+      backgroundBlur={{ current: null }}
+    />
+  );
+  expect(Hls.instances[0].source).toContain("access=0");
+  expect(container.querySelectorAll("track")).toHaveLength(2);
+
+  await act(async () => {
+    window.dispatchEvent(new CustomEvent("sami:ai-preference-changed", {
+      detail: { status: "REFUSED", accepted: false },
+    }));
+  });
+
+  await waitFor(() => {
+    expect(Hls.instances).toHaveLength(2);
+    expect(Hls.instances[1].source).toContain("access=1");
+    expect(container.querySelectorAll("track")).toHaveLength(1);
+  });
+});
+
+it("demande une reconnexion lorsque la session expire pendant le chargement HLS", () => {
+  renderPlayer();
+
+  act(() => {
+    Hls.instances[0].emit(Hls.Events.ERROR, {
+      fatal: true,
+      response: { code: 401 },
+    });
+  });
+
+  expect(redirectToLoginForExpiredSession).toHaveBeenCalledTimes(1);
+});
+
+it("authentifie toutes les requêtes HLS avec une autorisation limitée à la vidéo", () => {
+  render(
+    <VideoPlayer
+      video={{
+        VideoID: 7,
+        CheminAcces: "api/media/videos/7/master.m3u8",
+        mediaAccessToken: "media-token-video-7",
+        subtitles: [],
+        aiFeaturesAccepted: true,
+      }}
+      backgroundBlur={{ current: null }}
+    />
+  );
+  const xhr = {
+    withCredentials: false,
+    setRequestHeader: jest.fn(),
+  };
+
+  Hls.instances[0].config.xhrSetup(xhr);
+
+  expect(xhr.withCredentials).toBe(true);
+  expect(xhr.setRequestHeader).toHaveBeenCalledWith(
+    "X-SAMI-Media-Token",
+    "media-token-video-7"
+  );
 });
 
 it("regroupe les sous-titres dans les réglages avec les drapeaux et l'option de désactivation", () => {
@@ -275,6 +355,44 @@ it("affiche et change les pistes audio uniquement pour une vidéo multi-audio ex
     "aria-checked",
     "true"
   );
+});
+
+it("affiche Original et le doublage IA lorsque seule la piste IA existe dans les métadonnées", () => {
+  render(
+    <VideoPlayer
+      video={{
+        VideoID: 7,
+        CheminAcces: "api/media/videos/7/master.m3u8",
+        subtitles: [],
+        audioTracks: [{
+          label: "Français — doublage IA",
+          language: "fr",
+          isDefault: false,
+          origin: "AI_DUB",
+          synthetic: true,
+        }],
+      }}
+      backgroundBlur={{ current: null }}
+      multiAudioEnabled
+    />
+  );
+
+  const hls = Hls.instances.at(-1);
+  act(() => {
+    hls.emit(Hls.Events.AUDIO_TRACKS_UPDATED, {
+      audioTracks: [
+        { name: "Original", default: true },
+        { name: "Français — doublage IA", lang: "fr", default: false },
+      ],
+    });
+  });
+
+  openSettings();
+  const audioMenu = screen.getByRole("menuitem", { name: /Audio.*Original/ });
+  expect(audioMenu).toBeEnabled();
+  fireEvent.click(audioMenu);
+  expect(screen.getByRole("menuitemradio", { name: /Original/ })).toBeInTheDocument();
+  expect(screen.getByRole("menuitemradio", { name: "Français — doublage IA" })).toBeInTheDocument();
 });
 
 it("conserve l'entrée audio désactivée pour les anciennes vidéos", () => {

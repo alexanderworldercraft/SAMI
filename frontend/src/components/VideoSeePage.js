@@ -245,7 +245,7 @@ const VideoSeePage = () => {
         subtitles:
           data.video.VideoSubtitles?.map((sub) => ({
             label: sub.Label,
-            url: `${apiUrl}/${sub.CheminSubtitle}`,
+            url: `${apiUrl}/${String(sub.CheminSubtitle).replace(/^\/+/, "")}`,
             language: sub.Language,
             type: sub.Type,
             origin: sub.Origin,
@@ -257,8 +257,12 @@ const VideoSeePage = () => {
             language: track.Language,
             playlist: track.CheminPlaylist,
             isDefault: Boolean(track.IsDefault),
+            origin: track.Origin,
+            synthetic: Boolean(track.Synthetic),
             order: track.Ordre,
           })) || [],
+        aiFeaturesAccepted: data.aiFeaturesAccepted === true,
+        mediaAccessToken: data.mediaAccessToken || null,
       });
       setCurrentEpisode(data.video);
 

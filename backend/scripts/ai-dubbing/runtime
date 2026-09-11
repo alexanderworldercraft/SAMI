@@ -1,0 +1,22 @@
+#!/bin/sh
+set -eu
+
+SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+BACKEND_ROOT=$(CDPATH= cd -- "$SCRIPT_DIR/../.." && pwd)
+RUNTIME_ROOT=${SAMI_AI_DUBBING_ROOT:-"$BACKEND_ROOT/var/ai-dubbing"}
+PYTHON="$RUNTIME_ROOT/venv/bin/python"
+
+if [ ! -x "$PYTHON" ]; then
+  echo "Runtime de doublage IA absent. Exécutez npm run setup:ai-dubbing." >&2
+  exit 1
+fi
+
+export SAMI_AI_DUBBING_ROOT="$RUNTIME_ROOT"
+export HF_HOME=${HF_HOME:-"$RUNTIME_ROOT/cache/huggingface"}
+export BANDIT_INFER_WEIGHTS=${BANDIT_INFER_WEIGHTS:-"$RUNTIME_ROOT/models/bandit"}
+export HF_HUB_DISABLE_TELEMETRY=1
+export PYANNOTE_METRICS_ENABLED=0
+export DO_NOT_TRACK=1
+export TOKENIZERS_PARALLELISM=false
+
+exec "$PYTHON" "$SCRIPT_DIR/runtime.py" "$@"

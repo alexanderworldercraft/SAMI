@@ -117,13 +117,68 @@ describe("createServer", () => {
     }
   });
 
-  it("ne sert une destination transférée qu'après retrait du marqueur de blocage", async () => {
+  it("ne rend publics que les fichiers image des uploads", async () => {
+    const uploadsRootPath = await fs.promises.mkdtemp(
+      path.join(os.tmpdir(), "sami-static-public-images-")
+    );
+    temporaryRoots.push(uploadsRootPath);
+    const profilePath = path.join(uploadsRootPath, "pp", "7", "avatar.webp");
+    const musicPath = path.join(uploadsRootPath, "musique", "8", "musique", "track.mp3");
+    const subtitlePath = path.join(uploadsRootPath, "video", "42", "sousTitre", "classic", "fr.vtt");
+    await fs.promises.mkdir(path.dirname(profilePath), { recursive: true });
+    await fs.promises.mkdir(path.dirname(musicPath), { recursive: true });
+    await fs.promises.mkdir(path.dirname(subtitlePath), { recursive: true });
+    await fs.promises.writeFile(profilePath, "image publique");
+    await fs.promises.writeFile(musicPath, "audio privé");
+    await fs.promises.writeFile(subtitlePath, "WEBVTT");
+
+    server = createServer({
+      publicUrl: "https://sami.test",
+      publicHost: "sami.test",
+      uploadsRootPath,
+    });
+    await server.ready();
+
+    const profile = await server.inject({ method: "GET", url: "/uploads/pp/7/avatar.webp" });
+    expect(profile.statusCode).toBe(200);
+    expect(profile.body).toBe("image publique");
+
+    for (const url of [
+      "/uploads/musique/8/musique/track.mp3",
+      "/uploads/video/42/sousTitre/classic/fr.vtt",
+    ]) {
+      const response = await server.inject({ method: "GET", url });
+      expect(response.statusCode).toBe(404);
+      expect(response.json()).toEqual({ error: "Not found" });
+    }
+  });
+
+  it("protège aussi les nouvelles routes de lecture média", async () => {
+    server = createServer({
+      publicUrl: "https://sami.test",
+      publicHost: "sami.test",
+    });
+    await server.ready();
+
+    for (const url of [
+      "/api/media/videos/42/master.m3u8",
+      "/api/media/videos/42/files/hls/720p/segment.ts",
+      "/api/media/videos/42/subtitles/3",
+      "/api/media/music/8/file",
+    ]) {
+      const response = await server.inject({ method: "GET", url });
+      expect(response.statusCode).toBe(401);
+    }
+  });
+
+  it("ne rend publiques que les affiches d'une destination transférée publiée", async () => {
     const uploadsRootPath = await fs.promises.mkdtemp(
       path.join(os.tmpdir(), "sami-static-transfer-")
     );
     temporaryRoots.push(uploadsRootPath);
     const videoRoot = path.join(uploadsRootPath, "video", "42");
     const mediaPath = path.join(videoRoot, "hls", "segment.ts");
+    const posterPath = path.join(videoRoot, "affiche", "affiche.webp");
     const markerPath = path.join(videoRoot, VIDEO_TRANSFER_BLOCK_MARKER);
     const reservationPath = path.join(
       uploadsRootPath,
@@ -132,8 +187,10 @@ describe("createServer", () => {
       "42"
     );
     await fs.promises.mkdir(path.dirname(mediaPath), { recursive: true });
+    await fs.promises.mkdir(path.dirname(posterPath), { recursive: true });
     await fs.promises.mkdir(path.dirname(reservationPath), { recursive: true });
     await fs.promises.writeFile(mediaPath, "segment vérifié");
+    await fs.promises.writeFile(posterPath, "affiche vérifiée");
     await fs.promises.writeFile(markerPath, "blocked", { mode: 0o600 });
     await fs.promises.writeFile(reservationPath, "transfer-id", { mode: 0o600 });
 
@@ -179,12 +236,18 @@ describe("createServer", () => {
     expect(stillReserved.statusCode).toBe(404);
 
     await fs.promises.rm(reservationPath);
-    const published = await server.inject({
+    const privateMedia = await server.inject({
       method: "GET",
       url: "/uploads/video/42/hls/segment.ts",
     });
-    expect(published.statusCode).toBe(200);
-    expect(published.body).toBe("segment vérifié");
+    expect(privateMedia.statusCode).toBe(404);
+
+    const publishedPoster = await server.inject({
+      method: "GET",
+      url: "/uploads/video/42/affiche/affiche.webp",
+    });
+    expect(publishedPoster.statusCode).toBe(200);
+    expect(publishedPoster.body).toBe("affiche vérifiée");
   });
 
   it("protège la configuration d'export derrière l'authentification", async () => {

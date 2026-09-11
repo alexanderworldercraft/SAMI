@@ -21,13 +21,9 @@ export function registerSocialPreviewRoute(server, {
   publicUrl = process.env.PUBLIC_URL,
 } = {}) {
   const templatePath = path.join(frontendBuildRoot, "index.html");
-  let templatePromise = null;
-  const loadTemplate = () => {
-    if (!templatePromise) {
-      templatePromise = fs.promises.readFile(templatePath, "utf8");
-    }
-    return templatePromise;
-  };
+  // Le build frontend peut être remplacé pendant que le backend reste lancé.
+  // Relire le shell évite de continuer à servir un ancien hash JavaScript supprimé.
+  const loadTemplate = () => fs.promises.readFile(templatePath, "utf8");
 
   server.get("/lecture/:id", async (request, reply) => {
     const videoId = parseLectureVideoId(request.params?.id);

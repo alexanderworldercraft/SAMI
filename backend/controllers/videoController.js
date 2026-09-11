@@ -42,6 +42,12 @@ import {
   getVideoContentSearchMatch,
   getVideoTitleSearchMatch,
 } from "../services/video/videoSearchService.js";
+import { serializeUserAiPreference } from "../services/userAiPreferenceService.js";
+import {
+  protectedSubtitlePath,
+  protectedVideoMasterPath,
+} from "../services/protectedMediaService.js";
+import { createVideoMediaAccessToken } from "../services/videoMediaAccessToken.js";
 
 export {
   getAdditionsByDate,
@@ -1419,6 +1425,7 @@ export const getVideoDetails = async (request, reply) => {
         UtilisateurID: true,
         GradeID: true,
         PremiumEndDate: true,
+        AiPreference: true,
       },
     });
 
@@ -1426,6 +1433,20 @@ export const getVideoDetails = async (request, reply) => {
       // Le token est valide, mais l'utilisateur n'existe plus en base.
       return reply.status(401).send({ error: "Utilisateur introuvable." });
     }
+
+    const aiPreference = serializeUserAiPreference(user.AiPreference);
+    const aiFeaturesAccepted = aiPreference.status === "ACCEPTED";
+    const visibleSubtitles = video.VideoSubtitles.filter(
+      (subtitle) => aiFeaturesAccepted || subtitle.Origin !== "AI"
+    );
+    const visibleAudioTracks = video.VideoAudioTracks.filter(
+      (track) => aiFeaturesAccepted || track.Origin !== "AI_DUB"
+    );
+    const mediaAccessToken = createVideoMediaAccessToken({
+      userId,
+      videoId,
+      sessionExpiresAt: request.user?.exp,
+    });
 
     // 3) Contrôle d'accès premium
     const premiumContent = isVideoPremium(video);
@@ -1506,7 +1527,7 @@ export const getVideoDetails = async (request, reply) => {
         Episodes: saison.Episodes.map((episode) => ({
           VideoID: episode.VideoID,
           Titre: episode.Titre,
-          CheminAcces: episode.CheminAcces,
+          CheminAcces: protectedVideoMasterPath(episode.VideoID),
           Premium: !!episode.Premium,
           Watched: watchedVideoIds.has(episode.VideoID),
         })),
@@ -1514,28 +1535,35 @@ export const getVideoDetails = async (request, reply) => {
 
       return reply.send({
         type: "series",
+        aiFeaturesAccepted,
+        mediaAccessToken,
         video: {
           VideoID: video.VideoID,
           Titre: video.Titre,
           Resumer: video.Resumer,
-          CheminAcces: video.CheminAcces,
+          CheminAcces: protectedVideoMasterPath(video.VideoID),
           CheminImage: video.CheminImage,
           SaisonID: video.SaisonID,
           Premium: !!video.Premium,
           Genres: video.VideoGenres.map((vg) => vg.Genre.Nom),
-          VideoSubtitles: video.VideoSubtitles.map((subtitle) => ({
+          VideoSubtitles: visibleSubtitles.map((subtitle) => ({
+            VideoSubtitleID: subtitle.VideoSubtitleID,
             Label: subtitle.Label,
-            CheminSubtitle: subtitle.CheminSubtitle,
+            CheminSubtitle: protectedSubtitlePath(video.VideoID, subtitle.VideoSubtitleID),
             Language: subtitle.Language,
             Type: subtitle.Type,
             Origin: subtitle.Origin,
           })),
-          VideoAudioTracks: video.VideoAudioTracks.map((track) => ({
+          VideoAudioTracks: visibleAudioTracks.map((track) => ({
             VideoAudioTrackID: track.VideoAudioTrackID,
             Label: track.Label,
             Language: track.Language,
             CheminPlaylist: track.CheminPlaylist,
             IsDefault: track.IsDefault,
+            Origin: track.Origin,
+            Synthetic: track.Synthetic,
+            DisclosureVersion: track.DisclosureVersion,
+            PipelineVersion: track.PipelineVersion,
             Ordre: track.Ordre,
           })),
           Acteurs: videoActeurs,
@@ -1557,28 +1585,35 @@ export const getVideoDetails = async (request, reply) => {
     } else {
       return reply.send({
         type: "film",
+        aiFeaturesAccepted,
+        mediaAccessToken,
         video: {
           VideoID: video.VideoID,
           Titre: video.Titre,
           Resumer: video.Resumer,
-          CheminAcces: video.CheminAcces,
+          CheminAcces: protectedVideoMasterPath(video.VideoID),
           CheminImage: video.CheminImage,
           SaisonID: video.SaisonID,
           Premium: !!video.Premium,
           Genres: video.VideoGenres.map((vg) => vg.Genre.Nom),
-          VideoSubtitles: video.VideoSubtitles.map((subtitle) => ({
+          VideoSubtitles: visibleSubtitles.map((subtitle) => ({
+            VideoSubtitleID: subtitle.VideoSubtitleID,
             Label: subtitle.Label,
-            CheminSubtitle: subtitle.CheminSubtitle,
+            CheminSubtitle: protectedSubtitlePath(video.VideoID, subtitle.VideoSubtitleID),
             Language: subtitle.Language,
             Type: subtitle.Type,
             Origin: subtitle.Origin,
           })),
-          VideoAudioTracks: video.VideoAudioTracks.map((track) => ({
+          VideoAudioTracks: visibleAudioTracks.map((track) => ({
             VideoAudioTrackID: track.VideoAudioTrackID,
             Label: track.Label,
             Language: track.Language,
             CheminPlaylist: track.CheminPlaylist,
             IsDefault: track.IsDefault,
+            Origin: track.Origin,
+            Synthetic: track.Synthetic,
+            DisclosureVersion: track.DisclosureVersion,
+            PipelineVersion: track.PipelineVersion,
             Ordre: track.Ordre,
           })),
           Acteurs: videoActeurs,

@@ -87,7 +87,7 @@ describe("videoPreviewService", () => {
       videoId: VIDEO_ID,
       masterPlaylistPath,
     })).resolves.toEqual([
-      `/uploads/video/${VIDEO_ID}/preview/frame-01.jpg`,
+      `/api/media/videos/${VIDEO_ID}/files/preview/frame-01.jpg`,
     ]);
 
     expect(command.seek).toHaveBeenCalledWith(0.1);

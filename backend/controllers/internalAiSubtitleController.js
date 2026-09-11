@@ -60,6 +60,7 @@ export const failInternalAiSubtitleJob = async (request, reply) => {
     const job = await failAiSubtitleLease({
       ...leaseBody(request),
       errorMessage: request.body?.errorMessage || request.body?.error,
+      retryable: request.body?.retryable !== false,
     });
     return reply.send({ job: serializeAiSubtitleJob(job) });
   } catch (error) {

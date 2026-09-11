@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { authMiddleware } from "../middlewares/authMiddleware.js";
+import { aiFeatureAccessMiddleware } from "../middlewares/aiFeatureAccessMiddleware.js";
 import aiSubtitleRoutes from "../routes/aiSubtitleRoutes.js";
 
 const routeRecorder = () => {
@@ -33,6 +34,10 @@ describe("routes d'administration des sous-titres IA", () => {
       "GET /videos/:videoId",
       "POST /videos/:videoId/requests",
     ]);
-    expect(routes.every((route) => route.options.preHandler === authMiddleware)).toBe(true);
+    expect(routes.every((route) => (
+      Array.isArray(route.options.preHandler)
+      && route.options.preHandler[0] === authMiddleware
+      && route.options.preHandler[1] === aiFeatureAccessMiddleware
+    ))).toBe(true);
   });
 });

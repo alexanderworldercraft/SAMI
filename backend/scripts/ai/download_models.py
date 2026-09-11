@@ -12,7 +12,7 @@ def main():
     parser.add_argument("--whisper-model", default="large-v3")
     parser.add_argument(
         "--translation-model",
-        default="facebook/nllb-200-distilled-600M",
+        default="facebook/nllb-200-distilled-1.3B",
     )
     args = parser.parse_args()
 
@@ -21,7 +21,7 @@ def main():
     models.mkdir(parents=True, exist_ok=True)
     result = {
         "translationModel": args.translation_model,
-        "translationModelPath": str(models / "nllb-200-distilled-600M"),
+        "translationModelPath": str(models / args.translation_model.rsplit("/", 1)[-1]),
     }
 
     snapshot_download(

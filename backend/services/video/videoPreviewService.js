@@ -91,9 +91,6 @@ const extractFrameFromSegment = async (segmentPath, outputPath) => {
 const getVideoScopedPreviewDir = (videoId) =>
   path.join(VIDEO_ROOT, String(videoId), "preview");
 
-const getLegacyPreviewDir = (videoId) =>
-  path.join(UPLOADS_ROOT, "previews", String(videoId));
-
 const isUsablePreviewFrame = (filePath) => {
   try {
     const stats = fs.statSync(filePath);
@@ -131,19 +128,11 @@ const getPreviewFrameUrlsFromDir = (
 };
 
 export const getExistingPreviewFrames = (videoId) => {
-  const scopedFrames = getPreviewFrameUrlsFromDir(
-    videoId,
-    getVideoScopedPreviewDir(videoId),
-    `/uploads/video/${videoId}/preview`,
-    { requireSequentialNames: true }
-  );
-
-  if (scopedFrames.length > 0) return scopedFrames;
-
   return getPreviewFrameUrlsFromDir(
     videoId,
-    getLegacyPreviewDir(videoId),
-    `/uploads/previews/${videoId}`
+    getVideoScopedPreviewDir(videoId),
+    `/api/media/videos/${videoId}/files/preview`,
+    { requireSequentialNames: true }
   );
 };
 
@@ -187,7 +176,7 @@ const generatePreviewFrames = async ({ videoId, masterPlaylistPath }) => {
       }
     }
 
-    frames.push(`/uploads/video/${videoId}/preview/${outputFilename}`);
+    frames.push(`/api/media/videos/${videoId}/files/preview/${outputFilename}`);
   }
 
   if (!frames.length) {

@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import fs from "fs";
 import path from "path";
+import { Prisma } from "@prisma/client";
 
 import { ETAT } from "../../constants.js";
 import { prisma } from "../db.js";
@@ -25,7 +26,12 @@ import {
   resolveAiSubtitleSource,
 } from "./sourceService.js";
 import { isAiSubtitleSettingActive } from "./settingService.js";
-import { buildWebVtt, normalizeAiSegments } from "./vtt.js";
+import { assertAiTranscriptQuality } from "./transcriptQuality.js";
+import {
+  buildWebVtt,
+  normalizeAiSegments,
+  normalizeAiTranscriptSegments,
+} from "./vtt.js";
 
 const { createHash, randomBytes, randomUUID, timingSafeEqual } = crypto;
 const ACTIVE_JOB_STATUSES = [
@@ -52,6 +58,7 @@ export const serializeAiSubtitleJob = (job) => job && ({
   attemptCount: job.AttemptCount,
   maxAttempts: job.MaxAttempts,
   error: job.ErrorMessage,
+  qualityReport: job.QualityReport || null,
   createdAt: job.CreatedAt,
   updatedAt: job.UpdatedAt,
   completedAt: job.CompletedAt,
@@ -233,6 +240,7 @@ export async function queueAiSubtitleJob({
         LeaseTokenHash: null,
         LeaseExpiresAt: null,
         PipelineVersion: config.pipelineVersion,
+        QualityReport: Prisma.DbNull,
       },
     });
     return { alreadyAvailable: false, job };
@@ -264,7 +272,16 @@ export async function prepareNextAiSubtitleSource({ database = prisma, config } 
     where: {
       Status: AI_SUBTITLE_JOB_STATUS.QUEUED,
       SourceRelativePath: null,
-      Video: { AiTranscript: { is: null } },
+      OR: [
+        { Video: { AiTranscript: { is: null } } },
+        {
+          Video: {
+            AiTranscript: {
+              is: { PipelineVersion: { not: runtimeConfig.pipelineVersion } },
+            },
+          },
+        },
+      ],
     },
     orderBy: [{ Automatic: "desc" }, { CreatedAt: "asc" }],
     take: 40,
@@ -511,7 +528,13 @@ export async function claimNextAiSubtitleJob({
         AND: [{
           OR: [
             { SourceRelativePath: { not: null } },
-            { Video: { AiTranscript: { isNot: null } } },
+            {
+              Video: {
+                AiTranscript: {
+                  is: { PipelineVersion: runtimeConfig.pipelineVersion },
+                },
+              },
+            },
           ],
         }],
       },
@@ -521,6 +544,8 @@ export async function claimNextAiSubtitleJob({
     });
     const candidate = jobs[0] || null;
     if (!candidate) return null;
+    const reusableTranscript = candidate.Video.AiTranscript?.PipelineVersion
+      === runtimeConfig.pipelineVersion;
 
     const leaseToken = randomBytes(32).toString("base64url");
     const leaseGeneration = candidate.LeaseGeneration + 1;
@@ -533,7 +558,7 @@ export async function claimNextAiSubtitleJob({
       },
       data: {
         Status: AI_SUBTITLE_JOB_STATUS.LEASED,
-        Phase: candidate.Video.AiTranscript
+        Phase: reusableTranscript
           ? AI_SUBTITLE_PHASE.TRANSLATING
           : AI_SUBTITLE_PHASE.TRANSCRIBING,
         Progress: 10,
@@ -547,11 +572,15 @@ export async function claimNextAiSubtitleJob({
       },
     });
     if (updated.count !== 1) return null;
-    return {
-      job: await tx.aiSubtitleJob.findUnique({
+    const claimedJob = await tx.aiSubtitleJob.findUnique({
         where: { AiSubtitleJobID: candidate.AiSubtitleJobID },
         include: { Video: { include: { AiTranscript: true } } },
-      }),
+      });
+    if (!reusableTranscript && claimedJob?.Video) {
+      claimedJob.Video.AiTranscript = null;
+    }
+    return {
+      job: claimedJob,
       leaseToken,
       leaseGeneration,
       leaseExpiresAt,
@@ -603,13 +632,13 @@ export async function renewAiSubtitleLease({
 }
 
 export async function failAiSubtitleLease({
-  jobId, workerId, leaseToken, leaseGeneration, errorMessage,
+  jobId, workerId, leaseToken, leaseGeneration, errorMessage, retryable = true,
   database = prisma, config,
 }) {
   const job = await assertActiveLease({
     jobId, workerId, leaseToken, leaseGeneration, database,
   });
-  const exhausted = job.AttemptCount >= job.MaxAttempts;
+  const exhausted = retryable === false || job.AttemptCount >= job.MaxAttempts;
   const backoff = AI_SUBTITLE_RETRY_BACKOFF_MS[Math.min(
     Math.max(0, job.AttemptCount - 1),
     AI_SUBTITLE_RETRY_BACKOFF_MS.length - 1
@@ -669,7 +698,7 @@ export const serializeAiSubtitleClaim = (claim) => claim && ({
 });
 
 const writeGeneratedVtt = async ({ videoId, language, segments }) => {
-  const directory = path.join(VIDEO_ROOT, String(videoId), "sousTitre");
+  const directory = path.join(VIDEO_ROOT, String(videoId), "sousTitre", "ai");
   const filename = `${language}_ai.vtt`;
   const finalPath = path.join(directory, filename);
   const temporaryPath = `${finalPath}.${randomUUID()}.tmp`;
@@ -687,7 +716,7 @@ const writeGeneratedVtt = async ({ videoId, language, segments }) => {
   return {
     absolutePath: finalPath,
     storagePath: path.posix.join(
-      "uploads", "video", String(videoId), "sousTitre", filename
+      "uploads", "video", String(videoId), "sousTitre", "ai", filename
     ),
   };
 };
@@ -702,10 +731,14 @@ export async function completeAiSubtitleLease({
   });
   const targetSegments = normalizeAiSegments(result?.targetSegments);
   const sourceSegments = result?.sourceSegments
-    ? normalizeAiSegments(result.sourceSegments)
+    ? normalizeAiTranscriptSegments(result.sourceSegments)
     : null;
   const sourceLanguage = normalizeAiLanguage(result?.sourceLanguage || job.TargetLanguage);
   if (!sourceLanguage) throw new TypeError("La langue source détectée est invalide.");
+  if (sourceSegments) {
+    assertAiTranscriptQuality(sourceSegments, { label: "transcription source" });
+  }
+  assertAiTranscriptQuality(targetSegments, { label: "piste de sous-titres" });
   const generatedVtt = await writeGeneratedVtt({
     videoId: job.VideoID,
     language: job.TargetLanguage,
@@ -770,6 +803,7 @@ export async function completeAiSubtitleLease({
           SourceLanguage: sourceLanguage,
           TranscriptionModel: String(result?.transcriptionModel || "unknown").slice(0, 120),
           TranslationModel: String(result?.translationModel || "none").slice(0, 191),
+          QualityReport: result?.qualityReport ?? Prisma.DbNull,
           SourceRelativePath: null,
           SourceSize: null,
           SourceSha256: null,

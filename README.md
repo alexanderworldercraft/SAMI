@@ -2,7 +2,7 @@
 
 SAMI (**Système d’Archivage Multimédia Intégré**) est une médiathèque web privée permettant d’organiser, diffuser et suivre des films, séries et musiques depuis une seule interface.
 
-La version actuelle est la **7.15.0**. Elle repose sur un backend Fastify, une interface React, Prisma avec MySQL, un pipeline vidéo FFmpeg/HLS et Socket.IO pour le retour en temps réel des traitements.
+La version actuelle est la **8.1.0**. Elle repose sur un backend Fastify, une interface React, Prisma avec MySQL, un pipeline vidéo FFmpeg/HLS et Socket.IO pour le retour en temps réel des traitements.
 
 ## Fonctionnalités
 
@@ -17,6 +17,7 @@ La version actuelle est la **7.15.0**. Elle repose sur un backend Fastify, une i
 - import et transcodage FFmpeg avec suivi de progression via Socket.IO ;
 - encodage multi-server expérimental : une résolution par worker, redistribution dynamique et publication finale sur le serveur principal ;
 - sous-titres IA locaux expérimentaux : français automatique pour les nouveaux imports qui en sont dépourvus, quinze langues à la demande, catalogue administratif recherché et regroupé par vidéo, correction textuelle ou temporelle et affectation complète au meilleur worker disponible ;
+- doublages IA locaux distribués en anglais, français et japonais, avec calcul Qwen3-TTS sur clone NVIDIA, séparation de l'ambiance, profils vocaux verrouillés entre extrait et piste complète, filigrane audio et double validation administrative avant publication ;
 - export sécurisé et reprenable d’une vidéo traitée depuis un clone vers l’instance principale ;
 - historique de lecture, reprise intelligente et remise à zéro d’une série ;
 - recherche tolérante aux accents, séparateurs et petites fautes de saisie pour les films et les séries ;
@@ -44,7 +45,7 @@ La version actuelle est la **7.15.0**. Elle repose sur un backend Fastify, une i
 - journalisation des actions et sauvegardes manuelles ou planifiées de MySQL ;
 - limitations de requêtes, contrôle CORS et en-têtes de sécurité.
 
-## Nouveautés de la version 7.15.0
+## Nouveautés de la version 8.1.0
 
 - sections de l’administration repliables indépendamment et chargées à leur première ouverture ;
 - recherche obligatoire avant l’affichage des pistes IA, avec pagination par quarante vidéos et regroupement de toutes leurs langues dans un sélecteur ;
@@ -56,7 +57,7 @@ La version actuelle est la **7.15.0**. Elle repose sur un backend Fastify, une i
 - journalisation des corrections, suppressions et recréations administratives ;
 - actualisation automatique du lecteur lorsqu’une piste existante termine sa recréation.
 
-L’historique complet des versions, de la 6.1.0 à la 7.15.0, est disponible dans l’application à l’adresse `/updates` et dans `frontend/src/components/UpdatesPage.js`.
+L’historique complet des versions, de la 6.1.0 à la 8.1.0, est disponible dans l’application à l’adresse `/updates` et dans `frontend/src/components/UpdatesPage.js`.
 
 ## Stack technique
 
@@ -183,6 +184,349 @@ doivent porter le même nom, et `PUBLIC_URL` doit contenir en premier l'origine 
 publique qui sert l'application.
 
 Ne versionnez jamais les fichiers `.env`, les secrets, les certificats privés ou les sauvegardes de production.
+
+### Doublage IA : références vocales guidées (V5 R4)
+
+Le profil `sami-dubbing-v5-guided-references-r4` reprend les règles temporelles
+de V5 R3 et ajoute des références manuelles facultatives. Il doit être configuré
+à l'identique dans `SAMI_AI_DUBBING_PIPELINE_VERSION` sur le primary de test et
+le clone. Les anciens profils restent disponibles et ne sont pas réécrits.
+
+Dans l'administration du doublage, recherchez la vidéo par titre ou ID et
+sélectionnez la langue cible. Laissez le nombre d'intervenants vide pour le mode
+automatique. Sinon, « Générer l'extrait » ouvre la préparation guidée, sans créer
+de job : écoutez la vidéo d'origine dans le lecteur protégé, puis délimitez
+1 à 5 passages par intervenant, de 2 à 12 secondes chacun (3 secondes ou plus
+recommandées). Chaque passage doit contenir une seule voix, sans couper les mots
+ni chevaucher une autre sélection. Le dernier bouton lance le calcul.
+
+Le moteur choisit la plus longue référence alignée entièrement dans ces bornes,
+sans concaténer les prises. Il faut au moins deux secondes de mots alignés après
+ajustement vers l'intérieur des bornes. Les autres passages restent des alternatives
+pour « Régénérer ce profil » ; la référence rejetée est exclue, les autres profils
+et leurs décisions déjà validées sont conservés. Si les alternatives sont épuisées,
+il faut créer une nouvelle préparation guidée, sans repli sur un passage automatique.
+Ajouter un intervenant à un job guidé nécessite également une nouvelle préparation.
+
+Ces passages associent les identités détectées aux profils choisis ; ils ne constituent
+pas une correction manuelle de tous les dialogues. Une association ambiguë, deux profils
+correspondant à la même voix détectée, ou des alternatives contradictoires provoquent
+un diagnostic explicite. La répartition des répliques reste à vérifier à l'écoute.
+
+Déploiement : appliquer la migration `20260904170000_add_manual_voice_references`
+sur la base du primary de test avec `npx prisma migrate deploy`, régénérer le client
+Prisma avec `npx prisma generate --generator client`, transférer les scripts et services
+du clone, activer R4-R2 sur les deux instances puis les redémarrer. Le primary doit aussi
+recevoir les contrôleurs et le nouveau build frontend. Les sélections sont conservées
+sur le job, transmises au clone et enregistrées dans le manifeste vocal privé.
+La lecture du sélecteur utilise un manifeste HLS privé sans pistes IA, toujours soumis
+à l'authentification et aux droits de lecture habituels.
+
+La révision `sami-dubbing-v5-guided-references-r4-r1` conserve exactement ce
+parcours et corrige le contrôle des répliques de quatre unités lexicales ou moins.
+Le premier essai Qwen est déterministe ; jusqu'à deux essais échantillonnés sont
+comparés ensuite si le contrôle ASR court est incertain. Si la durée reste valide,
+une divergence CER courte sans expansion crédible est conservée comme avertissement
+avec la meilleure tentative, car Whisper n'est pas assez fiable sur quelques
+syllabes pour interrompre seul le rendu. L'absence de voix, la fin de média et une
+expansion verbale plausible restent bloquantes. Les phrases plus longues conservent
+le seuil V5 strict. R4 demeure disponible pour rejouer son comportement historique.
+
+La révision `sami-dubbing-v5-guided-references-r4-r2` corrige le comptage des
+contractions françaises et anglaises : `n'y`, `t'as`, `qu'il` ou `don't` comptent
+comme une seule unité parlée. Cette règle est limitée à R4-R2 afin de préserver
+les empreintes et résultats reproductibles des profils antérieurs.
+
+### Doublage IA : traductions par propositions (V5 R5)
+
+`sami-dubbing-v5-translated-clauses-r5` dérive de R4-R2, qui reste disponible
+sans modification. En traduction uniquement, les changements de voix peuvent couper
+le texte à la ponctuation, jamais à une position arbitraire dans un mot japonais
+ou latin. L'attribution reste estimée d'après les durées, pas issue d'un alignement
+forcé entre deux langues : chaque coupure est signalée à vérifier dans le rapport.
+Sans assez de frontières, le sous-titre reste entier sur la voix dominante avec
+un avertissement. Cela ne corrige ni une traduction source erronée ni tous les
+changements d'intervenant ; une écoute de contrôle reste nécessaire.
+
+Le parcours FR vers FR, les références guidées, les départs fixes, les fins flexibles
+et les seuils CER de R4-R2 sont conservés. Une erreur CER sur une phrase longue
+peut donc encore bloquer : R5 ne valide pas automatiquement une hallucination.
+En cas de blocage vocal R5, `quality-failure.json` conserve les trois tentatives et
+leurs transcriptions ; `quality-attempt-1.wav` à `quality-attempt-3.wav` contiennent
+au maximum les 15 premières secondes de chaque rejet (PCM mono 24 kHz, 16 bits).
+Le rapport indique si l'extrait est tronqué. Ces fichiers sont supprimés si la
+réplique est finalement acceptée. Une capture audio impossible est signalée sans
+masquer l'erreur initiale.
+
+Les audios suivent le transfert signé existant vers
+`backend/var/ai-dubbing/diagnostics/clones/<identité-hachée>/failure-<UUID>/`.
+Ils restent privés, sans URL publique, avec vérification du format, des tailles et
+des empreintes. La rétention reste de dix dossiers par clone ; les anciens rapports
+JSON restent compatibles. Aucun média source complet n'est transféré par ce mécanisme.
+
+Déployer les scripts et services sur les deux machines, **primary avant clone**
+pour accepter les nouveaux diagnostics. Activer le même identifiant R5 sur les deux,
+redémarrer les backends et reconstruire le frontend du primary pour les avertissements.
+Aucune nouvelle migration R5. Recréer l'analyse/l'extrait : un profil vocal R4-R2 déjà
+calculé conserve son ancien découpage et ne devient pas R5 en changeant seulement `.env`.
+La régénération ciblée au sein d'un même profil conserve les autres références validées.
+La validation GPU/Windows et l'écoute EN/JP complète restent à réaliser.
+
+### Doublage IA : échantillons bornés (V5 R5-R1)
+
+`sami-dubbing-v5-bounded-samples-r5-r1` conserve la R5, ses références manuelles,
+son découpage et ses réglages Qwen pour un même texte. Il sélectionne pour les
+échantillons des répliques entières de 8 secondes source et 120 caractères maximum,
+de préférence proches de 4 secondes et sans attribution signalée incertaine.
+Il ne découpe pas arbitrairement une phrase pour la faire entrer : faute de candidat,
+l'analyse échoue explicitement. Un échantillon synthétisé supérieur à 20 secondes est
+refusé, jamais tronqué pour être validé. Ces limites ne raccourcissent ni les références
+de voix choisies par l'admin ni les dialogues du rendu complet.
+
+Un superviseur Node impose 180 secondes par synthèse d'échantillon, 600 secondes par
+tentative de réplique et 60 secondes pour le filigrane d'un échantillon. Il intervient
+même si Python/CUDA reste occupé ; le délai ne se réinitialise pas avec le heartbeat.
+L'arrêt vise l'arbre du runtime (`taskkill /T /F` sous Windows, groupe de processus
+sous Unix), pas le backend. En cas d'échec de cette commande système, l'arrêt n'est
+pas confirmé : un message terminal l'indique et le diagnostic ne peut être finalisé
+avant la fermeture effective du runtime. Ne pas lancer de calcul concurrent alors.
+Les dépassements sont non relançables automatiquement et ne produisent pas une piste
+validée. Un lancement direct non supervisé de ce profil est refusé.
+
+Le terminal du clone affiche l'intervenant, l'opération et le temps écoulé toutes
+les 15 secondes. L'interface reçoit ce détail via le renouvellement du bail et son
+rafraîchissement habituel ; ce compteur ne mesure pas les tokens ni la progression GPU.
+`generation-attempt.json` est écrit avant l'appel : texte, langue, début source,
+profil/empreinte, graine et référence pour la dernière synthèse, ou durée de l'audio
+pour le marquage. Après une interruption forcée, son état peut rester `running` :
+`error.json` indique alors le timeout. Il suit le transfert privé clone → primary
+avec les diagnostics R5 existants, même si aucun WAV n'a été produit.
+
+Déployer **scripts et services sur les deux machines**, primary avant clone, puis
+le build frontend du primary. Mettre le même identifiant R5-R1 dans les deux `.env`
+et redémarrer. Aucune migration supplémentaire, aucun modèle à télécharger.
+Créer une nouvelle analyse R5-R1 avec les mêmes plages manuelles pour comparer :
+un job R5 interrompu reste lié à R5, y compris s'il est remis en file après expiration
+du bail. Changer `.env` ne le convertit pas. Les versions R5 et R4-R2 restent disponibles.
+Les tests automatisés du superviseur ne remplacent pas la vérification sur Windows/3090.
+
+### Doublage IA : comparaison japonaise ciblée (V5 R5-R2, expérimental)
+
+`sami-dubbing-v5-japanese-identity-r5-r2` ajoute une variante **uniquement pour le
+japonais** : Qwen reçoit l'identité vocale extraite du même WAV manuel, sans utiliser
+le texte ni les codes de parole de la référence comme contexte de continuation
+(`x_vector_only_mode=True`). Le texte cible et les plages sélectionnées ne changent
+pas. C'est le mode documenté dans le
+[code officiel Qwen3-TTS](https://github.com/QwenLM/Qwen3-TTS/blob/main/qwen_tts/inference/qwen3_tts_model.py).
+L'objectif est de tester la contamination possible par la référence française,
+pas de prétendre que cette cause ou la fidélité du nouveau mode sont déjà validées.
+La ressemblance doit être comparée à l'écoute. Les réglages de synthèse FR/EN restent
+ceux de R5-R1 ; les anciens profils et leurs empreintes sont inchangés.
+
+En japonais, chaque réplique du dialogue est contrôlée, même si elle contient moins
+de quatre caractères ou tient dans sa fenêtre. Le CER normalise les formes Unicode
+et katakana/hiragana, sans deviner les lectures des kanji. Les textes d'au plus huit
+caractères normalisés peuvent être retenus avec avertissement après comparaison des
+trois tentatives si l'énergie vocale est présente, sans expansion excessive du texte
+reconnu et avec une durée non confirmée au plus égale à `max(1.2, 0.25 × caractères + 0.5)`
+secondes. Cette borne expérimentale ne remplace pas l'écoute. Elle ne limite **pas**
+la fin souple d'un dialogue correctement reconnu. Les échantillons de profils
+restent soumis à l'écoute/validation manuelle ; le contrôle ci-dessus concerne les
+répliques synthétisées de l'extrait assemblé et du rendu complet.
+Les erreurs distinguent un dialogue non conforme d'un dépassement de la fin vidéo.
+
+Avant tout nouveau rendu complet, arrêter le worker du clone pour éviter deux calculs
+GPU simultanés, copier `backend/scripts/ai-dubbing` et `backend/services/aiDubbing`
+(y compris `commandRunner.js`), puis lancer depuis `backend` dans PowerShell :
+
+```powershell
+node scripts/ai-dubbing/compareJapanese.mjs --failure "C:\chemin\input-japanese-XXXXXX" --reference "C:\chemin\input-japanese-XXXXXX\reference.wav"
+```
+
+Le dossier portable est préparé sur la machine détenant la référence avec la même
+commande et `--prepare-only`, en indiquant le dossier `failure-UUID` et le WAV
+**source** du profil, pas son échantillon synthétique. `--check-only` vérifie seulement
+la cohérence/empreinte des entrées, sans charger de modèle ni écrire de résultat.
+Le lancement GPU exige également le même modèle et sa même révision que le diagnostic.
+
+La comparaison produit deux variantes de trois tentatives chacune, avec les mêmes
+graines appariées (graine du dernier échec + indice), textes, WAV de référence et
+réglages d'échantillonnage. Ce n'est pas une reproduction binaire garantie de l'ancien
+job. Chaque variante tourne dans son propre processus supervisé : 600 s par synthèse,
+20 min au maximum pour la variante entière, y compris le chargement et le contrôle.
+Ctrl+C arrête l'arbre du processus ; une variante terminée reste disponible si la
+suivante échoue. Aucun BandIt, Pyannote, Sortformer, accès DB, job, HLS ou publication.
+
+Résultats privés dans `backend/var/ai-dubbing/diagnostics/comparisons/japanese-*` :
+`summary.json`, puis `comparison.json`, diagnostics par tentative et WAV
+`AI-diagnostic-attempt-*.wav` dans chaque variante. Le contrôle R5-R2 est rapporté
+pour **les deux** variantes, sans valider automatiquement une piste. Les WAV sont
+bruts, non accélérés et non marqués, réservés au diagnostic local ; ils ne doivent
+pas être publiés comme voix authentiques. Ces comparaisons ne suivent pas la rotation
+des échecs ni leur transfert automatique : conserver seulement celles utiles aux tests.
+
+Après écoute concluante, sélectionner le nouvel identifiant dans les `.env` du
+primary de test et du clone, redémarrer, puis **créer une nouvelle analyse** avec les
+mêmes références manuelles. Changer `.env` ne convertit pas un job existant. Les profils
+vocaux validés d'une autre version restent intacts ; pas de réattribution des voix dans
+ce patch. Les `.env` actifs restent sur R5-R1 en attendant ce comparatif. Pas de nouveau
+modèle, migration ou build frontend requis pour R5-R2.
+
+### Doublage IA : arrêt de génération vérifiable (V5 R5-R3, expérimental)
+
+`sami-dubbing-v5-japanese-bounded-r5-r3` conserve l'identité vocale japonaise de
+R5-R2, les références manuelles, le texte, la répartition et les fins souples. Les
+autres langues et les anciens profils conservent leurs réglages. Aucun nouveau
+modèle ni migration. Ce profil ajoute uniquement pour Qwen/JP :
+
+- Un budget `max_new_tokens = min(720, max(96, 4 × N + 48))`, où N est le nombre de
+  caractères alphanumériques après normalisation Unicode NFKC. C'est une borne
+  expérimentale généreuse, **pas** la durée de la fenêtre de sous-titre.
+- Une vérification du dernier token de la séquence du talker : il doit correspondre
+  au signal EOS du modèle. L'EOS forcé à la limite est désactivé pour ne pas confondre
+  arrêt artificiel et fin naturelle. Sans EOS vérifiable, refus **avant décodage**,
+  aucun WAV tronqué transmis au contrôle qualité ou à la publication.
+- Une adaptation locale et temporaire des méthodes de l'instance Qwen, restaurées
+  même après exception, sans modifier la bibliothèque installée. Le contrat
+  `talker.generate → sequences → speech_tokenizer.decode` est vérifié ; une interface
+  incompatible bloque explicitement (`AI_DUBBING_GENERATION_CONTRACT`). Voir le
+  [modèle officiel Qwen3-TTS](https://github.com/QwenLM/Qwen3-TTS/blob/main/qwen_tts/core/models/modeling_qwen3_tts.py).
+- En cas de fin absente (`AI_DUBBING_GENERATION_LIMIT`), utilisation des trois
+  tentatives existantes de la réplique, sans recommencer le job automatiquement.
+  Un échantillon de profil reste refusé immédiatement si sa génération est interrompue.
+  Une sortie terminée naturellement passe ensuite le contrôle qualité habituel.
+- `generation-attempt.json` conserve `internalStage` et `internalStages` : préparation
+  de la référence, génération des tokens, retour avec présence/absence d'EOS,
+  décodage audio et fin du décodage. Les tentatives rejetées sont consignées dans
+  `quality-failure.json`. Les fichiers suivent le transfert privé des diagnostics.
+
+Le superviseur externe (600 s pour une réplique) reste nécessaire : un budget de
+tokens ne peut pas débloquer une opération CUDA figée. Il n'est pas augmenté.
+Les tests locaux de contrat ne prouvent ni la compatibilité effective du paquet
+Qwen du clone ni l'amélioration sonore sur la 3090 ; les deux restent à vérifier.
+
+Le comparateur accepte maintenant les archives de timeout composées de `error.json`,
+`generation-attempt.json` et `input-profile.json`. Il retrouve la réplique exacte par
+texte, intervenant et horodatage ; aucune reconstruction approximative. Une absence
+ou ambiguïté, un mauvais WAV ou des empreintes de profil incohérentes bloquent avant
+chargement GPU. Il accepte aussi les anciens diagnostics R5-R1 et R5-R2.
+
+Copier `backend/scripts/ai-dubbing` et `backend/services/aiDubbing` sur le clone, puis,
+serveur clone arrêté, tester depuis `backend` (chemins à adapter au paquet privé) :
+
+```powershell
+node scripts/ai-dubbing/compareJapanese.mjs --failure ".\input-japanese-XXXXXX" --reference ".\input-japanese-XXXXXX\reference.wav" --variant bounded-identity
+```
+
+`bounded-identity` lance R5-R3 seule, trois tentatives, et évite de rejouer le timeout
+R5-R2. `identity-ab` compare R5-R2/R5-R3 ; sans option, l'ancien comparatif R5-R1/R5-R2
+est conservé. Chaque sortie refusée avant décodage est indiquée dans le rapport et
+n'a pas de WAV. Aucun résultat n'est publié automatiquement. Refaire également le
+test du passage à 231,56 s déjà jugé bon pour contrôler l'absence de régression.
+
+Après écoute, sélectionner R5-R3 sur le primary de test et le clone et recréer une
+analyse. Les versions actives ne sont pas modifiées par la préparation du test.
+Ne pas relancer un ancien job en supposant que changer `.env` le convertit.
+
+### Doublage IA : comparatif anglais isolé (base R5-R3)
+
+Ce test diagnostique compare le prompt audio + texte français avec l'identité
+vocale seule pour une réplique anglaise en échec. Il ne crée pas de profil de
+production, ne modifie ni R5-R3, ni `.env`, ni les pistes ou jobs existants.
+Le rapport distingue `basePipelineVersion`/`baseGenerationConfigHash` et
+`diagnosticOverrides.promptPolicy` : le mode expérimental n'est pas une exécution
+inchangée du profil de production.
+
+Copier `backend/scripts/ai-dubbing` sur le clone à jour, arrêter son worker pendant
+le test et lancer depuis `backend`, avec le paquet privé préparé :
+
+```powershell
+node scripts/ai-dubbing/compareEnglish.mjs --failure ".\input-english-XXXXXX" --reference ".\input-english-XXXXXX\reference.wav"
+```
+
+`--check-only` vérifie les fichiers, langue, version et empreinte de référence sans
+GPU ; `--prepare-only` produit un paquet portable privé. La référence est le WAV
+original de l'intervenant, pas un WAV `quality-attempt` synthétique rejeté.
+Les trois anciens WAV rejetés sont aussi copiés dans le paquet lorsqu'ils sont
+présents, uniquement pour l'écoute comparative, jamais comme références vocales.
+Les deux modes produisent chacun trois tentatives avec les mêmes graines appariées
+et paramètres d'échantillonnage, sans garantir la reproduction des anciens WAV.
+Le modèle et sa révision doivent correspondre au diagnostic. La supervision reste
+à 600 secondes par génération et 20 minutes par variante ; le budget de tokens
+japonais n'est pas appliqué à l'anglais. Aucune connexion aux modèles distants.
+
+Résultats privés sous `var/ai-dubbing/diagnostics/comparisons/english-XXXXXX` :
+`summary.json`, puis `reference-text` et `speaker-identity`, chacun contenant
+`comparison.json`, les WAV `AI-diagnostic-attempt-N.wav` bruts (sans accélération)
+et les diagnostics individuels. Les scores ASR sont indicatifs, jamais une
+publication ou validation automatique. Écouter exactitude du dialogue, absence
+d'ajouts et fidélité de voix avant de retenir un nouveau profil. Les sorties
+diagnostiques sont synthétiques, privées, et à nettoyer manuellement après le test.
+
+### Doublage IA : identité vocale anglaise (V5 R5-R4, expérimental)
+
+`sami-dubbing-v5-english-identity-r5-r4` ajoute le mode Qwen identité vocale seule
+en anglais, sur les échantillons individuels, l'extrait et le rendu complet.
+La référence audio sélectionnée reste identique ; son texte est conservé dans les
+diagnostics mais n'est pas injecté dans le prompt anglais. Les anciens profils,
+notamment R5-R3, restent immuables et disponibles.
+
+Le français conserve le prompt audio + texte. Le japonais conserve l'identité
+seule, le budget de tokens, la vérification de fin avant décodage et ses contrôles
+qualité R5-R3. L'anglais ne reçoit ni le budget ni le contrôle linguistique japonais.
+Les seuils CER, trois tentatives, départs fixes, fins souples, limites d'accélération,
+références manuelles et répartition des intervenants ne changent pas. Un nouveau
+profil a sa propre empreinte : ces garanties ne promettent pas des WAV identiques
+bit à bit à ceux d'un ancien job.
+
+Empreinte : `0086594bd5b648717f336f68e4acb52b05158873d32c96c4c0f499acec8084d7`.
+Copier `backend/scripts/ai-dubbing`, `backend/services/aiDubbing` et, pour les
+vérifications, `backend/tests` sur le clone. Avant de créer le nouveau job, choisir
+sur le primary de test et le clone, puis redémarrer les deux :
+
+```dotenv
+SAMI_AI_DUBBING_PIPELINE_VERSION="sami-dubbing-v5-english-identity-r5-r4"
+```
+
+Aucune migration, reconstruction du frontend ou installation de modèle requise.
+Créer une nouvelle analyse anglaise pour la vidéo 13, valider les nouveaux
+échantillons puis le rendu complet. Changer `.env` ne convertit pas les jobs
+existants. Garder les cinq pistes déjà validées ; le comparatif positif sur une
+réplique ne vaut pas validation de toutes les voix ou du rendu complet R5-R4.
+
+### Provenance des pistes IA et suivi du rendu complet
+
+Dans `VideoAudioTrack`, `DisclosureVersion` versionne la notice de transparence IA
+(`2026-08-23-v1`), tandis que `PipelineVersion` identifie le profil de génération
+effectivement utilisé. La version de la notice est aussi enregistrée avec le choix
+de l'utilisateur ; changer cette notice peut donc demander une nouvelle réponse.
+Changer de moteur seul ne doit pas modifier cette version ni réinitialiser les choix.
+
+La migration `20260908090000_audio_track_pipeline_version` ajoute la colonne nullable
+et remplit les anciennes pistes `AI_DUB` uniquement depuis un job relié et portant
+le même `VideoID`. Les pistes sans preuve restent à `NULL` : ni leur label ni le
+profil actif ne permettent de reconstituer leur historique. Les nouvelles publications
+copient `AiDubbingJob.PipelineVersion`, jamais la configuration actuelle du serveur.
+Avant déploiement, on peut prévisualiser les correspondances sans écriture :
+
+```sql
+SELECT t.VideoAudioTrackID, t.VideoID, t.DisclosureVersion,
+       j.PipelineVersion AS PipelineVersionToSet
+FROM VideoAudioTrack t
+JOIN AiDubbingJob j ON j.AiDubbingJobID = t.AiDubbingJobID AND j.VideoID = t.VideoID
+WHERE t.Origin = 'AI_DUB';
+```
+
+Appliquer cette migration sur le primary avant redémarrage (`npx prisma migrate deploy`)
+et générer le client (`npx prisma generate --generator client`). Déployer également
+les contrôleurs du primary, les scripts/services sur le clone et le build frontend.
+
+Le suivi R5-R1 du rendu complet affiche désormais le numéro de réplique, le total,
+la tentative et le temps de synthèse. Le contrôle vocal, l'ajustement temporel,
+l'assemblage, le mixage et le filigrane final ont un état distinct avec temps écoulé.
+Ce suivi est commun au français, à l'anglais et au japonais, sans modifier les
+graines ni les critères qualité du profil. Les étapes observées hors synthèse
+ne reçoivent pas de nouvelle limite de temps ; la limite globale reste inchangée.
 
 ### Encodage vidéo multi-server expérimental
 

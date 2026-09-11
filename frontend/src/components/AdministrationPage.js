@@ -24,6 +24,7 @@ import AdminExperimentalFeatures from "./AdminExperimentalFeatures";
 import AdminDistributedEncodingDiagnostics from "./AdminDistributedEncodingDiagnostics";
 import AdminAiSubtitleManager from "./AdminAiSubtitleManager";
 import AdminAiSubtitleLibraryManager from "./AdminAiSubtitleLibraryManager";
+import AdminAiDubbingManager from "./AdminAiDubbingManager";
 import SuperAdminAiSubtitleEditor from "./SuperAdminAiSubtitleEditor";
 import AdminAccordion from "./AdminAccordion";
 
@@ -167,6 +168,9 @@ const AdministrationPage = () => {
             </AdminAccordion>
             <AdminAccordion title="Sous-titres IA" description="Modifie, supprime ou recrée les pistes produites par intelligence artificielle.">
                 <AdminAiSubtitleLibraryManager />
+            </AdminAccordion>
+            <AdminAccordion title="Doublages audio IA" description="Génère localement, contrôle puis publie des pistes synthétiques en anglais, français ou japonais.">
+                <AdminAiDubbingManager />
             </AdminAccordion>
             <AdminAccordion title="Éditeur temporel des sous-titres IA" description="Corrige précisément le texte et les horodatages avec un retour vidéo complet.">
                 <SuperAdminAiSubtitleEditor />

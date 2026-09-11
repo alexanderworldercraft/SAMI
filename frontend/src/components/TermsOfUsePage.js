@@ -32,8 +32,10 @@ const sections = [
   {
     title: "Intelligence artificielle et usage privé",
     body: [
-      "La génération de sous-titres repose actuellement sur des modèles exécutés localement et autorisés dans le cadre privé et non commercial de cette instance. La fonctionnalité ne doit pas être utilisée pour proposer un service commercial sans révision préalable des modèles, de leurs licences et des présentes conditions.",
-      "Les sous-titres automatiques peuvent contenir des erreurs de transcription, de traduction, de noms propres ou de synchronisation. Ils constituent une aide à la lecture et ne doivent pas être considérés comme une traduction certifiée.",
+      "Les fonctions d'intelligence artificielle sont facultatives. Lors de sa première utilisation après chaque modification importante de cette information, l'utilisateur doit accepter ou refuser explicitement d'y accéder. Son choix peut être modifié à tout moment dans les paramètres du compte.",
+      "La génération de sous-titres et de pistes audio repose sur des modèles exécutés localement et autorisés dans le cadre privé et non commercial de cette instance. La fonctionnalité ne doit pas être utilisée pour proposer un service commercial sans révision préalable des modèles, de leurs licences et des présentes conditions.",
+      "Les sous-titres automatiques peuvent contenir des erreurs de transcription, de traduction, de noms propres ou de synchronisation. Les pistes audio synthétiques peuvent comporter des erreurs de prononciation, d'interprétation ou d'attribution de voix. Elles constituent une aide à la compréhension, ne sont ni des traductions certifiées ni des doublages officiels, et sont toujours signalées comme générées par IA.",
+      "Une voix synthétique ressemblante ne doit jamais être présentée comme la voix authentique, comme une déclaration réelle ou comme l'approbation de la personne imitée. La publication reste soumise à une validation humaine par un administrateur.",
       "Avant toute commercialisation, l'administrateur doit en priorité remplacer ou relicencier tout modèle limité à un usage non commercial, réauditer l'ensemble des dépendances IA et adapter les informations légales et les durées de conservation.",
     ],
   },
@@ -79,7 +81,7 @@ const TermsOfUsePage = () => (
         l'accès aux comptes, aux contenus multimédias et aux fonctions d'administration.
       </p>
       <p className="text-sm text-slate-500 dark:text-neutral-400">
-        Dernière mise à jour : 22 août 2026
+        Dernière mise à jour : 23 août 2026
       </p>
     </header>
 

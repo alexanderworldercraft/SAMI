@@ -7,6 +7,7 @@ import { assertAiSubtitleConfig } from "./config.js";
 import { buildAiSubtitleProcessEnvironment } from "./processEnvironment.js";
 
 const MAX_OUTPUT_BYTES = 64 * 1024 * 1024;
+const TRANSLATION_QUALITY_LOG = "translation-quality-error.json";
 
 const runPython = (config, args, { signal, timeout = 24 * 60 * 60 * 1000 } = {}) =>
   new Promise((resolve, reject) => {
@@ -79,12 +80,14 @@ export async function runAiSubtitleEngine({
   await fs.promises.mkdir(workspace, { recursive: true, mode: 0o700 });
   const inputPath = path.join(workspace, "input.json");
   const outputPath = path.join(workspace, "output.json");
+  const diagnosticPath = path.join(workspace, TRANSLATION_QUALITY_LOG);
   await fs.promises.writeFile(inputPath, JSON.stringify({
     audioPath,
     transcript,
     targetLanguage,
   }), { encoding: "utf8", mode: 0o600 });
 
+  let completed = false;
   try {
     await withEncodingCapacity(
       () => runPython(runtimeConfig, [
@@ -94,8 +97,19 @@ export async function runAiSubtitleEngine({
       ], { signal }),
       { signal }
     );
-    return JSON.parse(await fs.promises.readFile(outputPath, "utf8"));
+    const result = JSON.parse(await fs.promises.readFile(outputPath, "utf8"));
+    completed = true;
+    return result;
   } finally {
-    await fs.promises.rm(workspace, { recursive: true, force: true }).catch(() => {});
+    if (completed || !fs.existsSync(diagnosticPath)) {
+      await fs.promises.rm(workspace, { recursive: true, force: true }).catch(() => {});
+    } else {
+      // On failure, retain only the targeted quality report. The input can contain
+      // the complete transcript and is unnecessary once the report exists.
+      await Promise.all([
+        fs.promises.rm(inputPath, { force: true }).catch(() => {}),
+        fs.promises.rm(outputPath, { force: true }).catch(() => {}),
+      ]);
+    }
   }
 }

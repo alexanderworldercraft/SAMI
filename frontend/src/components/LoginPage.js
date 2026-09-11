@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { buildCookieValue, parseCookieValue } from "../utils/cookieValue";
+import { getSafeReturnPath } from "../utils/authSession";
 
 // Nom des cookies utilisés pour la protection brute-force
 const LOGIN_ATTEMPTS_COOKIE = 'login_attempts';
@@ -51,6 +52,8 @@ const LoginPage = () => {
   const [motDePasse, setMotDePasse] = useState('');
   const [error, setError] = useState('');
   const navigate = useNavigate();
+  const location = useLocation();
+  const sessionExpired = new URLSearchParams(location.search).get("reason") === "session-expired";
 
   // ⬇️ États pour le reset de mot de passe
   const [showReset, setShowReset] = useState(false);
@@ -199,7 +202,7 @@ const LoginPage = () => {
       setError('');
       localStorage.removeItem('token');
 
-      navigate('/');
+      navigate(getSafeReturnPath(location.search), { replace: true });
     } catch (err) {
       console.error('Login failed:', err.response?.data || err.message);
 
@@ -287,6 +290,11 @@ const LoginPage = () => {
     <div className="flex items-center justify-center h-full">
       <div className="text-white p-8 w-96">
         <h2 className="text-2xl font-bold mb-6">Connexion</h2>
+        {sessionExpired && (
+          <p className="text-amber-300 mb-4 rounded border border-amber-500/50 bg-amber-950/30 p-3 text-sm">
+            Votre session a expiré. Reconnectez-vous pour reprendre la lecture.
+          </p>
+        )}
         {error && <p className="text-red-600 mb-4">{error}</p>}
         <form onSubmit={handleLogin} autoComplete="on">
           <div className="mb-4">

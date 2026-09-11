@@ -12,8 +12,9 @@ import {
   updateAiSubtitleConfiguration,
 } from "../controllers/aiSubtitleController.js";
 import { authMiddleware } from "../middlewares/authMiddleware.js";
+import { aiFeatureAccessMiddleware } from "../middlewares/aiFeatureAccessMiddleware.js";
 
-const protectedRoute = { preHandler: authMiddleware };
+const protectedRoute = { preHandler: [authMiddleware, aiFeatureAccessMiddleware] };
 
 export default async function aiSubtitleRoutes(fastify) {
   fastify.get("/config", protectedRoute, getAiSubtitleConfiguration);

@@ -29,12 +29,14 @@ import {
   renewRemoteAiJob,
   sendRemoteAiHeartbeat,
 } from "./workerClient.js";
+import { AI_SUBTITLE_REPETITIVE_TRANSCRIPTION } from "./transcriptQuality.js";
 
 const safeLog = (logger, method, ...args) => {
   try { logger?.[method]?.(...args); } catch { /* le log ne bloque jamais */ }
 };
 
 const CONNECTIVITY_WARNING_INTERVAL_MS = 60_000;
+const CONTEXTUAL_TRANSLATION_QUALITY_ERROR = "AI_SUBTITLE_CONTEXTUAL_TRANSLATION_QUALITY";
 
 const localDependencies = (config) => ({
   prepare: () => prepareNextAiSubtitleSource({ config }),
@@ -224,6 +226,12 @@ export async function startAiSubtitleWorkerRuntime(options = {}) {
       return { completed: true, jobId: claim.job.id };
     } catch (error) {
       lastError = String(error?.message || error).slice(0, 4000);
+      const retryable = !(
+        error?.retryable === false
+        || error?.code === AI_SUBTITLE_REPETITIVE_TRANSCRIPTION
+        || lastError.includes(AI_SUBTITLE_REPETITIVE_TRANSCRIPTION)
+        || lastError.includes(CONTEXTUAL_TRANSLATION_QUALITY_ERROR)
+      );
       unavailableUntil = Date.now() + AI_SUBTITLE_WORKER_FAILURE_COOLDOWN_MS;
       if (!controller.signal.aborted || !stopped) {
         await dependencies.fail({
@@ -231,6 +239,7 @@ export async function startAiSubtitleWorkerRuntime(options = {}) {
           leaseToken: claim.leaseToken,
           leaseGeneration: claim.leaseGeneration,
           errorMessage: lastError,
+          retryable,
         }).catch(() => {});
       }
       safeLog(logger, "error", `[ai-subtitles:${claim.job.id}]`, error);

@@ -19,9 +19,8 @@ import { useMusicPlayer } from "../context/MusicPlayerContext";
 const apiUrl = process.env.REACT_APP_URL_LOCAL;
 
 const resolveAudioSrc = (musique) => {
-  if (!musique?.CheminAcces) return "";
-  if (/^https?:\/\//i.test(musique.CheminAcces)) return musique.CheminAcces;
-  return `${apiUrl}/${musique.CheminAcces}`;
+  if (!musique?.MusiqueID || !musique?.CheminAcces) return "";
+  return `${apiUrl}/api/media/music/${musique.MusiqueID}/file`;
 };
 
 const resolveImageSrc = (musique) => {

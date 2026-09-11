@@ -50,8 +50,8 @@ export default async function (fastify) {
   fastify.get("/admin", { preHandler: authMiddleware }, getAdminVideos);
   fastify.get("/admin/deleted", { preHandler: authMiddleware }, getDeletedVideos);
   fastify.get("/:id/genres", getVideoGenres);
-  fastify.get("/:id/preview-frames", getVideoPreviewFrames);
-  fastify.get("/:id/preview-live", getVideoPreviewLive);
+  fastify.get("/:id/preview-frames", { preHandler: authMiddleware }, getVideoPreviewFrames);
+  fastify.get("/:id/preview-live", { preHandler: authMiddleware }, getVideoPreviewLive);
   fastify.get("/:id", { preHandler: authMiddleware }, getVideoDetails);
   fastify.get("/random-film", getRandomFilm);
   fastify.get("/random-series", getRandomSeriesFirstEpisode);

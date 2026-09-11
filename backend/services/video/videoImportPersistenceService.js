@@ -52,7 +52,7 @@ const moveImportedFiles = ({
 }) => {
   const finalVideoDir = path.join(VIDEO_ROOT, String(videoId));
   const finalHlsDir = path.join(finalVideoDir, "hls");
-  const finalSubtitleDir = path.join(finalVideoDir, "sousTitre");
+  const finalSubtitleDir = path.join(finalVideoDir, "sousTitre", "classic");
   const finalPosterDir = path.join(finalVideoDir, "affiche");
 
   fs.mkdirSync(finalVideoDir, { recursive: true });
@@ -81,6 +81,7 @@ const moveImportedFiles = ({
           "video",
           videoId,
           "sousTitre",
+          "classic",
           subtitle.filename
         ),
       });

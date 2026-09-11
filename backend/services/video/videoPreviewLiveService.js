@@ -17,7 +17,7 @@ const getPreviewLiveDir = (videoId) =>
   path.join(VIDEO_ROOT, String(videoId), "preview-live");
 
 const getPreviewLiveUrl = (videoId) =>
-  `/uploads/video/${videoId}/preview-live/thumbnails.vtt`;
+  `/api/media/videos/${videoId}/files/preview-live/thumbnails.vtt`;
 
 const secondsToVttTimestamp = (seconds) => {
   const milliseconds = Math.max(0, Math.round(Number(seconds || 0) * 1000));

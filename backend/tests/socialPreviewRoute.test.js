@@ -45,6 +45,41 @@ afterEach(async () => {
 });
 
 describe("GET /lecture/:id social preview", () => {
+  it("relit le shell React lorsqu'un nouveau build frontend remplace index.html", async () => {
+    const roots = await createStaticRoots();
+    server = createServer({
+      ...roots,
+      appName: "Mon SAMI",
+      publicUrl: "https://sami.example",
+      publicHost: "sami.example",
+      loadSocialPreviewMetadata: vi.fn().mockResolvedValue(null),
+    });
+    await server.ready();
+
+    const initialResponse = await server.inject({
+      method: "GET",
+      url: "/lecture/42",
+    });
+    expect(initialResponse.body).not.toContain("/static/js/main.nouveau.js");
+
+    await fs.promises.writeFile(
+      path.join(roots.frontendBuildRootPath, "index.html"),
+      [
+        "<!doctype html><html><head>",
+        SOCIAL_META_START,
+        '<title data-rh="true">Nouveau build</title>',
+        SOCIAL_META_END,
+        '</head><body><div id="root"></div><script src="/static/js/main.nouveau.js"></script></body></html>',
+      ].join("\n")
+    );
+
+    const rebuiltResponse = await server.inject({
+      method: "GET",
+      url: "/lecture/42",
+    });
+    expect(rebuiltResponse.body).toContain('/static/js/main.nouveau.js');
+  });
+
   it("sert le shell React enrichi avant le fallback statique et sans cookie", async () => {
     const roots = await createStaticRoots();
     const loadSocialPreviewMetadata = vi.fn().mockResolvedValue({

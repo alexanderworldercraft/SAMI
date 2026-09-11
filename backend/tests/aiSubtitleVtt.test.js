@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildWebVtt,
   normalizeAiSegments,
+  normalizeAiTranscriptSegments,
   normalizeEditedAiSegments,
   parseWebVtt,
 } from "../services/aiSubtitles/vtt.js";
@@ -43,5 +44,21 @@ describe("publication WebVTT des sous-titres IA", () => {
       { start: 0, end: 2, text: "Premier" },
       { start: 1.9, end: 3, text: "Second" },
     ])).toThrow(/chevauche/i);
+  });
+
+  it("conserve les confiances et horodatages par mot du transcript source", () => {
+    expect(normalizeAiTranscriptSegments([{
+      start: 1,
+      end: 2,
+      text: "Bonjour",
+      confidence: 0.93,
+      words: [{ start: 1.1, end: 1.8, text: "Bonjour", confidence: 0.88 }],
+    }])).toEqual([{
+      start: 1,
+      end: 2,
+      text: "Bonjour",
+      confidence: 0.93,
+      words: [{ start: 1.1, end: 1.8, text: "Bonjour", confidence: 0.88 }],
+    }]);
   });
 });

@@ -3,12 +3,13 @@ import path from "path";
 import { describe, expect, it, vi } from "vitest";
 
 import { startAiSubtitleWorkerRuntime } from "../services/aiSubtitles/workerRuntime.js";
+import { AI_SUBTITLE_REPETITIVE_TRANSCRIPTION } from "../services/aiSubtitles/transcriptQuality.js";
 
 const config = {
   role: "CLONE",
   instanceId: "mac-clone",
   performanceScore: 60,
-  pipelineVersion: "sami-ai-subtitles-v1",
+  pipelineVersion: "sami-ai-subtitles-v2-contextual-quality-r3-word-timing",
   protocolVersion: 1,
   heartbeatIntervalMs: 60_000,
   claimIntervalMs: 60_000,
@@ -92,6 +93,51 @@ describe("AI subtitle worker runtime", () => {
       claimError
     );
 
+    await runtime.stop();
+  });
+
+  it("signale une transcription répétitive comme un échec non réessayable", async () => {
+    const qualityError = new Error(
+      `[${AI_SUBTITLE_REPETITIVE_TRANSCRIPTION}] répétition anormale`
+    );
+    const fail = vi.fn().mockResolvedValue(undefined);
+    const runtime = await startAiSubtitleWorkerRuntime({
+      config,
+      capabilities: {
+        ready: true,
+        engine: "whisper.cpp-metal",
+        device: "metal",
+        model: "large-v3",
+        translationModel: "nllb",
+        error: null,
+        capabilities: {},
+      },
+      dependencies: {
+        heartbeat: vi.fn().mockResolvedValue(undefined),
+        claim: vi.fn().mockResolvedValue({
+          lease: {
+            job: { id: "quality-job", videoId: 11, targetLanguage: "fr" },
+            source: null,
+            transcript: null,
+            leaseToken: "lease-token",
+            leaseGeneration: 1,
+            renewAfterMs: 30_000,
+          },
+          localSourcePath: "/audio.wav",
+        }),
+        renew: vi.fn().mockResolvedValue(undefined),
+        runEngine: vi.fn().mockRejectedValue(qualityError),
+        fail,
+      },
+      logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+    });
+
+    await new Promise((resolve) => setImmediate(resolve));
+
+    expect(fail).toHaveBeenCalledWith(expect.objectContaining({
+      jobId: "quality-job",
+      retryable: false,
+    }));
     await runtime.stop();
   });
 });

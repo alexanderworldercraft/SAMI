@@ -1,9 +1,14 @@
+import crypto from "crypto";
+
 import { describe, expect, it, vi } from "vitest";
 
-import { claimNextAiSubtitleJob } from "../services/aiSubtitles/jobService.js";
+import {
+  claimNextAiSubtitleJob,
+  failAiSubtitleLease,
+} from "../services/aiSubtitles/jobService.js";
 
 const config = {
-  pipelineVersion: "sami-ai-subtitles-v1",
+  pipelineVersion: "sami-ai-subtitles-v2-contextual-quality-r3-word-timing",
   leaseDurationMs: 120_000,
   leaseRenewIntervalMs: 30_000,
 };
@@ -71,6 +76,7 @@ describe("ordonnanceur des sous-titres IA", () => {
         AiTranscript: {
           SourceLanguage: "en",
           Segments: [{ start: 0, end: 1, text: "Hello" }],
+          PipelineVersion: config.pipelineVersion,
         },
       },
     };
@@ -87,7 +93,11 @@ describe("ordonnanceur des sous-titres IA", () => {
     expect(claim.leaseToken).toHaveLength(43);
     expect(claim.leaseGeneration).toBe(1);
     expect(database.aiSubtitleJob.updateMany).toHaveBeenCalledWith(expect.objectContaining({
-      data: expect.objectContaining({ AssignedWorkerID: "rtx-3090", Status: "LEASED" }),
+      data: expect.objectContaining({
+        AssignedWorkerID: "rtx-3090",
+        Status: "LEASED",
+        Phase: "translating",
+      }),
     }));
   });
 
@@ -107,6 +117,42 @@ describe("ordonnanceur des sous-titres IA", () => {
     expect(database.aiSubtitleJob.updateMany).not.toHaveBeenCalled();
   });
 
+  it("retranscrit une ancienne transcription créée par le pipeline V1", async () => {
+    const queued = {
+      AiSubtitleJobID: "019c0000-0000-7000-8000-000000000004",
+      VideoID: 11,
+      TargetLanguage: "fr",
+      Status: "QUEUED",
+      SourceRelativePath: "sources/job/source.wav",
+      LeaseGeneration: 0,
+      AttemptCount: 0,
+      StartedAt: null,
+      Video: {
+        AiTranscript: {
+          SourceLanguage: "fr",
+          Segments: [{ start: 0, end: 1, text: "Ancien transcript" }],
+          PipelineVersion: "sami-ai-subtitles-v1",
+        },
+      },
+    };
+    const { database } = createDatabase({
+      workers: [onlineWorker("rtx-3090", 100)],
+      queuedJobs: [queued],
+    });
+
+    const claim = await claimNextAiSubtitleJob({
+      workerId: "rtx-3090",
+      now: new Date("2026-08-22T08:00:10.000Z"),
+      database,
+      config,
+    });
+
+    expect(claim.job.Video.AiTranscript).toBeNull();
+    expect(database.aiSubtitleJob.updateMany).toHaveBeenCalledWith(expect.objectContaining({
+      data: expect.objectContaining({ Phase: "transcribing" }),
+    }));
+  });
+
   it("bascule vers le worker suivant lorsque le meilleur est hors ligne", async () => {
     const queued = {
       AiSubtitleJobID: "019c0000-0000-7000-8000-000000000002",
@@ -116,7 +162,13 @@ describe("ordonnanceur des sous-titres IA", () => {
       LeaseGeneration: 0,
       AttemptCount: 0,
       StartedAt: null,
-      Video: { AiTranscript: { SourceLanguage: "en", Segments: [] } },
+      Video: {
+        AiTranscript: {
+          SourceLanguage: "en",
+          Segments: [],
+          PipelineVersion: config.pipelineVersion,
+        },
+      },
     };
     const offlineBest = {
       ...onlineWorker("rtx-3090", 100),
@@ -140,5 +192,48 @@ describe("ordonnanceur des sous-titres IA", () => {
       config,
     });
     expect(claim.job.AssignedWorkerID).toBe("rtx-3070");
+  });
+
+  it("arrête immédiatement un job dont la transcription est non réessayable", async () => {
+    const leaseToken = "quality-lease-token";
+    const job = {
+      AiSubtitleJobID: "019c0000-0000-7000-8000-000000000003",
+      VideoID: 11,
+      Status: "LEASED",
+      Phase: "TRANSCRIBING",
+      AssignedWorkerID: "mac-clone",
+      LeaseTokenHash: crypto.createHash("sha256").update(leaseToken).digest("hex"),
+      LeaseGeneration: 2,
+      LeaseExpiresAt: new Date(Date.now() + 60_000),
+      AttemptCount: 1,
+      MaxAttempts: 3,
+      SourceRelativePath: null,
+    };
+    const database = {
+      aiSubtitleJob: {
+        findUnique: vi.fn().mockResolvedValue(job),
+        update: vi.fn(async ({ data }) => ({ ...job, ...data })),
+      },
+    };
+
+    await failAiSubtitleLease({
+      jobId: job.AiSubtitleJobID,
+      workerId: "mac-clone",
+      leaseToken,
+      leaseGeneration: 2,
+      errorMessage: "Répétition anormale",
+      retryable: false,
+      database,
+    });
+
+    expect(database.aiSubtitleJob.update).toHaveBeenCalledWith({
+      where: { AiSubtitleJobID: job.AiSubtitleJobID },
+      data: expect.objectContaining({
+        Status: "FAILED",
+        Phase: "failed",
+        NextEligibleAt: null,
+        CompletedAt: expect.any(Date),
+      }),
+    });
   });
 });

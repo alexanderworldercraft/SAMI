@@ -4,6 +4,7 @@ import path from "path";
 
 import { ETAT } from "../../constants.js";
 import { prisma } from "../db.js";
+import { protectedVideoMasterPath } from "../protectedMediaService.js";
 import { resolveUploadPath, VIDEO_ROOT } from "../video/videoPaths.js";
 import { assertAiSubtitleConfig } from "./config.js";
 import {
@@ -32,7 +33,7 @@ const MAX_VTT_SIZE = 20 * 1024 * 1024;
 const serializeVideo = (video) => ({
   id: video.VideoID,
   title: video.Titre,
-  path: video.CheminAcces,
+  path: protectedVideoMasterPath(video.VideoID),
   seriesTitle: video.Saison?.Series?.Titre || null,
   seasonNumber: video.Saison?.Numero ?? null,
 });
@@ -52,6 +53,7 @@ const serializeGeneratedSubtitleTrack = (subtitle) => ({
     sourceLanguage: subtitle.AiSubtitleJob.SourceLanguage,
     transcriptionModel: subtitle.AiSubtitleJob.TranscriptionModel,
     translationModel: subtitle.AiSubtitleJob.TranslationModel,
+    qualityReport: subtitle.AiSubtitleJob.QualityReport || null,
     completedAt: subtitle.AiSubtitleJob.CompletedAt,
     error: subtitle.AiSubtitleJob.ErrorMessage,
   } : null,

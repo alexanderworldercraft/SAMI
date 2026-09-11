@@ -118,6 +118,7 @@ model Video {
   VideoSubtitles       VideoSubtitle[]
   VideoAudioTracks     VideoAudioTrack[]
   AiSubtitleJobs       AiSubtitleJob[]
+  AiDubbingJobs        AiDubbingJob[]
   AiTranscript         AiVideoTranscript?
   GenreFeaturedContent GenreFeaturedContent[]
   UserFavoriteContent  UserFavoriteContent[]
@@ -156,15 +157,21 @@ model VideoSubtitle {
 }
 
 model VideoAudioTrack {
-  VideoAudioTrackID Int       @id @default(autoincrement())
-  Label             String    @db.VarChar(100)
-  Language          String?   @db.VarChar(35)
-  CheminPlaylist    String    @db.VarChar(255)
-  IsDefault         Boolean   @default(false)
+  VideoAudioTrackID Int           @id @default(autoincrement())
+  Label             String        @db.VarChar(100)
+  Language          String?       @db.VarChar(35)
+  CheminPlaylist    String        @db.VarChar(255)
+  IsDefault         Boolean       @default(false)
+  Origin            String        @default("IMPORTED") @db.VarChar(16)
+  Synthetic         Boolean       @default(false)
+  DisclosureVersion String?       @db.VarChar(32)
+  PipelineVersion   String?       @db.VarChar(64)
+  AiDubbingJobID    String?       @unique @db.VarChar(36)
   Ordre             Int
   VideoID           Int
-  CreateDate        DateTime? @default(now())
-  Video             Video     @relation(fields: [VideoID], references: [VideoID])
+  CreateDate        DateTime?     @default(now())
+  Video             Video         @relation(fields: [VideoID], references: [VideoID])
+  AiDubbingJob      AiDubbingJob? @relation(fields: [AiDubbingJobID], references: [AiDubbingJobID], onDelete: SetNull)
 
   @@unique([VideoID, Ordre])
   @@index([VideoID], map: "VideoAudioTrack_VideoID_fkey")
@@ -268,6 +275,7 @@ model VideoEncodingWorker {
   Attempts              VideoEncodingTaskAttempt[]
   RequestNonces         VideoEncodingRequestNonce[]
   AiSubtitleWorker      AiSubtitleWorker?
+  AiDubbingWorker       AiDubbingWorker?
 
   @@index([Role, Enabled, LastHeartbeatAt], map: "idx_encoding_worker_availability")
   @@index([PipelineVersion, MaxNominalHeight], map: "idx_encoding_worker_capability")
@@ -318,6 +326,7 @@ model AiSubtitleJob {
   SourceLanguage     String?           @db.VarChar(35)
   TranscriptionModel String?           @db.VarChar(120)
   TranslationModel   String?           @db.VarChar(191)
+  QualityReport      Json?
   PipelineVersion    String            @db.VarChar(64)
   ErrorMessage       String?           @db.Text
   StartedAt          DateTime?
@@ -334,6 +343,30 @@ model AiSubtitleJob {
   @@index([AssignedWorkerID, Status], map: "idx_ai_subtitle_job_worker")
   @@index([LeaseExpiresAt], map: "idx_ai_subtitle_job_lease")
   @@index([RequestedByUserID], map: "idx_ai_subtitle_job_requester")
+}
+
+model AiDubbingWorker {
+  AiDubbingWorkerID String              @id @db.VarChar(100)
+  Role              String              @db.VarChar(16)
+  Ready             Boolean             @default(false)
+  Engine            String?             @db.VarChar(64)
+  Device            String?             @db.VarChar(120)
+  Model             String?             @db.VarChar(191)
+  ModelRevision     String?             @db.VarChar(191)
+  PipelineVersion   String              @db.VarChar(64)
+  PerformanceScore  Float               @default(1)
+  MaxSlots          Int                 @default(1)
+  Capabilities      Json?
+  BootID            String?             @db.VarChar(100)
+  LastHeartbeatAt   DateTime?
+  LastError         String?             @db.Text
+  CreatedAt         DateTime            @default(now())
+  UpdatedAt         DateTime            @default(now()) @updatedAt
+  Registry          VideoEncodingWorker @relation(fields: [AiDubbingWorkerID], references: [VideoEncodingWorkerID], onDelete: Cascade)
+  AssignedJobs      AiDubbingJob[]      @relation("AiDubbingAssignedWorker")
+  PreferredJobs     AiDubbingJob[]      @relation("AiDubbingPreferredWorker")
+
+  @@index([Ready, LastHeartbeatAt, PerformanceScore], map: "idx_ai_dubbing_worker_availability")
 }
 
 model AiVideoTranscript {
@@ -564,36 +597,40 @@ model UtilisateurGenre {
 }
 
 model Utilisateur {
-  UtilisateurID          Int                     @id @default(autoincrement())
-  Surnom                 String                  @unique
-  MotDePasse             String                  @db.VarChar(255)
-  CheminImage            String?                 @db.VarChar(255)
-  Email                  String                  @db.VarChar(100)
-  Salt                   String                  @db.VarChar(255)
-  GradeID                Int
-  EtatID                 Int
-  CreateDate             DateTime?               @default(now())
-  LastLogin              DateTime?
-  PremiumEndDate         DateTime?
-  Log                    Log[]
-  Albums                 Album[]
-  AlbumMusiques          AlbumMusique[]
-  Musiques               Musique[]
-  MusiqueGenres          MusiqueGenre[]
-  MusiqueGenreAlbums     MusiqueGenreAlbum[]
-  MusiqueGenreMusiques   MusiqueGenreMusique[]
-  Saisons                Saison[]
-  Seriess                Series[]
-  Etat                   Etat                    @relation(fields: [EtatID], references: [EtatID])
-  Grade                  Grade                   @relation(fields: [GradeID], references: [GradeID])
-  UtilisateurGenre       UtilisateurGenre[]
-  Videos                 Video[]
-  UserVideoProgress      UserVideoProgress[]
-  UserSeriesWatchReset   UserSeriesWatchReset[]
-  UserFavoriteContent    UserFavoriteContent[]
-  PlayerPreference       UserPlayerPreference?
-  PersonDuplicateReviews PersonDuplicateReview[]
-  AiSubtitleJobs         AiSubtitleJob[]
+  UtilisateurID           Int                     @id @default(autoincrement())
+  Surnom                  String                  @unique
+  MotDePasse              String                  @db.VarChar(255)
+  CheminImage             String?                 @db.VarChar(255)
+  Email                   String                  @db.VarChar(100)
+  Salt                    String                  @db.VarChar(255)
+  GradeID                 Int
+  EtatID                  Int
+  CreateDate              DateTime?               @default(now())
+  LastLogin               DateTime?
+  PremiumEndDate          DateTime?
+  Log                     Log[]
+  Albums                  Album[]
+  AlbumMusiques           AlbumMusique[]
+  Musiques                Musique[]
+  MusiqueGenres           MusiqueGenre[]
+  MusiqueGenreAlbums      MusiqueGenreAlbum[]
+  MusiqueGenreMusiques    MusiqueGenreMusique[]
+  Saisons                 Saison[]
+  Seriess                 Series[]
+  Etat                    Etat                    @relation(fields: [EtatID], references: [EtatID])
+  Grade                   Grade                   @relation(fields: [GradeID], references: [GradeID])
+  UtilisateurGenre        UtilisateurGenre[]
+  Videos                  Video[]
+  UserVideoProgress       UserVideoProgress[]
+  UserSeriesWatchReset    UserSeriesWatchReset[]
+  UserFavoriteContent     UserFavoriteContent[]
+  PlayerPreference        UserPlayerPreference?
+  AiPreference            UserAiPreference?
+  PersonDuplicateReviews  PersonDuplicateReview[]
+  AiSubtitleJobs          AiSubtitleJob[]
+  AiDubbingJobsRequested  AiDubbingJob[]          @relation("AiDubbingRequestedBy")
+  AiDubbingPreviewReviews AiDubbingJob[]          @relation("AiDubbingPreviewApprovedBy")
+  AiDubbingFinalReviews   AiDubbingJob[]          @relation("AiDubbingFinalApprovedBy")
 
   @@index([GradeID], map: "Utilisateur_GradeID_fkey")
   @@index([EtatID], map: "Utilisateur_EtatID_fkey")
@@ -608,6 +645,82 @@ model UserPlayerPreference {
   CreateDate              DateTime    @default(now())
   UpdateDate              DateTime    @updatedAt
   Utilisateur             Utilisateur @relation(fields: [UtilisateurID], references: [UtilisateurID], onDelete: Cascade)
+}
+
+model UserAiPreference {
+  UtilisateurID     Int         @id
+  Accepted          Boolean
+  DisclosureVersion String      @db.VarChar(32)
+  DecidedAt         DateTime    @default(now())
+  UpdateDate        DateTime    @updatedAt
+  Utilisateur       Utilisateur @relation(fields: [UtilisateurID], references: [UtilisateurID], onDelete: Cascade)
+}
+
+model AiDubbingJob {
+  AiDubbingJobID           String           @id @db.VarChar(36)
+  VideoID                  Int
+  TargetLanguage           String           @db.VarChar(8)
+  SourceLanguage           String?          @db.VarChar(8)
+  RequestedByUserID        Int?
+  Status                   String           @db.VarChar(32)
+  Phase                    String?          @db.VarChar(32)
+  Progress                 Int              @default(0)
+  PreviewStartSeconds      Int              @default(0)
+  ExpectedSpeakerCount     Int?
+  ManualVoiceReferences    Json?
+  PreviewRelativePath      String?          @db.VarChar(512)
+  VoiceProfileRelativePath String?          @db.VarChar(512)
+  VoiceProfileChecksum     String?          @db.Char(64)
+  SpeakerCount             Int?
+  VoiceSamples             Json?
+  RejectedVoiceReferences Json?
+  QualityReport            Json?
+  FinalPlaylistPath        String?          @db.VarChar(512)
+  VoiceModel               String           @db.VarChar(120)
+  VoiceEngine              String           @default("chatterbox") @db.VarChar(64)
+  VoiceModelRevision       String?          @db.VarChar(191)
+  DiarizationModel         String           @db.VarChar(191)
+  SeparationModel          String           @db.VarChar(191)
+  PipelineVersion          String           @db.VarChar(64)
+  GenerationConfigHash     String?          @db.Char(64)
+  InputManifest            Json?
+  InputManifestHash        String?          @db.Char(64)
+  ArtifactManifest         Json?
+  ArtifactManifestHash     String?          @db.Char(64)
+  AssignedWorkerID         String?          @db.VarChar(100)
+  PreferredWorkerID        String?          @db.VarChar(100)
+  LeaseTokenHash           String?          @db.Char(64)
+  LeaseGeneration          Int              @default(0)
+  LeaseExpiresAt           DateTime?
+  AttemptCount             Int              @default(0)
+  MaxAttempts              Int              @default(4)
+  NextEligibleAt           DateTime?
+  DisclosureVersion        String           @db.VarChar(32)
+  Watermarked              Boolean          @default(true)
+  ErrorMessage             String?          @db.Text
+  PreviewApprovedByUserID  Int?
+  PreviewApprovedAt        DateTime?
+  FinalApprovedByUserID    Int?
+  FinalApprovedAt          DateTime?
+  StartedAt                DateTime?
+  CompletedAt              DateTime?
+  CreatedAt                DateTime         @default(now())
+  UpdatedAt                DateTime         @default(now()) @updatedAt
+  Video                    Video            @relation(fields: [VideoID], references: [VideoID], onDelete: Cascade)
+  RequestedBy              Utilisateur?     @relation("AiDubbingRequestedBy", fields: [RequestedByUserID], references: [UtilisateurID], onDelete: SetNull)
+  PreviewApprovedBy        Utilisateur?     @relation("AiDubbingPreviewApprovedBy", fields: [PreviewApprovedByUserID], references: [UtilisateurID], onDelete: SetNull)
+  FinalApprovedBy          Utilisateur?     @relation("AiDubbingFinalApprovedBy", fields: [FinalApprovedByUserID], references: [UtilisateurID], onDelete: SetNull)
+  AssignedWorker           AiDubbingWorker? @relation("AiDubbingAssignedWorker", fields: [AssignedWorkerID], references: [AiDubbingWorkerID], onDelete: SetNull)
+  PreferredWorker          AiDubbingWorker? @relation("AiDubbingPreferredWorker", fields: [PreferredWorkerID], references: [AiDubbingWorkerID], onDelete: SetNull)
+  GeneratedAudioTrack      VideoAudioTrack?
+
+  @@index([VideoID, TargetLanguage, Status], map: "idx_ai_dubbing_video_language_status")
+  @@index([Status, CreatedAt], map: "idx_ai_dubbing_status_created")
+  @@index([Status, NextEligibleAt, CreatedAt], map: "idx_ai_dubbing_queue")
+  @@index([AssignedWorkerID, Status], map: "idx_ai_dubbing_worker_status")
+  @@index([PreferredWorkerID, LeaseExpiresAt], map: "idx_ai_dubbing_preferred_worker")
+  @@index([LeaseExpiresAt], map: "idx_ai_dubbing_lease")
+  @@index([RequestedByUserID], map: "idx_ai_dubbing_requester")
 }
 
 model UserFavoriteContent {

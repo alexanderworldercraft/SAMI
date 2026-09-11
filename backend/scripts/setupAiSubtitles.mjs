@@ -123,6 +123,7 @@ const status = () => {
   const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
   const required = [manifest.pythonPath, manifest.modelPath, manifest.translationModelPath];
   if (manifest.whisperCppPath) required.push(manifest.whisperCppPath);
+  if (manifest.vadModelPath) required.push(manifest.vadModelPath);
   const missing = required.filter((item) => !item || !fs.existsSync(item));
   let probe = null;
   if (missing.length === 0) {
@@ -213,7 +214,13 @@ if (checkOnly) {
   if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$/.test(model)) {
     throw new Error("SAMI_AI_SUBTITLE_MODEL contient une valeur invalide.");
   }
-  const translationModel = "facebook/nllb-200-distilled-600M";
+  const translationModel = String(
+    process.env.SAMI_AI_SUBTITLE_TRANSLATION_MODEL
+    || "facebook/nllb-200-distilled-1.3B"
+  ).trim();
+  if (!/^[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+$/.test(translationModel)) {
+    throw new Error("SAMI_AI_SUBTITLE_TRANSLATION_MODEL est invalide.");
+  }
   const downloaded = JSON.parse(run(pythonPath, [
     path.join(backendRoot, "scripts", "ai", "download_models.py"),
     "--root", root,
@@ -223,6 +230,7 @@ if (checkOnly) {
   ], { capture: true }));
 
   let whisperCppPath = null;
+  let vadModelPath = null;
   let modelPath = downloaded.modelPath || null;
   if (engine.startsWith("whisper.cpp")) {
     const repo = path.join(root, "whisper.cpp");
@@ -239,6 +247,9 @@ if (checkOnly) {
     if (!commandWorks("bash")) throw new Error("bash est requis pour télécharger le modèle whisper.cpp.");
     run("bash", [downloadScript, model], { cwd: repo });
     modelPath = path.join(repo, "models", `ggml-${model}.bin`);
+    const downloadVadScript = path.join(repo, "models", "download-vad-model.sh");
+    run("bash", [downloadVadScript, "silero-v6.2.0"], { cwd: repo });
+    vadModelPath = path.join(repo, "models", "ggml-silero-v6.2.0.bin");
   }
 
   const device = engine === "faster-whisper"
@@ -253,6 +264,7 @@ if (checkOnly) {
     model,
     modelPath,
     whisperCppPath,
+    vadModelPath,
     translationModel,
     translationModelPath: downloaded.translationModelPath,
     translationDevice: device === "cuda" ? "cuda" : device === "metal" ? "mps" : "cpu",

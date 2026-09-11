@@ -1,0 +1,2 @@
+setuptools<81
+soundfile>=0.12,<1

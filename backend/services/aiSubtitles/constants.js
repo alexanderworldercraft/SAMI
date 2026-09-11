@@ -1,7 +1,7 @@
 export const AI_SUBTITLE_SETTING_KEY = "ai_subtitles";
 export const AI_SUBTITLE_SIGNATURE_DOMAIN = "SAMI-AI-SUBTITLES-V1";
 export const AI_SUBTITLE_PROTOCOL_VERSION = 1;
-export const AI_SUBTITLE_PIPELINE_VERSION = "sami-ai-subtitles-v1";
+export const AI_SUBTITLE_PIPELINE_VERSION = "sami-ai-subtitles-v2-contextual-quality-r3-word-timing";
 
 export const AI_SUBTITLE_JOB_STATUS = Object.freeze({
   QUEUED: "QUEUED",

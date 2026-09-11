@@ -48,6 +48,36 @@ export const normalizeAiSegments = (segments) => {
   });
 };
 
+export const normalizeAiTranscriptSegments = (segments) => {
+  const normalized = normalizeAiSegments(segments);
+  return normalized.map((segment, index) => {
+    const source = segments[index] || {};
+    const confidence = Number(source.confidence);
+    const words = Array.isArray(source.words) ? source.words.slice(0, 10_000).map((word) => {
+      const start = Number(word?.start);
+      const end = Number(word?.end);
+      const text = String(word?.text || "").replace(/\s+/g, " ").trim();
+      const wordConfidence = Number(word?.confidence);
+      if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start || !text) return null;
+      return {
+        start,
+        end,
+        text,
+        ...(Number.isFinite(wordConfidence)
+          ? { confidence: Math.max(0, Math.min(1, wordConfidence)) }
+          : {}),
+      };
+    }).filter(Boolean) : [];
+    return {
+      ...segment,
+      ...(Number.isFinite(confidence)
+        ? { confidence: Math.max(0, Math.min(1, confidence)) }
+        : {}),
+      ...(words.length ? { words } : {}),
+    };
+  });
+};
+
 export const normalizeEditedAiSegments = (segments) => {
   if (!Array.isArray(segments) || segments.length > 20_000) {
     throw new TypeError("La liste des segments de sous-titres est invalide.");

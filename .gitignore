@@ -3,16 +3,11 @@ node_modules/
 backend/node_modules/
 frontend/node_modules/
 
-# Environment files
-.env
-.env.*
+# Environment files (including space-suffixed copies such as ".env prod")
+.env*
 !.env.exemple
-backend/.env
-backend/.env.*
-!backend/.env.exemple
-frontend/.env
-frontend/.env.*
-!frontend/.env.exemple
+!.env.example
+!backend/.env.pcfixe.exemple
 
 # Build outputs
 build/
@@ -41,10 +36,7 @@ archives/
 archive/
 
 # SSL secrets
-backend/ssl/*.key
-backend/ssl/*.crt
-backend/ssl/*.csr
-backend/ssl/*.pem
+backend/ssl/
 
 # Logs and runtime files
 *.log
@@ -58,6 +50,26 @@ yarn-error.log*
 .eslintcache
 coverage/
 .nyc_output/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+
+# Portable local AI diagnostics (outside backend/var)
+backend/input-english-*/
+backend/input-english-*.zip
+backend/input-japanese-*/
+backend/input-japanese-*.zip
+backend/failure-*/
+backend/failure-*.zip
+
+# Local database backups (keep Prisma SQL migrations versioned)
+*.sql.gz
+*.sql.zip
+*.sql.bak
 
 # Prisma local artifacts
 backend/prisma/dev.db

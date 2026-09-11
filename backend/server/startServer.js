@@ -27,6 +27,8 @@ import {
   isAiSubtitleEnvironmentEnabled,
 } from "../services/aiSubtitles/config.js";
 import { startAiSubtitleWorkerRuntime } from "../services/aiSubtitles/workerRuntime.js";
+import { isAiDubbingEnvironmentEnabled } from "../services/aiDubbing/config.js";
+import { startAiDubbingWorkerRuntime } from "../services/aiDubbing/workerRuntime.js";
 import { createServer } from "./createServer.js";
 import {
   buildBackupCronExpression,
@@ -210,6 +212,27 @@ function registerAiSubtitleRuntime(server) {
   };
 }
 
+function registerAiDubbingRuntime(server) {
+  let runtime = null;
+
+  server.addHook("onClose", async () => {
+    await runtime?.stop?.();
+    runtime = null;
+  });
+
+  return async function startAiDubbing() {
+    if (!isAiDubbingEnvironmentEnabled()) return null;
+    runtime = await startAiDubbingWorkerRuntime();
+    const capabilities = await runtime.ready;
+    const state = capabilities.ready ? "prêt" : "coordinateur uniquement";
+    console.info(`Runtime de doublage IA distribué démarré (${state}).`);
+    if (!capabilities.ready && capabilities.error) {
+      console.warn(`[ai-dubbing] worker hors du pool : ${capabilities.error}`);
+    }
+    return runtime;
+  };
+}
+
 export function loadTlsCredentials() {
   console.info("Lecture des certificats SSL...");
   const credentials = {
@@ -339,12 +362,14 @@ export async function startServer({
     const startBackgroundJobs = registerBackgroundJobs(server);
     const startDistributedEncoding = registerDistributedEncodingRuntime(server);
     const startAiSubtitles = registerAiSubtitleRuntime(server);
+    const startAiDubbing = registerAiDubbingRuntime(server);
     console.info(formatServerStartupBanner(startupInfo));
     await pingDatabase();
     await maintainVideoTransfers({ startup: true });
     await server.listen({ port, host });
     await startDistributedEncoding();
     await startAiSubtitles();
+    await startAiDubbing();
     startBackgroundJobs();
     console.info("Serveur démarré avec succès.");
     return server;
