@@ -145,14 +145,42 @@ export const serializeAiDubbingJob = (job) => job && ({
   updatedAt: job.UpdatedAt,
 });
 
-export async function listAiDubbingJobs({ page = 1, database = prisma } = {}) {
+export async function listAiDubbingJobs({ page = 1, view = "all", database = prisma } = {}) {
+  if (!["all", "ongoing", "published"].includes(view)) {
+    const error = new Error("Vue des doublages inconnue.");
+    error.statusCode = 400;
+    throw error;
+  }
+  if (view === "published") {
+    const where = { AiDubbingJobs: { some: { Status: "PUBLISHED" } } };
+    const pageSize = 5;
+    const total = await database.video.count({ where });
+    const totalPages = Math.max(1, Math.ceil(total / pageSize));
+    const currentPage = Math.min(Math.max(1, Number.parseInt(page, 10) || 1), totalPages);
+    const videos = await database.video.findMany({
+      where, orderBy: { VideoID: "desc" }, skip: (currentPage - 1) * pageSize, take: pageSize,
+      select: { VideoID: true, Titre: true, AiDubbingJobs: {
+        where: { Status: "PUBLISHED" }, orderBy: [{ CreatedAt: "desc" }, { AiDubbingJobID: "desc" }], include: jobInclude,
+      } },
+    });
+    const order = { fr: 0, ja: 1, en: 2 };
+    return {
+      groups: videos.map(video => ({ video: { id: video.VideoID, title: video.Titre },
+        jobs: video.AiDubbingJobs.map(serializeAiDubbingJob).sort((a, b) =>
+          (order[a.targetLanguage] ?? 3) - (order[b.targetLanguage] ?? 3)),
+      })),
+      pagination: { page: currentPage, pageSize, total, totalPages },
+    };
+  }
+  const where = view === "ongoing" ? { Status: { not: "PUBLISHED" } } : {};
   const pageSize = 40;
   const requestedPage = Math.max(1, Number.parseInt(page, 10) || 1);
-  const total = await database.aiDubbingJob.count();
+  const total = await database.aiDubbingJob.count({ where });
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const currentPage = Math.min(requestedPage, totalPages);
   const jobs = await database.aiDubbingJob.findMany({
-    orderBy: [{ CreatedAt: "desc" }],
+    where,
+    orderBy: [{ CreatedAt: "desc" }, { AiDubbingJobID: "desc" }],
     skip: (currentPage - 1) * pageSize,
     take: pageSize,
     include: jobInclude,

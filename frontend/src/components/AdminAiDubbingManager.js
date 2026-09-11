@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { CpuChipIcon, SpeakerWaveIcon, TrashIcon } from "@heroicons/react/24/outline";
 
 import api from "../services/api";
@@ -71,9 +71,29 @@ const formatClock = (totalSeconds) => {
     : `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
 };
 
+const PublishedGroup = ({ group, renderJob }) => {
+  const [open, setOpen] = useState(false);
+  return <section className="overflow-hidden rounded-2xl border border-sky-500/20 bg-white/80 dark:bg-slate-950/60">
+    <h3><button type="button" aria-expanded={open} aria-controls={`dubbing-video-${group.video.id}`}
+      onClick={() => setOpen(value => !value)} className="flex w-full items-center justify-between gap-4 p-5 text-left focus-visible:ring-2 focus-visible:ring-sky-500">
+      <span><span className="block text-2xl font-black">{group.video.title || `Vidéo ${group.video.id}`}</span>
+        <span className="mt-1 block text-sm font-normal text-slate-500">Vidéo #{group.video.id} · {group.jobs.length} doublage(s) validé(s)</span></span>
+      <span aria-hidden="true">{open ? "−" : "+"}</span>
+    </button></h3>
+    {open && <div id={`dubbing-video-${group.video.id}`} className="grid gap-3 border-t border-sky-500/20 p-4">{group.jobs.map(renderJob)}</div>}
+  </section>;
+};
+
 export default function AdminAiDubbingManager() {
   const [config, setConfig] = useState(null);
   const [jobs, setJobs] = useState([]);
+  const [activeTab, setActiveTab] = useState("ongoing");
+  const [ongoingPage, setOngoingPage] = useState(1);
+  const [publishedPage, setPublishedPage] = useState(1);
+  const [groups, setGroups] = useState([]);
+  const [pagination, setPagination] = useState({ page: 1, totalPages: 1 });
+  const [listLoading, setListLoading] = useState(false);
+  const requestNumber = useRef(0);
   const [videoId, setVideoId] = useState("");
   const [language, setLanguage] = useState("fr");
   const [expectedSpeakerCount, setExpectedSpeakerCount] = useState("");
@@ -89,20 +109,29 @@ export default function AdminAiDubbingManager() {
   useEffect(() => { setGuidedPreparation(false); }, [videoId, language, expectedSpeakerCount]);
 
   const load = useCallback(async () => {
+    const requestId = ++requestNumber.current;
+    setListLoading(true);
     try {
       const [configResponse, jobsResponse] = await Promise.all([
         api.get("/ai-dubbing/config"),
-        api.get("/ai-dubbing/jobs"),
+        api.get(`/ai-dubbing/jobs?view=${activeTab}&page=${activeTab === "ongoing" ? ongoingPage : publishedPage}`),
       ]);
+      if (requestId !== requestNumber.current) return;
       setConfig(configResponse.data);
-      setJobs(jobsResponse.data?.jobs || []);
+      if (activeTab === "ongoing") setJobs(jobsResponse.data?.jobs || []);
+      else setGroups(jobsResponse.data?.groups || []);
+      setPagination(jobsResponse.data?.pagination || { page: 1, totalPages: 1 });
+      if (jobsResponse.data?.pagination?.page) {
+        (activeTab === "ongoing" ? setOngoingPage : setPublishedPage)(jobsResponse.data.pagination.page);
+      }
       setError("");
     } catch (requestError) {
+      if (requestId !== requestNumber.current) return;
       setError(requestError.response?.data?.error || "Le doublage IA est indisponible.");
     } finally {
-      setLoading(false);
+      if (requestId === requestNumber.current) { setLoading(false); setListLoading(false); }
     }
-  }, []);
+  }, [activeTab, ongoingPage, publishedPage]);
 
   useEffect(() => {
     load();
@@ -246,121 +275,7 @@ export default function AdminAiDubbingManager() {
     worker.ready && worker.online && worker.enabled && !worker.draining
   ));
 
-  return (
-    <section className="grid gap-6 text-slate-900 dark:text-white">
-      <div className="rounded-2xl border border-amber-400/30 bg-amber-500/10 p-5">
-        <div className="flex items-start gap-3">
-          <CpuChipIcon className="mt-0.5 size-6 shrink-0 text-amber-600 dark:text-amber-300" aria-hidden="true" />
-          <div>
-            <h3 className="font-black">Doublages synthétiques — génération locale</h3>
-            <p className="mt-2 text-sm leading-6 text-slate-700 dark:text-slate-200">
-              Les voix cherchent à préserver les caractéristiques des intervenants, mais ne sont ni
-              authentiques ni officielles. Chaque piste reste marquée « IA », watermarquée et invisible
-              avant validation humaine de l'extrait puis de la piste complète.
-            </p>
-            <p className="mt-2 text-xs leading-5 text-slate-600 dark:text-slate-300">
-              La première phase analyse désormais toute la vidéo afin de verrouiller les mêmes profils
-              vocaux pour l'extrait et la piste complète. Elle peut donc être sensiblement plus longue.
-              Indiquez le nombre réel d'intervenants lorsqu'il est connu pour éviter une séparation
-              excessive des voix.
-            </p>
-            <p className="mt-2 text-xs font-semibold text-slate-600 dark:text-slate-300">
-              Coordinateur : {(config?.coordinatorReady ?? config?.ready) ? "prêt" : config?.error || "indisponible"}
-              {` · Clone vocal : ${availableWorkers.length > 0 ? `${availableWorkers.length} prêt` : "aucun disponible"}`}
-            </p>
-            {(config?.workers || []).length > 0 && availableWorkers.length === 0 && (
-              <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">
-                Les demandes peuvent être placées en attente, mais aucun clone compatible ne peut
-                encore les calculer. Vérifiez le heartbeat, Qwen3-TTS, CUDA et pyannote sur le PC fixe.
-              </p>
-            )}
-            {(config?.workers || []).map((worker) => (
-              <p key={worker.id} className="mt-1 text-xs text-slate-600 dark:text-slate-300">
-                {worker.id} · {worker.model || "modèle inconnu"} · {worker.device || "périphérique inconnu"}
-                {worker.ready && worker.online && worker.enabled && !worker.draining ? " · prêt" : " · hors du pool"}
-              </p>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      <form onSubmit={requestPreview} className="grid gap-3 rounded-2xl border border-sky-500/20 bg-white/70 p-5 dark:bg-slate-950/50 sm:grid-cols-2 sm:items-end xl:grid-cols-[1fr_1fr_1fr_1fr_auto]">
-        <DubbingVideoSelect value={videoId} onChange={setVideoId} />
-        <label className="grid gap-2 text-sm font-bold">
-          Langue cible
-          <select
-            value={language}
-            onChange={(event) => setLanguage(event.target.value)}
-            className="rounded-xl border border-slate-300 bg-white px-4 py-3 text-slate-950 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
-          >
-            {(config?.languages || []).map((item) => <option key={item.code} value={item.code}>{item.label}</option>)}
-          </select>
-        </label>
-        <label className="grid gap-2 text-sm font-bold">
-          Nombre d'intervenants
-          <input
-            min="1"
-            max="30"
-            type="number"
-            inputMode="numeric"
-            aria-label="Nombre d'intervenants"
-            placeholder="Auto"
-            value={expectedSpeakerCount}
-            onChange={(event) => setExpectedSpeakerCount(event.target.value)}
-            className="rounded-xl border border-slate-300 bg-white px-4 py-3 text-slate-950 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
-          />
-          <span className="text-xs font-medium text-slate-500">
-            Renseigné = choix des passages par voix · vide = mode automatique
-          </span>
-        </label>
-        <fieldset className="grid gap-2 text-sm font-bold">
-          <legend>Début de l'extrait</legend>
-          <div className="flex items-center gap-2">
-            <input
-              required
-              min="0"
-              max="10079"
-              type="number"
-              aria-label="Minutes du début de l'extrait"
-              value={previewMinutes}
-              onChange={(event) => setPreviewMinutes(event.target.value)}
-              className="min-w-0 flex-1 rounded-xl border border-slate-300 bg-white px-3 py-3 text-slate-950 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
-            />
-            <span aria-hidden="true">:</span>
-            <input
-              required
-              min="0"
-              max="59"
-              type="number"
-              aria-label="Secondes du début de l'extrait"
-              value={previewSeconds}
-              onChange={(event) => setPreviewSeconds(event.target.value)}
-              className="min-w-0 flex-1 rounded-xl border border-slate-300 bg-white px-3 py-3 text-slate-950 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
-            />
-          </div>
-          <span className="text-xs font-medium text-slate-500">minutes : secondes · durée 45 s</span>
-        </fieldset>
-        <button
-          type="submit"
-          disabled={!config?.ready || Boolean(actionLoading) || guidedPreparation}
-          className="rounded-xl bg-sky-600 px-5 py-3 text-sm font-bold text-white hover:bg-sky-500 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          Générer l'extrait
-        </button>
-      </form>
-
-      {guidedPreparation && <GuidedVoiceReferenceEditor
-        key={`${videoId}:${language}:${expectedSpeakerCount}`}
-        videoId={videoId} count={Number(expectedSpeakerCount)} busy={Boolean(actionLoading)}
-        onSubmit={startPreview} onCancel={() => setGuidedPreparation(false)}
-      />}
-
-      {message && <p role="status" className="rounded-xl bg-emerald-500/10 px-4 py-3 text-sm font-semibold text-emerald-700 dark:text-emerald-200">{message}</p>}
-      {error && <p role="alert" className="rounded-xl bg-red-500/10 px-4 py-3 text-sm font-semibold text-red-700 dark:text-red-200">{error}</p>}
-
-      <div className="grid gap-4">
-        {jobs.length === 0 && <p className="text-sm text-slate-500">Aucune tâche de doublage IA.</p>}
-        {jobs.map((job) => (
+  const renderJob = (job) => (
           <article key={job.id} className="rounded-2xl border border-slate-200 bg-white/80 p-5 dark:border-slate-800 dark:bg-slate-950/60">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
@@ -373,6 +288,7 @@ export default function AdminAiDubbingManager() {
                 </p>
                 <p className="mt-1 text-xs text-slate-500">
                   Version : {job.id}
+                  {job.models?.pipeline ? ` · Profil : ${job.models.pipeline}` : ""}
                   {job.publishedTrackLabel
                     ? ` · Piste ${job.publishedTrackId} : ${job.publishedTrackLabel}`
                     : ""}
@@ -625,7 +541,145 @@ export default function AdminAiDubbingManager() {
               )}
             </div>
           </article>
-        ))}
+
+  );
+
+  return (
+    <section className="grid gap-6 text-slate-900 dark:text-white">
+      <div role="tablist" aria-label="État des doublages" className="flex flex-wrap gap-2">
+        {[["ongoing", "En cours"], ["published", "Terminés et validés"]].map(([id, label]) => <button key={id} type="button" role="tab" id={`dubbing-tab-${id}`} aria-controls={`dubbing-panel-${id}`} aria-selected={activeTab === id}
+          tabIndex={activeTab === id ? 0 : -1}
+          onKeyDown={event => {
+            if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+            event.preventDefault();
+            const next = event.key === "Home" ? "ongoing" : event.key === "End" ? "published" : activeTab === "ongoing" ? "published" : "ongoing";
+            setActiveTab(next); setDeleteConfirmation(""); setPagination({ page: 1, totalPages: 1 });
+            document.getElementById(`dubbing-tab-${next}`)?.focus();
+          }}
+          onClick={() => { setActiveTab(id); setDeleteConfirmation(""); setPagination({ page: 1, totalPages: 1 }); }}
+          className={`rounded-xl px-4 py-3 text-sm font-bold focus-visible:ring-2 focus-visible:ring-sky-400 ${activeTab === id ? "bg-sky-500/20 text-sky-700 dark:text-sky-200" : "text-slate-500 hover:bg-sky-500/10"}`}>{label}</button>)}
+      </div>
+      <div hidden={activeTab !== "ongoing"} className={activeTab === "ongoing" ? "grid gap-6" : "hidden"}>
+      <div className="rounded-2xl border border-amber-400/30 bg-amber-500/10 p-5">
+        <div className="flex items-start gap-3">
+          <CpuChipIcon className="mt-0.5 size-6 shrink-0 text-amber-600 dark:text-amber-300" aria-hidden="true" />
+          <div>
+            <h3 className="font-black">Doublages synthétiques — génération locale</h3>
+            <p className="mt-2 text-sm leading-6 text-slate-700 dark:text-slate-200">
+              Les voix cherchent à préserver les caractéristiques des intervenants, mais ne sont ni
+              authentiques ni officielles. Chaque piste reste marquée « IA », watermarquée et invisible
+              avant validation humaine de l'extrait puis de la piste complète.
+            </p>
+            <p className="mt-2 text-xs leading-5 text-slate-600 dark:text-slate-300">
+              La première phase analyse désormais toute la vidéo afin de verrouiller les mêmes profils
+              vocaux pour l'extrait et la piste complète. Elle peut donc être sensiblement plus longue.
+              Indiquez le nombre réel d'intervenants lorsqu'il est connu pour éviter une séparation
+              excessive des voix.
+            </p>
+            <p className="mt-2 text-xs font-semibold text-slate-600 dark:text-slate-300">
+              Coordinateur : {(config?.coordinatorReady ?? config?.ready) ? "prêt" : config?.error || "indisponible"}
+              {` · Clone vocal : ${availableWorkers.length > 0 ? `${availableWorkers.length} prêt` : "aucun disponible"}`}
+            </p>
+            {(config?.workers || []).length > 0 && availableWorkers.length === 0 && (
+              <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">
+                Les demandes peuvent être placées en attente, mais aucun clone compatible ne peut
+                encore les calculer. Vérifiez le heartbeat, Qwen3-TTS, CUDA et pyannote sur le PC fixe.
+              </p>
+            )}
+            {(config?.workers || []).map((worker) => (
+              <p key={worker.id} className="mt-1 text-xs text-slate-600 dark:text-slate-300">
+                {worker.id} · {worker.model || "modèle inconnu"} · {worker.device || "périphérique inconnu"}
+                {worker.ready && worker.online && worker.enabled && !worker.draining ? " · prêt" : " · hors du pool"}
+              </p>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <form onSubmit={requestPreview} className="grid gap-3 rounded-2xl border border-sky-500/20 bg-white/70 p-5 dark:bg-slate-950/50 sm:grid-cols-2 sm:items-end xl:grid-cols-[1fr_1fr_1fr_1fr_auto]">
+        <DubbingVideoSelect value={videoId} onChange={setVideoId} />
+        <label className="grid gap-2 text-sm font-bold">
+          Langue cible
+          <select
+            value={language}
+            onChange={(event) => setLanguage(event.target.value)}
+            className="rounded-xl border border-slate-300 bg-white px-4 py-3 text-slate-950 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+          >
+            {(config?.languages || []).map((item) => <option key={item.code} value={item.code}>{item.label}</option>)}
+          </select>
+        </label>
+        <label className="grid gap-2 text-sm font-bold">
+          Nombre d'intervenants
+          <input
+            min="1"
+            max="30"
+            type="number"
+            inputMode="numeric"
+            aria-label="Nombre d'intervenants"
+            placeholder="Auto"
+            value={expectedSpeakerCount}
+            onChange={(event) => setExpectedSpeakerCount(event.target.value)}
+            className="rounded-xl border border-slate-300 bg-white px-4 py-3 text-slate-950 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+          />
+          <span className="text-xs font-medium text-slate-500">
+            Renseigné = choix des passages par voix · vide = mode automatique
+          </span>
+        </label>
+        <fieldset className="grid gap-2 text-sm font-bold">
+          <legend>Début de l'extrait</legend>
+          <div className="flex items-center gap-2">
+            <input
+              required
+              min="0"
+              max="10079"
+              type="number"
+              aria-label="Minutes du début de l'extrait"
+              value={previewMinutes}
+              onChange={(event) => setPreviewMinutes(event.target.value)}
+              className="min-w-0 flex-1 rounded-xl border border-slate-300 bg-white px-3 py-3 text-slate-950 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+            />
+            <span aria-hidden="true">:</span>
+            <input
+              required
+              min="0"
+              max="59"
+              type="number"
+              aria-label="Secondes du début de l'extrait"
+              value={previewSeconds}
+              onChange={(event) => setPreviewSeconds(event.target.value)}
+              className="min-w-0 flex-1 rounded-xl border border-slate-300 bg-white px-3 py-3 text-slate-950 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+            />
+          </div>
+          <span className="text-xs font-medium text-slate-500">minutes : secondes · durée 45 s</span>
+        </fieldset>
+        <button
+          type="submit"
+          disabled={!config?.ready || Boolean(actionLoading) || guidedPreparation}
+          className="rounded-xl bg-sky-600 px-5 py-3 text-sm font-bold text-white hover:bg-sky-500 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          Générer l'extrait
+        </button>
+      </form>
+
+      {guidedPreparation && <GuidedVoiceReferenceEditor
+        key={`${videoId}:${language}:${expectedSpeakerCount}`}
+        videoId={videoId} count={Number(expectedSpeakerCount)} busy={Boolean(actionLoading)}
+        onSubmit={startPreview} onCancel={() => setGuidedPreparation(false)}
+      />}
+
+      </div>
+      {message && <p role="status" className="rounded-xl bg-emerald-500/10 px-4 py-3 text-sm font-semibold text-emerald-700 dark:text-emerald-200">{message}</p>}
+      {error && <p role="alert" className="rounded-xl bg-red-500/10 px-4 py-3 text-sm font-semibold text-red-700 dark:text-red-200">{error}</p>}
+
+      <div role="tabpanel" id={`dubbing-panel-${activeTab}`} aria-labelledby={`dubbing-tab-${activeTab}`} aria-busy={listLoading} className="grid gap-4">
+        {activeTab === "ongoing" && jobs.length === 0 && <p className="text-sm text-slate-500">Aucune tâche de doublage IA.</p>}
+        {activeTab === "ongoing" ? jobs.map(renderJob) : groups.map(group => <PublishedGroup key={group.video.id} group={group} renderJob={renderJob} />)}
+        {!listLoading && activeTab === "published" && groups.length === 0 && <p>Aucun doublage terminé et validé.</p>}
+        {pagination.totalPages > 1 && <nav aria-label="Pages des doublages" className="flex items-center justify-center gap-4">
+          <button type="button" disabled={listLoading || pagination.page <= 1} onClick={() => (activeTab === "ongoing" ? setOngoingPage : setPublishedPage)(pagination.page - 1)} className="rounded-lg border px-3 py-2 disabled:opacity-40">Précédent</button>
+          <span>Page {pagination.page} sur {pagination.totalPages}</span>
+          <button type="button" disabled={listLoading || pagination.page >= pagination.totalPages} onClick={() => (activeTab === "ongoing" ? setOngoingPage : setPublishedPage)(pagination.page + 1)} className="rounded-lg border px-3 py-2 disabled:opacity-40">Suivant</button>
+        </nav>}
       </div>
     </section>
   );

@@ -494,6 +494,28 @@ Créer une nouvelle analyse anglaise pour la vidéo 13, valider les nouveaux
 existants. Garder les cinq pistes déjà validées ; le comparatif positif sur une
 réplique ne vaut pas validation de toutes les voix ou du rendu complet R5-R4.
 
+### Navigation de l'administration et bibliothèque des doublages
+
+La sidebar partagée passe en mode Admin uniquement sur `/administration` pour les
+grades 1 et 2. Elle conserve Accueil et Paramètres, remplace Aléatoires par le
+catalogue des sections et masque les outils réservés au grade 1 pour les admins.
+Les liens `?section=ai-dubbing`, `?section=content`, etc. sont directs et compatibles
+avec précédent/suivant du navigateur. Les sections se montent à leur première
+visite puis restent masquées sans perdre les saisies ; les suraccordéons externes
+sont supprimés. Le catalogue commun est `frontend/src/constants/adminSections.js`.
+Les autorisations serveur et le consentement IA restent obligatoires.
+
+Dans Doublages audio IA, « En cours » conserve les actions, erreurs, refus et
+validations en attente. « Terminés et validés » contient uniquement les jobs
+`PUBLISHED`, regroupés par vidéo (ID décroissant), toutes versions conservées,
+langues FR puis JP puis EN, versions les plus récentes d'abord dans chaque langue.
+Les cartes sont repliées par défaut et la suppression reste confirmée explicitement.
+La pagination serveur compte cinq vidéos par page, pas cinq pistes.
+`GET /api/ai-dubbing/jobs?view=published&page=1` retourne `groups` et `pagination` ;
+`view=ongoing` exclut les publiés et conserve une pagination de 40 jobs.
+Sans `view`, le contrat historique de liste de tous les jobs reste disponible.
+Aucune modification du pipeline de synthèse, aucune migration nécessaire.
+
 ### Provenance des pistes IA et suivi du rendu complet
 
 Dans `VideoAudioTrack`, `DisclosureVersion` versionne la notice de transparence IA

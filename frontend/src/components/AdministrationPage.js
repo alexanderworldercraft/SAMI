@@ -1,4 +1,6 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
+import { useLocation } from "react-router-dom";
+import { activeAdminSection, adminSectionsFor } from "../constants/adminSections";
 import FormNewAdmin from "./FormNewAdmin";
 import AdminList from "./AdminList";
 import UserManagerCard from "./UserManagerCard";
@@ -26,7 +28,13 @@ import AdminAiSubtitleManager from "./AdminAiSubtitleManager";
 import AdminAiSubtitleLibraryManager from "./AdminAiSubtitleLibraryManager";
 import AdminAiDubbingManager from "./AdminAiDubbingManager";
 import SuperAdminAiSubtitleEditor from "./SuperAdminAiSubtitleEditor";
-import AdminAccordion from "./AdminAccordion";
+// Mount on first visit, then keep forms/editors intact while navigating sections.
+const AdminSection = ({ sectionId, activeId, children }) => {
+    const [visited, setVisited] = useState(sectionId === activeId);
+    useEffect(() => { if (sectionId === activeId) setVisited(true); }, [sectionId, activeId]);
+    if (!visited && sectionId !== activeId) return null;
+    return <div hidden={sectionId !== activeId} id={`admin-${sectionId}`} className="[&>section]:my-0">{children}</div>;
+};
 
 const tabButtonClass = (active) =>
     `rounded-lg px-4 py-2 text-sm font-bold transition duration-200 ${
@@ -71,6 +79,15 @@ const TabbedAdminSection = ({ title, description, tabs, activeTab, onTabChange }
 };
 
 const AdministrationPage = () => {
+    const location = useLocation();
+    const [grade, setGrade] = useState(null);
+    useEffect(() => {
+        let cancelled = false;
+        api.get("/users/me").then(response => { if (!cancelled) setGrade(response.data?.GradeID || 0); })
+            .catch(() => { if (!cancelled) setGrade(0); });
+        return () => { cancelled = true; };
+    }, []);
+    const activeId = activeAdminSection(location.search, grade);
     const [, setReload] = useState(false);
     const [activeContentTab, setActiveContentTab] = useState("genres");
     const [activeMusicContentTab, setActiveMusicContentTab] = useState("musiques");
@@ -122,16 +139,16 @@ const AdministrationPage = () => {
         { id: "music-genres", label: "Genres", content: <AdminMusicContentManager activeTab="genres" /> },
     ];
 
+    if (grade === null) return <p role="status">Chargement de l'administration…</p>;
+    if (!adminSectionsFor(grade).length) return <p role="alert">Accès réservé à l'administration.</p>;
+
     return (
         <div className="container mx-auto px-4 py-10 sm:px-6 lg:px-8">
             <header className="mb-8 text-center">
                 <p className="text-sm font-bold uppercase text-sky-500 dark:text-sky-400">SAMI</p>
-                <h1 className="mt-3 text-3xl font-black text-slate-950 dark:text-white">Gestion des administrateurs</h1>
+                <h1 className="mt-3 text-3xl font-black text-slate-950 dark:text-white">Administration</h1>
             </header>
-            <AdminAccordion
-                title="Contenus à la une"
-                description="Force la rotation des contenus vedettes par genre."
-            >
+            <AdminSection sectionId="featured" activeId={activeId}>
             <section className="relative mx-auto max-w-4xl overflow-hidden rounded-2xl border border-sky-500/10 bg-white/80 p-6 shadow-xl shadow-slate-950/5 backdrop-blur dark:bg-slate-950/70 dark:text-white dark:shadow-sky-950/20">
                 <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_12%_20%,rgba(14,165,233,0.14),transparent_26%),radial-gradient(circle_at_88%_0%,rgba(139,92,246,0.10),transparent_22%)]" />
                 <div className="relative">
@@ -156,35 +173,35 @@ const AdministrationPage = () => {
                 {featuredError && <p className="mt-4 text-sm font-semibold text-red-600 dark:text-red-300">{featuredError}</p>}
                 </div>
             </section>
-            </AdminAccordion>
-            <AdminAccordion title="Message général" description="Configure le message affiché à l'ensemble des utilisateurs.">
+            </AdminSection>
+            <AdminSection sectionId="message" activeId={activeId}>
                 <AdminMessageSettings />
-            </AdminAccordion>
-            <AdminAccordion title="Fonctionnalités expérimentales" description="Active et configure les fonctionnalités encore en expérimentation.">
+            </AdminSection>
+            <AdminSection sectionId="experimental" activeId={activeId}>
                 <AdminExperimentalFeatures />
-            </AdminAccordion>
-            <AdminAccordion title="Sous-titres français manquants" description="Planifie la génération française des vidéos qui n'en disposent pas.">
+            </AdminSection>
+            <AdminSection sectionId="missing-subtitles" activeId={activeId}>
                 <AdminAiSubtitleManager />
-            </AdminAccordion>
-            <AdminAccordion title="Sous-titres IA" description="Modifie, supprime ou recrée les pistes produites par intelligence artificielle.">
+            </AdminSection>
+            <AdminSection sectionId="ai-subtitles" activeId={activeId}>
                 <AdminAiSubtitleLibraryManager />
-            </AdminAccordion>
-            <AdminAccordion title="Doublages audio IA" description="Génère localement, contrôle puis publie des pistes synthétiques en anglais, français ou japonais.">
+            </AdminSection>
+            <AdminSection sectionId="ai-dubbing" activeId={activeId}>
                 <AdminAiDubbingManager />
-            </AdminAccordion>
-            <AdminAccordion title="Éditeur temporel des sous-titres IA" description="Corrige précisément le texte et les horodatages avec un retour vidéo complet.">
+            </AdminSection>
+            <AdminSection sectionId="subtitle-editor" activeId={activeId}>
                 <SuperAdminAiSubtitleEditor />
-            </AdminAccordion>
-            <AdminAccordion title="Diagnostic d'encodage distribué" description="Inspecte les traitements distribués et leur conservation.">
+            </AdminSection>
+            <AdminSection sectionId="encoding" activeId={activeId}>
                 <AdminDistributedEncodingDiagnostics />
-            </AdminAccordion>
-            <AdminAccordion title="Genres de la page d'accueil" description="Organise les contenus mis en avant par genre.">
+            </AdminSection>
+            <AdminSection sectionId="homepage-genres" activeId={activeId}>
                 <AdminHomepageGenreManager />
-            </AdminAccordion>
-            <AdminAccordion title="Contenus favoris" description="Configure les contenus favoris présentés dans l'application.">
+            </AdminSection>
+            <AdminSection sectionId="favorites" activeId={activeId}>
                 <AdminFavoriteContentManager />
-            </AdminAccordion>
-            <AdminAccordion title="Gestion des contenus" description="Genres, séries, vidéos, sagas, univers et personnes.">
+            </AdminSection>
+            <AdminSection sectionId="content" activeId={activeId}>
             <TabbedAdminSection
                 title="Gestion des contenus"
                 description="Modifie les genres, séries, vidéos, sagas, univers et personnes depuis une seule zone."
@@ -192,8 +209,8 @@ const AdministrationPage = () => {
                 activeTab={activeContentTab}
                 onTabChange={setActiveContentTab}
             />
-            </AdminAccordion>
-            <AdminAccordion title="Gestion des contenus musicaux" description="Musiques, albums et genres dédiés à la musique.">
+            </AdminSection>
+            <AdminSection sectionId="music" activeId={activeId}>
             <TabbedAdminSection
                 title="Gestion des contenus musicaux"
                 description="Modifie les musiques, albums et genres dédiés à la musique."
@@ -201,8 +218,8 @@ const AdministrationPage = () => {
                 activeTab={activeMusicContentTab}
                 onTabChange={setActiveMusicContentTab}
             />
-            </AdminAccordion>
-            <AdminAccordion title="Corbeilles" description="Restaure ou supprime définitivement les contenus supprimés.">
+            </AdminSection>
+            <AdminSection sectionId="trash" activeId={activeId}>
             <TabbedAdminSection
                 title="Corbeilles"
                 description="Restaure ou supprime définitivement les contenus supprimés."
@@ -214,19 +231,19 @@ const AdministrationPage = () => {
                 activeTab={activeTrashTab}
                 onTabChange={setActiveTrashTab}
             />
-            </AdminAccordion>
-            <AdminAccordion title="Sauvegardes" description="Crée et télécharge les sauvegardes administratives.">
+            </AdminSection>
+            <AdminSection sectionId="backups" activeId={activeId}>
                 <AdminBackupManager />
-            </AdminAccordion>
-            <AdminAccordion title="Ajouter un administrateur" description="Crée un nouveau compte d'administration.">
+            </AdminSection>
+            <AdminSection sectionId="new-admin" activeId={activeId}>
                 <FormNewAdmin />
-            </AdminAccordion>
-            <AdminAccordion title="Liste des administrateurs" description="Consulte et gère les comptes administrateurs.">
+            </AdminSection>
+            <AdminSection sectionId="admins" activeId={activeId}>
                 <AdminList />
-            </AdminAccordion>
-            <AdminAccordion title="Gestion des utilisateurs" description="Consulte et modifie les comptes utilisateurs.">
+            </AdminSection>
+            <AdminSection sectionId="users" activeId={activeId}>
                 <UserManagerCard onStateChange={handleStateChange} />
-            </AdminAccordion>
+            </AdminSection>
             {/* Ajoutez d'autres composants ou fonctionnalités ici */}
         </div>
     );

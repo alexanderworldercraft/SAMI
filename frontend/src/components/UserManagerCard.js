@@ -728,7 +728,7 @@ const UserManagerCard = ({ onStateChange }) => {
       )}
 
       {/* Grille de cartes utilisateurs */}
-      <ul className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-6">
+      <ul className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
         {paginatedUsers.map((user) => {
           const activity = activityMap[user.UtilisateurID];
           const risk = computeRiskLevel(activity);

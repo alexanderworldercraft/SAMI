@@ -64,7 +64,7 @@ export const getAdminAiDubbingJobs = async (request, reply) => {
   const admin = await ensureAdmin(request, reply);
   if (!admin) return;
   try {
-    return reply.send(await listAiDubbingJobs({ page: request.query?.page }));
+    return reply.send(await listAiDubbingJobs({ page: request.query?.page, view: request.query?.view }));
   } catch (error) {
     return sendError(reply, error, "Liste des doublages IA indisponible.");
   }

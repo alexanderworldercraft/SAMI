@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 
 import api from "../services/api";
 import AdminAiDubbingManager from "./AdminAiDubbingManager";
@@ -60,6 +60,44 @@ it("demande une confirmation explicite avant de supprimer un doublage IA", async
   fireEvent.click(screen.getByRole("button", { name: "Confirmer la suppression" }));
   await waitFor(() => expect(api.delete).toHaveBeenCalledWith("/ai-dubbing/jobs/job-1"));
   expect(await screen.findByRole("status")).toHaveTextContent(/fichiers privés ont été supprimés/i);
+});
+
+it("sépare les publiés, replie les groupes et pagine par vidéo sans changer les actions", async () => {
+  const originalGet = api.get.getMockImplementation();
+  const makeGroup = id => ({ video: { id, title: `Vidéo publiée ${id}` }, jobs: ["fr", "ja", "en"].map(language => ({
+    id: `published-${id}-${language}`, video: { id, title: `Vidéo publiée ${id}` }, targetLanguage: language,
+    targetLanguageLabel: { fr: "Français", ja: "Japonais", en: "Anglais" }[language], status: "PUBLISHED", progress: 100,
+    models: { pipeline: "profil-validé" },
+  })) });
+  api.get.mockImplementation(url => {
+    if (url.includes("view=published")) return Promise.resolve({ data: {
+      groups: url.endsWith("page=2") ? [makeGroup(7)] : [13, 12, 11, 10, 9].map(makeGroup),
+      pagination: { page: url.endsWith("page=2") ? 2 : 1, totalPages: 2, pageSize: 5, total: 6 },
+    } });
+    return originalGet(url);
+  });
+  render(<AdminAiDubbingManager />);
+  await screen.findByText(/Film test — Français/);
+  fireEvent.click(screen.getByRole("tab", { name: "Terminés et validés" }));
+  const groupButton = await screen.findByRole("button", { name: /Vidéo publiée 13/ });
+  expect(groupButton).toHaveAttribute("aria-expanded", "false");
+  expect(screen.queryByText(/Film test — Français/)).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Générer l'extrait" })).not.toBeInTheDocument();
+  expect(screen.getAllByRole("heading", { level: 3 })).toHaveLength(5);
+  fireEvent.click(groupButton);
+  expect(screen.getAllByRole("heading", { level: 4 }).map(heading => heading.textContent)).toEqual([
+    "Vidéo publiée 13 — Français", "Vidéo publiée 13 — Japonais", "Vidéo publiée 13 — Anglais",
+  ]);
+  const french = screen.getAllByRole("article")[0];
+  fireEvent.click(within(french).getByRole("button", { name: "Supprimer le doublage IA" }));
+  expect(api.delete).not.toHaveBeenCalled();
+  fireEvent.click(within(french).getByRole("button", { name: "Confirmer la suppression" }));
+  await waitFor(() => expect(api.delete).toHaveBeenCalledWith("/ai-dubbing/jobs/published-13-fr"));
+  await waitFor(() => expect(screen.getByRole("button", { name: "Suivant" })).toBeEnabled());
+  fireEvent.click(screen.getByRole("button", { name: "Suivant" }));
+  expect(await screen.findByRole("button", { name: /Vidéo publiée 7/ })).toHaveAttribute("aria-expanded", "false");
+  expect(screen.queryByRole("button", { name: /Vidéo publiée 13/ })).not.toBeInTheDocument();
+  expect(screen.getByText("Page 2 sur 2")).toBeInTheDocument();
 });
 
 it("affiche le dépassement et le chevauchement sans annoncer un décalage des départs", async () => {

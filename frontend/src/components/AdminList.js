@@ -567,7 +567,7 @@ const AdminList = () => {
         )}
 
         {/* Grille de cartes admins (même structure que UserManagerCard) */}
-        <ul className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-6">
+        <ul className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
           {paginatedAdmins.map((admin) => {
             const isBlocked = admin.EtatID === 3;
             const isSuperAdmin = admin.GradeID === 1;

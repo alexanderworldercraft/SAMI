@@ -31,6 +31,7 @@ import NavVisibilityToggle from './NavVisibilityToggle'
 import { useNav } from '../context/NavContext'
 import UserAvatar from "./UserAvatar";
 import { scrollToPageTop } from '../utils/scrollToPageTop'
+import { activeAdminSection, adminSectionsFor } from '../constants/adminSections'
 
 const apiBaseUrl = process.env.REACT_APP_URL_LOCAL
 const appName = process.env.REACT_APP_NAME || 'SAMI'
@@ -76,6 +77,21 @@ const navIconClass = (active) =>
     'size-6 shrink-0 transition duration-200'
   )
 
+const AdminLinks = ({ grade, search, onNavigate }) => (
+  <li>
+    <div className="text-xs/6 font-semibold text-gray-400">Admin</div>
+    <ul className="-mx-2 mt-2 space-y-1">
+      {adminSectionsFor(grade).map(section => {
+        const active = activeAdminSection(search, grade) === section.id;
+        return <li key={section.id}><Link to={`/administration?section=${section.id}`}
+          aria-current={active ? "page" : undefined} onClick={onNavigate} className={navItemClass(active)}>
+          {section.label}
+        </Link></li>;
+      })}
+    </ul>
+  </li>
+)
+
 export default function NavBar() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [user, setUser] = useState(null)
@@ -107,6 +123,7 @@ export default function NavBar() {
     fetchUser()
   }, [])
 
+  const adminMode = location.pathname === '/administration' && adminSectionsFor(user?.GradeID).length > 0
   const navigation = [
     { name: 'Accueil', href: '/', icon: HomeIcon, scrollToTop: true },
     { name: 'Vidéos', href: '/videos', icon: FilmIcon, scrollToTop: true },
@@ -119,7 +136,7 @@ export default function NavBar() {
           { name: 'Nouvelle musique', href: '/nouvelle-musique', icon: MusicalNoteIcon },
         ]
       : []),
-  ]
+  ].filter(item => !adminMode || item.href === '/')
 
   const dropdownItems = [
     { name: 'Votre Profil', href: '/settings' },
@@ -233,8 +250,7 @@ export default function NavBar() {
                     </ul>
                   </li>
 
-                  {/* Aléatoires */}
-                  <li>
+                  {adminMode ? <AdminLinks grade={user.GradeID} search={location.search} onNavigate={() => handleMainNavigation(true, true)} /> : (<li>
                     <div className="text-xs/6 font-semibold text-gray-400">Aléatoires</div>
                     <ul role="list" className="-mx-2 mt-2 space-y-1">
                       <li>
@@ -265,7 +281,8 @@ export default function NavBar() {
                         </button>
                       </li>
                     </ul>
-                  </li>
+                  </li> )}
+
 
                   {/* Settings */}
                   <li className="mt-auto">
@@ -327,8 +344,7 @@ export default function NavBar() {
                   </ul>
                 </li>
 
-                {/* Aléatoires */}
-                <li>
+                {adminMode ? <AdminLinks grade={user.GradeID} search={location.search} onNavigate={() => handleMainNavigation(false, true)} /> : (<li>
                   <div className="text-xs/6 font-semibold text-gray-400">Aléatoires</div>
                   <ul role="list" className="-mx-2 mt-2 space-y-1">
                     <li>
@@ -359,7 +375,8 @@ export default function NavBar() {
                       </button>
                     </li>
                   </ul>
-                </li>
+                </li> )}
+
 
                 {/* Settings */}
                 <li className="mt-auto">

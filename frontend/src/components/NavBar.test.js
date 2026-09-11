@@ -4,6 +4,7 @@ import { scrollToPageTop } from "../utils/scrollToPageTop";
 import api from "../services/api";
 
 const mockNavigate = jest.fn();
+let mockLocation = { pathname: "/videos", search: "" };
 
 jest.mock(
   "react-router-dom",
@@ -20,7 +21,7 @@ jest.mock(
         {children}
       </a>
     ),
-    useLocation: () => ({ pathname: "/videos" }),
+    useLocation: () => mockLocation,
     useNavigate: () => mockNavigate,
   }),
   { virtual: true }
@@ -63,6 +64,7 @@ jest.mock("../utils/scrollToPageTop", () => ({ scrollToPageTop: jest.fn() }));
 describe("NavBar - retour en haut", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockLocation = { pathname: "/videos", search: "" };
     api.get.mockReturnValue(new Promise(() => {}));
   });
 
@@ -80,6 +82,32 @@ describe("NavBar - retour en haut", () => {
     });
 
     expect(scrollToPageTop).toHaveBeenCalledTimes(10);
+  });
+
+  test.each([1, 2])("navigation administrative commune mobile/desktop pour grade %s", async grade => {
+    mockLocation = { pathname: "/administration", search: "?section=ai-dubbing" };
+    api.get.mockResolvedValue({ data: { GradeID: grade } });
+    render(<NavBar />);
+    await waitFor(() => expect(screen.getAllByRole("link", { name: "Doublages audio IA" })).toHaveLength(2));
+    screen.getAllByRole("link", { name: "Doublages audio IA" }).forEach(link => {
+      expect(link).toHaveAttribute("href", "/administration?section=ai-dubbing");
+      expect(link).toHaveAttribute("aria-current", "page");
+      fireEvent.click(link);
+    });
+    expect(screen.queryByText("Aléatoires")).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Vidéos" })).not.toBeInTheDocument();
+    expect(screen.getAllByRole("link", { name: "Accueil" })).toHaveLength(2);
+    expect(screen.getAllByRole("link", { name: "Paramètres" })).toHaveLength(2);
+    expect(screen.queryAllByRole("link", { name: "Sauvegardes" })).toHaveLength(grade === 1 ? 2 : 0);
+  });
+
+  test("ne montre pas de liens Admin aux membres ordinaires", async () => {
+    mockLocation = { pathname: "/administration", search: "?section=backups" };
+    api.get.mockResolvedValue({ data: { GradeID: 3 } });
+    render(<NavBar />);
+    await screen.findByRole("button", { name: /Ouvrir le menu utilisateur/ });
+    expect(screen.queryByRole("link", { name: "Sauvegardes" })).not.toBeInTheDocument();
+    expect(screen.getAllByText("Aléatoires")).toHaveLength(2);
   });
 
   test("relie le badge de version aux mises à jour sur mobile et ordinateur", () => {
