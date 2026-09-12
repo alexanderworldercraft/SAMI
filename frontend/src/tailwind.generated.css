@@ -3729,6 +3729,10 @@
     }
   }
 
+  .bg-red-700 {
+    background-color: var(--color-red-700);
+  }
+
   .bg-rose-500\/10 {
     background-color: #ff23571a;
   }

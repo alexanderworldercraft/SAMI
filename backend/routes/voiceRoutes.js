@@ -1,4 +1,5 @@
 import crypto from "crypto";
+import { updateVoice, deleteVoice } from "../services/voices/crud.js";
 import fs from "fs";
 import os from "os";
 import path from "path";
@@ -19,6 +20,7 @@ export default async function voiceRoutes(app) {
     return [1, 2].includes(user?.GradeID);
   };
   app.setErrorHandler((error, req, reply) => {
+    if (error.code === "P2034") { error.statusCode = 409; error.message = "Une autre opération a modifié cet audio. Actualisez et réessayez."; }
     if (!error.statusCode || error.statusCode >= 500) req.log.error(error);
     reply.code(error.statusCode || 500).send({ error: error.statusCode ? error.message : "Opération vocale impossible." });
   });
@@ -26,7 +28,8 @@ export default async function voiceRoutes(app) {
     const admin = await isAdmin(req);
     const page = Math.max(1, Math.min(100000, Number.parseInt(req.query.page, 10) || 1));
     if (req.query.personId && !/^[1-9]\d*$/.test(req.query.personId)) fail("Personne invalide.");
-    const where = voiceWhere({ admin, personId: req.query.personId, search: String(req.query.search || "").slice(0, 191) });
+    if (req.query.kind !== undefined && !["ORIGINAL", "AI"].includes(req.query.kind)) fail("Type de voix invalide.");
+    const where = voiceWhere({ admin, kind: req.query.kind, personId: req.query.personId, search: String(req.query.search || "").slice(0, 191) });
     const [rows, total] = await Promise.all([
       prisma.voiceAudio.findMany({ where, include: voiceInclude, orderBy: [{ CreatedAt: "desc" }, { VoiceAudioID: "desc" }], take: 24, skip: (page - 1) * 24 }),
       prisma.voiceAudio.count({ where }),
@@ -35,7 +38,7 @@ export default async function voiceRoutes(app) {
   });
   app.get("/config", { preHandler: adminOnly }, async () => {
     const workers = await listAiDubbingWorkers();
-    return { languages: LANGUAGES, workerReady: workers.some(w => w.online && w.ready && w.enabled && !w.draining && w.capabilities?.voiceLibrary === 1) };
+    return { transcriptionWorkerReady: workers.some(w => w.online && w.ready && w.enabled && !w.draining && w.capabilities?.voiceTranscription === 1), languages: LANGUAGES, workerReady: workers.some(w => w.online && w.ready && w.enabled && !w.draining && w.capabilities?.voiceLibrary === 1) };
   });
   app.post("/originals", { preHandler: adminOnly }, async (req, reply) => {
     let temporary;
@@ -69,8 +72,16 @@ export default async function voiceRoutes(app) {
     if (!changed.count) fail("Audio non disponible pour publication.", 409);
     return { public: req.body.public };
   });
+  app.get("/:id", async req => {
+    const admin = await isAdmin(req);
+    const row = await prisma.voiceAudio.findFirst({ where: { ...voiceWhere({ admin }), VoiceAudioID: req.params.id }, include: voiceInclude });
+    if (!row) fail("Audio introuvable.", 404);
+    return serializeVoice(row, admin);
+  });
+  app.delete("/:id", { preHandler: adminOnly }, req => deleteVoice({ id: req.params.id }));
+  app.patch("/:id", { preHandler: adminOnly }, req => updateVoice({ id: req.params.id, body: req.body, userId: req.voiceAdmin.userId }));
   app.post("/:id/retry", { preHandler: adminOnly }, async req => {
-    const changed = await prisma.voiceAudio.updateMany({ where: { VoiceAudioID: req.params.id, Kind: "AI", Status: "FAILED", Personne: { EtatID: 1 } }, data: { Status: "QUEUED", ErrorMessage: null, LeaseToken: null, LeaseExpiresAt: null, AssignedWorkerID: null } });
+    const changed = await prisma.voiceAudio.updateMany({ where: { VoiceAudioID: req.params.id, Kind: { in: ["AI", "ORIGINAL"] }, Status: "FAILED", Personne: { EtatID: 1 } }, data: { Status: "QUEUED", ErrorMessage: null, LeaseToken: null, LeaseExpiresAt: null, AssignedWorkerID: null } });
     if (!changed.count) fail("Cette réplique ne peut pas être relancée.", 409);
     return { queued: true };
   });

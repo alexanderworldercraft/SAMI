@@ -68,6 +68,7 @@ export async function runAiSubtitleEngine({
   jobId,
   audioPath = null,
   transcript = null,
+  transcriptionOnly = false,
   targetLanguage,
   signal,
   config,
@@ -84,6 +85,7 @@ export async function runAiSubtitleEngine({
   await fs.promises.writeFile(inputPath, JSON.stringify({
     audioPath,
     transcript,
+    transcriptionOnly,
     targetLanguage,
   }), { encoding: "utf8", mode: 0o600 });
 

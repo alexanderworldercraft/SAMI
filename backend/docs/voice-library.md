@@ -30,3 +30,21 @@ La migration n’est pas appliquée automatiquement par le serveur. Les tests un
 ## Délais de génération
 
 Les répliques de la bibliothèque (500 caractères maximum) disposent de 1 800 secondes par tentative de synthèse, avec au plus trois tentatives après contrôle qualité. Le processus complet est limité à 100 minutes pour inclure le chargement des modèles et les contrôles. Le superviseur Node impose ces délais même si Python ne répond plus. Les répliques de film conservent leur délai de 600 secondes. Déployer ensemble le runtime Python et le superviseur Node sur chaque clone, puis redémarrer SAMI ; aucune réinstallation des modèles n’est nécessaire.
+
+## Consultation, modification et suppression
+
+Les routes `GET /voices/:id`, `PATCH /voices/:id` et `DELETE /voices/:id` complètent la création et la liste. Toutes exigent connexion et consentement IA ; les mutations exigent un administrateur ou super administrateur. La consultation d’un audio privé est réservée aux admins.
+
+L’édition permet de corriger le titre, la langue et le texte. Pour un original, le justificatif peut aussi être corrigé après confirmation ; l’auteur et la date de cette confirmation sont enregistrés. La personne, la source et la nature original/IA restent fixes afin de préserver l’attribution : un autre enregistrement doit être ajouté séparément. Une référence utilisée par une réplique en attente ou en cours ne peut pas changer de transcription ou de langue. Les autorisations déjà copiées sur les répliques conservent leur historique.
+
+Modifier le texte ou la langue d’une réplique exige `regenerate: true` : elle repasse en attente et en privé, sans audio consultable avant la réussite des contrôles. Renommer une réplique conserve son audio et sa visibilité. La génération en cours bloque les modifications et la suppression.
+
+La suppression est définitive après confirmation dans l’interface. Un original reste protégé tant qu’une réplique le référence, quel que soit son état. Les transactions sérialisables et la contrainte de référence protègent les opérations concurrentes. Le dossier audio est retiré après validation de la suppression en base ; un échec de nettoyage est signalé dans l’interface et les journaux, sans rendre le fichier accessible. Aucune migration supplémentaire n’est nécessaire pour ces opérations.
+
+## Transcription automatique des originaux
+
+La transcription est facultative lors de l’ajout : vide ou absente, elle place l’original en `QUEUED`. Un clone de doublage annonçant `voiceTranscription: 1` utilise son moteur local des sous-titres (faster-whisper ou whisper.cpp selon son installation), avec les contrôles de transcription existants, sans traduction ni synthèse Qwen. Le texte source est enregistré sous bail, avec son modèle de provenance ; la langue détectée doit correspondre à celle choisie. L’original devient utilisable après réussite et reste privé. L’interface identifie la transcription initiale comme IA et permet sa correction.
+
+Sur un original existant, effacer le texte demande également sa transcription automatique et le repasse en privé. Une saisie manuelle peut résoudre une demande en attente ou échouée. Un original utilisé par une génération en attente/en cours ne peut pas être modifié. Un échec de transcription est visible et relançable ; il n’efface pas l’enregistrement.
+
+Déployer backend/frontend et clones, puis redémarrer pour renouveler leurs capacités. Le clone doit disposer de l’installation des sous-titres (`npm run setup:ai`) et de sa configuration activée, en plus du doublage. Si aucun clone compatible n’est disponible, la demande attend et l’interface l’indique. Aucune migration supplémentaire n’est nécessaire.

@@ -1,4 +1,5 @@
 import crypto from "crypto";
+import { runAiSubtitleEngine } from "../aiSubtitles/engineProcess.js";
 import fs from "fs";
 import path from "path";
 import { signedFetch } from "../aiDubbing/workerClient.js";
@@ -29,6 +30,12 @@ export async function runVoiceLease({ config, signal }) {
     if (crypto.createHash("sha256").update(reference).digest("hex") !== lease.referenceSha256) throw new Error("Empreinte de la voix originale invalide.");
     const referencePath = path.join(workspace, "reference.wav");
     await fs.promises.writeFile(referencePath, reference, { mode: 0o600 });
+    if (lease.kind === "ORIGINAL") {
+      const result = await runAiSubtitleEngine({ jobId: `voice-${lease.id}`, audioPath: referencePath, targetLanguage: lease.language, transcriptionOnly: true, signal: controller.signal });
+      const text = (result.sourceSegments || []).map(segment => String(segment.text || "").trim()).filter(Boolean).join(" ");
+      await request("finish", { text, sourceLanguage: result.sourceLanguage, transcriptionModel: result.transcriptionModel });
+      return;
+    }
     const inputPath = path.join(workspace, "input.json");
     const outputPath = path.join(workspace, "output.json");
     await fs.promises.writeFile(inputPath, JSON.stringify({ ...lease, reference: undefined, referencePath }), { mode: 0o600 });

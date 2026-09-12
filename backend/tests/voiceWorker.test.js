@@ -4,11 +4,14 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 
+vi.mock("../services/aiSubtitles/engineProcess.js", () => ({ runAiSubtitleEngine: vi.fn() }));
+import { runAiSubtitleEngine } from "../services/aiSubtitles/engineProcess.js";
 vi.mock("../services/aiDubbing/workerClient.js", () => ({ signedFetch: vi.fn() }));
 vi.mock("../services/aiDubbing/commandRunner.js", () => ({ runAiDubbingCommand: vi.fn() }));
 import { signedFetch } from "../services/aiDubbing/workerClient.js";
 import { runAiDubbingCommand } from "../services/aiDubbing/commandRunner.js";
 import { runVoiceLease, isDirectVoiceOutput } from "../services/voices/worker.js";
+import { voicePath } from "../services/voices/library.js";
 import { claimVoice } from "../services/voices/leases.js";
 
 let root;
@@ -35,6 +38,15 @@ describe("worker de répliques", () => {
     expect(signedFetch).toHaveBeenLastCalledWith(expect.objectContaining({ path: `/api/internal/voices/${job.id}/finish`, body: expect.objectContaining({ token: job.token, watermarked: true, watermarkConfidence: 0.9 }) }));
     expect(fs.existsSync(path.join(root, "voices", job.id))).toBe(false);
   });
+  it("transcrit un original avec le moteur des sous-titres sans lancer Qwen", async () => {
+    const job = { ...lease(), kind: "ORIGINAL" };
+    signedFetch.mockResolvedValueOnce({ lease: job }).mockResolvedValue({});
+    runAiSubtitleEngine.mockResolvedValue({ sourceLanguage: "fr", sourceSegments: [{ text: "Bonjour" }, { text: "à tous." }], transcriptionModel: "whisper" });
+    await runVoiceLease({ config: { workRoot: root, command: "/configured-dubbing" } });
+    expect(runAiDubbingCommand).not.toHaveBeenCalled();
+    expect(runAiSubtitleEngine).toHaveBeenCalledWith(expect.objectContaining({ transcriptionOnly: true, targetLanguage: "fr" }));
+    expect(signedFetch).toHaveBeenLastCalledWith(expect.objectContaining({ body: expect.objectContaining({ text: "Bonjour à tous.", sourceLanguage: "fr", transcriptionModel: "whisper" }) }));
+  });
   it("refuse une référence altérée avant le chargement du modèle", async () => {
     const job = { ...lease(), referenceSha256: "incorrect" };
     signedFetch.mockResolvedValueOnce({ lease: job }).mockResolvedValue({});
@@ -46,6 +58,23 @@ describe("worker de répliques", () => {
     signedFetch.mockResolvedValue({ lease: null });
     await runVoiceLease({ config: { workRoot: root } });
     expect(runAiDubbingCommand).not.toHaveBeenCalled();
+  });
+  it("attribue la transcription uniquement aux clones qui annoncent le moteur de sous-titres", async () => {
+    const id = crypto.randomUUID();
+    const file = voicePath(id); fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, reference);
+    const worker = { Ready: true, Role: "CLONE", Registry: { Enabled: true }, LastHeartbeatAt: new Date(), Capabilities: { voiceLibrary: 1 } };
+    const row = { VoiceAudioID: id, Kind: "ORIGINAL", Text: "", Language: "fr" };
+    const database = {
+      voiceAudio: { updateMany: vi.fn(async () => ({ count: 1 })), count: vi.fn(async () => 0), findMany: vi.fn(async ({ where }) => where.Kind.in.includes("ORIGINAL") ? [row] : []) },
+      aiDubbingWorker: { findUnique: vi.fn(async () => worker) },
+      aiDubbingJob: { count: vi.fn(async () => 0) }, aiSubtitleJob: { count: vi.fn(async () => 0) }, videoEncodingTask: { count: vi.fn(async () => 0) },
+    };
+    database.$transaction = fn => fn(database);
+    try {
+      expect(await claimVoice("clone", database)).toBeNull();
+      worker.Capabilities.voiceTranscription = 1;
+      expect(await claimVoice("clone", database)).toMatchObject({ id, kind: "ORIGINAL", reference: reference.toString("base64"), referenceText: "" });
+    } finally { fs.rmSync(path.dirname(file), { recursive: true, force: true }); }
   });
   it("n'attribue pas de réplique à un ancien runtime ou à un worker occupé", async () => {
     const worker = { Ready: true, Role: "CLONE", Registry: { Enabled: true }, LastHeartbeatAt: new Date(), Capabilities: {} };

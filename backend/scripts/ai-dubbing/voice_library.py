@@ -22,6 +22,14 @@ def validate_request(payload, install, runtime):
     return text, language, profile
 
 
+def quality_attempt_summary(attempt, recognized, duration, cer, activity, decision):
+    reason = ("absence de parole détectée" if not activity.get("hasSpeech") else
+              "transcription vide" if not recognized.strip() else
+              decision.get("rejectionReason") or "texte reconnu non confirmé")
+    return (f"Essai {attempt}: {reason}, durée {duration:.2f}s, "
+            f"écart de transcription {cer:.1%}, reconnu : {recognized[:180]!r}")
+
+
 def process_voice(input_path, output_path, root, runtime):
     import soundfile as sf
 
@@ -39,11 +47,12 @@ def process_voice(input_path, output_path, root, runtime):
     quality_model = runtime.load_quality_model(install)
     raw = workspace / "raw.wav"
     cue = {"speaker": "SPEAKER_00", "text": text, "start": 0, "end": 180}
+    rejected_attempts = []
     for attempt in range(3):
         runtime.seed_synthesis(cue, payload["referenceSha256"], attempt, profile)
         waveform, rate = runtime.generate_voice(
             engine, text, language, "SPEAKER_00", reference, attempt=attempt, profile=profile,
-            watch_context={"workspace": workspace, "source_start": 0, "kind": "library", "progress": 20 + attempt * 20},
+            watch_context={"workspace": workspace, "source_start": 0, "kind": "library", "progress": 20 + attempt * 20, "attempt": attempt + 1},
         )
         runtime.save_generated_audio(waveform, rate, raw)
         duration = sf.info(raw).duration
@@ -63,8 +72,14 @@ def process_voice(input_path, output_path, root, runtime):
             accepted = decision["accepted"]
         if accepted and activity.get("hasSpeech"):
             break
+        summary = quality_attempt_summary(
+            attempt + 1, recognized, duration,
+            runtime.character_error_rate(text, recognized), activity, decision,
+        )
+        runtime.log(summary)
+        rejected_attempts.append(summary)
     else:
-        raise ValueError("Le contrôle vocal local ne confirme pas le texte demandé après trois essais.")
+        raise ValueError("Le contrôle vocal local ne confirme pas le texte demandé après trois essais. " + " | ".join(rejected_attempts))
     destination = workspace / "voice.wav"
     confidence = runtime.watermark_audio(raw, destination)
     runtime.write_json(output_path, {

@@ -1,4 +1,6 @@
 import crypto from "crypto";
+import { probeAiSubtitleEngine } from "../aiSubtitles/engineProcess.js";
+import { getAiSubtitleConfig } from "../aiSubtitles/config.js";
 import fs from "fs";
 import path from "path";
 import { pipeline } from "stream/promises";
@@ -219,6 +221,13 @@ export async function collectAiDubbingCapabilities({ config } = {}) {
       cwd: runtimeConfig.workRoot,
     });
     const probe = JSON.parse(String(output).trim().split(/\r?\n/).filter(Boolean).at(-1));
+    let voiceTranscription = 0;
+    try {
+      const subtitles = getAiSubtitleConfig();
+      if (probe.ready && subtitles.enabled && subtitles.install) {
+        voiceTranscription = (await probeAiSubtitleEngine({ config: subtitles })).ready ? 1 : 0;
+      }
+    } catch { /* The dubbing worker remains usable without the subtitle engine. */ }
     return {
       ready: Boolean(probe.ready),
       engine: probe.voiceEngine || runtimeConfig.voiceEngine,
@@ -232,6 +241,7 @@ export async function collectAiDubbingCapabilities({ config } = {}) {
         languages: ["en", "fr", "ja"],
         ...(probe.components || {}),
         voiceLibrary: probe.voiceLibrary === 1 ? 1 : 0,
+        voiceTranscription,
         // Le probe matériel ne remplace pas l'identité du profil utilisée par le primary.
         profile: {
           id: runtimeConfig.profile.id,

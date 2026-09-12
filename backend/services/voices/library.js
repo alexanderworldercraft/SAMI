@@ -14,7 +14,8 @@ export const voicePath = (id, file = "audio.wav") => {
   if (!/^[a-f0-9-]{36}$/.test(String(id)) || !["audio.wav", "source", "input", "result.wav"].includes(file)) fail("Identifiant audio invalide.");
   return path.join(VOICE_ROOT, id, file);
 };
-export const voiceWhere = ({ admin = false, personId, search = "" } = {}) => ({
+export const voiceWhere = ({ admin = false, personId, kind, search = "" } = {}) => ({
+  ...(kind ? { Kind: kind } : {}),
   Personne: { EtatID: 1 },
   ...(admin ? {} : { IsPublic: true, Status: "READY" }),
   ...(personId ? { PersonneID: Number(personId) } : {}),
@@ -25,6 +26,7 @@ export const serializeVoice = (row, admin = false) => ({
   kind: row.Kind, title: row.Title, language: row.Language, text: row.Text,
   public: row.IsPublic, status: row.Status, duration: row.Duration,
   originalId: row.OriginalID && (admin || row.Original?.IsPublic && row.Original?.Status === "READY") ? row.OriginalID : null,
+  automaticTranscription: row.Models?.automaticTranscription === true,
   createdAt: row.CreatedAt, watermarked: row.Watermarked,
   ...(admin ? { error: row.ErrorMessage, authorizationNote: row.AuthorizationNote, authorizedBy: row.AuthorizedBy, authorizedAt: row.AuthorizedAt, models: row.Models } : {}),
 });
@@ -43,7 +45,7 @@ export async function validateOriginal(body, database = prisma) {
   if (!Number.isSafeInteger(personId) || personId <= 0) fail("Sélectionnez une personne.");
   if (!await database.personne.findFirst({ where: { PersonneID: personId, EtatID: 1 } })) fail("Personne introuvable.", 404);
   if (body.authorized !== true && body.authorized !== "true") fail("L'autorisation d'utiliser cette voix doit être confirmée.");
-  return { PersonneID: personId, Title: textField(body.title, "Titre", 191), Language: languageField(body.language), Text: textField(body.text, "Transcription originale", 1000), AuthorizationNote: textField(body.authorizationNote, "Justificatif d'autorisation", 2000) };
+  return { PersonneID: personId, Title: textField(body.title, "Titre", 191), Language: languageField(body.language), Text: body.text == null || typeof body.text === "string" && !body.text.trim() ? "" : textField(body.text, "Transcription originale", 1000), AuthorizationNote: textField(body.authorizationNote, "Justificatif d'autorisation", 2000) };
 }
 const uploadedFormats = "wav,mp3,ogg,flac,mov,matroska,aac,aiff";
 export const probeAudio = (filename, upload = false) => new Promise((resolve, reject) => ffmpeg.ffprobe(filename, ["-protocol_whitelist", "file,pipe,crypto,data", ...(upload ? ["-format_whitelist", uploadedFormats] : [])], (error, result) => error ? reject(error) : resolve(result)));
@@ -84,7 +86,7 @@ export async function createOriginal({ body, userId, upload, database = prisma }
       source = { SourceVideoID: videoId, SourceStart: Number(body.start), SourceEnd: Number(body.end) };
     }
     const duration = await normalizeOriginal({ input, destination: voicePath(id), upload: Boolean(upload), ...(upload ? {} : { start: source.SourceStart, end: source.SourceEnd }) });
-    return await database.voiceAudio.create({ data: { ...fields, ...source, VoiceAudioID: id, Kind: "ORIGINAL", CreatedBy: userId, AuthorizedBy: userId, Duration: duration }, include: voiceInclude });
+    return await database.voiceAudio.create({ data: { ...fields, ...source, VoiceAudioID: id, Kind: "ORIGINAL", Status: fields.Text ? "READY" : "QUEUED", Models: fields.Text ? undefined : { automaticTranscription: true }, CreatedBy: userId, AuthorizedBy: userId, Duration: duration }, include: voiceInclude });
   } catch (error) {
     await fs.promises.rm(path.dirname(voicePath(id)), { recursive: true, force: true });
     throw error;

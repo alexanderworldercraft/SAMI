@@ -43,12 +43,32 @@ describe("accès à la bibliothèque vocale", () => {
     }
     expect(db.voiceAudio.findFirst).not.toHaveBeenCalled();
   });
+  it.each(["GET", "PATCH", "DELETE"])("protège les opérations CRUD sans connexion ou sans consentement : %s", async method => {
+    const request = { method, url: "/voices/123", ...(method === "PATCH" ? { payload: { title: "Autre titre" } } : {}) };
+    expect((await app.inject(request)).statusCode).toBe(401);
+    db.userAiPreference.findUnique.mockResolvedValue({ Accepted: false, DisclosureVersion: AI_DISCLOSURE_VERSION });
+    expect((await app.inject({ ...request, headers: { "x-user": "7" } })).statusCode).toBe(403);
+  });
+  it("filtre aussi la consultation individuelle pour un utilisateur", async () => {
+    db.voiceAudio.findFirst.mockResolvedValue(null);
+    expect((await app.inject({ url: "/voices/123", headers: { "x-user": "7" } })).statusCode).toBe(404);
+    expect(db.voiceAudio.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ VoiceAudioID: "123", IsPublic: true, Status: "READY" }) }));
+  });
+  it.each(["ORIGINAL", "AI"])("filtre la liste et le compteur par catégorie : %s", async kind => {
+    expect((await app.inject({ url: `/voices?kind=${kind}`, headers: { "x-user": "7" } })).statusCode).toBe(200);
+    expect(db.voiceAudio.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ Kind: kind, IsPublic: true }) }));
+    expect(db.voiceAudio.count).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ Kind: kind, IsPublic: true }) }));
+  });
+  it("refuse une catégorie inconnue", async () => {
+    expect((await app.inject({ url: "/voices?kind=OTHER", headers: { "x-user": "7" } })).statusCode).toBe(400);
+    expect(db.voiceAudio.findMany).not.toHaveBeenCalled();
+  });
   it("ne liste que les audios publiés et prêts pour un utilisateur", async () => {
     expect((await app.inject({ url: "/voices?personId=4", headers: { "x-user": "7" } })).statusCode).toBe(200);
     expect(db.voiceAudio.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ IsPublic: true, Status: "READY", PersonneID: 4 }) }));
   });
   it("réserve création, génération, publication et téléchargement aux admins", async () => {
-    for (const [method, url, payload] of [["POST", "/voices/originals", {}], ["POST", "/voices/123/replicas", {}], ["PATCH", "/voices/123/visibility", { public: true }], ["POST", "/voices/123/retry", {}], ["GET", "/voices/123/download"]]) {
+    for (const [method, url, payload] of [["PATCH", "/voices/123", { title: "Test" }], ["DELETE", "/voices/123"], ["POST", "/voices/originals", {}], ["POST", "/voices/123/replicas", {}], ["PATCH", "/voices/123/visibility", { public: true }], ["POST", "/voices/123/retry", {}], ["GET", "/voices/123/download"]]) {
       expect((await app.inject({ method, url, payload, headers: { "x-user": "7" } })).statusCode).toBe(403);
     }
     expect(db.voiceAudio.create).not.toHaveBeenCalled();
@@ -104,12 +124,12 @@ describe("intégrité des originaux et des générations", () => {
       if (saved) fs.rmSync(path.dirname(voicePath(saved.VoiceAudioID)), { recursive: true, force: true });
     }
   });
-  it("exige une personne active, une transcription et une autorisation", async () => {
+  it("exige une personne active et une autorisation, mais accepte une transcription vide", async () => {
     db.personne.findFirst.mockResolvedValue({ PersonneID: 4 });
     const body = { personId: 4, title: "Référence", language: "fr", text: "Bonjour", authorized: true, authorizationNote: "Accord enregistré" };
     await expect(validateOriginal(body)).resolves.toMatchObject({ PersonneID: 4 });
     await expect(validateOriginal({ ...body, authorized: false })).rejects.toMatchObject({ statusCode: 400 });
-    await expect(validateOriginal({ ...body, text: "" })).rejects.toMatchObject({ statusCode: 400 });
+    await expect(validateOriginal({ ...body, text: "" })).resolves.toMatchObject({ Text: "" });
     await expect(validateOriginal({ ...body, language: "invalid" })).rejects.toMatchObject({ statusCode: 400 });
     db.personne.findFirst.mockResolvedValue(null);
     await expect(validateOriginal(body)).rejects.toMatchObject({ statusCode: 404 });
@@ -119,6 +139,19 @@ describe("intégrité des originaux et des générations", () => {
     db.voiceAudio.findFirst.mockResolvedValue(null);
     await expect(renewVoice("clone", "id", "old", db)).rejects.toMatchObject({ statusCode: 409 });
     await expect(finishVoice("clone", "id", { token: "old", audio: "abc" }, db)).rejects.toMatchObject({ statusCode: 409 });
+  });
+  it("enregistre une transcription sous bail sans modifier le fichier original", async () => {
+    db.voiceAudio.findFirst.mockResolvedValue({ Kind: "ORIGINAL", Language: "fr" });
+    db.voiceAudio.updateMany.mockResolvedValue({ count: 1 });
+    await expect(finishVoice("clone", "id", { token: "lease", text: "Texte reconnu.", sourceLanguage: "fr", transcriptionModel: "whisper" }, db)).resolves.toEqual({ ready: true });
+    expect(db.voiceAudio.updateMany).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ Text: "Texte reconnu.", Status: "READY", Models: { automaticTranscription: true, transcriptionModel: "whisper" } }) }));
+  });
+  it("refuse une transcription vide ou dans une autre langue", async () => {
+    db.voiceAudio.findFirst.mockResolvedValue({ Kind: "ORIGINAL", Language: "fr" });
+    for (const body of [{ text: "", sourceLanguage: "fr" }, { text: "Hello", sourceLanguage: "en" }]) {
+      await expect(finishVoice("clone", "id", { token: "lease", transcriptionModel: "whisper", ...body }, db)).rejects.toMatchObject({ statusCode: 400 });
+    }
+    expect(db.voiceAudio.updateMany).not.toHaveBeenCalled();
   });
   it("refuse une sortie sans watermark avant toute écriture", async () => {
     db.voiceAudio.findFirst.mockResolvedValue({ VoiceAudioID: "id" });

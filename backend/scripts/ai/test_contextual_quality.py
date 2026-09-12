@@ -1,6 +1,8 @@
 import json
 import tempfile
 import unittest
+from unittest.mock import patch
+import worker
 from pathlib import Path
 
 from worker import (
@@ -16,6 +18,19 @@ from worker import (
 
 
 class ContextualSubtitleQualityTests(unittest.TestCase):
+    def test_transcription_only_never_translates_source(self):
+        with tempfile.TemporaryDirectory() as directory:
+            audio = Path(directory) / "source.wav"
+            audio.write_bytes(b"test")
+            output = Path(directory) / "out.json"
+            segments = [{"start": 0, "end": 2, "text": "Bonjour à tous."}]
+            with patch.object(worker, "transcribe_faster_whisper", return_value=("fr", segments)), patch.object(worker, "translate_segments") as translate:
+                worker.execute({"engine": "faster-whisper", "model": "whisper"}, {"audioPath": str(audio), "targetLanguage": "en", "transcriptionOnly": True}, output)
+            translate.assert_not_called()
+            result = json.loads(output.read_text())
+            self.assertEqual(result["sourceLanguage"], "fr")
+            self.assertEqual(result["sourceSegments"][0]["text"], "Bonjour à tous.")
+
     def test_parses_whisper_cpp_full_json_word_timestamps(self):
         language, segments = parse_whisper_cpp_transcription({
             "result": {"language": "fr"},

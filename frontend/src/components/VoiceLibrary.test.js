@@ -7,7 +7,7 @@ import { VOICE_PRESENTATION_TEXT } from "../constants/voicePresentation";
 
 jest.mock("react-router-dom", () => ({ Link: ({ children, to, ...props }) => <a href={to} {...props}>{children}</a>, useSearchParams: () => [new URLSearchParams()] }), { virtual: true });
 jest.mock("../context/AiFeaturePreferenceContext", () => ({ useAiFeaturePreference: jest.fn() }));
-jest.mock("../services/api", () => ({ __esModule: true, default: { get: jest.fn(), patch: jest.fn(), post: jest.fn(), defaults: { baseURL: "/api" } } }));
+jest.mock("../services/api", () => ({ __esModule: true, default: { get: jest.fn(), patch: jest.fn(), post: jest.fn(), delete: jest.fn(), defaults: { baseURL: "/api" } } }));
 jest.mock("./DubbingVideoSelect", () => () => <div>Vidéo SAMI</div>);
 const item = { id: "voice-1", personId: 7, person: { Prenom: "Voix", Nom: "Exemple" }, title: "Bonjour", text: "Bonjour à tous", language: "fr", kind: "AI", status: "READY", public: true, originalId: null };
 beforeEach(() => {
@@ -33,6 +33,8 @@ test("un utilisateur écoute les répliques publiées sans commande de télécha
   expect(audio).toHaveAttribute("controlsList", "nodownload");
   expect(audio).toHaveAttribute("src", "/api/voices/voice-1/audio");
   expect(screen.queryByText(/Télécharger/)).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Modifier" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Supprimer" })).not.toBeInTheDocument();
   expect(screen.queryByRole("button", { name: /Générer/ })).not.toBeInTheDocument();
   expect(screen.queryByText(/Écouter l’original/)).not.toBeInTheDocument();
 });
@@ -87,4 +89,80 @@ test("ajoute un original depuis la fiche personne sans générer de réplique", 
   expect(url).toBe("/voices/originals");
   expect(body.get("personId")).toBe("7");
   expect(screen.queryByLabelText(/Texte à prononcer/)).not.toBeInTheDocument();
+});
+
+const adminVoices = (voice = item) => api.get.mockImplementation(url => Promise.resolve({ data: url === "/voices/config" ? { workerReady: true } : { items: [voice], admin: true, pages: 1 } }));
+test("modifier le texte IA exige une confirmation explicite de régénération", async () => {
+  adminVoices(); api.patch.mockResolvedValue({ data: {} });
+  render(<VoiceCollection />);
+  fireEvent.click(await screen.findByRole("button", { name: "Modifier" }));
+  fireEvent.change(screen.getByLabelText("Texte à prononcer"), { target: { value: "Bonsoir" } });
+  const checkbox = screen.getByRole("checkbox");
+  expect(checkbox).toBeRequired();
+  fireEvent.click(checkbox);
+  await act(async () => fireEvent.submit(screen.getByRole("form", { name: "Modifier une voix" })));
+  expect(api.patch).toHaveBeenCalledWith("/voices/voice-1", { title: "Bonjour", text: "Bonsoir", language: "fr", regenerate: true });
+});
+test("supprimer demande confirmation et annuler ne fait aucun appel", async () => {
+  adminVoices(); api.delete.mockResolvedValue({ data: { deleted: true } });
+  render(<VoiceCollection />);
+  fireEvent.click(await screen.findByRole("button", { name: "Supprimer" }));
+  expect(api.delete).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole("button", { name: "Annuler" }));
+  expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Supprimer" }));
+  await act(async () => fireEvent.click(screen.getByRole("button", { name: "Supprimer définitivement" })));
+  expect(api.delete).toHaveBeenCalledWith("/voices/voice-1");
+  expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+});
+test("affiche le refus de suppression d’un original utilisé", async () => {
+  adminVoices({ ...item, kind: "ORIGINAL" });
+  api.delete.mockRejectedValue({ response: { data: { error: "Supprimez d’abord les répliques." } } });
+  render(<VoiceCollection />);
+  fireEvent.click(await screen.findByRole("button", { name: "Supprimer" }));
+  await act(async () => fireEvent.click(screen.getByRole("button", { name: "Supprimer définitivement" })));
+  expect(screen.getByRole("alert")).toHaveTextContent("Supprimez d’abord les répliques.");
+  expect(screen.getByRole("alertdialog")).toBeInTheDocument();
+});
+test("ne propose pas de modification ni de suppression pendant la génération", async () => {
+  adminVoices({ ...item, status: "PROCESSING" });
+  render(<VoiceCollection />);
+  expect(await screen.findByRole("button", { name: "Modifier" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Supprimer" })).toBeDisabled();
+});
+
+test("laisser la transcription vide permet l’ajout automatique sans génération de voix", async () => {
+  api.get.mockImplementation(url => Promise.resolve({ data: url === "/voices/config" ? { workerReady: true, transcriptionWorkerReady: true } : url === "/people" ? [{ PersonneID: 7, Prenom: "Voix", Nom: "Exemple" }] : { items: [], admin: true, pages: 1 } }));
+  api.post.mockResolvedValue({ data: {} });
+  render(<PersonVoiceSection personId="7" />);
+  fireEvent.click(await screen.findByRole("button", { name: "Ajouter une voix originale" }));
+  await screen.findByRole("option", { name: "Voix Exemple" });
+  expect(screen.getByLabelText(/Transcription exacte/)).not.toBeRequired();
+  fireEvent.change(screen.getByLabelText("Titre"), { target: { value: "Original" } });
+  fireEvent.change(screen.getByLabelText(/Justificatif/), { target: { value: "Accord" } });
+  fireEvent.click(screen.getByRole("checkbox"));
+  fireEvent.change(screen.getByLabelText(/Fichier audio/), { target: { files: [new File(["audio"], "original.wav", { type: "audio/wav" })] } });
+  await act(async () => fireEvent.submit(screen.getByRole("button", { name: "Conserver l’original" }).closest("form")));
+  expect(api.post.mock.calls[0][1].get("text")).toBe("");
+});
+test("un original en attente ne peut pas encore servir de référence", async () => {
+  adminVoices({ ...item, kind: "ORIGINAL", text: "", status: "QUEUED", automaticTranscription: true });
+  render(<VoiceCollection />);
+  expect(await screen.findByText("Transcription automatique en attente")).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Utiliser comme référence" })).not.toBeInTheDocument();
+});
+
+test("les onglets filtrent les catégories et réinitialisent la recherche", async () => {
+  api.get.mockImplementation((url, options) => Promise.resolve({ data: { items: [{ ...item, kind: options?.params?.kind || "ORIGINAL" }], admin: false, pages: 1 } }));
+  render(<VoiceCollection />);
+  expect(await screen.findByLabelText("Original : Bonjour")).toBeInTheDocument();
+  expect(screen.getByRole("tab", { name: "Originaux" })).toHaveAttribute("aria-selected", "true");
+  fireEvent.change(screen.getByLabelText("Rechercher une voix"), { target: { value: "test" } });
+  fireEvent.click(screen.getByRole("tab", { name: "Voix IA" }));
+  expect(await screen.findByLabelText("IA : Bonjour")).toBeInTheDocument();
+  expect(screen.queryByLabelText("Original : Bonjour")).not.toBeInTheDocument();
+  expect(api.get).toHaveBeenLastCalledWith("/voices", { params: { personId: undefined, page: 1, search: "", kind: "AI" } });
+  fireEvent.keyDown(screen.getByRole("tab", { name: "Voix IA" }), { key: "ArrowLeft" });
+  await screen.findByLabelText("Original : Bonjour");
+  expect(screen.getByRole("tab", { name: "Originaux" })).toHaveFocus();
 });

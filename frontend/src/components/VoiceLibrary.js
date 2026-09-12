@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useId, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { MicrophoneIcon, SparklesIcon } from "@heroicons/react/24/outline";
 import api from "../services/api";
@@ -64,7 +64,8 @@ function OriginalForm({ onSaved, personId }) {
       <DubbingVideoSelect value={form.videoId} onChange={v => set("videoId", v)} />
       <div className="grid grid-cols-2 gap-4">{[["start", "Début (secondes)"], ["end", "Fin (secondes)"]].map(([key, label]) => <label key={key} className="grid gap-2 text-sm">{label}<input required className={inputClass} type="number" min="0" step="0.1" value={form[key]} onChange={e => set(key, e.target.value)} /></label>)}</div>
     </>}
-    <label className="grid gap-2 text-sm font-medium">Transcription exacte de l’extrait<textarea required maxLength={1000} rows={3} className={inputClass} value={form.text} onChange={e => set("text", e.target.value)} /></label>
+    <label className="grid gap-2 text-sm font-medium">Transcription exacte de l’extrait · facultative<textarea aria-describedby="original-transcription-help" maxLength={1000} rows={3} className={inputClass} value={form.text} onChange={e => set("text", e.target.value)} /></label>
+    <p id="original-transcription-help" className="text-sm text-slate-600 dark:text-slate-300">Laissez ce champ vide pour transcrire l’extrait avec l’IA locale des sous-titres. La transcription sera modifiable avant utilisation. Si vous la saisissez, recopiez les paroles de l’original, pas le texte de la future réplique.</p>
     <label className="grid gap-2 text-sm font-medium">Justificatif d’autorisation<textarea required maxLength={2000} rows={2} className={inputClass} value={form.authorizationNote} onChange={e => set("authorizationNote", e.target.value)} placeholder="Origine de l’autorisation, périmètre et référence du justificatif" /></label>
     <label className="flex items-start gap-3 text-sm"><input required type="checkbox" className="mt-1" checked={form.authorized} onChange={e => set("authorized", e.target.checked)} />Je confirme disposer de l’autorisation d’utiliser cette voix pour créer et, si je les publie, partager des répliques synthétiques.</label>
     {error && <p role="alert" className="text-red-600 dark:text-red-400">{error}</p>}
@@ -97,26 +98,65 @@ function ReplicaForm({ original, onSaved, onClose }) {
   </form>;
 }
 
+function EditVoiceForm({ item, onSaved, onClose }) {
+  const [title, setTitle] = useState(item.title);
+  const [text, setText] = useState(item.text);
+  const [language, setLanguage] = useState(item.language);
+  const [note, setNote] = useState(item.authorizationNote || "");
+  const [confirmed, setConfirmed] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const regenerate = item.kind === "AI" && (text !== item.text || language !== item.language);
+  const authorizationChanged = item.kind === "ORIGINAL" && note !== item.authorizationNote;
+  return <form aria-label="Modifier une voix" className={`${panelClass} grid gap-4`} onSubmit={async e => {
+    e.preventDefault(); setBusy(true); setError("");
+    try {
+      const body = { title, text, language };
+      if (regenerate) body.regenerate = confirmed;
+      if (authorizationChanged) Object.assign(body, { authorizationNote: note, authorized: confirmed });
+      await api.patch(`/voices/${item.id}`, body); onSaved();
+    } catch (err) { setError(err.response?.data?.error || "Modification impossible."); }
+    finally { setBusy(false); }
+  }}>
+    <h2 className="text-lg font-bold">Modifier · {item.title}</h2>
+    <p className="text-sm">{personName(item.person)} · {item.kind === "AI" ? "Réplique IA" : "Voix originale"}. La personne et le fichier original restent associés à cet enregistrement.</p>
+    <label className="grid gap-2 text-sm">Titre<input required maxLength={191} className={inputClass} value={title} onChange={e => setTitle(e.target.value)} /></label>
+    <LanguageSelect value={language} onChange={setLanguage} />
+    <label className="grid gap-2 text-sm">{item.kind === "AI" ? "Texte à prononcer" : "Transcription exacte"}<textarea required={item.kind === "AI"} maxLength={item.kind === "AI" ? 500 : 1000} rows={4} className={inputClass} value={text} onChange={e => setText(e.target.value)} /></label>
+    {item.kind === "ORIGINAL" && <p className="text-sm">Laissez la transcription vide pour demander sa reconnaissance automatique. Si vous effacez un texte existant, l’original repassera en privé et attendra la transcription.</p>}
+    {item.kind === "ORIGINAL" && <label className="grid gap-2 text-sm">Justificatif d’autorisation<textarea required maxLength={2000} className={inputClass} value={note} onChange={e => setNote(e.target.value)} /></label>}
+    {(regenerate || authorizationChanged) && <label className="flex items-start gap-3 text-sm"><input required type="checkbox" checked={confirmed} onChange={e => setConfirmed(e.target.checked)} />{regenerate ? "Je confirme la nouvelle génération. Cette réplique redeviendra privée et son audio sera remplacé après validation." : "Je confirme disposer de l’autorisation décrite pour utiliser cette voix."}</label>}
+    {error && <p role="alert" className="text-red-600 dark:text-red-400">{error}</p>}
+    <div className="flex gap-3"><button className={buttonClass} disabled={busy}>{busy ? "Enregistrement…" : regenerate ? "Enregistrer et régénérer" : "Enregistrer"}</button><button type="button" disabled={busy} onClick={onClose}>Annuler</button></div>
+  </form>;
+}
+
 export function VoiceCollection({ personId, compact = false }) {
+  const [kind, setKind] = useState("ORIGINAL");
+  const tabsId = useId();
   const [data, setData] = useState(null); const [page, setPage] = useState(1);
   const [search, setSearch] = useState(""); const [error, setError] = useState("");
   const [adding, setAdding] = useState(false); const [original, setOriginal] = useState(null);
+  const [transcriptionReady, setTranscriptionReady] = useState(null);
   const [workerReady, setWorkerReady] = useState(null); const [busyId, setBusyId] = useState(null);
+  const [editing, setEditing] = useState(null);
+  const [deleting, setDeleting] = useState(null);
+  const [notice, setNotice] = useState("");
   const [revision, setRevision] = useState(0);
   const refresh = useCallback(() => setRevision(v => v + 1), []);
   useEffect(() => {
     let active = true;
-    const load = () => api.get("/voices", { params: { personId, page, search } }).then(r => {
+    const load = () => api.get("/voices", { params: { personId, page, search, kind } }).then(r => {
       if (active) { setData(r.data); setError(""); }
     }).catch(err => { if (active) { setError(err.response?.data?.error || "Bibliothèque indisponible."); if ([401, 403, 428].includes(err.response?.status)) setData(null); } });
     load();
     const timer = setInterval(load, 10000);
     return () => { active = false; clearInterval(timer); };
-  }, [personId, page, search, revision]);
+  }, [personId, page, search, kind, revision]);
   useEffect(() => {
     if (!data?.admin) return;
     let active = true;
-    const load = () => api.get("/voices/config").then(r => { if (active) setWorkerReady(r.data.workerReady); }).catch(() => {});
+    const load = () => api.get("/voices/config").then(r => { if (active) { setWorkerReady(r.data.workerReady); setTranscriptionReady(r.data.transcriptionWorkerReady); } }).catch(() => {});
     load();
     const timer = setInterval(load, 10000);
     return () => { active = false; clearInterval(timer); };
@@ -127,34 +167,69 @@ export function VoiceCollection({ personId, compact = false }) {
     catch (err) { setError(err.response?.data?.error || "Opération impossible."); }
     finally { setBusyId(null); }
   };
+  const selectKind = next => {
+    if (next === kind) return;
+    setKind(next); setPage(1); setSearch(""); setData(null);
+    setAdding(false); setOriginal(null); setEditing(null); setDeleting(null); setNotice(""); setError("");
+  };
   return <section className="grid gap-5 text-slate-900 dark:text-white" aria-label="Bibliothèque de voix">
     <div className="flex flex-wrap items-center justify-between gap-3">
       {compact ? <h2 className="text-xl font-bold">Voix originales et répliques IA</h2> : <label className="w-full max-w-md"><span className="sr-only">Rechercher une voix</span><input className={inputClass} placeholder="Rechercher une personne ou un extrait…" value={search} onChange={e => { setSearch(e.target.value); setPage(1); }} /></label>}
       {data?.admin && <div className="flex flex-wrap gap-3"><button className={buttonClass} onClick={() => { setAdding(v => !v); setOriginal(null); }}>{adding ? "Fermer l’ajout" : "Ajouter une voix originale"}</button>{compact && <Link className="self-center text-sm text-sky-700 underline dark:text-sky-300" to={`/voix?personId=${personId}`}>Voir la bibliothèque</Link>}</div>}
     </div>
+    <div role="tablist" aria-label="Catégories de voix" className="flex gap-2 border-b border-slate-200 pb-3 dark:border-slate-700">
+      {[["ORIGINAL", "Originaux"], ["AI", "Voix IA"]].map(([value, label], index) => <button key={value} type="button" role="tab" id={`${tabsId}-${value}`} aria-controls={`${tabsId}-panel`} aria-selected={kind === value} tabIndex={kind === value ? 0 : -1} className={kind === value ? buttonClass : "rounded-xl px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800"} onClick={() => selectKind(value)} onKeyDown={e => {
+        if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key)) return;
+        e.preventDefault();
+        const next = e.key === "Home" ? 0 : e.key === "End" ? 1 : 1 - index;
+        e.currentTarget.parentElement.querySelectorAll('[role="tab"]')[next].focus();
+        selectKind(next === 0 ? "ORIGINAL" : "AI");
+      }}>{label}</button>)}
+    </div>
+    <div role="tabpanel" id={`${tabsId}-panel`} aria-labelledby={`${tabsId}-${kind}`} className="grid gap-5">
     {data?.admin && (!compact || original) && workerReady === false && <p className="rounded-xl bg-amber-500/10 p-3 text-sm">Aucun worker vocal compatible n’est disponible actuellement. Les générations resteront en attente.</p>}
-    {adding && <OriginalForm personId={personId} onSaved={() => { setAdding(false); setPage(1); refresh(); }} />}
-    {original && <ReplicaForm key={original.id} original={original} onClose={() => setOriginal(null)} onSaved={() => { setOriginal(null); setPage(1); refresh(); }} />}
+    {data?.admin && transcriptionReady === false && <p className="rounded-xl bg-amber-500/10 p-3 text-sm">Aucun clone avec le moteur de sous-titres n’est disponible pour transcrire les originaux. Vous pouvez saisir la transcription manuellement ou laisser la demande en attente.</p>}
+    {adding && <OriginalForm personId={personId} onSaved={() => { setAdding(false); selectKind("ORIGINAL"); setPage(1); refresh(); }} />}
+    {original && <ReplicaForm key={original.id} original={original} onClose={() => setOriginal(null)} onSaved={() => { setOriginal(null); selectKind("AI"); setPage(1); refresh(); }} />}
+    {notice && <p role="status" className="text-sm">{notice}</p>}
+    {deleting && data?.admin && <div role="alertdialog" aria-label="Confirmer la suppression de la voix" className={`${panelClass} grid gap-3`}>
+      <h2 className="font-bold">Supprimer « {deleting.title} » ?</h2>
+      <p>Cette suppression est définitive et retire le fichier audio. Un original utilisé par des répliques ne peut pas être supprimé tant qu’elles existent.</p>
+      <div className="flex gap-3"><button className="rounded-xl bg-red-700 px-4 py-2 text-white disabled:opacity-50" disabled={busyId === deleting.id} onClick={async () => {
+        setBusyId(deleting.id); setError("");
+        try {
+          const result = await api.delete(`/voices/${deleting.id}`);
+          setNotice(result.data?.warning || "Voix supprimée.");
+          setDeleting(null); setEditing(null); setOriginal(null); setPage(1); refresh();
+        } catch (err) { setError(err.response?.data?.error || "Suppression impossible."); }
+        finally { setBusyId(null); }
+      }}>Supprimer définitivement</button><button disabled={busyId === deleting.id} onClick={() => setDeleting(null)}>Annuler</button></div>
+    </div>}
+    {editing && data?.admin && <EditVoiceForm key={editing.id} item={editing} onClose={() => setEditing(null)} onSaved={() => { setEditing(null); refresh(); }} />}
     {error && <p role="alert" className="text-red-600 dark:text-red-400">{error}</p>}
     {!data && !error && <p>Chargement des voix…</p>}
-    {data?.items.length === 0 && <div className={`${panelClass} py-10 text-center`}><MicrophoneIcon className="mx-auto mb-3 h-9 w-9 text-sky-500" /><p>Aucune voix {data.admin ? "enregistrée" : "publiée"} pour le moment.</p></div>}
+    {data?.items.length === 0 && <div className={`${panelClass} py-10 text-center`}><MicrophoneIcon className="mx-auto mb-3 h-9 w-9 text-sky-500" /><p>{kind === "ORIGINAL" ? "Aucun original" : "Aucune voix IA"} {data.admin ? "disponible" : kind === "ORIGINAL" ? "publié" : "publiée"} pour le moment.</p></div>}
     <div className="grid gap-4 lg:grid-cols-2">{data?.items.map(item => <article key={item.id} className={`${panelClass} flex flex-col gap-3`}>
       <div className="flex flex-wrap items-center gap-2 text-xs font-bold"><span className={`rounded-full px-3 py-1 ${item.kind === "AI" ? "bg-violet-500/15 text-violet-700 dark:text-violet-300" : "bg-sky-500/15 text-sky-700 dark:text-sky-300"}`}>{item.kind === "AI" ? "IA · Voix synthétique" : "Original"}</span><span>{languageName(item.language)}</span>{data.admin && <span className="ml-auto text-slate-500 dark:text-slate-400">{item.public ? "Publié" : "Privé · admins"}</span>}</div>
       <div><h3 className="text-lg font-bold">{item.title}</h3><Link className="text-sm text-sky-700 hover:underline dark:text-sky-300" to={`/personnes/${item.personId}`}>{personName(item.person)}{item.kind === "AI" ? " · IA" : ""}</Link></div>
       <p className="whitespace-pre-wrap break-words text-sm text-slate-600 dark:text-slate-300">{item.text}</p>
-      {item.status === "READY" ? <audio aria-label={`${item.kind === "AI" ? "IA" : "Original"} : ${item.title}`} controls controlsList={data.admin ? undefined : "nodownload"} preload="none" crossOrigin="use-credentials" src={audioUrl(item.id)} className="mt-auto w-full" onContextMenu={data.admin ? undefined : e => e.preventDefault()} /> : <p role="status" className="text-sm">{statusNames[item.status]}</p>}
+      {item.automaticTranscription && item.text && <p className="text-xs text-slate-500 dark:text-slate-400">Transcription initiale par IA · vérifiable et modifiable par un administrateur.</p>}
+      {item.status === "READY" ? <audio aria-label={`${item.kind === "AI" ? "IA" : "Original"} : ${item.title}`} controls controlsList={data.admin ? undefined : "nodownload"} preload="none" crossOrigin="use-credentials" src={audioUrl(item.id)} className="mt-auto w-full" onContextMenu={data.admin ? undefined : e => e.preventDefault()} /> : <p role="status" className="text-sm">{item.kind === "ORIGINAL" ? ({ QUEUED: "Transcription automatique en attente", PROCESSING: "Transcription automatique en cours", FAILED: "Transcription automatique échouée" }[item.status] || statusNames[item.status]) : statusNames[item.status]}</p>}
       {item.originalId && item.kind === "AI" && <details className="text-sm"><summary className="cursor-pointer text-sky-700 dark:text-sky-300">Écouter l’original de référence</summary><audio aria-label={`Original de référence : ${item.title}`} controls controlsList={data.admin ? undefined : "nodownload"} crossOrigin="use-credentials" preload="none" src={audioUrl(item.originalId)} className="mt-3 w-full" /></details>}
       {data.admin && <>
         {item.error && <p className="text-sm text-red-600 dark:text-red-400">{item.error}</p>}
         <div className="flex flex-wrap items-center gap-3 text-sm">
-          {item.kind === "ORIGINAL" && <button className={buttonClass} onClick={() => { setOriginal(item); setAdding(false); }}>Utiliser comme référence</button>}
+          <button disabled={busyId === item.id || item.status === "PROCESSING"} className="font-semibold text-sky-700 dark:text-sky-300" onClick={() => { setEditing(item); setAdding(false); setOriginal(null); }}>Modifier</button>
+          {item.kind === "ORIGINAL" && item.status === "READY" && <button className={buttonClass} onClick={() => { setOriginal(item); setAdding(false); }}>Utiliser comme référence</button>}
           {item.status === "READY" && <><button disabled={busyId === item.id} className="font-semibold text-sky-700 dark:text-sky-300" onClick={() => action(item.id, "visibility", { public: !item.public })}>{item.public ? "Rendre privé" : "Publier"}</button><a className="text-slate-600 underline dark:text-slate-300" href={audioUrl(item.id, true)}>Télécharger {item.kind === "AI" ? "l’IA" : "l’original"}</a></>}
+          <button disabled={busyId === item.id || item.status === "PROCESSING"} className="font-semibold text-red-700 dark:text-red-400" onClick={() => { setDeleting(item); setEditing(null); }}>Supprimer</button>
           {item.status === "FAILED" && <button disabled={busyId === item.id} className={buttonClass} onClick={() => action(item.id, "retry", {})}>Relancer</button>}
         </div>
         <details className="text-xs text-slate-500 dark:text-slate-400"><summary className="cursor-pointer">Autorisation d’utilisation</summary><p className="mt-2 whitespace-pre-wrap">{item.authorizationNote}</p><p>Confirmée par l’administrateur #{item.authorizedBy} le {new Date(item.authorizedAt).toLocaleDateString("fr-FR")}.</p></details>
       </>}
     </article>)}</div>
     {data?.pages > 1 && <nav aria-label="Pagination des voix" className="flex items-center justify-center gap-4"><button className={buttonClass} disabled={page <= 1} onClick={() => setPage(p => p - 1)}>Précédent</button><span>{page} / {data.pages}</span><button className={buttonClass} disabled={page >= data.pages} onClick={() => setPage(p => p + 1)}>Suivant</button></nav>}
+    </div>
   </section>;
 }
 

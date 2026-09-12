@@ -924,6 +924,12 @@ def execute(manifest, payload, output_path):
         raise ValueError("Aucune parole exploitable n'a été détectée.")
     source_segments = tighten_transcript_segments(source_segments)
     assert_transcript_quality(source_segments, "transcription source")
+    if payload.get("transcriptionOnly") is True:
+        write_json(output_path, {
+            "sourceLanguage": source_language, "sourceSegments": source_segments,
+            "transcriptionModel": manifest.get("model", "unknown"),
+        })
+        return
     target_segments, quality_report = translate_segments(
         manifest, source_segments, source_language, target_language
     )

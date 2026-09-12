@@ -2,7 +2,7 @@ import crypto from "crypto";
 import fs from "fs";
 import path from "path";
 import { prisma } from "../db.js";
-import { fail, probeAudio, voicePath } from "./library.js";
+import { fail, probeAudio, voicePath, textField } from "./library.js";
 import { AI_DUBBING_OFFLINE_AFTER_MS } from "../aiDubbing/constants.js";
 
 const leaseMs = 120000;
@@ -23,14 +23,14 @@ export async function claimVoice(workerId, database = prisma) {
       tx.videoEncodingTask.count({ where: { AssignedWorkerID: workerId, Status: "LEASED", LeaseExpiresAt: { gt: now } } }),
     ]);
     if (busy.some(Boolean)) return null;
-    const candidates = await tx.voiceAudio.findMany({ where: { Kind: "AI", Status: "QUEUED", Personne: { EtatID: 1 } }, include: { Original: true }, orderBy: { CreatedAt: "asc" }, take: 50 });
-    const row = candidates.find(row => row.Models?.voiceEngine === worker.Engine && row.Models?.voiceModel === worker.Model && (row.Models?.voiceModelRevision || null) === (worker.ModelRevision || null) && row.Models?.pipeline === worker.PipelineVersion && row.Models?.generationConfigHash === worker.Capabilities?.profile?.generationConfigHash);
+    const candidates = await tx.voiceAudio.findMany({ where: { Kind: { in: worker.Capabilities?.voiceTranscription === 1 ? ["AI", "ORIGINAL"] : ["AI"] }, Status: "QUEUED", Personne: { EtatID: 1 } }, include: { Original: true }, orderBy: { CreatedAt: "asc" }, take: 50 });
+    const row = candidates.find(row => row.Kind === "ORIGINAL" || row.Models?.voiceEngine === worker.Engine && row.Models?.voiceModel === worker.Model && (row.Models?.voiceModelRevision || null) === (worker.ModelRevision || null) && row.Models?.pipeline === worker.PipelineVersion && row.Models?.generationConfigHash === worker.Capabilities?.profile?.generationConfigHash);
     if (!row) return null;
     const token = crypto.randomBytes(32).toString("hex");
     const changed = await tx.voiceAudio.updateMany({ where: { VoiceAudioID: row.VoiceAudioID, Status: "QUEUED" }, data: { Status: "PROCESSING", AssignedWorkerID: workerId, LeaseToken: hash(token), LeaseExpiresAt: new Date(now.getTime() + leaseMs) } });
     if (!changed.count) return null;
-    const reference = await fs.promises.readFile(voicePath(row.OriginalID));
-    return { id: row.VoiceAudioID, token, text: row.Text, language: row.Language, models: row.Models, referenceText: row.Original.Text, reference: reference.toString("base64"), referenceSha256: crypto.createHash("sha256").update(reference).digest("hex") };
+    const reference = await fs.promises.readFile(voicePath(row.Kind === "ORIGINAL" ? row.VoiceAudioID : row.OriginalID));
+    return { id: row.VoiceAudioID, kind: row.Kind, token, text: row.Text, language: row.Language, models: row.Models, referenceText: row.Original?.Text || "", reference: reference.toString("base64"), referenceSha256: crypto.createHash("sha256").update(reference).digest("hex") };
   }, { isolationLevel: "Serializable" });
 }
 export const leaseWhere = (workerId, id, token) => ({ VoiceAudioID: id, AssignedWorkerID: workerId, LeaseToken: hash(token), Status: "PROCESSING", LeaseExpiresAt: { gt: new Date() } });
@@ -41,11 +41,22 @@ export async function renewVoice(workerId, id, token, database = prisma) {
 }
 export async function finishVoice(workerId, id, body, database = prisma) {
   const where = leaseWhere(workerId, id, body.token);
-  if (!await database.voiceAudio.findFirst({ where })) fail("Bail vocal expiré.", 409);
+  const row = await database.voiceAudio.findFirst({ where });
+  if (!row) fail("Bail vocal expiré.", 409);
   if (body.error) {
     const changed = await database.voiceAudio.updateMany({ where, data: { Status: "FAILED", ErrorMessage: String(body.error).slice(0, 4000), LeaseToken: null, LeaseExpiresAt: null } });
     if (!changed.count) fail("Bail vocal expiré.", 409);
     return { failed: true };
+  }
+  if (row.Kind === "ORIGINAL") {
+    const text = textField(body.text, "Transcription automatique", 1000);
+    if (body.sourceLanguage !== row.Language) fail("La langue détectée ne correspond pas à la langue de l’original. Corrigez la langue ou saisissez la transcription.");
+    const result = await database.voiceAudio.updateMany({ where, data: {
+      Text: text, Status: "READY", ErrorMessage: null, LeaseToken: null, LeaseExpiresAt: null,
+      Models: { automaticTranscription: true, transcriptionModel: textField(body.transcriptionModel, "Modèle de transcription", 191) },
+    } });
+    if (!result.count) fail("Bail vocal expiré.", 409);
+    return { ready: true };
   }
   if (body.watermarked !== true || !(body.watermarkConfidence >= 0.5) || typeof body.audio !== "string" || body.audio.length > 20 * 1024 * 1024 || !/^[A-Za-z0-9+/]+={0,2}$/.test(body.audio)) fail("Sortie vocale invalide ou non watermarquée.");
   const audio = Buffer.from(body.audio, "base64");
