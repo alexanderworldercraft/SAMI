@@ -27,6 +27,7 @@ const updates = [
         "items": [
           "Le bouton « Passer le générique » apparaît en bas à gauche du lecteur pendant chaque intervalle validé et amène la lecture à sa fin.",
           "Pour les séries, « Épisode suivant » apparaît en bas à droite dès le début du dernier générique validé, si celui-ci commence strictement après la moitié de la vidéo. Il reste disponible jusqu’à la fin.",
+          "Si aucun générique validé ne commence après la moitié de la vidéo, le bouton « Épisode suivant » apparaît par défaut à 90 % de la lecture.",
           "Le passage suit l’ordre des épisodes de SAMI, rejoint la saison suivante si nécessaire et démarre l’épisode suivant à zéro. Le bouton reste masqué lorsqu’aucun épisode suivant n’est accessible.",
           "Les deux boutons sont intégrés au lecteur personnalisé et à son plein écran."
         ]

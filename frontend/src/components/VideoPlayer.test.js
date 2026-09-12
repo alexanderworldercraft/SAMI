@@ -915,3 +915,21 @@ it("attend les métadonnées du nouvel épisode avant de repartir de zéro", () 
   expect(media.currentTime).toBe(15);
   expect(media.play).toHaveBeenCalledTimes(1);
 });
+
+it("propose l’épisode suivant à 90 % sans générique, uniquement avec un épisode accessible", () => {
+  const video = { VideoID: 14, CheminAcces: "uploads/video/14/master.m3u8", subtitles: [] };
+  const backgroundBlur = { current: null };
+  const onNextEpisode = jest.fn();
+  const { container, rerender } = render(<VideoPlayer video={video} backgroundBlur={backgroundBlur} nextEpisode={{ VideoID: 15 }} onNextEpisode={onNextEpisode} />);
+  const media = container.querySelector("video");
+  Object.defineProperty(media, "duration", { configurable: true, value: 1500 });
+  fireEvent.durationChange(media);
+  media.currentTime = 1349; fireEvent.timeUpdate(media);
+  expect(screen.queryByText("Épisode suivant")).not.toBeInTheDocument();
+  media.currentTime = 1350; fireEvent.timeUpdate(media);
+  fireEvent.click(screen.getByText("Épisode suivant"));
+  expect(onNextEpisode).toHaveBeenCalledTimes(1);
+  expect(screen.queryByText("Passer le générique")).not.toBeInTheDocument();
+  rerender(<VideoPlayer video={video} backgroundBlur={backgroundBlur} nextEpisode={null} />);
+  expect(screen.queryByText("Épisode suivant")).not.toBeInTheDocument();
+});

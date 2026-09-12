@@ -9,9 +9,10 @@ export const parseCreditTime = text => {
 export function getCreditActions(segments, time, duration) {
   const approved = (segments || []).filter(s => s.Status === "APPROVED" && Number.isFinite(s.Start) && Number.isFinite(s.End) && s.Start >= 0 && s.End > s.Start && s.End <= duration).sort((a, b) => a.Start - b.Start);
   const last = approved[approved.length - 1];
+  const nextThreshold = last && last.Start > duration / 2 ? last.Start : duration * 0.9;
   return {
     active: approved.find(s => time >= s.Start && time < s.End) || null,
-    showNext: Boolean(last && duration > 0 && last.Start > duration / 2 && time >= last.Start),
+    showNext: Boolean(Number.isFinite(duration) && duration > 0 && Number.isFinite(time) && time >= nextThreshold),
   };
 }
 // Preserve the series ordering returned by the server and used by EpisodeList.

@@ -30,3 +30,18 @@ test("next episode crosses seasons and respects access without skipping a locked
   expect(getNextCreditEpisode(null, 1, true)).toBeNull();
   expect(getNextCreditEpisode(series, 99, true)).toBeNull();
 });
+
+test.each([[], [{ Start: 10, End: 20, Status: "APPROVED" }], [{ Start: 50, End: 60, Status: "APPROVED" }], [{ Start: 95, End: 99, Status: "PENDING" }], [{ Start: 95, End: 99, Status: "REJECTED" }]].map(credits => [credits]))("falls back to 90 percent without approved ending credits: %j", credits => {
+  expect(getCreditActions(credits, 89.99, 100).showNext).toBe(false);
+  expect(getCreditActions(credits, 90, 100).showNext).toBe(true);
+  expect(getCreditActions(credits, 100, 100).showNext).toBe(true);
+  expect(getCreditActions(credits, 90, 100).active).toBeNull();
+});
+test("approved credits after 90 percent retain priority over the fallback", () => {
+  const credits = [{ Start: 95, End: 99, Status: "APPROVED" }];
+  expect(getCreditActions(credits, 90, 100).showNext).toBe(false);
+  expect(getCreditActions(credits, 95, 100).showNext).toBe(true);
+});
+test.each([0, NaN, Infinity])("does not use the fallback with unavailable duration %s", duration => {
+  expect(getCreditActions([], 100, duration).showNext).toBe(false);
+});

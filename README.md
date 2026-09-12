@@ -52,7 +52,7 @@ La version actuelle est la **8.3.0**. Elle repose sur un backend Fastify, une in
 - vérification, correction, validation et refus par les admins et superadmins depuis la fiche vidéo ou la nouvelle section de modération ;
 - contrôle serveur de la durée et prévention des chevauchements entre génériques validés ;
 - bouton « Passer le générique » pendant chaque intervalle validé ;
-- bouton « Épisode suivant » à partir du dernier générique s’il commence après la moitié de la vidéo, avec passage entre saisons et démarrage à zéro ;
+- bouton « Épisode suivant » à partir du dernier générique s’il commence après la moitié de la vidéo, avec un seuil de secours à 90 % en l’absence de générique validé après la moitié, passage entre saisons et démarrage à zéro ;
 - harmonisation des textes et formulaires des génériques et du doublage avec les thèmes clair et sombre ;
 - correction des URL des playlists HLS utilisées pour afficher la durée des épisodes.
 
@@ -979,7 +979,8 @@ Les décisions et corrections sont sérialisées par vidéo en transaction MySQL
 Pendant un intervalle validé, **Passer le générique** amène la lecture à sa fin.
 Pour une série, **Épisode suivant** apparaît dès le début du dernier intervalle
 validé si ce début est strictement après 50 % de la vidéo, et reste visible jusqu'à
-la fin. Il suit l'ordre existant des saisons/épisodes, traverse les saisons et
+la fin. Si aucun générique validé ne commence après 50 %, le bouton apparaît par
+défaut à 90 % de la vidéo. Il suit l'ordre existant des saisons/épisodes, traverse les saisons et
 redémarre l'épisode suivant à zéro. Il reste masqué si l'épisode suivant est absent
 ou inaccessible. Ces boutons font partie du lecteur personnalisé, y compris son
 plein écran ; les interfaces vidéo natives du navigateur (PiP / plein écran natif
