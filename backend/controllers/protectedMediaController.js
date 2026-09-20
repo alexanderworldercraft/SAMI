@@ -58,6 +58,7 @@ export const protectedMediaController = {
     const content = rewriteProtectedPlaylist({
       videoId: access.video.VideoID,
       playlistRelativePath: relativePath,
+      storagePath: access.video.CheminAcces,
       content: fs.readFileSync(masterPath, "utf8"),
       audioTracks: access.video.VideoAudioTracks,
       aiFeaturesAccepted: access.aiFeaturesAccepted && request.query?.originalOnly !== "1",
@@ -74,6 +75,7 @@ export const protectedMediaController = {
     const resolved = resolveProtectedVideoFile({
       videoId: access.video.VideoID,
       relativePath: request.params["*"],
+      storagePath: access.video.CheminAcces,
     });
     if (!resolved || !fs.existsSync(resolved.absolutePath)) {
       return reply.status(404).send({ error: "Fichier introuvable." });
@@ -92,6 +94,7 @@ export const protectedMediaController = {
       const content = rewriteProtectedPlaylist({
         videoId: access.video.VideoID,
         playlistRelativePath: resolved.relativePath,
+        storagePath: access.video.CheminAcces,
         content: fs.readFileSync(resolved.absolutePath, "utf8"),
         audioTracks: access.video.VideoAudioTracks,
         aiFeaturesAccepted: access.aiFeaturesAccepted,

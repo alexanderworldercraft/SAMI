@@ -58,28 +58,41 @@ const getVideoRelativePath = (videoId, storagePath) => {
   return normalizeStoragePath(path.relative(videoRoot, absolutePath));
 };
 
-const getLocalPlaylistReference = ({ videoId, playlistRelativePath, reference }) => {
+// Legacy roots come exclusively from storage paths read from the database.
+const getLegacyStorageRoot = (storagePath) => {
+  const normalized = normalizeStoragePath(storagePath);
+  const match = normalized.match(/^(uploads\/(?:videos\/(?:hls_[a-zA-Z0-9_-]+|[0-9]+-[0-9]+(?:_fixed)?_HLS)|subtitles\/[0-9]+))\/[^/].*$/);
+  if (!match) return null;
+  const root = path.resolve(BACKEND_ROOT, match[1]);
+  const absolutePath = resolveUploadPath(storagePath);
+  return absolutePath && isPathInside(root, absolutePath) ? root : null;
+};
+
+const getLocalPlaylistReference = ({ videoId, playlistRelativePath, reference, storagePath }) => {
   const cleanReference = String(reference || "").trim().split(/[?#]/, 1)[0];
   if (!cleanReference || cleanReference.startsWith("#") || /^[a-z][a-z0-9+.-]*:/i.test(cleanReference)) {
     return null;
   }
 
-  const videoRoot = path.join(VIDEO_ROOT, String(videoId));
+  const legacy = playlistRelativePath.startsWith("legacy/");
+  const videoRoot = legacy ? getLegacyStorageRoot(storagePath) : path.join(VIDEO_ROOT, String(videoId));
+  if (!videoRoot) return null;
+  const localPlaylistPath = legacy ? playlistRelativePath.slice("legacy/".length) : playlistRelativePath;
   let absolutePath;
-  if (cleanReference.startsWith("/uploads/video/")) {
+  if (cleanReference.startsWith("/uploads/video/") || (legacy && cleanReference.startsWith("/uploads/videos/"))) {
     absolutePath = path.resolve(BACKEND_ROOT, cleanReference.slice(1));
   } else if (cleanReference.startsWith("/")) {
     return null;
   } else {
     absolutePath = path.resolve(
       videoRoot,
-      path.posix.dirname(normalizeStoragePath(playlistRelativePath)),
+      path.posix.dirname(normalizeStoragePath(localPlaylistPath)),
       cleanReference
     );
   }
 
   if (!isPathInside(videoRoot, absolutePath)) return null;
-  return normalizeStoragePath(path.relative(videoRoot, absolutePath));
+  return `${legacy ? "legacy/" : ""}${normalizeStoragePath(path.relative(videoRoot, absolutePath))}`;
 };
 
 const findAiAudioTrackForPath = (relativePath, audioTracks) => {
@@ -137,7 +150,7 @@ export async function getVideoMediaAccess(videoId, userId, { database = prisma }
   };
 }
 
-export function resolveProtectedVideoFile({ videoId, relativePath }) {
+export function resolveProtectedVideoFile({ videoId, relativePath, storagePath }) {
   const normalized = normalizeStoragePath(relativePath);
   if (
     !normalized
@@ -146,8 +159,10 @@ export function resolveProtectedVideoFile({ videoId, relativePath }) {
     || normalized.split("/").some((segment) => !segment || segment === "." || segment === "..")
   ) return null;
 
-  const videoRoot = path.join(VIDEO_ROOT, String(Number(videoId)));
-  const absolutePath = path.resolve(videoRoot, normalized);
+  const legacy = normalized.startsWith("legacy/");
+  const videoRoot = legacy ? getLegacyStorageRoot(storagePath) : path.join(VIDEO_ROOT, String(Number(videoId)));
+  if (!videoRoot) return null;
+  const absolutePath = path.resolve(videoRoot, legacy ? normalized.slice("legacy/".length) : normalized);
   if (!isPathInside(videoRoot, absolutePath)) return null;
   if (fs.existsSync(absolutePath)) {
     const realVideoRoot = fs.realpathSync(videoRoot);
@@ -159,13 +174,19 @@ export function resolveProtectedVideoFile({ videoId, relativePath }) {
 }
 
 export function resolveProtectedVideoStorageFile(videoId, storagePath) {
-  const relativePath = getVideoRelativePath(videoId, storagePath);
-  return relativePath ? resolveProtectedVideoFile({ videoId, relativePath }) : null;
+  let relativePath = getVideoRelativePath(videoId, storagePath);
+  if (!relativePath) {
+    const legacyRoot = getLegacyStorageRoot(storagePath);
+    if (!legacyRoot) return null;
+    relativePath = `legacy/${normalizeStoragePath(path.relative(legacyRoot, resolveUploadPath(storagePath)))}`;
+  }
+  return resolveProtectedVideoFile({ videoId, relativePath, storagePath });
 }
 
 export function rewriteProtectedPlaylist({
   videoId,
   playlistRelativePath,
+  storagePath,
   content,
   audioTracks = [],
   aiFeaturesAccepted = false,
@@ -177,7 +198,7 @@ export function rewriteProtectedPlaylist({
     if (line.startsWith("#EXT-X-MEDIA")) {
       const uriMatch = line.match(/URI="([^"]+)"/i);
       const referencedPath = uriMatch
-        ? getLocalPlaylistReference({ videoId, playlistRelativePath, reference: uriMatch[1] })
+        ? getLocalPlaylistReference({ videoId, playlistRelativePath, storagePath, reference: uriMatch[1] })
         : null;
       if (referencedPath && findAiAudioTrackForPath(referencedPath, audioTracks) && !aiFeaturesAccepted) {
         continue;
@@ -186,7 +207,7 @@ export function rewriteProtectedPlaylist({
 
     if (line.startsWith("#")) {
       rewritten.push(line.replace(/URI="([^"]+)"/gi, (match, reference) => {
-        const referencedPath = getLocalPlaylistReference({ videoId, playlistRelativePath, reference });
+        const referencedPath = getLocalPlaylistReference({ videoId, playlistRelativePath, storagePath, reference });
         return referencedPath ? `URI="${protectedVideoFilePath(videoId, referencedPath)}"` : match;
       }));
       continue;
@@ -200,6 +221,7 @@ export function rewriteProtectedPlaylist({
     const referencedPath = getLocalPlaylistReference({
       videoId,
       playlistRelativePath,
+      storagePath,
       reference: trimmed,
     });
     rewritten.push(referencedPath ? protectedVideoFilePath(videoId, referencedPath) : line);

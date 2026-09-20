@@ -57,16 +57,30 @@ export const upsertVideoProgress = async (request, reply) => {
   try {
     const videoExists = await prisma.video.findFirst({
       where: { VideoID: videoId, EtatID: ETAT.ACTIVE },
-      select: { VideoID: true },
+      select: {
+        VideoID: true,
+        CreditSegments: {
+          where: { Status: "APPROVED" },
+          select: { Start: true, End: true },
+          orderBy: { Start: "desc" },
+        },
+      },
     });
 
     if (!videoExists) {
       return reply.status(404).send({ error: "Vidéo non trouvée." });
     }
 
-    const progressPercent = (timecode / duration) * 100;
+    // Match the player's getCreditActions: the last valid approved credit
+    // starting strictly after halfway takes priority, even beyond 90%.
+    const endingCredit = videoExists.CreditSegments.find(segment =>
+      Number.isFinite(segment.Start) && Number.isFinite(segment.End)
+      && segment.Start > duration / 2 && segment.End > segment.Start
+      && segment.End <= duration
+    );
+    const completionThreshold = endingCredit ? endingCredit.Start : duration * 0.9;
 
-    if (progressPercent > 80) {
+    if (timecode >= completionThreshold) {
       await prisma.userVideoProgress.deleteMany({
         where: {
           UserID: userId,
@@ -86,7 +100,7 @@ export const upsertVideoProgress = async (request, reply) => {
       return reply.send({
         progress: null,
         deleted: true,
-        reason: "PROGRESS_OVER_80",
+        reason: "PROGRESS_COMPLETED",
       });
     }
 
