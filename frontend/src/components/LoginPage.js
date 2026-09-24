@@ -54,6 +54,19 @@ const LoginPage = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const sessionExpired = new URLSearchParams(location.search).get("reason") === "session-expired";
+  const extensionRequest = React.useMemo(() => {
+    const params = new URLSearchParams(location.search);
+    if (params.get("client") !== "browser-extension") return null;
+    return {
+      clientId: params.get("clientId") || "",
+      redirectUri: params.get("redirectUri") || "",
+      state: params.get("state") || "",
+      codeChallenge: params.get("codeChallenge") || "",
+      extensionName: params.get("extensionName") || "Extension SAMI",
+    };
+  }, [location.search]);
+  const [extensionAuthenticated, setExtensionAuthenticated] = useState(false);
+  const [extensionAuthorizing, setExtensionAuthorizing] = useState(false);
 
   // ⬇️ États pour le reset de mot de passe
   const [showReset, setShowReset] = useState(false);
@@ -91,6 +104,14 @@ const LoginPage = () => {
       }
     }
   }, []);
+
+  useEffect(() => {
+    if (!extensionRequest) return;
+    const apiBaseUrl = process.env.REACT_APP_URL_LOCAL;
+    axios.get(`${apiBaseUrl}/api/users/me`, { withCredentials: true })
+      .then(() => setExtensionAuthenticated(true))
+      .catch(() => setExtensionAuthenticated(false));
+  }, [extensionRequest]);
 
   // Si le formulaire est verrouillé, on met en place un timer pour le décompte
   useEffect(() => {
@@ -202,7 +223,11 @@ const LoginPage = () => {
       setError('');
       localStorage.removeItem('token');
 
-      navigate(getSafeReturnPath(location.search), { replace: true });
+      if (extensionRequest) {
+        setExtensionAuthenticated(true);
+      } else {
+        navigate(getSafeReturnPath(location.search), { replace: true });
+      }
     } catch (err) {
       console.error('Login failed:', err.response?.data || err.message);
 
@@ -258,6 +283,23 @@ const LoginPage = () => {
     }
   };
 
+  const handleAuthorizeExtension = async () => {
+    setError("");
+    setExtensionAuthorizing(true);
+    try {
+      const apiBaseUrl = process.env.REACT_APP_URL_LOCAL;
+      const response = await axios.post(
+        `${apiBaseUrl}/api/extension-auth/authorize`,
+        extensionRequest,
+        { withCredentials: true }
+      );
+      window.location.assign(response.data.redirectUrl);
+    } catch (err) {
+      setError(err.response?.data?.error || "Impossible d'autoriser l'extension.");
+      setExtensionAuthorizing(false);
+    }
+  };
+
   const handleResetPassword = async (e) => {
     e.preventDefault();
     setResetError('');
@@ -290,13 +332,22 @@ const LoginPage = () => {
     <div className="flex items-center justify-center h-full">
       <div className="text-white p-8 w-96">
         <h2 className="text-2xl font-bold mb-6">Connexion</h2>
+        {extensionRequest && (
+          <div className="mb-4 rounded border border-sky-500/50 bg-sky-950/40 p-3 text-sm">
+            <p className="font-semibold">Connexion de {extensionRequest.extensionName}</p>
+            <p className="mt-1 break-all font-mono text-xs text-slate-400">{extensionRequest.clientId}</p>
+            <p className="mt-1 text-slate-300">
+              Seuls les comptes administrateurs peuvent autoriser l'import. Le mot de passe ne sera jamais transmis à l'extension.
+            </p>
+          </div>
+        )}
         {sessionExpired && (
           <p className="text-amber-300 mb-4 rounded border border-amber-500/50 bg-amber-950/30 p-3 text-sm">
             Votre session a expiré. Reconnectez-vous pour reprendre la lecture.
           </p>
         )}
         {error && <p className="text-red-600 mb-4">{error}</p>}
-        <form onSubmit={handleLogin} autoComplete="on">
+        {!extensionAuthenticated && <form onSubmit={handleLogin} autoComplete="on">
           <div className="mb-4">
             <label htmlFor="username" className="block text-gray-200">Surnom</label>
             <input
@@ -377,7 +428,23 @@ const LoginPage = () => {
           >
             Se connecter
           </button>
-        </form>
+        </form>}
+
+        {extensionRequest && extensionAuthenticated && (
+          <div className="rounded border border-emerald-500/50 bg-emerald-950/30 p-4">
+            <p className="mb-3 text-sm text-emerald-100">
+              Connexion validée. Confirmez l'accès pour permettre à l'extension d'importer des vidéos avec votre compte.
+            </p>
+            <button
+              type="button"
+              onClick={handleAuthorizeExtension}
+              disabled={extensionAuthorizing}
+              className="w-full rounded bg-emerald-700 py-2 font-bold text-white hover:bg-emerald-800 disabled:opacity-50"
+            >
+              {extensionAuthorizing ? "Autorisation…" : "Autoriser l'extension"}
+            </button>
+          </div>
+        )}
 
 
         {/* Bloc de récupération de mot de passe */}
@@ -442,9 +509,9 @@ const LoginPage = () => {
           </div>
         )}
 
-        <p className="mt-4 text-center">
+        {!extensionRequest && <p className="mt-4 text-center">
           Vous n'avez pas de compte ? <Link to="/register" className="text-sky-600 hover:text-sky-700">S'inscrire</Link>
-        </p>
+        </p>}
       </div>
     </div>
   );

@@ -12,11 +12,13 @@ import {
   updateVideoEncodingWorker,
 } from "../controllers/videoEncodingController.js";
 import { authMiddleware } from "../middlewares/authMiddleware.js";
+import { extensionAuthMiddleware } from "../middlewares/extensionAuthMiddleware.js";
 
 const protectedRoute = { preHandler: authMiddleware };
 
 export default async function videoEncodingRoutes(fastify) {
   fastify.get("/config", protectedRoute, getVideoEncodingConfig);
+  fastify.get("/extension-config", { preHandler: extensionAuthMiddleware }, getVideoEncodingConfig);
   fastify.put("/config", protectedRoute, updateVideoEncodingConfig);
 
   fastify.get("/workers", protectedRoute, getVideoEncodingWorkers);
@@ -33,6 +35,7 @@ export default async function videoEncodingRoutes(fastify) {
   );
 
   fastify.post("/jobs", protectedRoute, createVideoEncodingJob);
+  fastify.post("/extension-jobs", { preHandler: extensionAuthMiddleware }, createVideoEncodingJob);
   fastify.get("/jobs", protectedRoute, getVideoEncodingJobs);
   fastify.get("/jobs/:jobId", protectedRoute, getVideoEncodingJob);
   fastify.post(

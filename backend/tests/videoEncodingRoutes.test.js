@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { uploadInternalVideoEncodingArtifact } from "../controllers/internalVideoEncodingController.js";
 import { authMiddleware } from "../middlewares/authMiddleware.js";
+import { extensionAuthMiddleware } from "../middlewares/extensionAuthMiddleware.js";
 import {
   internalDistributedEncodingBodyIntegrity,
   internalDistributedEncodingRawAuth,
@@ -21,25 +22,30 @@ const routeRecorder = () => {
 };
 
 describe("routes d'encodage multi-server", () => {
-  it("enregistre toute l'API publique derrière authMiddleware", async () => {
+  it("protège séparément l'API web et les imports de l'extension", async () => {
     const { fastify, routes } = routeRecorder();
 
     await videoEncodingRoutes(fastify);
 
     expect(routes.map(({ method, path }) => `${method} ${path}`)).toEqual([
       "GET /config",
+      "GET /extension-config",
       "PUT /config",
       "GET /workers",
       "POST /workers",
       "PATCH /workers/:workerId",
       "DELETE /workers/:workerId",
       "POST /jobs",
+      "POST /extension-jobs",
       "GET /jobs",
       "GET /jobs/:jobId",
       "POST /jobs/:jobId/resume",
       "POST /jobs/:jobId/cancel",
     ]);
-    expect(routes.every((route) => route.options.preHandler === authMiddleware)).toBe(true);
+    const extensionRoutes = routes.filter((route) => route.path.startsWith("/extension-"));
+    expect(extensionRoutes).toHaveLength(2);
+    expect(extensionRoutes.every((route) => route.options.preHandler === extensionAuthMiddleware)).toBe(true);
+    expect(routes.filter((route) => !route.path.startsWith("/extension-")).every((route) => route.options.preHandler === authMiddleware)).toBe(true);
   });
 
   it("protège le JSON interne en deux phases et traite le PUT brut onRequest", async () => {

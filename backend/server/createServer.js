@@ -32,6 +32,7 @@ import userRoutes from "../routes/userRoutes.js";
 import videoExportRoutes from "../routes/videoExportRoutes.js";
 import videoEncodingRoutes from "../routes/videoEncodingRoutes.js";
 import videoRoutes from "../routes/videoRoutes.js";
+import extensionAuthRoutes from "../routes/extensionAuthRoutes.js";
 import { registerSocialPreviewRoute } from "../routes/socialPreviewRoutes.js";
 import { globalRateLimit } from "../middlewares/rateLimitMiddleware.js";
 import {
@@ -48,6 +49,7 @@ const uploadsRoot = path.join(backendRoot, "uploads");
 
 const ROUTES = [
   [userRoutes, "/api/users"],
+  [extensionAuthRoutes, "/api/extension-auth"],
   [videoRoutes, "/api/videos"],
   [videoEncodingRoutes, "/api/video-encoding"],
   [aiSubtitleRoutes, "/api/ai-subtitles"],

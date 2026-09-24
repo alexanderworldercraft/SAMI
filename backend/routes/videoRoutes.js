@@ -41,6 +41,7 @@ import {
 } from "../controllers/videoController.js";
 
 import { authMiddleware } from "../middlewares/authMiddleware.js";
+import { extensionAuthMiddleware } from "../middlewares/extensionAuthMiddleware.js";
 
 export default async function (fastify) {
   fastify.get("/credits/review", { preHandler: authMiddleware }, listCreditQueue);
@@ -50,6 +51,7 @@ export default async function (fastify) {
   fastify.delete("/:id/credits/:segmentId", { preHandler: authMiddleware }, deleteVideoCredit);
   fastify.post("/episodes", { preHandler: authMiddleware }, addEpisode); // Ajouter un épisode
   fastify.post("/add", { preHandler: authMiddleware }, async (req, reply) => addVideo(req, reply, fastify));
+  fastify.post("/extension-import", { preHandler: extensionAuthMiddleware }, async (req, reply) => addVideo(req, reply, fastify));
   fastify.post("/", { preHandler: authMiddleware }, async (req, reply) => addVideo(req, reply, fastify));
 
   fastify.get("/", getVideosAndSeries);

@@ -1,0 +1,7 @@
+#sami-extension-import-button {
+  position: fixed; right: 18px; bottom: 18px; z-index: 2147483647;
+  border: 1px solid #38bdf8; border-radius: 999px; padding: 10px 16px;
+  background: #082f49; color: white; font: 700 13px/1.2 system-ui; cursor: pointer;
+  box-shadow: 0 8px 28px rgba(0,0,0,.35);
+}
+#sami-extension-import-button:hover { background: #075985; }

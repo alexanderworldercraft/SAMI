@@ -634,9 +634,43 @@ model Utilisateur {
   AiDubbingJobsRequested  AiDubbingJob[]          @relation("AiDubbingRequestedBy")
   AiDubbingPreviewReviews AiDubbingJob[]          @relation("AiDubbingPreviewApprovedBy")
   AiDubbingFinalReviews   AiDubbingJob[]          @relation("AiDubbingFinalApprovedBy")
+  ExtensionAuthCodes      ExtensionAuthCode[]
+  ExtensionAccessTokens   ExtensionAccessToken[]
 
   @@index([GradeID], map: "Utilisateur_GradeID_fkey")
   @@index([EtatID], map: "Utilisateur_EtatID_fkey")
+}
+
+model ExtensionAuthCode {
+  ExtensionAuthCodeID String      @id @db.VarChar(36)
+  CodeHash            String      @unique @db.Char(64)
+  ClientID            String      @db.VarChar(64)
+  RedirectURI         String      @db.VarChar(255)
+  CodeChallenge       String      @db.VarChar(128)
+  ExtensionName       String      @db.VarChar(100)
+  UtilisateurID       Int
+  ExpiresAt           DateTime
+  CreatedAt           DateTime    @default(now())
+  Utilisateur         Utilisateur @relation(fields: [UtilisateurID], references: [UtilisateurID], onDelete: Cascade)
+
+  @@index([UtilisateurID, ExpiresAt], map: "idx_extension_auth_code_user_expiry")
+  @@index([ExpiresAt], map: "idx_extension_auth_code_expiry")
+}
+
+model ExtensionAccessToken {
+  ExtensionAccessTokenID String      @id @db.VarChar(36)
+  TokenHash              String      @unique @db.Char(64)
+  ClientID               String      @db.VarChar(64)
+  ExtensionName          String      @db.VarChar(100)
+  UtilisateurID          Int
+  LastUsedAt             DateTime?
+  ExpiresAt              DateTime
+  RevokedAt              DateTime?
+  CreatedAt              DateTime    @default(now())
+  Utilisateur            Utilisateur @relation(fields: [UtilisateurID], references: [UtilisateurID], onDelete: Cascade)
+
+  @@index([UtilisateurID, RevokedAt, ExpiresAt], map: "idx_extension_token_user_status")
+  @@index([TokenHash, RevokedAt], map: "idx_extension_token_hash_status")
 }
 
 model UserPlayerPreference {

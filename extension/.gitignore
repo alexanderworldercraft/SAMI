@@ -1,0 +1,8 @@
+.env
+dist/
+companion/config.json
+companion/sami-companion-host.exe
+companion/sami-companion-host-macos
+companion/launcher.generated.c
+companion/launch.generated.sh
+companion/companion.log

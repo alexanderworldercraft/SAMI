@@ -35,8 +35,18 @@ const NewVideoForm = ({
     videoEncodingWorkers = [],
     onDistributedJobCreated,
 }) => {
-    const [title, setTitle] = useState("");
-    const [summary, setSummary] = useState("");
+    const extensionDraft = React.useMemo(() => {
+        const params = new URLSearchParams(window.location.search);
+        const source = params.get("extensionSource") || "";
+        if (!/^https?:\/\//.test(source)) return null;
+        return {
+            source,
+            title: (params.get("title") || "").slice(0, 100),
+            description: params.get("description") || "",
+        };
+    }, []);
+    const [title, setTitle] = useState(extensionDraft?.title || "");
+    const [summary, setSummary] = useState(extensionDraft?.description || "");
     const [videoFile, setVideoFile] = useState(null);
     const [imageFile, setImageFile] = useState(null);
     const [genres, setGenres] = useState([]);
@@ -125,20 +135,9 @@ const NewVideoForm = ({
             { autoClose: false }
         );
 
-        const formData = await buildVideoFormData();
-
-        console.log("Données envoyées au backend :");
-        formData.forEach((value, key) => {
-            console.log(`${key}:`, value);
-        });
-
         try {
-            await api.post("/videos/add", formData, {
-                headers: {
-                    // ne pas mettre Content-Type manuellement : axios le gère avec FormData
-                    // Authorization est normalement injecté par ton interceptor `api`
-                },
-            });
+            const formData = await buildVideoFormData();
+            await api.post("/videos/add", formData, { headers: {} });
 
             showNotification("Vidéo ajoutée avec succès.", "success", "✅");
         } catch (error) {
@@ -246,6 +245,15 @@ const NewVideoForm = ({
             {/* <NotificationTester/> */}
 
             <form ref={formRef} onSubmit={handleSubmit}>
+                {extensionDraft && (
+                    <div className="mb-4 rounded-xl border border-amber-400/30 bg-amber-500/10 p-4 text-sm text-amber-900 dark:text-amber-100">
+                        <p className="font-bold">Import préparé par l'extension navigateur</p>
+                        <p className="mt-1 break-all">Source : {extensionDraft.source}</p>
+                        <p className="mt-2 text-xs">
+                            Le titre et le résumé ont été préremplis. Sélectionnez le fichier produit par l'extension ou son futur composant compagnon.
+                        </p>
+                    </div>
+                )}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                     <div className='grid gap-4'>
                         {/* Titre de la vidéo */}

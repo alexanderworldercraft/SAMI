@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useId, useState } from "react";
+import { ChevronDownIcon } from "@heroicons/react/20/solid";
 import UploadProgressBar from "./UploadProgressBar";
 import {
     normalizeVideoEncodingJob,
@@ -349,6 +350,8 @@ const TaskHistory = ({
     onResumeDistributedJob,
     onClose,
 }) => {
+    const [isExpanded, setIsExpanded] = useState(true);
+    const contentId = useId();
     const [openFinishedByTaskId, setOpenFinishedByTaskId] = useState({});
     const [nowMs, setNowMs] = useState(() => Date.now());
     const visibleTasks = tasks.slice(-6).reverse();
@@ -401,12 +404,26 @@ const TaskHistory = ({
 
     return (
         <div className="fixed bottom-4 right-4 z-10 max-h-[80vh] w-[min(92vw,34rem)] overflow-y-auto rounded-xl border border-slate-800 bg-blue-50 p-4 text-slate-900 shadow-lg dark:bg-slate-950 dark:text-neutral-100">
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <div className={`flex flex-wrap items-center justify-between gap-3 ${isExpanded ? "mb-4" : ""}`}>
                 <h2 className="text-lg font-bold">Traitements vidéo</h2>
                 <div className="flex flex-wrap items-center justify-end gap-2">
                     <span className="rounded-full bg-sky-500/15 px-3 py-1 text-xs font-bold text-sky-800 dark:text-sky-200">
                         {visibleCount}
                     </span>
+                    <button
+                        type="button"
+                        onClick={() => setIsExpanded((current) => !current)}
+                        aria-expanded={isExpanded}
+                        aria-controls={contentId}
+                        aria-label={isExpanded ? "Réduire les traitements vidéo" : "Déplier les traitements vidéo"}
+                        className="inline-flex items-center gap-2 rounded-lg border border-sky-500/20 bg-sky-500/10 px-3 py-2 text-xs font-bold text-sky-800 transition hover:bg-sky-500/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 dark:text-sky-200"
+                    >
+                        {isExpanded ? "Réduire" : "Déplier"}
+                        <ChevronDownIcon
+                            aria-hidden="true"
+                            className={`size-4 transition-transform ${isExpanded ? "" : "rotate-180"}`}
+                        />
+                    </button>
                     {allTreatmentsFinished && (
                         <button
                             type="button"
@@ -419,7 +436,7 @@ const TaskHistory = ({
                 </div>
             </div>
 
-            <div className="grid gap-3">
+            <div id={contentId} hidden={!isExpanded} className={isExpanded ? "grid gap-3" : "hidden"}>
                 {visibleDistributedJobs.map((job) => (
                     <EncodingJobCard
                         key={job.id}
