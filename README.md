@@ -45,6 +45,39 @@ La version actuelle est la **8.3.0**. Elle repose sur un backend Fastify, une in
 - journalisation des actions et sauvegardes manuelles ou planifiées de MySQL ;
 - limitations de requêtes, contrôle CORS et en-têtes de sécurité.
 
+## Base de sélection d'interface par appareil
+
+La détection locale propose `classic`, `tactile` ou `remote`. Les préférences
+sont exposées par `useInterfacePreference()` et par `data-interface-mode` sur
+l'élément HTML, pour préparer les futurs composants TV. Cette étape ne modifie
+pas la mise en page ni la navigation actuelle.
+
+Le consentement appartient au compte : absence de réponse = aucune écriture ;
+refus explicite = refus mémorisé et aucune popup d'appareil ; acceptation =
+confirmation ou modification de chaque nouvel appareil. « Ne pas enregistrer »
+ferme la proposition pour la session ; elle revient lors d'une prochaine
+connexion ou ouverture de SAMI. Un appareil correspond à un navigateur, identifié
+par un UUID aléatoire conservé localement uniquement après son enregistrement.
+Le stockage est distinct par compte et ne contient ni empreinte matérielle ni
+agent utilisateur. Les détections TV restent indicatives et sont corrigeables.
+
+Dans Paramètres, l'utilisateur peut renommer, changer le type ou l'interface,
+supprimer un appareil, et consulter les dates gérées par le serveur. Désactiver
+l'enregistrement nécessite une confirmation et supprime tous ses appareils dans
+une transaction. Le refus reste mémorisé ; la détection automatique continue.
+Les autres navigateurs prennent connaissance d'une révocation à leur prochaine
+navigation ou reprise de focus. Effacer le stockage local fait perdre la
+reconnaissance de l'appareil, qui pourra être enregistré à nouveau.
+
+Avant de déployer cette base, appliquer la migration
+`20260930120000_add_user_interface_devices`, régénérer le client Prisma et
+reconstruire le frontend. La migration crée `UserInterfacePreference` et
+`UserDevice`, avec `CreateDate`, `UpdateDate`, `LastUsedDate` et suppression en
+cascade lors de la suppression du compte. Aucun consentement n'est prérempli.
+Les routes `/api/users/interface-preference` et
+`/api/users/interface-devices` exigent l'authentification et utilisent uniquement
+l'utilisateur de la session pour déterminer le propriétaire.
+
 ## Nouveautés de la version 8.3.0
 
 - propositions de plusieurs génériques par vidéo, avec saisie des bornes et capture de la position actuelle du lecteur ;

@@ -1,3 +1,4 @@
+import { userInterfaceController } from "../controllers/userInterfaceController.js";
 // routes/userRoutes.js
 import { userController } from '../controllers/userController.js';
 import { authMiddleware } from '../middlewares/authMiddleware.js';
@@ -33,6 +34,13 @@ export default async function userRoutes(fastify, options) {
   fastify.post('/premium/webhook/fake', userController.fakePremiumPaymentWebhook);
   fastify.post('/favorites/status', { preHandler: authMiddleware }, userController.getFavoriteStatus);
   fastify.post('/favorites/toggle', { preHandler: authMiddleware }, userController.toggleFavorite);
+
+  fastify.get('/interface-preference', { preHandler: authMiddleware }, userInterfaceController.get);
+  fastify.put('/interface-preference', { preHandler: authMiddleware }, userInterfaceController.consent);
+  fastify.post('/interface-devices/resolve', { preHandler: authMiddleware }, userInterfaceController.resolve);
+  fastify.post('/interface-devices', { preHandler: authMiddleware }, userInterfaceController.register);
+  fastify.put('/interface-devices/:id', { preHandler: authMiddleware }, userInterfaceController.update);
+  fastify.delete('/interface-devices/:id', { preHandler: authMiddleware }, userInterfaceController.remove);
 
   fastify.get('/player-preferences', { preHandler: authMiddleware }, userPlayerPreferenceController.get);
   fastify.put('/player-preferences', { preHandler: authMiddleware }, userPlayerPreferenceController.update);

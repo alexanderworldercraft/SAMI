@@ -35,6 +35,8 @@ import DataCompliancePage from "./components/DataCompliancePage";
 import StatsPage from "./components/StatsPage";
 import { AiFeaturePreferenceProvider } from "./context/AiFeaturePreferenceContext";
 
+import { InterfacePreferenceProvider } from "./context/InterfacePreferenceContext";
+
 const NameApp = process.env.REACT_APP_NAME + " " + process.env.REACT_APP_VER;
 
 
@@ -148,6 +150,7 @@ export default function App() {
     <MusicPlayerProvider>
       <Router>
         <AiFeaturePreferenceProvider>
+        <InterfacePreferenceProvider>
         <MetaUpdater />
         <MaintenanceBanner />
         <PersistentMusicPlayer />
@@ -333,6 +336,7 @@ export default function App() {
           }
         />
         </Routes>
+        </InterfacePreferenceProvider>
         </AiFeaturePreferenceProvider>
       </Router>
     </MusicPlayerProvider>

@@ -6,6 +6,7 @@ import SubscriptionPlans from "./SubscriptionPlans";
 import WatchHistoryCards from "./WatchHistoryCards";
 import GenreSelect from "./GenreSelect";
 import VideoList from "./VideoList";
+import InterfaceDeviceSettings from "./InterfaceDeviceSettings";
 import AiFeatureSettings from "./AiFeatureSettings";
 
 import { ChevronDownIcon } from "@heroicons/react/16/solid";
@@ -275,6 +276,7 @@ const SettingsPage = () => {
           <>
             <UpdateSettings />
             <AiFeatureSettings />
+            <InterfaceDeviceSettings />
           </>
         );
       case "deleteAccount":

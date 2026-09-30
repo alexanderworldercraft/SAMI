@@ -24,6 +24,13 @@ const sections = [
     ],
   },
   {
+    title: "Interface et appareils enregistrés",
+    body: [
+      "La détection automatique de l'interface s'effectue dans le navigateur. Après votre consentement explicite, vous pouvez enregistrer chaque appareil avec son nom, son type, l'interface choisie et les dates de création, de modification et de dernière utilisation. Un identifiant aléatoire par navigateur et compte est alors conservé localement pour reconnaître cet appareil, sans empreinte matérielle.",
+      "Sans réponse, aucun choix ni appareil n'est enregistré. Un refus explicite est conservé sur votre compte pour ne plus présenter la demande. Vous pouvez modifier ou supprimer vos appareils dans Paramètres ; la désactivation, après confirmation, supprime tous les appareils enregistrés sur votre compte.",
+    ],
+  },
+  {
     title: "Cookies et stockage local",
     body: [
       "SAMI peut utiliser des cookies, le stockage local du navigateur et des jetons de session pour maintenir la connexion, appliquer les préférences d'affichage et sécuriser les appels API.",

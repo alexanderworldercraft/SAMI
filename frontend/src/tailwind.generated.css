@@ -785,6 +785,10 @@
     z-index: 120;
   }
 
+  .z-\[190\] {
+    z-index: 190;
+  }
+
   .z-\[200\] {
     z-index: 200;
   }
@@ -909,6 +913,10 @@
 
   .my-8 {
     margin-block: calc(var(--spacing) * 8);
+  }
+
+  .my-auto {
+    margin-block: auto;
   }
 
   .ms-4 {
@@ -3069,6 +3077,16 @@
     }
   }
 
+  .border-slate-400\/20 {
+    border-color: #90a1b933;
+  }
+
+  @supports (color: color-mix(in lab, red, red)) {
+    .border-slate-400\/20 {
+      border-color: color-mix(in oklab, var(--color-slate-400) 20%, transparent);
+    }
+  }
+
   .border-slate-400\/30 {
     border-color: #90a1b94d;
   }
@@ -3076,6 +3094,16 @@
   @supports (color: color-mix(in lab, red, red)) {
     .border-slate-400\/30 {
       border-color: color-mix(in oklab, var(--color-slate-400) 30%, transparent);
+    }
+  }
+
+  .border-slate-400\/40 {
+    border-color: #90a1b966;
+  }
+
+  @supports (color: color-mix(in lab, red, red)) {
+    .border-slate-400\/40 {
+      border-color: color-mix(in oklab, var(--color-slate-400) 40%, transparent);
     }
   }
 
@@ -5761,6 +5789,10 @@
     white-space: normal;
   }
 
+  .whitespace-nowrap {
+    white-space: nowrap;
+  }
+
   .whitespace-pre-line {
     white-space: pre-line;
   }
@@ -8223,6 +8255,10 @@
 
   .focus-visible\:outline-sky-400:focus-visible {
     outline-color: var(--color-sky-400);
+  }
+
+  .focus-visible\:outline-sky-500:focus-visible {
+    outline-color: var(--color-sky-500);
   }
 
   .focus-visible\:outline-sky-600:focus-visible {
