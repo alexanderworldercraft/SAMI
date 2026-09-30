@@ -919,6 +919,10 @@
     margin-block: calc(var(--spacing) * 4);
   }
 
+  .my-6 {
+    margin-block: calc(var(--spacing) * 6);
+  }
+
   .my-8 {
     margin-block: calc(var(--spacing) * 8);
   }
@@ -1952,6 +1956,10 @@
 
   .grid-cols-2 {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .grid-cols-3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .grid-cols-4 {
@@ -3713,6 +3721,10 @@
     .bg-neutral-900\/50 {
       background-color: color-mix(in oklab, var(--color-neutral-900) 50%, transparent);
     }
+  }
+
+  .bg-neutral-950 {
+    background-color: var(--color-neutral-950);
   }
 
   .bg-neutral-950\/95 {

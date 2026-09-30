@@ -2,8 +2,8 @@
 
 Classic conserve l'interface existante et son responsive. Tactile utilise sa
 propre disposition et sa navigation, avec des adaptations des listes et des
-lecteurs au toucher. Remote reste une entrée provisoire vers classic jusqu'à
-validation de tactile.
+lecteurs au toucher. Remote fournit une disposition TV et une navigation
+à la télécommande.
 
 ## Organisation
 
@@ -28,7 +28,14 @@ interfaces/
     pages/                   composition du lecteur tactile
     players/                 adaptation du moteur vidéo partagé
     tactile.css              styles limités au rendu tactile
-  remote/index.js            entrée provisoire vers classic
+  remote/
+    index.js                 interface télécommande
+    layout/                  disposition TV et barre latérale
+    components/              gestion du focus et des commandes globales
+    pages/                   composition du lecteur remote
+    players/                 adaptation du moteur vidéo partagé
+    spatialNavigation.js     sélection géométrique du focus
+    remote.css               styles limités au rendu remote
 ```
 
 Les services API, contextes, constantes et utilitaires restent communs dans
@@ -47,9 +54,9 @@ restent exclusivement définies par le routage commun. Ses lecteurs peuvent
 réutiliser les services et utilitaires existants, et le contexte musique reste
 au-dessus du sélecteur d'interface.
 
-Remote réutilise encore les composants classic. Tactile réutilise les pages
+Remote et tactile réutilisent les pages
 existantes avec sa propre disposition et remplace la composition de lecture
-pour activer explicitement les contrôles tactiles. Les services et données ne
+pour activer explicitement leurs contrôles. Les services et données ne
 sont pas dupliqués. Le lecteur musique persistant conserve la même référence
 entre les modes. Le changement effectif de disposition entre classic et
 tactile peut remonter la page courante ; la playlist reste dans le contexte
@@ -58,7 +65,7 @@ musique commun.
 `data-interface-mode`, géré par `InterfacePreferenceProvider`, conserve le mode
 demandé ou détecté. `data-interface-rendered`, géré par `InterfaceRenderer`,
 indique l'interface effectivement affichée : `tactile` pour tactile,
-`classic` pour classic, remote provisoire et administration. Le choix utilisateur n'est jamais remplacé par ce mode d'affichage.
+`remote` pour remote et `classic` pour classic et administration. Le choix utilisateur n'est jamais remplacé par ce mode d'affichage.
 Un mode inconnu utilise classic comme secours.
 
 ## Administration
@@ -104,4 +111,30 @@ la migration de la première brique reste nécessaire si elle n'a pas encore
 
 L'aperçu visuel utilise des données fictives aux formats téléphone (390 pixels)
 et tablette (834 pixels). La lecture réelle et les gestes natifs doivent être
-validés sur un appareil tactile avant de commencer remote.
+validés sur un appareil tactile. Le tactile a été validé par l’utilisateur avant
+le démarrage de remote.
+
+## Interface remote V1
+
+- Barre latérale et rubriques conservées, focus contrasté, cibles agrandies,
+  grilles adaptées à la TV, favoris accessibles et absence de dépendance au survol.
+- Navigation aux flèches selon la position des éléments, défilement du focus,
+  confinement aux dialogues et menus ouverts, commandes cachées exclues du focus.
+- OK/Entrée active les liens et boutons ; la recherche et les formulaires
+  conservent les champs et le clavier natif de l’appareil.
+- Dans le lecteur, OK sur la vidéo reprend/met en pause quand les commandes
+  sont masquées, ou sélectionne la première commande quand elles sont affichées.
+  Haut/bas affiche les commandes ; gauche/droite avance ou recule de 10 secondes
+  quand elles sont masquées. Sur les commandes affichées, les flèches déplacent
+  le focus ; les sliders et sélecteurs utilisent leurs commandes natives.
+- Retour ferme les réglages ou l’aide, puis les commandes du lecteur ; un autre
+  Retour revient à la page précédente. Les dialogues se ferment avant de quitter
+  la page. Escape, BrowserBack, Backspace hors saisie et les touches Retour TV
+  Tizen (10009) / webOS (461) sont prises en charge.
+- Le lecteur musique persistant conserve son identité entre les trois modes.
+  Les routes d’administration restent classic avec leurs protections existantes.
+- Aucun changement d’API, de consentement, de préférences enregistrées ou de BDD.
+
+L’aperçu TV utilise des données fictives. Le fonctionnement du clavier natif,
+les touches propres à chaque modèle de TV et la lecture réelle doivent encore
+être vérifiés sur l’appareil cible.

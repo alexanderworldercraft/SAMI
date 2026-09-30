@@ -85,8 +85,10 @@ Le frontend possède trois entrées dans `frontend/src/interfaces` : `classic`,
 regroupée dans `classic` avec ses pages, sa navigation et ses lecteurs.
 Tactile dispose maintenant d'une navigation fixe, d'un menu et d'une recherche
 au toucher, de cibles agrandies, de favoris visibles et de contrôles vidéo
-adaptés. Les pages et traitements existants restent réutilisés. Remote affiche
-provisoirement classic, en conservant le choix enregistré. L'administration et
+adaptés. Remote dispose d’une barre latérale, d’une navigation aux flèches
+avec focus visible et de commandes vidéo adaptées à la télécommande. La saisie
+utilise le clavier natif de l’appareil. Les pages et traitements existants restent
+réutilisés. L'administration et
 les formulaires d'ajout restent toujours en classic.
 
 Les URL, les droits d'accès, les services et les contextes restent communs.

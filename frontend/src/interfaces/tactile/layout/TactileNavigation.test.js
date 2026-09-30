@@ -24,6 +24,7 @@ test("propose une navigation tactile persistante et marque la rubrique active", 
   expect(within(nav).getByRole("link", { name: "Vidéos" })).toHaveAttribute("aria-current", "page");
   fireEvent.click(screen.getByRole("button", { name: "Plus de rubriques" }));
   expect(await screen.findByRole("link", { name: "Paramètres" })).toHaveAttribute("href", "/settings");
+  expect(screen.queryByRole("link", { name: "Mon profil" })).not.toBeInTheDocument();
   expect(screen.queryByRole("link", { name: "Administration" })).not.toBeInTheDocument();
   expect(screen.queryByRole("link", { name: "Voix" })).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: "Fermer" }));

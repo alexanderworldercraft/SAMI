@@ -1,8 +1,12 @@
 import { classicInterface } from "../classic";
+import RemoteShell from "./layout/RemoteShell";
+import RemotePlaybackPage from "./pages/RemotePlaybackPage";
+import "./remote.css";
 
-// Point d'entrée réservé à l'étape TV, après validation de tactile.
 export const remoteInterface = Object.freeze({
   ...classicInterface,
   id: "remote",
-  fallback: "classic",
+  renderedMode: "remote",
+  Shell: RemoteShell,
+  pages: Object.freeze({ ...classicInterface.pages, playback: RemotePlaybackPage }),
 });

@@ -21,12 +21,13 @@ test("classic fournit toutes les pages publiques et utilisateur existantes", () 
   expect(typeof classicInterface.Shell).toBe("function");
   expect(typeof classicInterface.PersistentMusicPlayer).toBe("function");
 });
-test.each(["remote"])("%s conserve sa sélection et réutilise provisoirement les composants classic", (mode) => {
+test.each(["remote"])("%s conserve sa sélection et fournit sa disposition et son lecteur télécommande", (mode) => {
   const definition = resolveInterface(mode);
   expect(definition.id).toBe(mode);
-  expect(definition.renderedMode).toBe("classic");
-  expect(definition.pages).toBe(classicInterface.pages);
-  expect(definition.Shell).toBe(classicInterface.Shell);
+  expect(definition.renderedMode).toBe("remote");
+  expect(definition.pages.playback).not.toBe(classicInterface.pages.playback);
+  expect(definition.pages.settings).toBe(classicInterface.pages.settings);
+  expect(definition.Shell).not.toBe(classicInterface.Shell);
   expect(definition.PersistentMusicPlayer).toBe(classicInterface.PersistentMusicPlayer);
 });
 test.each(["classic", "tactile", "remote"])("l'administration reste classic pour le mode %s", (mode) => {

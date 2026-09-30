@@ -962,3 +962,113 @@ test.each([
     heightGetter.mockRestore();
   }
 });
+
+
+test("la télécommande déplace la lecture de 10 secondes commandes masquées et Retour ferme les commandes", () => {
+  const view = render(<VideoPlayer video={{ VideoID: 14, CheminAcces: "test.m3u8", subtitles: [] }} backgroundBlur={{ current: null }} interactionMode="remote" />);
+  const player = view.container.querySelector('[data-remote-player]');
+  const media = view.container.querySelector("video");
+  Object.defineProperty(media, "duration", { configurable: true, value: 120 });
+  media.currentTime = 40;
+  player.focus();
+  fireEvent.keyDown(player, { key: "Escape" });
+  expect(screen.getByTestId("player-controls")).toHaveAttribute("inert");
+  fireEvent.keyDown(player, { key: "ArrowRight" });
+  expect(media.currentTime).toBe(50);
+  fireEvent.keyDown(player, { key: "ArrowLeft" });
+  expect(media.currentTime).toBe(40);
+  fireEvent.keyDown(player, { key: "ArrowUp" });
+  expect(screen.getByTestId("player-controls")).not.toHaveAttribute("inert");
+  fireEvent.click(screen.getByRole("button", { name: "Ouvrir les réglages du lecteur" }));
+  fireEvent.keyDown(screen.getByRole("button", { name: "Fermer les réglages du lecteur" }), { key: "Unidentified", keyCode: 10009 });
+  expect(screen.queryByRole("menu", { name: "Réglages du lecteur" })).not.toBeInTheDocument();
+  expect(player).toHaveFocus();
+});
+
+test("les flèches sur les commandes remote ne déclenchent pas les raccourcis classic", () => {
+  const view = render(<VideoPlayer video={{ VideoID: 14, CheminAcces: "test.m3u8", subtitles: [] }} backgroundBlur={{ current: null }} interactionMode="remote" />);
+  const media = view.container.querySelector("video");
+  media.currentTime = 40;
+  const play = screen.getByRole("button", { name: "Lire" }); play.focus();
+  fireEvent.keyDown(play, { key: "ArrowRight" });
+  expect(media.currentTime).toBe(40);
+});
+
+test("OK reprend la vidéo quand les commandes remote sont masquées", async () => {
+  const view = render(<VideoPlayer video={{ VideoID: 14, CheminAcces: "test.m3u8", subtitles: [] }} backgroundBlur={{ current: null }} interactionMode="remote" />);
+  const media = view.container.querySelector("video");
+  media.play = jest.fn().mockResolvedValue();
+  const player = view.container.querySelector('[data-remote-player]'); player.focus();
+  fireEvent.keyDown(player, { key: "Escape" });
+  await act(async () => fireEvent.keyDown(player, { key: "Enter" }));
+  expect(media.play).toHaveBeenCalledTimes(1);
+  fireEvent.keyDown(player, { key: "Enter", repeat: true });
+  expect(media.play).toHaveBeenCalledTimes(1);
+});
+
+test("le volume remote s'ouvre avec un bouton et Retour rend le focus sans masquer les commandes", () => {
+  render(<VideoPlayer video={{ VideoID: 14, CheminAcces: "test.m3u8", subtitles: [] }} backgroundBlur={{ current: null }} interactionMode="remote" />);
+  expect(screen.queryByRole("slider", { name: "Volume" })).not.toBeInTheDocument();
+  const button = screen.getByRole("button", { name: "Régler le volume" });
+  fireEvent.click(button);
+  const slider = screen.getByRole("slider", { name: "Volume" });
+  expect(slider).toHaveFocus();
+  fireEvent.change(slider, { target: { value: "0.5" } });
+  expect(slider).toHaveValue("0.5");
+  fireEvent.keyDown(slider, { key: "Escape" });
+  expect(screen.queryByRole("slider", { name: "Volume" })).not.toBeInTheDocument();
+  expect(button).toHaveFocus();
+  expect(screen.getByTestId("player-controls")).not.toHaveAttribute("inert");
+});
+
+test("Haut et Bas relient les deux lignes remote sans modifier la progression", () => {
+  const view = render(<VideoPlayer video={{ VideoID: 14, CheminAcces: "test.m3u8", subtitles: [] }} backgroundBlur={{ current: null }} interactionMode="remote" />);
+  const media = view.container.querySelector("video"); media.currentTime = 40;
+  const progress = screen.getByRole("slider", { name: "Position de lecture" });
+  const play = screen.getByRole("button", { name: "Lire" });
+  expect(progress.closest('[data-player-progress]')).not.toBeNull();
+  expect(play.closest('[data-player-actions]')).not.toBeNull();
+  expect(progress.closest('[data-player-actions]')).toBeNull();
+  play.focus(); fireEvent.keyDown(play, { key: "ArrowUp" });
+  expect(progress).toHaveFocus();
+  fireEvent.keyDown(progress, { key: "ArrowDown" });
+  expect(play).toHaveFocus();
+  expect(media.currentTime).toBe(40);
+  const volume = screen.getByRole("button", { name: "Régler le volume" });
+  volume.focus(); fireEvent.keyDown(volume, { key: "ArrowUp" });
+  expect(progress).toHaveFocus();
+  fireEvent.keyDown(progress, { key: "ArrowDown" });
+  expect(volume).toHaveFocus();
+});
+
+test("gauche/droite restent sur la ligne des boutons remote, du son aux options", () => {
+  render(<VideoPlayer video={{ VideoID: 14, CheminAcces: "test.m3u8", subtitles: [] }} backgroundBlur={{ current: null }} interactionMode="remote" />);
+  const names = ["Lire", "Régler le volume", "Ouvrir les réglages du lecteur", "Afficher les commandes du lecteur", "Basculer en plein écran"];
+  const buttons = names.map((name) => screen.getByRole("button", { name }));
+  buttons[0].focus();
+  for (let i = 0; i < buttons.length - 1; i += 1) {
+    fireEvent.keyDown(buttons[i], { key: "ArrowRight" });
+    expect(buttons[i + 1]).toHaveFocus();
+  }
+  for (let i = buttons.length - 1; i > 0; i -= 1) {
+    fireEvent.keyDown(buttons[i], { key: "ArrowLeft" });
+    expect(buttons[i - 1]).toHaveFocus();
+  }
+});
+
+test("la progression remote avance et recule de 15 secondes, en respectant les limites", () => {
+  const view = render(<VideoPlayer video={{ VideoID: 14, CheminAcces: "test.m3u8", subtitles: [] }} backgroundBlur={{ current: null }} interactionMode="remote" />);
+  const media = view.container.querySelector("video");
+  Object.defineProperty(media, "duration", { configurable: true, value: 120 });
+  media.currentTime = 40;
+  const progress = screen.getByRole("slider", { name: "Position de lecture" }); progress.focus();
+  fireEvent.keyDown(progress, { key: "ArrowRight" });
+  expect(media.currentTime).toBe(55);
+  fireEvent.keyDown(progress, { key: "ArrowLeft" });
+  expect(media.currentTime).toBe(40);
+  media.currentTime = 115; fireEvent.keyDown(progress, { key: "ArrowRight" });
+  expect(media.currentTime).toBe(120);
+  media.currentTime = 5; fireEvent.keyDown(progress, { key: "ArrowLeft" });
+  expect(media.currentTime).toBe(0);
+  expect(progress).toHaveFocus();
+});

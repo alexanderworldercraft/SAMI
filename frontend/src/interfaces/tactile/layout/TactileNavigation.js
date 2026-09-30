@@ -34,7 +34,7 @@ export default function TactileNavigation() {
     { href: "/sagas", label: "Sagas" },
     { href: "/personnes", label: "Acteurs et réalisateurs" },
     ...(ai.authenticated && ai.preference?.accepted && !ai.loading ? [{ href: "/voix", label: "Voix" }] : []),
-    ...(user ? [{ href: "/profile", label: "Mon profil" }, { href: "/settings", label: "Paramètres" }] : [{ href: "/login", label: "Connexion" }]),
+    ...(user ? [{ href: "/settings", label: "Paramètres" }] : [{ href: "/login", label: "Connexion" }]),
     ...([1, 2].includes(user?.GradeID) ? [{ href: "/administration", label: "Administration" }, { href: "/nouvelle-video", label: "Nouvelle vidéo" }, { href: "/nouvelle-musique", label: "Nouvelle musique" }] : []),
     { href: "/updates", label: "Mises à jour" },
     { href: "/stats", label: "Statistiques" },

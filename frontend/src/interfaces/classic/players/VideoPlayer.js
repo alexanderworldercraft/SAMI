@@ -121,7 +121,7 @@ const PlayerLanguageFlag = ({ flag }) => (
   ) : (
     <span
       title="Langue non identifiée"
-      aria-label="Langue non identifiée"
+        aria-label="Langue non identifiée"
       className="flex h-4 w-6 shrink-0 items-center justify-center rounded-sm border border-white/15 bg-white/5"
     >
       <GlobeAltIcon className="h-3.5 w-3.5 text-white/55" aria-hidden="true" />
@@ -181,9 +181,10 @@ const VideoPlayer = ({
   const fitContainerRef = useRef(null);
   const playerContainerRef = useRef(null);
   const controlsContainerRef = useRef(null);
+  const remoteActionRef = useRef(null);
   const [tactileControlsHeight, setTactileControlsHeight] = useState(88);
   useEffect(() => {
-    if (interactionMode !== "tactile") return;
+    if (interactionMode === "classic") return;
     const update = () => setTactileControlsHeight(Math.ceil(controlsContainerRef.current?.getBoundingClientRect().height || 88));
     update();
     const observer = typeof ResizeObserver !== "undefined" ? new ResizeObserver(update) : null;
@@ -206,6 +207,18 @@ const VideoPlayer = ({
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [volume, setVolume] = useState(1);
   const [muted, setMuted] = useState(false);
+  const [remoteVolumeOpen, setRemoteVolumeOpen] = useState(false);
+  const remoteVolumeButtonRef = useRef(null);
+  const remoteVolumePanelRef = useRef(null);
+  useEffect(() => {
+    if (!remoteVolumeOpen) return undefined;
+    remoteVolumePanelRef.current?.querySelector("input")?.focus();
+    const onOutside = (event) => {
+      if (!remoteVolumePanelRef.current?.contains(event.target) && !remoteVolumeButtonRef.current?.contains(event.target)) setRemoteVolumeOpen(false);
+    };
+    document.addEventListener("pointerdown", onOutside);
+    return () => document.removeEventListener("pointerdown", onOutside);
+  }, [remoteVolumeOpen]);
   const [captionsEnabled, setCaptionsEnabled] = useState(false);
   const [selectedSubtitleIndex, setSelectedSubtitleIndex] = useState(0);
   const [activeSubtitleCues, setActiveSubtitleCues] = useState([]);
@@ -1265,12 +1278,17 @@ const VideoPlayer = ({
       clearTimeout(controlsHideTimeoutRef.current);
     }
     controlsHideTimeoutRef.current = setTimeout(() => {
+      if (interactionMode === "remote" && controlsContainerRef.current?.contains(document.activeElement)) {
+        controlsHideTimeoutRef.current = null;
+        return;
+      }
       setControlsVisible(false);
       controlsHideTimeoutRef.current = null;
     }, PLAYER_CONTROLS_HIDE_DELAY_MS);
   };
 
   const openKeyboardHelp = () => {
+    setRemoteVolumeOpen(false);
     setSettingsMenuOpen(false);
     setSettingsPanel(SETTINGS_PANEL.MAIN);
     setKeyboardHelpOpen(true);
@@ -1288,6 +1306,7 @@ const VideoPlayer = ({
   };
 
   const openSettingsMenu = () => {
+    setRemoteVolumeOpen(false);
     setKeyboardHelpOpen(false);
     setSettingsMenuOpen(true);
     setSettingsPanel(SETTINGS_PANEL.MAIN);
@@ -1354,7 +1373,7 @@ const VideoPlayer = ({
   }, [settingsMenuOpen]);
 
   useEffect(() => {
-    if (!video?.CheminAcces) return undefined;
+    if (!video?.CheminAcces || interactionMode === "remote") return undefined;
 
     const handlePlayerKeyDown = (event) => {
       if (
@@ -1403,7 +1422,7 @@ const VideoPlayer = ({
     // Les actions lisent directement l'élément vidéo courant ; seule la durée de repli
     // peut rendre nécessaire de recréer le gestionnaire.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [duration, video?.CheminAcces, video?.VideoID]);
+  }, [duration, video?.CheminAcces, video?.VideoID, interactionMode]);
 
   const hideControls = () => {
     setControlsVisible(false);
@@ -1528,10 +1547,10 @@ const VideoPlayer = ({
     ? "Automatique"
     : availableLevels.find((level) => level.level === selectedLevel)?.resolution
       || "Automatique";
-  const playerChromePinnedVisible = keyboardHelpOpen
+  const playerChromePinnedVisible = remoteVolumeOpen || keyboardHelpOpen
     || settingsMenuOpen
     || (!controlsDismissed && (!playing || controlsVisible));
-  const playerChromeAutoReveal = interactionMode !== "tactile" && !playerChromePinnedVisible && !controlsDismissed;
+  const playerChromeAutoReveal = interactionMode === "classic" && !playerChromePinnedVisible && !controlsDismissed;
   const playerChromeVisibilityClass = playerChromePinnedVisible
     ? "opacity-100"
     : playerChromeAutoReveal
@@ -1543,10 +1562,80 @@ const VideoPlayer = ({
       ? "bottom-4 group-hover:bottom-16 group-focus-within:bottom-16"
       : "bottom-4";
 
+  const handleRemoteKeyDown = (event) => {
+    if (interactionMode !== "remote" || event.defaultPrevented || event.isComposing) return;
+    const back = event.key === "Escape" || event.key === "BrowserBack" || event.key === "GoBack" || event.keyCode === 461 || event.keyCode === 10009;
+    if (back && remoteVolumeOpen) {
+      event.preventDefault(); event.stopPropagation();
+      setRemoteVolumeOpen(false);
+      remoteVolumeButtonRef.current?.focus();
+      return;
+    }
+    if (back && (keyboardHelpOpen || settingsMenuOpen || playerChromePinnedVisible)) {
+      event.preventDefault(); event.stopPropagation();
+      if (event.repeat) return;
+      if (keyboardHelpOpen) closeKeyboardHelp();
+      else if (settingsMenuOpen) closeSettingsMenu();
+      else hideControls();
+      playerContainerRef.current?.focus({ preventScroll: true });
+      return;
+    }
+    const progress = controlsContainerRef.current?.querySelector('[data-player-progress] input');
+    if (event.target === progress && ["ArrowLeft", "ArrowRight"].includes(event.key)) {
+      event.preventDefault(); event.stopPropagation();
+      seekBy(event.key === "ArrowLeft" ? -15 : 15);
+      return;
+    }
+    if (!remoteVolumeOpen && !settingsMenuOpen && !keyboardHelpOpen
+      && event.target.matches?.('[data-remote-action]')
+      && ["ArrowLeft", "ArrowRight"].includes(event.key)) {
+      event.preventDefault(); event.stopPropagation();
+      const buttons = Array.from(controlsContainerRef.current.querySelectorAll('[data-remote-action]')).filter((button) => !button.disabled);
+      const index = buttons.indexOf(event.target);
+      const next = buttons[index + (event.key === "ArrowLeft" ? -1 : 1)];
+      if (next) { remoteActionRef.current = next; next.focus(); }
+      return;
+    }
+    if (event.target === progress && event.key === "ArrowDown") {
+      event.preventDefault(); event.stopPropagation();
+      (remoteActionRef.current?.isConnected ? remoteActionRef.current : controlsContainerRef.current?.querySelector('[data-player-actions] button'))?.focus();
+      return;
+    }
+    if (!remoteVolumeOpen && !settingsMenuOpen && !keyboardHelpOpen
+      && event.target.closest?.('[data-player-actions]') && event.key === "ArrowUp") {
+      event.preventDefault(); event.stopPropagation();
+      remoteActionRef.current = event.target;
+      progress?.focus();
+      return;
+    }
+    const onPlayer = event.target === playerContainerRef.current;
+    if (!onPlayer) return;
+    if (event.key === "Enter") {
+      event.preventDefault();
+      if (event.repeat) return;
+      if (!playerChromePinnedVisible) togglePlayback();
+      else controlsContainerRef.current?.querySelector("button")?.focus();
+    } else if (event.key.startsWith("Arrow")) {
+      if (!playerChromePinnedVisible && ["ArrowLeft", "ArrowRight"].includes(event.key)) {
+        event.preventDefault();
+        seekBy(event.key === "ArrowLeft" ? -10 : 10);
+      } else if (!playerChromePinnedVisible || event.key === "ArrowUp" || event.key === "ArrowDown") {
+        event.preventDefault();
+        showControls();
+        requestAnimationFrame(() => controlsContainerRef.current?.querySelector("button")?.focus());
+      }
+    }
+  };
+
   return (
-    <div ref={fitContainerRef} data-player-interaction={interactionMode} className="relative w-full h-full flex items-center justify-center">
+    <div ref={fitContainerRef} data-player-interaction={interactionMode}
+      onKeyDown={handleRemoteKeyDown} className="relative w-full h-full flex items-center justify-center">
       <div
         ref={playerContainerRef}
+        data-remote-player={interactionMode === "remote" ? "true" : undefined}
+        tabIndex={interactionMode === "remote" ? 0 : undefined}
+        role={interactionMode === "remote" ? "group" : undefined}
+        aria-label={interactionMode === "remote" ? "Lecteur vidéo : OK pour lire ou choisir, flèches pour naviguer" : undefined}
         className="relative border-0 ring-0 group rounded-xl xl:rounded-2xl shadow-xl/30 overflow-visible"
         style={{
           width: isFullscreen ? "100vw" : playerSize.width ? `${playerSize.width}px` : "100%",
@@ -1580,7 +1669,7 @@ const VideoPlayer = ({
         {captionsEnabled && activeSubtitleCues.length > 0 && (
           <div
             data-testid="player-subtitles"
-            style={interactionMode === "tactile" && playerChromePinnedVisible ? { bottom: tactileControlsHeight + 8 } : undefined}
+            style={interactionMode !== "classic" && playerChromePinnedVisible ? { bottom: tactileControlsHeight + 8 } : undefined}
             aria-label="Sous-titres"
             className={`pointer-events-none absolute inset-x-0 z-30 flex flex-col items-center gap-1 px-4 text-center transition-[bottom] duration-300 ease-in-out ${subtitlePositionClass}`}
           >
@@ -1598,10 +1687,12 @@ const VideoPlayer = ({
         <div
           ref={controlsContainerRef}
           data-testid="player-controls"
-          style={interactionMode === "tactile" && !playerChromePinnedVisible ? { pointerEvents: "none" } : undefined}
+          inert={interactionMode === "remote" && !playerChromePinnedVisible ? "" : undefined}
+          style={interactionMode !== "classic" && !playerChromePinnedVisible ? { pointerEvents: "none" } : undefined}
           className={`absolute inset-x-0 bottom-0 z-40 rounded-b-xl bg-gradient-to-t from-black/95 via-black/65 to-transparent px-3 pb-3 pt-10 text-white transition-opacity duration-200 xl:rounded-b-2xl ${playerChromeVisibilityClass}`}
         >
           <div
+            data-player-progress
             className="relative mb-2 flex h-5 items-center"
             onMouseMove={handleProgressHover}
             onMouseLeave={() => setHoverPreview(null)}
@@ -1655,9 +1746,10 @@ const VideoPlayer = ({
             />
           </div>
 
-          <div className="flex items-center gap-3 text-sm">
+          <div data-player-actions className="flex items-center gap-3 text-sm">
             <button
               type="button"
+              data-remote-action
               onClick={togglePlayback}
               className="min-w-7 rounded p-1 text-lg leading-none hover:bg-white/15"
               aria-label={playing ? "Mettre en pause" : "Lire"}
@@ -1665,6 +1757,20 @@ const VideoPlayer = ({
               {playing ? "❚❚" : "▶"}
             </button>
 
+            {interactionMode === "remote" ? <div className="relative">
+              <button type="button" data-remote-action ref={remoteVolumeButtonRef} onClick={() => {
+                setRemoteVolumeOpen((open) => !open);
+                setSettingsMenuOpen(false); setKeyboardHelpOpen(false);
+              }} aria-label="Régler le volume" aria-expanded={remoteVolumeOpen} aria-controls="remote-volume-panel" className="rounded p-2 hover:bg-white/15">
+                {muted || volume === 0 ? "🔇" : "🔊"}
+              </button>
+              {remoteVolumeOpen && <div ref={remoteVolumePanelRef} id="remote-volume-panel" role="menu" aria-label="Réglage du volume" className="absolute bottom-full left-0 z-50 mb-4 w-72 rounded-xl border border-white/20 bg-neutral-950 p-4 shadow-xl">
+                <label htmlFor="remote-volume" className="mb-3 block font-bold">Volume {Math.round((muted ? 0 : volume) * 100)} %</label>
+                <input id="remote-volume" type="range" min="0" max="1" step="0.05" value={muted ? 0 : volume} onChange={(event) => updateVolume(Number(event.target.value))} aria-label="Volume" className="w-full accent-sky-500" />
+                <button type="button" onClick={toggleMute} aria-label={muted ? "Réactiver le son" : "Couper le son"} className="mt-3 w-full rounded p-2 hover:bg-white/15">{muted ? "Réactiver le son" : "Couper le son"}</button>
+                <button type="button" onClick={() => { setRemoteVolumeOpen(false); remoteVolumeButtonRef.current?.focus(); }} className="mt-2 w-full rounded p-2 hover:bg-white/15">Fermer le volume</button>
+              </div>}
+            </div> : <>
             <button
               type="button"
               onClick={toggleMute}
@@ -1683,6 +1789,7 @@ const VideoPlayer = ({
               aria-label="Volume"
               className="hidden h-1 w-20 cursor-pointer accent-sky-500 sm:block"
             />
+            </>}
 
             <span className="tabular-nums text-xs font-semibold text-white/90">
               {formatPlaybackTime(currentTime)} / {formatPlaybackTime(duration)}
@@ -2086,6 +2193,7 @@ const VideoPlayer = ({
                 aria-haspopup="menu"
                 aria-expanded={settingsMenuOpen}
                 aria-controls="player-settings-menu"
+                data-remote-action
                 aria-label={settingsMenuOpen ? "Fermer les réglages du lecteur" : "Ouvrir les réglages du lecteur"}
                 className={`flex h-8 w-8 items-center justify-center rounded-full transition ${
                   settingsMenuOpen ? "bg-white text-neutral-950" : "text-white/90 hover:bg-white/15"
@@ -2098,7 +2206,7 @@ const VideoPlayer = ({
             <div
               data-player-keyboard-help="true"
               className="relative"
-              onMouseEnter={openKeyboardHelp}
+              onMouseEnter={interactionMode === "remote" ? undefined : openKeyboardHelp}
               onMouseLeave={(event) => {
                 if (!event.currentTarget.contains(document.activeElement)) {
                   closeKeyboardHelp();
@@ -2157,14 +2265,16 @@ const VideoPlayer = ({
               <button
                 type="button"
                 onClick={openKeyboardHelp}
-                onFocus={openKeyboardHelp}
+                onFocus={interactionMode === "remote" ? undefined : openKeyboardHelp}
                 onKeyDown={(event) => {
+                  if (interactionMode === "remote") return;
                   if (event.key === "Escape") {
                     event.preventDefault();
                     closeKeyboardHelp();
                     event.currentTarget.blur();
                   }
                 }}
+                data-remote-action
                 aria-label="Afficher les commandes du lecteur"
                 aria-controls="player-keyboard-shortcuts"
                 aria-describedby={keyboardHelpOpen ? "player-keyboard-shortcuts" : undefined}
@@ -2179,6 +2289,7 @@ const VideoPlayer = ({
               type="button"
               onClick={toggleFullscreen}
               className="rounded p-1 text-lg leading-none hover:bg-white/15"
+              data-remote-action
               aria-label="Basculer en plein écran"
             >
               ⛶

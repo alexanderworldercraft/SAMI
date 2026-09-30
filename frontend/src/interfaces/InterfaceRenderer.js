@@ -4,6 +4,7 @@ import { useInterfacePreference } from "../context/InterfacePreferenceContext";
 import MaintenanceBanner from "../components/MaintenanceBanner";
 import { resolveInterface } from "./registry";
 import AppRoutes from "./shared/AppRoutes";
+import RemoteControls from "./remote/components/RemoteControls";
 import MetaUpdater from "./shared/MetaUpdater";
 
 export default function InterfaceRenderer() {
@@ -21,6 +22,7 @@ export default function InterfaceRenderer() {
 
   return (
     <>
+      {definition.renderedMode === "remote" && <RemoteControls />}
       <MetaUpdater />
       <MaintenanceBanner />
       <PersistentMusicPlayer />
