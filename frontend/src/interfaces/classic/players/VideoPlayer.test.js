@@ -933,3 +933,32 @@ it("propose l’épisode suivant à 90 % sans générique, uniquement avec un é
   rerender(<VideoPlayer video={video} backgroundBlur={backgroundBlur} nextEpisode={null} />);
   expect(screen.queryByText("Épisode suivant")).not.toBeInTheDocument();
 });
+
+it("le lecteur tactile révèle ses contrôles au toucher sans dépendre du survol", () => {
+  const { container } = render(<VideoPlayer interactionMode="tactile" video={{ VideoID: 7, CheminAcces: "test.mp4", subtitles: [] }} backgroundBlur={{ current: null }} />);
+  const video = container.querySelector("video");
+  fireEvent.play(video);
+  const controls = screen.getByTestId("player-controls");
+  expect(controls).not.toHaveClass("group-hover:opacity-100");
+  expect(controls).toHaveStyle({ pointerEvents: "none" });
+  fireEvent.click(screen.getByTestId("player-interaction-layer"), { clientX: 10, clientY: 10, detail: 1 });
+  expect(controls).toHaveClass("opacity-100");
+  expect(controls.style.pointerEvents).toBe("");
+});
+
+test.each([
+  [390, 708, 390, 219],
+  [844, 262, 465, 262],
+])("le lecteur tactile tient dans %s × %s sans déformer la vidéo", (availableWidth, availableHeight, width, height) => {
+  const widthGetter = jest.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(availableWidth);
+  const heightGetter = jest.spyOn(HTMLElement.prototype, "clientHeight", "get").mockReturnValue(availableHeight);
+  try {
+    const view = render(<VideoPlayer video={{ VideoID: 1, CheminAcces: "test.m3u8" }} interactionMode="tactile" />);
+    const frame = view.container.querySelector('[data-player-interaction="tactile"]').firstElementChild;
+    expect(frame).toHaveStyle({ width: `${width}px`, height: `${height}px` });
+    view.unmount();
+  } finally {
+    widthGetter.mockRestore();
+    heightGetter.mockRestore();
+  }
+});

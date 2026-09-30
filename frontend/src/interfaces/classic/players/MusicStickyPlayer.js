@@ -290,7 +290,7 @@ const MusicStickyPlayer = ({ playlist, setPlaylist }) => {
   };
 
   return (
-    <section className={`fixed bottom-4 right-4 z-50 overflow-hidden rounded-2xl border border-sky-500/10 bg-white/95 shadow-2xl/30 shadow-slate-950/20 backdrop-blur max-sm:left-4 dark:bg-slate-950/95 dark:text-white dark:shadow-sky-950/30 ${playerCollapsed ? "w-fit max-w-[calc(100vw-2rem)]" : "w-[min(960px,calc(100vw-2rem))] max-sm:max-h-[calc(100dvh-2rem)] max-sm:overflow-y-auto"}`}>
+    <section data-music-player className={`fixed bottom-4 right-4 z-50 overflow-hidden rounded-2xl border border-sky-500/10 bg-white/95 shadow-2xl/30 shadow-slate-950/20 backdrop-blur max-sm:left-4 dark:bg-slate-950/95 dark:text-white dark:shadow-sky-950/30 ${playerCollapsed ? "w-fit max-w-[calc(100vw-2rem)]" : "w-[min(960px,calc(100vw-2rem))] max-sm:max-h-[calc(100dvh-2rem)] max-sm:overflow-y-auto"}`}>
       <div className="bg-[radial-gradient(circle_at_50%_0%,rgba(14,165,233,0.24),transparent_42%),linear-gradient(135deg,rgba(2,132,199,0.18),rgba(15,23,42,0.04)_48%,rgba(14,165,233,0.12))] dark:bg-[radial-gradient(circle_at_50%_0%,rgba(14,165,233,0.30),transparent_42%),linear-gradient(135deg,rgba(2,6,23,0.96),rgba(12,74,110,0.35)_54%,rgba(2,6,23,0.94))]">
         {playerCollapsed ? (
           <div className="flex items-center gap-2 px-3 py-3">

@@ -1,0 +1,32 @@
+import React, { act } from "react";
+import { fireEvent, render, screen } from "@testing-library/react";
+import TactileSearch from "./TactileSearch";
+import api from "../../../services/api";
+const mockNavigate = jest.fn();
+jest.mock("react-router-dom", () => ({ useNavigate: () => mockNavigate }), { virtual: true });
+jest.mock("../../../services/api", () => ({ get: jest.fn() }));
+beforeEach(() => { jest.clearAllMocks(); jest.useFakeTimers(); });
+afterEach(() => jest.useRealTimers());
+test("cherche après temporisation et permet une ouverture explicite du résultat", async () => {
+  api.get.mockResolvedValue({ data: { items: [{ id: 7, type: "video", Titre: "Film" }] } });
+  const close = jest.fn(); render(<TactileSearch onNavigate={close} />);
+  fireEvent.change(screen.getByLabelText("Titre de vidéo ou de série"), { target: { value: "Film" } });
+  await act(async () => { jest.advanceTimersByTime(300); });
+  fireEvent.click(screen.getByRole("button", { name: "Film" }));
+  expect(mockNavigate).toHaveBeenCalledWith("/lecture/7"); expect(close).toHaveBeenCalled();
+});
+test("le formulaire encode la recherche et ignore les anciennes suggestions", async () => {
+  let resolveFirst;
+  api.get.mockImplementationOnce(() => new Promise((resolve) => { resolveFirst = resolve; }));
+  api.get.mockResolvedValue({ data: { items: [{ id: 2, type: "video", Titre: "Nouveau" }] } });
+  render(<TactileSearch onNavigate={jest.fn()} />);
+  const input = screen.getByLabelText("Titre de vidéo ou de série");
+  fireEvent.change(input, { target: { value: "Ancien" } });
+  await act(async () => { jest.advanceTimersByTime(300); });
+  fireEvent.change(input, { target: { value: "a & b" } });
+  await act(async () => { jest.advanceTimersByTime(300); });
+  await act(async () => { resolveFirst({ data: { items: [{ id: 1, type: "video", Titre: "Ancien" }] } }); });
+  expect(screen.queryByRole("button", { name: "Ancien" })).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Voir tous les résultats" }));
+  expect(mockNavigate).toHaveBeenCalledWith("/videos?search=a%20%26%20b");
+});

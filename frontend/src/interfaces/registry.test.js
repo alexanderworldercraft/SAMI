@@ -21,7 +21,7 @@ test("classic fournit toutes les pages publiques et utilisateur existantes", () 
   expect(typeof classicInterface.Shell).toBe("function");
   expect(typeof classicInterface.PersistentMusicPlayer).toBe("function");
 });
-test.each(["tactile", "remote"])("%s conserve sa sélection et réutilise provisoirement les composants classic", (mode) => {
+test.each(["remote"])("%s conserve sa sélection et réutilise provisoirement les composants classic", (mode) => {
   const definition = resolveInterface(mode);
   expect(definition.id).toBe(mode);
   expect(definition.renderedMode).toBe("classic");
@@ -37,4 +37,13 @@ test.each(["classic", "tactile", "remote"])("l'administration reste classic pour
 });
 test.each([undefined, "invalid", "constructor", "__proto__"])("un mode inconnu %s utilise classic", (mode) => {
   expect(resolveInterface(mode)).toBe(INTERFACES.classic);
+});
+
+test("tactile fournit sa navigation et son lecteur adaptés, en réutilisant les pages communes", () => {
+  const definition = resolveInterface("tactile");
+  expect(definition.renderedMode).toBe("tactile");
+  expect(definition.Shell).not.toBe(classicInterface.Shell);
+  expect(definition.pages.playback).not.toBe(classicInterface.pages.playback);
+  expect(definition.pages.settings).toBe(classicInterface.pages.settings);
+  expect(definition.PersistentMusicPlayer).toBe(classicInterface.PersistentMusicPlayer);
 });

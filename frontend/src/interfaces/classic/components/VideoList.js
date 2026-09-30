@@ -180,7 +180,7 @@ const VideoList = ({
   }
 
   return (
-    <div className={`container grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-8 gap-4 mx-auto ${gridClassName}`}>
+    <div data-content-grid className={`container grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-8 gap-4 mx-auto ${gridClassName}`}>
       {videos.map((item) =>
         // --- NOUVEAU: cartes "personne"
         item.type === "person" ? (

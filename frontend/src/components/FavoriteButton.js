@@ -33,6 +33,7 @@ const FavoriteButton = ({
 
   return (
     <button
+      data-favorite-action
       type="button"
       onClick={handleClick}
       disabled={saving || !type || !id}

@@ -83,9 +83,11 @@ l'utilisateur de la session pour déterminer le propriétaire.
 Le frontend possède trois entrées dans `frontend/src/interfaces` : `classic`,
 `tactile` et `remote`. L'interface actuelle, y compris son responsive, est
 regroupée dans `classic` avec ses pages, sa navigation et ses lecteurs.
-Tactile et remote affichent provisoirement ces mêmes composants, en conservant
-le mode choisi par l'utilisateur. L'administration et les formulaires d'ajout
-restent toujours en classic.
+Tactile dispose maintenant d'une navigation fixe, d'un menu et d'une recherche
+au toucher, de cibles agrandies, de favoris visibles et de contrôles vidéo
+adaptés. Les pages et traitements existants restent réutilisés. Remote affiche
+provisoirement classic, en conservant le choix enregistré. L'administration et
+les formulaires d'ajout restent toujours en classic.
 
 Les URL, les droits d'accès, les services et les contextes restent communs.
 `data-interface-mode` indique le choix demandé ; `data-interface-rendered`

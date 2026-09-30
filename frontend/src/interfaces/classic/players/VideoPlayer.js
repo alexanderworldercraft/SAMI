@@ -173,12 +173,24 @@ const VideoPlayer = ({
   onNextEpisode,
   initialPlaybackTime = null,
   autoPlayOnLoad = false,
+  interactionMode = "classic",
 }) => {
   const videoRef = useRef(null);
   const readyMediaIdRef = useRef(null);
   const initialPlaybackAppliedRef = useRef(null);
   const fitContainerRef = useRef(null);
   const playerContainerRef = useRef(null);
+  const controlsContainerRef = useRef(null);
+  const [tactileControlsHeight, setTactileControlsHeight] = useState(88);
+  useEffect(() => {
+    if (interactionMode !== "tactile") return;
+    const update = () => setTactileControlsHeight(Math.ceil(controlsContainerRef.current?.getBoundingClientRect().height || 88));
+    update();
+    const observer = typeof ResizeObserver !== "undefined" ? new ResizeObserver(update) : null;
+    if (controlsContainerRef.current) observer?.observe(controlsContainerRef.current);
+    window.addEventListener("resize", update);
+    return () => { observer?.disconnect?.(); window.removeEventListener("resize", update); };
+  }, [interactionMode]);
 
   // Qualités HLS
   const [availableLevels, setAvailableLevels] = useState([]);
@@ -1519,7 +1531,7 @@ const VideoPlayer = ({
   const playerChromePinnedVisible = keyboardHelpOpen
     || settingsMenuOpen
     || (!controlsDismissed && (!playing || controlsVisible));
-  const playerChromeAutoReveal = !playerChromePinnedVisible && !controlsDismissed;
+  const playerChromeAutoReveal = interactionMode !== "tactile" && !playerChromePinnedVisible && !controlsDismissed;
   const playerChromeVisibilityClass = playerChromePinnedVisible
     ? "opacity-100"
     : playerChromeAutoReveal
@@ -1532,7 +1544,7 @@ const VideoPlayer = ({
       : "bottom-4";
 
   return (
-    <div ref={fitContainerRef} className="relative w-full h-full flex items-center justify-center">
+    <div ref={fitContainerRef} data-player-interaction={interactionMode} className="relative w-full h-full flex items-center justify-center">
       <div
         ref={playerContainerRef}
         className="relative border-0 ring-0 group rounded-xl xl:rounded-2xl shadow-xl/30 overflow-visible"
@@ -1568,6 +1580,7 @@ const VideoPlayer = ({
         {captionsEnabled && activeSubtitleCues.length > 0 && (
           <div
             data-testid="player-subtitles"
+            style={interactionMode === "tactile" && playerChromePinnedVisible ? { bottom: tactileControlsHeight + 8 } : undefined}
             aria-label="Sous-titres"
             className={`pointer-events-none absolute inset-x-0 z-30 flex flex-col items-center gap-1 px-4 text-center transition-[bottom] duration-300 ease-in-out ${subtitlePositionClass}`}
           >
@@ -1583,7 +1596,9 @@ const VideoPlayer = ({
         )}
 
         <div
+          ref={controlsContainerRef}
           data-testid="player-controls"
+          style={interactionMode === "tactile" && !playerChromePinnedVisible ? { pointerEvents: "none" } : undefined}
           className={`absolute inset-x-0 bottom-0 z-40 rounded-b-xl bg-gradient-to-t from-black/95 via-black/65 to-transparent px-3 pb-3 pt-10 text-white transition-opacity duration-200 xl:rounded-b-2xl ${playerChromeVisibilityClass}`}
         >
           <div

@@ -1,9 +1,9 @@
 # Interfaces SAMI
 
-Cette étape isole l'interface classic existante, avec ses écrans, ses lecteurs,
-sa navigation et ses classes responsive. Les interfaces tactile et remote ont
-un point d'entrée distinct, mais affichent encore les composants classic.
-Leur développement intervient après validation successive de chaque mode.
+Classic conserve l'interface existante et son responsive. Tactile utilise sa
+propre disposition et sa navigation, avec des adaptations des listes et des
+lecteurs au toucher. Remote reste une entrée provisoire vers classic jusqu'à
+validation de tactile.
 
 ## Organisation
 
@@ -21,7 +21,13 @@ interfaces/
     pages/                   écrans utilisateur et pages publiques
     players/                 lecteurs vidéo et musique
     components/              composants de présentation classic
-  tactile/index.js           entrée provisoire vers classic
+  tactile/
+    index.js                 interface tactile
+    layout/                  navigation fixe et menu tactile
+    components/              recherche tactile
+    pages/                   composition du lecteur tactile
+    players/                 adaptation du moteur vidéo partagé
+    tactile.css              styles limités au rendu tactile
   remote/index.js            entrée provisoire vers classic
 ```
 
@@ -41,16 +47,18 @@ restent exclusivement définies par le routage commun. Ses lecteurs peuvent
 réutiliser les services et utilitaires existants, et le contexte musique reste
 au-dessus du sélecteur d'interface.
 
-Tactile et remote réutilisent actuellement les mêmes références de composants
-que classic. Le changement de préférence entre ces trois entrées ne remonte
-donc pas les pages ou le lecteur musique et conserve leur état. Il n'ajoute
-aucun traitement ni appel API de consentement. Aucun écran spécifique tactile
-ou remote n'est encore développé.
+Remote réutilise encore les composants classic. Tactile réutilise les pages
+existantes avec sa propre disposition et remplace la composition de lecture
+pour activer explicitement les contrôles tactiles. Les services et données ne
+sont pas dupliqués. Le lecteur musique persistant conserve la même référence
+entre les modes. Le changement effectif de disposition entre classic et
+tactile peut remonter la page courante ; la playlist reste dans le contexte
+musique commun.
 
 `data-interface-mode`, géré par `InterfacePreferenceProvider`, conserve le mode
 demandé ou détecté. `data-interface-rendered`, géré par `InterfaceRenderer`,
-indique l'interface effectivement affichée, actuellement `classic` dans tous
-les cas. Le choix utilisateur n'est jamais remplacé par ce mode d'affichage.
+indique l'interface effectivement affichée : `tactile` pour tactile,
+`classic` pour classic, remote provisoire et administration. Le choix utilisateur n'est jamais remplacé par ce mode d'affichage.
 Un mode inconnu utilise classic comme secours.
 
 ## Administration
@@ -76,3 +84,24 @@ Les tests automatisés ne remplacent pas la validation visuelle et la lecture
 sur l'instance déployée. Aucune nouvelle migration de BDD pour cette étape ;
 la migration de la première brique reste nécessaire si elle n'a pas encore
 été appliquée.
+
+## Adaptations tactiles
+
+- Navigation fixe Accueil/Vidéos/Musique/Plus, sans sidebar ni marge réservée.
+- Menu complet avec fermeture persistante pendant le défilement, recherche
+  explicite, thèmes, liens utilisateur, voix selon consentement et outils admin
+  selon grade. Les pages administratives restent classic.
+- Zones interactives d'au moins 44 pixels, actions de navigation de 48 pixels,
+  champs de 16 pixels et prise en compte des zones sûres de l'écran.
+- Grilles de 2 à 6 colonnes selon la largeur, favoris visibles au toucher,
+  titres maintenus et aperçu au survol désactivé dans ce mode.
+- Contrôles vidéo révélés au toucher, sans révélation automatique au survol ;
+  contrôles invisibles non interceptants et sous-titres au-dessus de leur
+  hauteur réelle. Le moteur HLS, les sous-titres, pistes audio, génériques et
+  commandes existantes restent partagés.
+- Lecteur musique et bandeau de maintenance placés au-dessus de la navigation.
+- Styles exclusivement sous `html[data-interface-rendered="tactile"]`.
+
+L'aperçu visuel utilise des données fictives aux formats téléphone (390 pixels)
+et tablette (834 pixels). La lecture réelle et les gestes natifs doivent être
+validés sur un appareil tactile avant de commencer remote.

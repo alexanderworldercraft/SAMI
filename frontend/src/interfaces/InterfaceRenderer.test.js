@@ -3,6 +3,8 @@ import { act, render, screen } from "@testing-library/react";
 import InterfaceRenderer from "./InterfaceRenderer";
 import { useInterfacePreference } from "../context/InterfacePreferenceContext";
 import { useLocation } from "react-router-dom";
+jest.mock("./tactile/layout/TactileShell", () => ({ children }) => children);
+jest.mock("./tactile/pages/TactilePlaybackPage", () => () => null);
 const mockOnMount = jest.fn();
 function MockPlayer() {
   React.useEffect(() => { mockOnMount(); }, []);
@@ -29,7 +31,7 @@ test("changer un mode provisoire conserve l'√©tat du lecteur et le choix demand√
     view.rerender(<InterfaceRenderer />);
     expect(screen.getByTestId("interface-id")).toHaveTextContent(mode);
     expect(screen.getByRole("button", { name: "Lecture en cours" })).toBeInTheDocument();
-    expect(document.documentElement.dataset.interfaceRendered).toBe("classic");
+    expect(document.documentElement.dataset.interfaceRendered).toBe(mode === "tactile" ? "tactile" : "classic");
   }
   expect(mockOnMount).toHaveBeenCalledTimes(1);
   view.unmount();

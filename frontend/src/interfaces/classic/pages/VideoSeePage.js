@@ -32,7 +32,7 @@ ouvrez Paramètres → Abonnement,
 puis choisissez la formule qui vous convient (mensuelle ou annuelle).
 L’activation est immédiate et ne nécessite aucun paiement réel : il s’agit d’une simulation pour tester les fonctionnalités.`;
 
-const VideoSeePage = () => {
+const VideoSeePage = ({ PlayerComponent = VideoPlayer }) => {
 
   const { id } = useParams();
   const navigate = useNavigate();
@@ -778,9 +778,9 @@ const VideoSeePage = () => {
       )}
       {video && (
         <main className="flex flex-col grow gap-12">
-          <section className="h-[calc(100vh-4rem)] max-h-[calc(100vh-4rem)] box-border py-16 flex items-center px-16">
+          <section data-playback-stage className="h-[calc(100vh-4rem)] max-h-[calc(100vh-4rem)] box-border py-16 flex items-center px-16">
             <div className="w-full h-full">
-              <VideoPlayer
+              <PlayerComponent
                 video={video}
                 backgroundBlur={backgroundBlur}
                 onVideoElement={setVideoElement}
