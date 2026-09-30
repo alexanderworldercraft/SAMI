@@ -3,7 +3,7 @@ import { Disclosure, Menu } from '@headlessui/react';
 import { Bars3Icon, XMarkIcon } from '@heroicons/react/24/outline';
 import { useLocation, useNavigate } from 'react-router-dom'; // Importer useLocation
 import api from '../services/api';
-import SearchBar from './SearchBar';
+import SearchBar from '../interfaces/classic/components/SearchBar';
 import ThemeToggle from './ThemeToggle';
 
 const apiBaseUrl = process.env.REACT_APP_URL_LOCAL;

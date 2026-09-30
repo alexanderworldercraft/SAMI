@@ -9,7 +9,7 @@ import {
   InformationCircleIcon,
 } from "@heroicons/react/20/solid";
 import { XMarkIcon } from "@heroicons/react/24/outline";
-import PaginationPage from "./PaginationPage";
+import PaginationPage from "../interfaces/classic/components/PaginationPage";
 import UserAvatar from "./UserAvatar";
 import WatchHistoryCards from "./WatchHistoryCardsAdminPanel";
 import FavoriteContentList from "./FavoriteContentList";

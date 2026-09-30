@@ -9,7 +9,7 @@ import {
 } from "@heroicons/react/24/outline";
 
 import api from "../services/api";
-import PaginationPage from "./PaginationPage";
+import PaginationPage from "../interfaces/classic/components/PaginationPage";
 
 const apiUrl = String(process.env.REACT_APP_URL_LOCAL || "").replace(/\/$/, "");
 const MIN_CUE_DURATION = 0.1;

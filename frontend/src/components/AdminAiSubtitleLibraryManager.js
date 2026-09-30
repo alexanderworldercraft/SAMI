@@ -8,7 +8,7 @@ import {
 } from "@heroicons/react/24/outline";
 
 import api from "../services/api";
-import PaginationPage from "./PaginationPage";
+import PaginationPage from "../interfaces/classic/components/PaginationPage";
 
 const ACTIVE_STATUSES = new Set(["QUEUED", "PREPARING", "LEASED"]);
 

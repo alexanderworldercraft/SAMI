@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { StarIcon } from "@heroicons/react/24/solid";
 import api from "../services/api";
-import PaginationPage from "./PaginationPage";
+import PaginationPage from "../interfaces/classic/components/PaginationPage";
 
 const apiBaseUrl = process.env.REACT_APP_URL_LOCAL;
 const fieldClass = "rounded-xl border border-sky-500/20 bg-white/85 px-4 py-3 text-sm font-semibold text-slate-900 shadow-sm transition duration-200 hover:border-sky-400/60 focus:outline-none focus:ring-2 focus:ring-sky-400 dark:bg-slate-950/65 dark:text-white";
