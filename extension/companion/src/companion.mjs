@@ -3,45 +3,58 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { assembleMedia } from "./media.mjs";
+import { checkRuntime } from "./runtime.mjs";
+import { sanitizeError } from "./network.mjs";
 import { uploadToSami } from "./upload.mjs";
-
+import { NativeDecoder, encodeMessage } from "./nativeProtocol.mjs";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const configPath = path.join(root, "config.json");
-const config = fs.existsSync(configPath) ? JSON.parse(fs.readFileSync(configPath, "utf8")) : {};
-const trace = (message) => process.stderr.write(`[${new Date().toISOString()}] ${message}\n`);
-const send = (message) => {
-  const payload = Buffer.from(JSON.stringify(message)); const header = Buffer.alloc(4); header.writeUInt32LE(payload.length, 0);
-  process.stdout.write(Buffer.concat([header, payload]));
-  trace(`Réponse envoyée (${payload.length} octets).`);
+const controller = new AbortController();
+let active = false; let closed = false;
+const send = (message) => { if (!closed) process.stdout.write(encodeMessage(message)); };
+const config = () => {
+  if (Number(process.versions.node.split(".")[0]) < 22) throw new Error("Node.js 22 ou plus récent est nécessaire. Relancez l’installateur avec cette version.");
+  const file = path.join(root, "config.json");
+  try { return fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, "utf8")) : {}; }
+  catch { throw new Error("companion/config.json n’est pas un JSON valide."); }
 };
-let buffer = Buffer.alloc(0);
 async function handle(message) {
-  if (message.action === "ping") return send({ ok: true, version: "0.1.0" });
-  if (message.action === "download") {
-    const outputPath = await assembleMedia(message.candidate, { config, title: message.title });
-    return send({ ok: true, outputPath });
-  }
-  if (message.action === "import") {
-    const tempDirectory = fs.mkdtempSync(path.join(os.tmpdir(), "sami-companion-"));
+  if (message.action === "cancel") { controller.abort(); return; }
+  if (active) throw new Error("Une opération est déjà en cours sur cette connexion.");
+  active = true;
+  try {
+    const settings = config();
+    if (message.action === "ping") return send({ ok: true, version: "0.1.4", node: process.version, ...checkRuntime(settings) });
+    if (!["download", "import"].includes(message.action)) throw new Error("Action inconnue.");
+    const startedAt = Date.now(); let lastProgressAt = 0;
+    const progress = ({ stage = "assembly", time } = {}) => {
+      if (Date.now() - lastProgressAt < 1000) return;
+      lastProgressAt = Date.now();
+      send({ type: "progress", stage, time, elapsedSeconds: Math.floor((Date.now() - startedAt) / 1000) });
+    };
+    send({ type: "progress", stage: "starting", elapsedSeconds: 0 });
+    if (message.action === "download") {
+      const outputPath = await assembleMedia(message.candidate, { config: settings, title: message.title, onProgress: progress, signal: controller.signal });
+      return send({ ok: true, outputPath });
+    }
+    if (!message.apiBaseUrl || !message.accessToken || !message.metadata?.titre) throw new Error("Import incomplet : instance, authentification et titre sont nécessaires.");
+    const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "sami-companion-"));
     try {
-      const filePath = await assembleMedia(message.candidate, { config, outputDirectory: tempDirectory, title: message.metadata?.titre });
-      const result = await uploadToSami({ apiBaseUrl: message.apiBaseUrl, accessToken: message.accessToken, filePath, metadata: message.metadata || {}, allowUnauthorizedTls: config.allowUnauthorizedTls === true });
-      return send({ ok: true, result });
-    } finally { fs.rmSync(tempDirectory, { recursive: true, force: true }); }
-  }
-  throw new Error("Action inconnue.");
+      const filePath = await assembleMedia(message.candidate, { config: settings, outputDirectory: temporary,
+        title: message.metadata.titre, onProgress: progress, signal: controller.signal });
+      send({ type: "progress", stage: "uploading", elapsedSeconds: Math.floor((Date.now() - startedAt) / 1000) });
+      const result = await uploadToSami({ apiBaseUrl: message.apiBaseUrl, accessToken: message.accessToken, filePath,
+        metadata: message.metadata, allowUnauthorizedTls: settings.allowUnauthorizedTls === true, signal: controller.signal });
+      send({ ok: true, result });
+    } finally { fs.rmSync(temporary, { recursive: true, force: true }); }
+  } finally { active = false; }
 }
-process.stdin.on("data", (chunk) => {
-  trace(`Données reçues (${chunk.length} octets).`);
-  buffer = Buffer.concat([buffer, chunk]);
-  while (buffer.length >= 4) {
-    const length = buffer.readUInt32LE(0); if (buffer.length < length + 4) break;
-    const payload = buffer.subarray(4, length + 4); buffer = buffer.subarray(length + 4);
-    let message; try { message = JSON.parse(payload.toString("utf8")); } catch { send({ ok: false, error: "Message JSON invalide." }); continue; }
-    handle(message).catch((error) => send({ ok: false, error: error.message }));
-  }
+const decoder = new NativeDecoder((message) => {
+  handle(message).catch((error) => send({ ok: false, error: controller.signal.aborted ? "Opération annulée. Si l’envoi avait commencé, vérifiez SAMI avant de relancer." : sanitizeError(error.message) }));
 });
-process.stdin.on("end", () => trace("Entrée standard fermée."));
-process.on("uncaughtException", (error) => { trace(`Erreur non interceptée : ${error.stack || error.message}`); process.exit(1); });
-process.on("unhandledRejection", (error) => { trace(`Promesse rejetée : ${error?.stack || error}`); process.exit(1); });
-trace(`Compagnon démarré avec Node ${process.version}.`);
+process.stdin.on("data", (chunk) => {
+  try { decoder.push(chunk); }
+  catch (error) { send({ ok: false, error: error.message }); controller.abort(); process.stdin.destroy(); }
+});
+process.stdin.on("end", () => { closed = true; controller.abort(); });
+process.stdout.on("error", () => { closed = true; controller.abort(); });
+process.on("SIGTERM", () => { closed = true; controller.abort(); });

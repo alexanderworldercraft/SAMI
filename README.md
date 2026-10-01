@@ -2,7 +2,7 @@
 
 SAMI (**Système d’Archivage Multimédia Intégré**) est une médiathèque web privée permettant d’organiser, diffuser et suivre des films, séries et musiques depuis une seule interface.
 
-La version actuelle est la **8.3.0**. Elle repose sur un backend Fastify, une interface React, Prisma avec MySQL, un pipeline vidéo FFmpeg/HLS et Socket.IO pour le retour en temps réel des traitements.
+La version actuelle est la **8.4.0**. Elle repose sur un backend Fastify, une interface React, Prisma avec MySQL, un pipeline vidéo FFmpeg/HLS et Socket.IO pour le retour en temps réel des traitements.
 
 ## Fonctionnalités
 
@@ -96,6 +96,23 @@ Les URL, les droits d'accès, les services et les contextes restent communs.
 indique le mode réellement affiché. Aucun changement de BDD pour cette étape.
 Voir [l'organisation et le contrat des interfaces](frontend/src/interfaces/README.md).
 
+## Nouveautés de la version 8.4.0
+
+- trois interfaces classic, tactile et remote, choisies par détection locale ou préférence par appareil ;
+- consentement explicite à l’enregistrement, confirmation des nouveaux appareils et gestion complète dans Paramètres ;
+- navigation tactile en bas de l’écran, cibles agrandies, lecteur adapté au portrait/paysage et restauration du thème au démarrage ;
+- interface TV avec barre latérale, focus visible, flèches, OK et Retour, et saisie au clavier natif ;
+- focus direct sur le lecteur remote après chargement, progression distincte des boutons et réglage du volume dans un panneau dédié ;
+- déplacement de 15 secondes sur la progression remote, avec navigation horizontale explicite entre les cinq commandes ;
+- extension Chromium et compagnon FFmpeg pour le téléchargement local et l’import authentifié vers SAMI, à installer séparément ;
+- édition des enregistrements vocaux, transcription locale des originaux et protection des références en cours de génération ;
+- compatibilité des chemins des anciens médias, suivi de fin de lecture cohérent avec les génériques et historique des traitements réductible.
+
+Avant déploiement, appliquer la migration `20260930120000_add_user_interface_devices`
+et régénérer le client Prisma si cela n’a pas encore été fait. La lecture réelle,
+le clavier natif et les touches spécifiques aux téléviseurs restent à valider sur
+les appareils cibles. Voir aussi [l’installation de l’extension](extension_2/extension/README.md).
+
 ## Nouveautés de la version 8.3.0
 
 - propositions de plusieurs génériques par vidéo, avec saisie des bornes et capture de la position actuelle du lecteur ;
@@ -123,7 +140,7 @@ le déploiement. Les détails sont dans la section « Génériques proposés par
 
 Les consignes de déploiement, la migration et les limites sont détaillées dans [la documentation de la bibliothèque de voix](backend/docs/voice-library.md).
 
-L’historique complet des versions, de la 6.1.0 à la 8.3.0, est disponible dans l’application à l’adresse `/updates` et dans `frontend/src/interfaces/classic/pages/UpdatesPage.js`.
+L’historique complet des versions, de la 6.1.0 à la 8.4.0, est disponible dans l’application à l’adresse `/updates` et dans `frontend/src/interfaces/classic/pages/UpdatesPage.js`.
 
 ## Stack technique
 

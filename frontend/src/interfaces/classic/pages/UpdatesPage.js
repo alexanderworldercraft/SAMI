@@ -2,6 +2,85 @@ import React, { useEffect, useState } from "react";
 
 const updates = [
   {
+    "version": "8.4.0",
+    "title": "Des interfaces adaptées à chaque appareil et une première interface TV",
+    "date": "1 octobre 2026",
+    "sections": [
+      {
+        "title": "Trois interfaces : classic, tactile et remote",
+        "items": [
+          "SAMI propose désormais une interface classique avec son responsive, une interface tactile pour les téléphones et tablettes, et une interface remote pour la navigation à la télécommande.",
+          "La détection locale propose un mode adapté à l’appareil ; ce choix reste modifiable, notamment pour utiliser l’interface TV sur un ordinateur branché à un téléviseur.",
+          "Les pages, les adresses et les droits d’accès restent communs. L’administration et les formulaires d’ajout conservent leur interface classic ; la playlist et le lecteur musique persistant sont conservés lors du changement de mode."
+        ]
+      },
+      {
+        "title": "Des appareils enregistrés uniquement avec votre accord",
+        "items": [
+          "Une première demande permet d’accepter ou de refuser l’enregistrement des appareils. Sans réponse, aucun choix n’est enregistré ; sans consentement, la détection locale continue sans mémoriser d’appareil.",
+          "Après acceptation, chaque nouveau navigateur propose de confirmer le mode détecté, de modifier le nom, le type ou l’interface, ou de ne pas enregistrer cet appareil. Ce dernier choix reporte la proposition à une prochaine session.",
+          "Un refus explicite est mémorisé et désactive les demandes d’enregistrement. Le choix peut être modifié dans Paramètres, comme indiqué dans la fenêtre de consentement.",
+          "Les paramètres permettent de consulter, renommer, modifier et supprimer les appareils du compte. Les dates de création, de modification et de dernière utilisation sont gérées automatiquement.",
+          "La désactivation de l’enregistrement demande confirmation, puis supprime tous les appareils du compte. La reconnaissance repose sur un identifiant aléatoire par compte et navigateur, sans empreinte matérielle ni enregistrement de l’agent utilisateur."
+        ]
+      },
+      {
+        "title": "Une navigation pensée pour le tactile",
+        "items": [
+          "Une barre inférieure donne accès à Accueil, Vidéos, Musique et Plus. Le menu complet et le choix du thème restent accessibles depuis Plus ; la barre supérieure conserve la recherche.",
+          "Les zones interactives sont agrandies, les favoris restent visibles, les titres ne dépendent plus du survol et les grilles s’adaptent à la largeur de l’écran.",
+          "Sur les petits formats, la vidéo utilise toute la largeur ou toute la hauteur disponible entre les barres de navigation selon ses proportions, sans déformation ni recadrage, y compris après rotation.",
+          "Les commandes vidéo s’affichent au toucher et les sous-titres tiennent compte de leur hauteur réelle. Le lecteur musique et les notifications de maintenance sont placés au-dessus de la navigation.",
+          "Le thème enregistré est appliqué dès le démarrage, même lorsque le menu est fermé. Le sélecteur tactile retrouve sa forme allongée et son menu reste dans les limites de l’écran."
+        ]
+      },
+      {
+        "title": "Une première interface TV à la télécommande",
+        "items": [
+          "Une barre latérale, des éléments agrandis et un focus contrasté permettent de naviguer avec les flèches ; OK/Entrée active l’élément sélectionné.",
+          "Le focus suit les éléments visibles, les dialogues et les menus ouverts. Retour ferme d’abord le panneau actif avant de revenir à la page précédente ; les touches Retour TV Tizen et webOS sont également prises en charge.",
+          "La recherche et la connexion utilisent les champs et le clavier natif de l’appareil pour cette première version. Au bord du texte, les flèches permettent de quitter un champ de recherche pour rejoindre la navigation.",
+          "Le lien Mon profil est retiré des menus tactile et remote. Les paramètres, les autres rubriques et les accès administratifs autorisés restent disponibles."
+        ]
+      },
+      {
+        "title": "Un lecteur vidéo adapté au mode remote",
+        "items": [
+          "L’ouverture d’une vidéo, y compris par lien direct, attend que le lecteur soit chargé et dimensionné avant de lui donner le focus ; les flèches pendant l’attente ne conduisent plus au bas de la page.",
+          "La progression occupe une ligne distincte au-dessus de Play, Son, Options, Infos et Plein écran. Gauche/droite parcourent directement cette ligne de boutons ; Haut rejoint la progression et Bas revient au dernier bouton sélectionné.",
+          "Sur la progression, gauche/droite déplacent la lecture de 15 secondes, sans dépasser le début ou la fin. Lorsque les commandes sont masquées, les raccourcis gauche/droite déplacent la lecture de 10 secondes.",
+          "Le volume s’ouvre dans un panneau dédié depuis le bouton Son ; Retour ferme ce panneau et restitue le focus au bouton. Le doublon visuel de la progression est supprimé.",
+          "Le bouton Infos s’ouvre avec OK sans interrompre le parcours au simple focus. Les réglages, sous-titres, pistes audio, génériques et fonctions HLS utilisent le moteur de lecture commun."
+        ]
+      },
+      {
+        "title": "Une extension navigateur pour télécharger et importer",
+        "items": [
+          "Une extension Chromium, à installer séparément, détecte les médias de la page et propose une sélection des flux et qualités, avec prise en charge des fichiers directs, HLS et DASH.",
+          "Le compagnon local utilise FFmpeg pour télécharger ou assembler les médias. Le téléchargement local ne nécessite pas de connexion à SAMI et n’envoie pas le fichier à l’instance.",
+          "L’import vers SAMI exige une connexion et les droits administratifs du serveur ; il conserve les choix de série, saison, genres, affiche et encodage. Le nom et l’adresse de l’instance sont configurables.",
+          "L’extension permet de retrouver l’état du traitement après fermeture de sa fenêtre et d’annuler les opérations locales. Le compagnon dispose d’un diagnostic et de lanceurs adaptés à Mac, Windows et Linux ; il nécessite une installation sur l’appareil."
+        ]
+      },
+      {
+        "title": "Une bibliothèque vocale plus complète",
+        "items": [
+          "Les administrateurs peuvent modifier ou supprimer les enregistrements vocaux selon leur état. La personne, la source et la nature original/IA restent fixes pour préserver l’attribution.",
+          "Un original ajouté sans texte peut être transcrit par un clone local compatible, sans traduction ni génération de voix. La transcription IA est identifiée, corrigeable et relançable en cas d’échec ; l’original reste conservé.",
+          "La correction du texte ou de la langue d’une réplique nécessite sa régénération et la remet en privé jusqu’à réussite. Les références utilisées par une génération en cours sont protégées contre les modifications incompatibles."
+        ]
+      },
+      {
+        "title": "Compatibilité média et suivi des traitements",
+        "items": [
+          "La lecture protégée respecte les chemins des anciens médias enregistrés dans SAMI, sans imposer de déplacement des fichiers originaux.",
+          "Le suivi de fin de lecture utilise les génériques validés lorsqu’ils commencent après la moitié de la vidéo, ou le seuil de secours à 90 %, en cohérence avec le bouton Épisode suivant.",
+          "L’historique des traitements vidéo peut être réduit ou déplié tout en conservant son compteur et ses mises à jour en direct."
+        ]
+      }
+    ]
+  },
+  {
     "version": "8.3.0",
     "title": "Génériques participatifs et passage à l’épisode suivant",
     "date": "11 septembre 2026",

@@ -17,46 +17,48 @@ const envPath = fs.existsSync(path.join(root, ".env"))
   : path.join(root, ".env.example");
 const env = parseEnv(fs.readFileSync(envPath, "utf8"));
 const appName = env.EXTENSION_APP_NAME || "SAMI";
-const apiBaseUrl = String(env.EXTENSION_API_BASE_URL || "").replace(/\/$/, "");
-if (!/^https?:\/\/[^/]+/.test(apiBaseUrl)) throw new Error("EXTENSION_API_BASE_URL est invalide.");
+const apiBaseUrl = String(env.EXTENSION_API_BASE_URL || "").replace(/\/+$/, "");
+const instance = new URL(apiBaseUrl);
+if (!["http:", "https:"].includes(instance.protocol) || instance.username || instance.password || instance.search || instance.hash) throw new Error("EXTENSION_API_BASE_URL doit être l’URL HTTP(S) de l’application, sans identifiants, requête ni fragment.");
 
 const output = path.join(root, "dist");
-fs.rmSync(output, { recursive: true, force: true });
-fs.mkdirSync(output, { recursive: true });
-fs.cpSync(path.join(root, "src"), output, { recursive: true });
-
-for (const filename of ["content.js", "popup.html"]) {
-  const target = path.join(output, filename);
-  fs.writeFileSync(target, fs.readFileSync(target, "utf8").replaceAll("__APP_NAME__", appName));
-}
-
-const manifest = {
+const firefoxOutput = path.join(root, "dist-firefox");
+const baseManifest = {
   manifest_version: 3,
   name: `${appName} - Import vidéo`,
-  version: env.EXTENSION_VERSION || "0.1.0",
+  version: env.EXTENSION_VERSION || "0.1.4",
   description: `Télécharge une vidéo directe ou prépare son import dans ${appName}.`,
-  permissions: ["activeTab", "downloads", "identity", "nativeMessaging", "scripting", "storage", "webRequest"],
+  permissions: ["activeTab", "identity", "nativeMessaging", "scripting", "storage", "webRequest", "webNavigation"],
   host_permissions: ["<all_urls>"],
   background: { service_worker: "background.js", type: "module" },
   action: { default_popup: "popup.html", default_title: `${appName} - Import vidéo` },
   content_scripts: [{
-    matches: [
-      "https://www.youtube.com/*",
-      "https://youtu.be/*",
-      "https://senpai-stream.space/*",
-      "https://animes-sama.fr/*",
-      "https://fr.pornhub.com/*"
-    ],
+    matches: ["http://*/*", "https://*/*"],
     js: ["content.js"],
-    css: ["content.css"],
-    run_at: "document_idle"
+    all_frames: true,
+    match_about_blank: true,
+    run_at: "document_start"
   }]
 };
-fs.writeFileSync(path.join(output, "manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`);
-fs.writeFileSync(path.join(output, "config.js"), `export const CONFIG = ${JSON.stringify({
+const buildTarget = (directory, manifest) => {
+  fs.rmSync(directory, { recursive: true, force: true });
+  fs.mkdirSync(directory, { recursive: true });
+  fs.cpSync(path.join(root, "src"), directory, { recursive: true });
+  for (const filename of ["content.js", "popup.html"]) {
+    const target = path.join(directory, filename);
+    fs.writeFileSync(target, fs.readFileSync(target, "utf8").replaceAll("__APP_NAME__", appName));
+  }
+  fs.writeFileSync(path.join(directory, "manifest.json"), `${JSON.stringify(manifest, null, 2)}\n`);
+  fs.writeFileSync(path.join(directory, "config.js"), `export const CONFIG = ${JSON.stringify({
   appName,
   apiBaseUrl,
-  downloadFolder: env.EXTENSION_DOWNLOAD_FOLDER || appName,
   companionHost: env.EXTENSION_COMPANION_HOST || "fr.sami.media_companion",
-}, null, 2)};\n`);
-console.log(`Extension ${appName} générée dans ${output}`);
+  }, null, 2)};\n`);
+};
+buildTarget(output, baseManifest);
+buildTarget(firefoxOutput, {
+  ...baseManifest,
+  background: { scripts: ["background.js"], type: "module" },
+  browser_specific_settings: { gecko: { id: env.EXTENSION_FIREFOX_ID || "sami-import@worldercraft.fr", strict_min_version: "121.0" } },
+});
+console.log(`Extension ${appName} générée dans ${output} et ${firefoxOutput}`);
