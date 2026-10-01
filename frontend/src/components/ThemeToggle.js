@@ -1,66 +1,14 @@
-import React, { useEffect, useState } from 'react';
-import Cookies from 'js-cookie';
+import React from 'react';
 import { Menu, MenuButton, MenuItem, MenuItems } from '@headlessui/react';
 import { Switch } from '@headlessui/react';
 import { EllipsisVerticalIcon } from '@heroicons/react/20/solid';
 import { SunIcon, MoonIcon } from '@heroicons/react/20/solid';
-import { buildCookieValue, parseCookieValue } from "../utils/cookieValue";
+import useTheme from "../hooks/useTheme";
 
-const ThemeToggle = () => {
-  const [theme, setTheme] = useState(() => {
-    const saved = Cookies.get('theme');
-    if (saved) return parseCookieValue(saved).value || saved;
-    return 'system';
-  });
-
-  const [isDark, setIsDark] = useState(false);
-
-  useEffect(() => {
-    const updateIsDark = () => {
-      if (theme === 'dark') return setIsDark(true);
-      if (theme === 'light') return setIsDark(false);
-      return setIsDark(window.matchMedia('(prefers-color-scheme: dark)').matches);
-    };
-    applyTheme(theme);
-    updateIsDark();
-  }, [theme]);
-
-  useEffect(() => {
-    if (theme === 'system') {
-      const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-      const systemChangeHandler = () => {
-        applyTheme('system');
-        setIsDark(mediaQuery.matches);
-      };
-      mediaQuery.addEventListener('change', systemChangeHandler);
-      return () => mediaQuery.removeEventListener('change', systemChangeHandler);
-    }
-  }, [theme]);
-
-  const applyTheme = (value) => {
-    const root = document.documentElement;
-    if (value === 'dark') {
-      root.classList.add('dark');
-    } else if (value === 'light') {
-      root.classList.remove('dark');
-    } else if (value === 'system') {
-      if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
-        root.classList.add('dark');
-      } else {
-        root.classList.remove('dark');
-      }
-    }
-    const expiresAt = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString();
-    Cookies.set('theme', buildCookieValue(value, expiresAt), { expires: 365 });
-  };
-
-  const handleSelectChange = (value) => {
-    setTheme(value);
-  };
-
-  const handleToggleChange = (enabled) => {
-    setTheme(enabled ? 'dark' : 'light');
-  };
+const ThemeToggle = ({ tactile = false }) => {
+  const { isDark, selectTheme } = useTheme();
+  const handleSelectChange = selectTheme;
+  const handleToggleChange = (enabled) => selectTheme(enabled ? 'dark' : 'light');
 
   return (
     <div className="flex items-center gap-4">
@@ -68,10 +16,10 @@ const ThemeToggle = () => {
         title="Choix du thème du site (Claire/Sombre)."
         checked={isDark}
         onChange={handleToggleChange}
-        className="group relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent bg-gray-200 transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:ring-offset-2 data-[checked]:bg-indigo-600"
+        className={`group relative inline-flex ${tactile ? "h-11 w-20 items-center border-0 p-1" : "h-6 w-11 border-2"} shrink-0 cursor-pointer rounded-full border-transparent bg-gray-200 transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:ring-offset-2 data-[checked]:bg-indigo-600`}
       >
         <span className="sr-only">Basculer le thème</span>
-        <span className="pointer-events-none relative inline-block size-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out group-data-[checked]:translate-x-5">
+        <span className={`pointer-events-none relative inline-block ${tactile ? "size-9 group-data-[checked]:translate-x-9" : "size-5 group-data-[checked]:translate-x-5"} transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out`}>
           <span
             aria-hidden="true"
             className="absolute inset-0 flex size-full items-center justify-center transition-opacity duration-200 ease-in group-data-[checked]:opacity-0 group-data-[checked]:duration-100 group-data-[checked]:ease-out"
@@ -96,7 +44,8 @@ const ThemeToggle = () => {
         </div>
 
         <MenuItems
-          className="absolute right-0 z-10 mt-2 w-56 origin-top-right rounded-md bg-white dark:bg-slate-900 shadow-lg ring-1 ring-black/5 focus:outline-none"
+          anchor={tactile ? { to: "bottom start", gap: 8, padding: 16 } : undefined}
+          className={`${tactile ? "z-[170] max-w-[calc(100vw-2rem)] max-h-[calc(100dvh-2rem)] overflow-y-auto" : "absolute right-0 z-10 mt-2 origin-top-right"} w-56 rounded-md bg-white dark:bg-slate-900 shadow-lg ring-1 ring-black/5 focus:outline-none`}
         >
           <div className="py-1">
             <MenuItem>

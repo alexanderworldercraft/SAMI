@@ -1,0 +1,61 @@
+/* Les adaptations sont limitées au mode réellement affiché. */
+html[data-interface-rendered="tactile"] {
+  --tactile-nav-height: calc(4.5rem + env(safe-area-inset-bottom, 0px));
+  background-color: #eff6ff;
+  color-scheme: light;
+}
+html[data-interface-rendered="tactile"] :is(button, input:not([type="range"]):not([type="checkbox"]):not([type="radio"]), select) {
+  min-height: 44px;
+}
+html[data-interface-rendered="tactile"] button { min-width: 44px; touch-action: manipulation; }
+html[data-interface-rendered="tactile"] :is(input, select, textarea) { font-size: 16px; }
+html[data-interface-rendered="tactile"] a { touch-action: manipulation; }
+html[data-interface-rendered="tactile"] .tactile-shell { padding-bottom: calc(var(--tactile-nav-height) + 1rem); }
+html[data-interface-rendered="tactile"] .tactile-action { display: inline-flex; align-items: center; justify-content: center; min-height: 48px; min-width: 48px; padding: .75rem; border-radius: .75rem; font-weight: 700; }
+html[data-interface-rendered="tactile"] .tactile-action:disabled { opacity: .5; }
+html[data-interface-rendered="tactile"] .tactile-action:focus-visible,
+html[data-interface-rendered="tactile"] .tactile-tab:focus-visible { outline: 2px solid #0ea5e9; outline-offset: -2px; }
+html[data-interface-rendered="tactile"] .tactile-bottom-nav { min-height: var(--tactile-nav-height); padding-bottom: env(safe-area-inset-bottom, 0px); }
+html[data-interface-rendered="tactile"] .tactile-tab { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .25rem; min-height: 72px; font-size: .75rem; font-weight: 700; }
+html[data-interface-rendered="tactile"] .tactile-topbar { padding-top: max(.5rem, env(safe-area-inset-top, 0px)); }
+html[data-interface-rendered="tactile"] .tactile-menu-panel { max-height: calc(100dvh - 2rem - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px)); padding-bottom: max(1.25rem, env(safe-area-inset-bottom, 0px)); }
+html[data-interface-rendered="tactile"] [data-music-player] { bottom: calc(var(--tactile-nav-height) + .75rem); max-height: calc(100dvh - var(--tactile-nav-height) - 5rem); overflow-y: auto; }
+html[data-interface-rendered="tactile"] [data-content-grid] { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; margin-inline: auto; }
+html[data-interface-rendered="tactile"] [data-content-grid] [class~="opacity-0"][class~="group-hover:opacity-100"] { opacity: 0; }
+html[data-interface-rendered="tactile"] [data-content-grid] [class~="group-hover:opacity-0"] { opacity: 1; }
+html[data-interface-rendered="tactile"] [data-content-grid] [data-favorite-action] { opacity: 1 !important; pointer-events: auto !important; }
+html[data-interface-rendered="tactile"] [data-content-grid] img { transform: none; }
+html[data-interface-rendered="tactile"] [data-content-grid] .group { transform: none; }
+html[data-interface-rendered="tactile"] footer { flex-wrap: wrap; }
+html[data-interface-rendered="tactile"] footer a { display: inline-flex; align-items: center; min-height: 44px; }
+html[data-interface-rendered="tactile"] [data-player-interaction="tactile"] [data-testid="player-controls"] > .flex { flex-wrap: wrap; gap: .5rem; }
+html[data-interface-rendered="tactile"] [data-player-interaction="tactile"] input[type="range"] { min-height: 28px; }
+html[data-interface-rendered="tactile"] [data-player-interaction="tactile"] [data-player-settings] > [role="menu"] { max-width: calc(100vw - 2rem); }
+@media (min-width: 600px) { html[data-interface-rendered="tactile"] [data-content-grid] { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (min-width: 900px) { html[data-interface-rendered="tactile"] [data-content-grid] { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+@media (min-width: 1400px) { html[data-interface-rendered="tactile"] [data-content-grid] { grid-template-columns: repeat(6, minmax(0, 1fr)); } }
+
+html.dark[data-interface-rendered="tactile"] { background-color: #020617; color-scheme: dark; }
+html[data-interface-rendered="tactile"] .tactile-topbar { padding-inline: max(1rem, env(safe-area-inset-left, 0px)) max(1rem, env(safe-area-inset-right, 0px)); }
+html[data-interface-rendered="tactile"] .tactile-bottom-nav { padding-inline: env(safe-area-inset-left, 0px) env(safe-area-inset-right, 0px); }
+html[data-interface-rendered="tactile"] [data-maintenance-banner] { bottom: var(--tactile-nav-height); }
+html[data-interface-rendered="tactile"] body.has-maintenance-banner [data-music-player] { bottom: calc(var(--tactile-nav-height) + 7rem); }
+html[data-interface-rendered="tactile"] [data-player-interaction="tactile"] :fullscreen [data-testid="player-controls"] { padding-bottom: max(.75rem, env(safe-area-inset-bottom, 0px)); }
+
+/* Le moteur conserve les proportions et remplit le premier bord disponible. */
+@media (max-width: 767px), (max-width: 1024px) and (max-height: 500px) {
+  html[data-interface-rendered="tactile"] .tactile-shell main:has(> .tactile-playback) {
+    padding-top: 0;
+  }
+  html[data-interface-rendered="tactile"] .tactile-playback [data-playback-stage] {
+    width: 100vw;
+    margin-inline: calc(50% - 50vw);
+    height: max(0px, calc(100dvh - var(--tactile-topbar-height, 64px) - var(--tactile-bottom-height, var(--tactile-nav-height))));
+    max-height: none;
+    padding: 0;
+  }
+  html[data-interface-rendered="tactile"] .tactile-playback [data-player-interaction="tactile"] > div,
+  html[data-interface-rendered="tactile"] .tactile-playback [data-player-interaction="tactile"] video {
+    border-radius: 0;
+  }
+}

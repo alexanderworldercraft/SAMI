@@ -1,5 +1,7 @@
 {
   "ffmpegPath": "ffmpeg",
+  "ffmpegPaths": {},
   "downloadDirectory": "",
+  "downloadDirectories": {},
   "allowUnauthorizedTls": false
 }

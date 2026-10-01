@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { StarIcon } from "@heroicons/react/24/solid";
-import PaginationPage from "./PaginationPage";
+import PaginationPage from "../interfaces/classic/components/PaginationPage";
 
 const apiBaseUrl = process.env.REACT_APP_URL_LOCAL;
 const ITEMS_PER_PAGE = 6;

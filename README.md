@@ -2,7 +2,7 @@
 
 SAMI (**Système d’Archivage Multimédia Intégré**) est une médiathèque web privée permettant d’organiser, diffuser et suivre des films, séries et musiques depuis une seule interface.
 
-La version actuelle est la **8.3.0**. Elle repose sur un backend Fastify, une interface React, Prisma avec MySQL, un pipeline vidéo FFmpeg/HLS et Socket.IO pour le retour en temps réel des traitements.
+La version actuelle est la **8.4.0**. Elle repose sur un backend Fastify, une interface React, Prisma avec MySQL, un pipeline vidéo FFmpeg/HLS et Socket.IO pour le retour en temps réel des traitements.
 
 ## Fonctionnalités
 
@@ -45,6 +45,74 @@ La version actuelle est la **8.3.0**. Elle repose sur un backend Fastify, une in
 - journalisation des actions et sauvegardes manuelles ou planifiées de MySQL ;
 - limitations de requêtes, contrôle CORS et en-têtes de sécurité.
 
+## Base de sélection d'interface par appareil
+
+La détection locale propose `classic`, `tactile` ou `remote`. Les préférences
+sont exposées par `useInterfacePreference()` et par `data-interface-mode` sur
+l'élément HTML, pour préparer les futurs composants TV. Cette étape ne modifie
+pas la mise en page ni la navigation actuelle.
+
+Le consentement appartient au compte : absence de réponse = aucune écriture ;
+refus explicite = refus mémorisé et aucune popup d'appareil ; acceptation =
+confirmation ou modification de chaque nouvel appareil. « Ne pas enregistrer »
+ferme la proposition pour la session ; elle revient lors d'une prochaine
+connexion ou ouverture de SAMI. Un appareil correspond à un navigateur, identifié
+par un UUID aléatoire conservé localement uniquement après son enregistrement.
+Le stockage est distinct par compte et ne contient ni empreinte matérielle ni
+agent utilisateur. Les détections TV restent indicatives et sont corrigeables.
+
+Dans Paramètres, l'utilisateur peut renommer, changer le type ou l'interface,
+supprimer un appareil, et consulter les dates gérées par le serveur. Désactiver
+l'enregistrement nécessite une confirmation et supprime tous ses appareils dans
+une transaction. Le refus reste mémorisé ; la détection automatique continue.
+Les autres navigateurs prennent connaissance d'une révocation à leur prochaine
+navigation ou reprise de focus. Effacer le stockage local fait perdre la
+reconnaissance de l'appareil, qui pourra être enregistré à nouveau.
+
+Avant de déployer cette base, appliquer la migration
+`20260930120000_add_user_interface_devices`, régénérer le client Prisma et
+reconstruire le frontend. La migration crée `UserInterfacePreference` et
+`UserDevice`, avec `CreateDate`, `UpdateDate`, `LastUsedDate` et suppression en
+cascade lors de la suppression du compte. Aucun consentement n'est prérempli.
+Les routes `/api/users/interface-preference` et
+`/api/users/interface-devices` exigent l'authentification et utilisent uniquement
+l'utilisateur de la session pour déterminer le propriétaire.
+
+## Séparation des interfaces frontend
+
+Le frontend possède trois entrées dans `frontend/src/interfaces` : `classic`,
+`tactile` et `remote`. L'interface actuelle, y compris son responsive, est
+regroupée dans `classic` avec ses pages, sa navigation et ses lecteurs.
+Tactile dispose maintenant d'une navigation fixe, d'un menu et d'une recherche
+au toucher, de cibles agrandies, de favoris visibles et de contrôles vidéo
+adaptés. Remote dispose d’une barre latérale, d’une navigation aux flèches
+avec focus visible et de commandes vidéo adaptées à la télécommande. La saisie
+utilise le clavier natif de l’appareil. Les pages et traitements existants restent
+réutilisés. L'administration et
+les formulaires d'ajout restent toujours en classic.
+
+Les URL, les droits d'accès, les services et les contextes restent communs.
+`data-interface-mode` indique le choix demandé ; `data-interface-rendered`
+indique le mode réellement affiché. Aucun changement de BDD pour cette étape.
+Voir [l'organisation et le contrat des interfaces](frontend/src/interfaces/README.md).
+
+## Nouveautés de la version 8.4.0
+
+- trois interfaces classic, tactile et remote, choisies par détection locale ou préférence par appareil ;
+- consentement explicite à l’enregistrement, confirmation des nouveaux appareils et gestion complète dans Paramètres ;
+- navigation tactile en bas de l’écran, cibles agrandies, lecteur adapté au portrait/paysage et restauration du thème au démarrage ;
+- interface TV avec barre latérale, focus visible, flèches, OK et Retour, et saisie au clavier natif ;
+- focus direct sur le lecteur remote après chargement, progression distincte des boutons et réglage du volume dans un panneau dédié ;
+- déplacement de 15 secondes sur la progression remote, avec navigation horizontale explicite entre les cinq commandes ;
+- extension Chromium et compagnon FFmpeg pour le téléchargement local et l’import authentifié vers SAMI, à installer séparément ;
+- édition des enregistrements vocaux, transcription locale des originaux et protection des références en cours de génération ;
+- compatibilité des chemins des anciens médias, suivi de fin de lecture cohérent avec les génériques et historique des traitements réductible.
+
+Avant déploiement, appliquer la migration `20260930120000_add_user_interface_devices`
+et régénérer le client Prisma si cela n’a pas encore été fait. La lecture réelle,
+le clavier natif et les touches spécifiques aux téléviseurs restent à valider sur
+les appareils cibles. Voir aussi [l’installation de l’extension](extension_2/extension/README.md).
+
 ## Nouveautés de la version 8.3.0
 
 - propositions de plusieurs génériques par vidéo, avec saisie des bornes et capture de la position actuelle du lecteur ;
@@ -72,7 +140,7 @@ le déploiement. Les détails sont dans la section « Génériques proposés par
 
 Les consignes de déploiement, la migration et les limites sont détaillées dans [la documentation de la bibliothèque de voix](backend/docs/voice-library.md).
 
-L’historique complet des versions, de la 6.1.0 à la 8.3.0, est disponible dans l’application à l’adresse `/updates` et dans `frontend/src/components/UpdatesPage.js`.
+L’historique complet des versions, de la 6.1.0 à la 8.4.0, est disponible dans l’application à l’adresse `/updates` et dans `frontend/src/interfaces/classic/pages/UpdatesPage.js`.
 
 ## Stack technique
 

@@ -627,6 +627,8 @@ model Utilisateur {
   UserFavoriteContent     UserFavoriteContent[]
   CreditProposals         VideoCreditSegment[] @relation("CreditAuthor")
   CreditReviews           VideoCreditSegment[] @relation("CreditReviewer")
+  InterfacePreference     UserInterfacePreference?
+  Devices                 UserDevice[]
   PlayerPreference        UserPlayerPreference?
   AiPreference            UserAiPreference?
   PersonDuplicateReviews  PersonDuplicateReview[]
@@ -1134,4 +1136,27 @@ model VideoCreditSegment {
   @@index([Status, CreatedAt])
   @@index([AuthorID])
   @@index([ReviewerID])
+}
+
+model UserInterfacePreference {
+  UtilisateurID Int         @id
+  Accepted      Boolean
+  CreateDate    DateTime    @default(now())
+  UpdateDate    DateTime    @updatedAt
+  Utilisateur   Utilisateur @relation(fields: [UtilisateurID], references: [UtilisateurID], onDelete: Cascade)
+}
+
+model UserDevice {
+  UserDeviceID  Int         @id @default(autoincrement())
+  UtilisateurID Int
+  DeviceKey     String      @db.VarChar(36)
+  Nom           String      @db.VarChar(100)
+  Type          String      @db.VarChar(16)
+  InterfaceMode String      @db.VarChar(16)
+  CreateDate    DateTime    @default(now())
+  UpdateDate    DateTime    @updatedAt
+  LastUsedDate  DateTime    @default(now())
+  Utilisateur   Utilisateur @relation(fields: [UtilisateurID], references: [UtilisateurID], onDelete: Cascade)
+
+  @@unique([UtilisateurID, DeviceKey])
 }

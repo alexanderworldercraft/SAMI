@@ -6,3 +6,7 @@ companion/sami-companion-host-macos
 companion/launcher.generated.c
 companion/launch.generated.sh
 companion/companion.log
+node_modules/
+dist-firefox/
+companion/node-path.txt
+companion/fr.*.json

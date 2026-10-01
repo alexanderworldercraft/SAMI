@@ -248,6 +248,7 @@ const ContentPreviewTooltip = ({ item, title, className = "", children }) => {
       ref={anchorRef}
       className={`relative ${className}`}
       onMouseEnter={() => {
+        if (["tactile", "remote"].includes(document.documentElement.dataset.interfaceRendered)) return;
         setHovered(true);
         window.requestAnimationFrame(updatePosition);
       }}
