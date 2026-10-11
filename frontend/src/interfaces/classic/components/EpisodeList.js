@@ -32,7 +32,7 @@ const EpisodeList = ({
 
   return (
     <div>
-      <ul role="list" className="divide-y">
+      <ul data-episode-list role="list" className="divide-y">
         {episodes.map((episode) => {
           const isActive = currentEpisode?.VideoID === episode.VideoID;
           const duration = durations[episode.VideoID];
@@ -100,6 +100,8 @@ const EpisodeList = ({
           ) : (
             <Link
               key={episode.VideoID}
+              data-episode-link
+              aria-current={isActive ? "page" : undefined}
               to={`/lecture/${episode.VideoID}${linkAnchor}`}
               onClick={() => onEpisodeClick?.(episode)}
             >

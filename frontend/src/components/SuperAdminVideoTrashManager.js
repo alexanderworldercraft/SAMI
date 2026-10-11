@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowPathIcon, TrashIcon } from "@heroicons/react/24/outline";
 import api from "../services/api";
+import TrashDeleteAllButton from "./TrashDeleteAllButton";
 
 const apiUrl = process.env.REACT_APP_URL_LOCAL;
 
@@ -154,10 +155,17 @@ const SuperAdminVideoTrashManager = () => {
               onChange={(event) => setSearchTerm(event.target.value)}
               className="block w-full rounded-xl border border-sky-500/20 bg-white/85 px-4 py-3 text-sm font-semibold text-slate-900 shadow-sm transition duration-200 hover:border-sky-400/60 focus:outline-none focus:ring-2 focus:ring-sky-400 dark:bg-slate-950/65 dark:text-white sm:max-w-md"
             />
+            <div className="flex flex-wrap gap-3">
             <button type="button" onClick={loadDeletedVideos} disabled={saving} className={buttonClass}>
               <ArrowPathIcon className="size-5" />
               Actualiser
             </button>
+              <TrashDeleteAllButton
+                items={filteredVideos} getDeleteUrl={(item) => `/videos/${item.VideoID}/permanent`} label="Vidéos"
+                disabled={saving || loadingAuth || !isSuperAdmin} setSaving={setSaving}
+                reload={loadDeletedVideos} setMessage={setMessage} setError={setErrorMessage}
+              />
+            </div>
           </div>
 
           {loadingAuth ? (

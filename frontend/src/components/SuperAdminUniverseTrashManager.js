@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowPathIcon, TrashIcon } from "@heroicons/react/24/outline";
 import api from "../services/api";
+import TrashDeleteAllButton from "./TrashDeleteAllButton";
 
 const buttonClass = "inline-flex items-center justify-center gap-2 rounded-lg border border-sky-300/40 bg-sky-500/15 px-5 py-3 text-sm font-bold text-slate-900 transition duration-200 hover:border-sky-300/80 hover:bg-sky-500/25 disabled:cursor-not-allowed disabled:opacity-60 dark:text-white";
 const dangerButtonClass = "inline-flex items-center justify-center gap-2 rounded-lg border border-red-300/50 bg-red-500/15 px-5 py-3 text-sm font-bold text-red-700 transition hover:bg-red-500/25 disabled:cursor-not-allowed disabled:opacity-60 dark:text-red-200";
@@ -134,10 +135,17 @@ const SuperAdminUniverseTrashManager = () => {
               onChange={(event) => setSearchTerm(event.target.value)}
               className="block w-full rounded-xl border border-sky-500/20 bg-white/85 px-4 py-3 text-sm font-semibold text-slate-900 shadow-sm transition duration-200 hover:border-sky-400/60 focus:outline-none focus:ring-2 focus:ring-sky-400 dark:bg-slate-950/65 dark:text-white sm:max-w-md"
             />
+            <div className="flex flex-wrap gap-3">
             <button type="button" onClick={loadDeletedUniverses} disabled={saving} className={buttonClass}>
               <ArrowPathIcon className="size-5" />
               Actualiser
             </button>
+              <TrashDeleteAllButton
+                items={filteredUniverses} getDeleteUrl={(item) => `/universes/${item.UniverseID}/permanent`} label="Univers"
+                disabled={saving || loadingAuth || !isSuperAdmin} setSaving={setSaving}
+                reload={loadDeletedUniverses} setMessage={setMessage} setError={setErrorMessage}
+              />
+            </div>
           </div>
 
           {loadingAuth ? (

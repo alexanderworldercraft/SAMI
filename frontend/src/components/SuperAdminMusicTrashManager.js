@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowPathIcon, TrashIcon } from "@heroicons/react/24/outline";
 import api from "../services/api";
+import TrashDeleteAllButton from "./TrashDeleteAllButton";
 
 const buttonClass = "inline-flex items-center justify-center gap-2 rounded-lg border border-sky-300/40 bg-sky-500/15 px-5 py-3 text-sm font-bold text-slate-900 transition duration-200 hover:border-sky-300/80 hover:bg-sky-500/25 disabled:cursor-not-allowed disabled:opacity-60 dark:text-white";
 const dangerButtonClass = "inline-flex items-center justify-center gap-2 rounded-lg border border-red-300/50 bg-red-500/15 px-5 py-3 text-sm font-bold text-red-700 transition hover:bg-red-500/25 disabled:cursor-not-allowed disabled:opacity-60 dark:text-red-200";
@@ -115,7 +116,14 @@ const SuperAdminMusicTrashManager = ({ type = "musiques" }) => {
           {error && <div className="mb-5 rounded-xl border border-red-400/30 bg-red-500/10 px-4 py-3 text-sm font-semibold text-red-700 dark:text-red-200">{error}</div>}
           <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <input value={searchTerm} onChange={(event) => setSearchTerm(event.target.value)} placeholder="Filtrer par titre ou ID..." className={`${fieldClass} sm:max-w-md`} />
+            <div className="flex flex-wrap gap-3">
             <button type="button" onClick={loadItems} disabled={saving} className={buttonClass}><ArrowPathIcon className="size-5" />Actualiser</button>
+              <TrashDeleteAllButton
+                items={filteredItems} getDeleteUrl={(item) => `/music/${type}/${item[idKey]}/permanent`} label={isAlbum ? "Albums" : "Musiques"}
+                disabled={saving || loadingAuth || !isSuperAdmin} setSaving={setSaving}
+                reload={loadItems} setMessage={setMessage} setError={setError}
+              />
+            </div>
           </div>
           {loadingAuth ? (
             <p className="rounded-xl border border-sky-500/10 bg-white/70 px-4 py-5 text-sm font-semibold text-slate-600 dark:bg-slate-950/40 dark:text-slate-300">Vérification des droits...</p>

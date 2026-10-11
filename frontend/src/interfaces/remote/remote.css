@@ -34,3 +34,13 @@ html[data-interface-rendered="remote"] [data-player-interaction="remote"] [data-
 @media (max-width: 700px) { html[data-interface-rendered="remote"] { --remote-sidebar-width: 11rem; } html[data-interface-rendered="remote"] .remote-content { padding: 1rem; } html[data-interface-rendered="remote"] [data-content-grid] { grid-template-columns: repeat(2,minmax(0,1fr)); } }
 
 html[data-interface-rendered="remote"] [data-content-grid] .text-sm { font-size: 1.125rem; line-height: 1.5; }
+
+/* Le focus porte sur toute la ligne d’épisode, plutôt que sur un lien inline. */
+html[data-interface-rendered="remote"] [data-episode-list] { display: grid; gap: .75rem; padding: .75rem; }
+html[data-interface-rendered="remote"] [data-episode-link] { display: block; border-radius: .75rem; scroll-margin-block: 1.5rem; }
+html[data-interface-rendered="remote"] [data-episode-link] li { padding: 1.25rem; }
+html[data-interface-rendered="remote"] [data-episode-link] p:first-child { font-size: 1.25rem; line-height: 1.6; }
+html[data-interface-rendered="remote"] [data-episode-link]:focus li { background: #e0f2fe; }
+html[data-interface-rendered="remote"] [data-episode-link]:focus p { color: #0c4a6e; }
+html.dark[data-interface-rendered="remote"] [data-episode-link]:focus li { background: #075985; }
+html.dark[data-interface-rendered="remote"] [data-episode-link]:focus p { color: #fff; }
