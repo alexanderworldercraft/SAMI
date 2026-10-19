@@ -6,6 +6,7 @@ import { Prisma } from "@prisma/client";
 import { ETAT } from "../../constants.js";
 import { prisma } from "../db.js";
 import { upsertEncodingWorker } from "../distributedEncoding/persistence.js";
+import { hasPendingEncodingForWorker } from "../distributedEncoding/scheduler.js";
 import { VIDEO_ROOT } from "../video/videoPaths.js";
 import {
   AI_SUBTITLE_JOB_STATUS,
@@ -55,6 +56,12 @@ export const serializeAiSubtitleJob = (job) => job && ({
   progress: job.Progress,
   sourceLanguage: job.SourceLanguage,
   assignedWorkerId: job.AssignedWorkerID,
+  assignedWorker: job.AssignedWorker ? {
+    id: job.AssignedWorkerID,
+    displayName: job.AssignedWorker.Registry?.DisplayName || job.AssignedWorkerID,
+    role: job.AssignedWorker.Registry?.Role || job.AssignedWorker.Role,
+  } : null,
+  primaryApprovedAt: job.PrimaryApprovedAt || null,
   attemptCount: job.AttemptCount,
   maxAttempts: job.MaxAttempts,
   error: job.ErrorMessage,
@@ -147,6 +154,7 @@ export async function listVideosWithoutFrenchSubtitles({ page = 1, database = pr
         where: { TargetLanguage: "fr" },
         take: 1,
         orderBy: { CreatedAt: "desc" },
+        include: { AssignedWorker: { include: { Registry: true } } },
       },
     },
   });
@@ -237,6 +245,8 @@ export async function queueAiSubtitleJob({
         SourceSize: null,
         SourceSha256: null,
         AssignedWorkerID: null,
+        PrimaryApprovedAt: null,
+        PrimaryApprovedByUserID: null,
         LeaseTokenHash: null,
         LeaseExpiresAt: null,
         PipelineVersion: config.pipelineVersion,
@@ -363,6 +373,7 @@ export async function prepareNextAiSubtitleSource({ database = prisma, config } 
 
 export async function ensureAiPrimaryWorker({ database = prisma, config } = {}) {
   const runtimeConfig = config || assertAiSubtitleConfig();
+  if (await database.videoEncodingWorker.findUnique({ where: { VideoEncodingWorkerID: runtimeConfig.instanceId } })) return;
   await upsertEncodingWorker({
     instanceId: runtimeConfig.instanceId,
     role: "PRIMARY",
@@ -371,7 +382,7 @@ export async function ensureAiPrimaryWorker({ database = prisma, config } = {}) 
     displayName: "Serveur principal",
     enabled: true,
     maxNominalHeight: 360,
-  }, { database });
+  }, { database, preserveAdministration: true });
 }
 
 export async function heartbeatAiSubtitleWorker(workerId, heartbeat, {
@@ -391,7 +402,7 @@ export async function heartbeatAiSubtitleWorker(workerId, heartbeat, {
     where: { AiSubtitleWorkerID: String(workerId) },
     create: {
       AiSubtitleWorkerID: String(workerId),
-      Role: String(heartbeat.role || registry.Role).toUpperCase(),
+      Role: registry.Role,
       Ready: Boolean(heartbeat.ready),
       Engine: heartbeat.engine || null,
       Device: heartbeat.device || null,
@@ -406,7 +417,7 @@ export async function heartbeatAiSubtitleWorker(workerId, heartbeat, {
       LastError: heartbeat.lastError || null,
     },
     update: {
-      Role: String(heartbeat.role || registry.Role).toUpperCase(),
+      Role: registry.Role,
       Ready: Boolean(heartbeat.ready),
       Engine: heartbeat.engine || null,
       Device: heartbeat.device || null,
@@ -475,13 +486,72 @@ export async function reclaimExpiredAiSubtitleLeases({
   return expired.length;
 }
 
-const workerIsOnline = (worker, now, config) =>
+export const workerIsOnline = (worker, now, config) =>
   worker.Ready
   && worker.Registry?.Enabled
   && !worker.Registry?.Draining
   && worker.PipelineVersion === config.pipelineVersion
   && worker.LastHeartbeatAt
   && new Date(worker.LastHeartbeatAt).getTime() >= now.getTime() - AI_SUBTITLE_OFFLINE_AFTER_MS;
+
+const aiWorkerRole = (worker) => worker.Registry?.Role || worker.Role;
+
+export async function getAiSubtitleWorkers({ database = prisma, config, now = new Date() } = {}) {
+  const runtimeConfig = config || assertAiSubtitleConfig();
+  const workers = await database.aiSubtitleWorker.findMany({ include: { Registry: true } });
+  const connectedClones = workers.filter((worker) => aiWorkerRole(worker) === "CLONE"
+    && workerIsOnline(worker, now, runtimeConfig));
+  const encodingWorkers = await database.videoEncodingWorker.findMany({ where: { Enabled: true } });
+  return Promise.all(workers.map(async (worker) => {
+    const online = workerIsOnline(worker, now, runtimeConfig);
+    const id = worker.AiSubtitleWorkerID;
+    const [encodingBusy, subtitleBusy, voiceBusy, dubbingBusy, encodingPending] = await Promise.all([
+      database.videoEncodingTask.count({ where: { AssignedWorkerID: id, Status: "LEASED", LeaseExpiresAt: { gt: now } } }),
+      database.aiSubtitleJob.count({ where: { AssignedWorkerID: id, Status: "LEASED", LeaseExpiresAt: { gt: now } } }),
+      database.voiceAudio.count({ where: { AssignedWorkerID: id, Status: "PROCESSING", LeaseExpiresAt: { gt: now } } }),
+      database.aiDubbingJob.count({ where: { AssignedWorkerID: id, Status: { in: ["PROCESSING_PREVIEW", "PROCESSING_FULL"] }, LeaseExpiresAt: { gt: now } } }),
+      online ? hasPendingEncodingForWorker({ worker: worker.Registry, cloneWorkers: encodingWorkers, database, now }) : false,
+    ]);
+    let unavailableReason = null;
+    if (!worker.Registry.Enabled) unavailableReason = "Serveur désactivé";
+    else if (worker.Registry.Draining) unavailableReason = "Serveur en drainage";
+    else if (!worker.LastHeartbeatAt || new Date(worker.LastHeartbeatAt).getTime() < now.getTime() - AI_SUBTITLE_OFFLINE_AFTER_MS) unavailableReason = "Hors ligne";
+    else if (!worker.Ready) unavailableReason = "Runtime IA indisponible";
+    else if (worker.PipelineVersion !== runtimeConfig.pipelineVersion) unavailableReason = "Version IA incompatible";
+    else if (subtitleBusy) unavailableReason = "Sous-titre en cours";
+    else if (encodingBusy || encodingPending) unavailableReason = "Priorité à l’encodage";
+    else if (voiceBusy) unavailableReason = "Traitement vocal en cours";
+    else if (dubbingBusy) unavailableReason = "Doublage en cours";
+    else if (aiWorkerRole(worker) === "PRIMARY") unavailableReason = connectedClones.length
+      ? "Réservé aux clones IA connectés" : "Autorisation requise par sous-titre";
+    return {
+      ...serializeAiSubtitleWorker(worker),
+      role: aiWorkerRole(worker),
+      displayName: worker.Registry.DisplayName || id,
+      online,
+      eligible: online,
+      available: online && !unavailableReason,
+      unavailableReason,
+      activeJobs: subtitleBusy,
+    };
+  }));
+}
+
+export async function approveAiSubtitlePrimary(jobId, userId, { database = prisma, config, now = new Date() } = {}) {
+  const runtimeConfig = config || assertAiSubtitleConfig();
+  return database.$transaction(async (tx) => {
+    const workers = await tx.aiSubtitleWorker.findMany({ include: { Registry: true } });
+    if (workers.some((worker) => aiWorkerRole(worker) === "CLONE" && workerIsOnline(worker, now, runtimeConfig))) {
+      throw Object.assign(new Error("Un clone IA est connecté : le primary ne peut pas prendre ce sous-titre."), { statusCode: 409 });
+    }
+    const updated = await tx.aiSubtitleJob.updateMany({
+      where: { AiSubtitleJobID: String(jobId), Status: { in: ["QUEUED", "PREPARING"] }, Video: { EtatID: ETAT.ACTIVE } },
+      data: { PrimaryApprovedAt: now, PrimaryApprovedByUserID: userId },
+    });
+    if (!updated.count) throw Object.assign(new Error("Ce sous-titre n’est plus en attente."), { statusCode: 409 });
+    return tx.aiSubtitleJob.findUnique({ where: { AiSubtitleJobID: String(jobId) } });
+  }, { isolationLevel: "Serializable" });
+}
 
 export async function claimNextAiSubtitleJob({
   workerId,
@@ -502,29 +572,31 @@ export async function claimNextAiSubtitleJob({
         Number(right.PerformanceScore) - Number(left.PerformanceScore)
         || left.AiSubtitleWorkerID.localeCompare(right.AiSubtitleWorkerID)
       );
-    const preferredWorker = onlineWorkers[0];
+    const clones = onlineWorkers.filter((item) => aiWorkerRole(item) === "CLONE");
+    const candidates = clones.length ? clones : onlineWorkers.filter((item) => aiWorkerRole(item) === "PRIMARY");
+    if (!candidates.some((worker) => worker.AiSubtitleWorkerID === String(workerId))) return null;
+    const encodingWorkers = await tx.videoEncodingWorker.findMany({ where: { Enabled: true } });
+    let preferredWorker = null;
+    for (const candidateWorker of candidates) {
+      const id = candidateWorker.AiSubtitleWorkerID;
+      const [voiceBusy, encodingBusy, subtitleBusy, dubbingBusy] = await Promise.all([
+        tx.voiceAudio.count({ where: { AssignedWorkerID: id, Status: "PROCESSING", LeaseExpiresAt: { gt: instant } } }),
+        tx.videoEncodingTask.count({ where: { AssignedWorkerID: id, Status: "LEASED", LeaseExpiresAt: { gt: instant } } }),
+        tx.aiSubtitleJob.count({ where: { AssignedWorkerID: id, Status: "LEASED", LeaseExpiresAt: { gt: instant } } }),
+        tx.aiDubbingJob.count({ where: { AssignedWorkerID: id, Status: { in: ["PROCESSING_PREVIEW", "PROCESSING_FULL"] }, LeaseExpiresAt: { gt: instant } } }),
+      ]);
+      if (voiceBusy || encodingBusy || subtitleBusy || dubbingBusy) continue;
+      if (await hasPendingEncodingForWorker({ worker: candidateWorker.Registry,
+        cloneWorkers: encodingWorkers, database: tx, now: instant })) continue;
+      preferredWorker = candidateWorker;
+      break;
+    }
     if (preferredWorker?.AiSubtitleWorkerID !== String(workerId)) return null;
-    if (await tx.voiceAudio.count({ where: { AssignedWorkerID: String(workerId), Status: "PROCESSING", LeaseExpiresAt: { gt: instant } } })) return null;
-    const [activeAiJobs, encodingBusy] = await Promise.all([
-      tx.aiSubtitleJob.count({
-        where: {
-          Status: AI_SUBTITLE_JOB_STATUS.LEASED,
-          LeaseExpiresAt: { gt: instant },
-        },
-      }),
-      tx.videoEncodingTask.count({
-        where: {
-          AssignedWorkerID: preferredWorker.AiSubtitleWorkerID,
-          Status: "LEASED",
-          LeaseExpiresAt: { gt: instant },
-        },
-      }),
-    ]);
-    if (activeAiJobs > 0 || encodingBusy > 0) return null;
 
     const jobs = await tx.aiSubtitleJob.findMany({
       where: {
         Status: AI_SUBTITLE_JOB_STATUS.QUEUED,
+        ...(aiWorkerRole(preferredWorker) === "PRIMARY" ? { PrimaryApprovedAt: { not: null } } : {}),
         OR: [{ NextEligibleAt: null }, { NextEligibleAt: { lte: instant } }],
         AND: [{
           OR: [
@@ -556,6 +628,7 @@ export async function claimNextAiSubtitleJob({
         AiSubtitleJobID: candidate.AiSubtitleJobID,
         Status: AI_SUBTITLE_JOB_STATUS.QUEUED,
         LeaseGeneration: candidate.LeaseGeneration,
+        ...(aiWorkerRole(preferredWorker) === "PRIMARY" ? { PrimaryApprovedAt: { not: null } } : {}),
       },
       data: {
         Status: AI_SUBTITLE_JOB_STATUS.LEASED,

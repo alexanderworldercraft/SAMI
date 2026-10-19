@@ -40,6 +40,11 @@ const AI_SUBTITLE_LOG_ACTIONS = Object.freeze([
     Description: "Un administrateur relance la transcription complète d'un sous-titre IA.",
     Criticite: 2,
   },
+  {
+    Nom: "ai_subtitle_primary_approved",
+    Description: "Un administrateur autorise le primary pour un sous-titre IA sans clone disponible.",
+    Criticite: 2,
+  },
 ]);
 
 const AI_DUBBING_AND_CONSENT_LOG_ACTIONS = Object.freeze([

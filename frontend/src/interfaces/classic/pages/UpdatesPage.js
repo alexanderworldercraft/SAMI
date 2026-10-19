@@ -2,6 +2,105 @@ import React, { useEffect, useState } from "react";
 
 const updates = [
   {
+    "version": "8.6.0",
+    "title": "Personnages des acteurs, titres alternatifs et recherche du catalogue",
+    "date": "19 octobre 2026",
+    "sections": [
+      {
+        "title": "Retrouver les personnages interprétés par chaque acteur",
+        "items": [
+          "Chaque acteur peut être associé à un ou plusieurs personnages pour un même film ou une même série. Pour les séries, ces personnages sont définis pour toute la série.",
+          "Sur la page Lecture, les noms des personnages apparaissent en bas de la photo de l’acteur, séparés par des virgules, tout en conservant une seule card par personne.",
+          "Un dégradé du noir en bas au transparent en haut couvre environ le tiers inférieur de la photo pour rendre les noms lisibles. Les personnes sans personnage renseigné conservent leur présentation habituelle."
+        ]
+      },
+      {
+        "title": "Importer et corriger les personnages depuis les fiches personnes",
+        "items": [
+          "Dans « Import personnes », chaque personnage s’ajoute entre parenthèses après le nom de l’acteur : Eddie Murphy (Akeem) (Clarence) (Randy) | Omar Sy (Driss). Les noms seuls restent acceptés.",
+          "Un réimport complète les personnages déjà associés au contenu sans effacer les précédents ni ajouter de doublons. Les personnages restent distincts de l’identité de la personne ; leur saisie concerne l’import Acteurs.",
+          "Les administrateurs et super administrateurs disposent du bouton « Modifier les personnages » sur chaque contenu de la distribution dans la fiche personne. Un champ par personnage permet de corriger, ajouter ou supprimer des noms avant l’enregistrement ; Annuler abandonne les modifications.",
+          "Le formulaire de liaison manuelle permet également de renseigner les personnages d’un acteur. La fusion de personnes conserve leurs personnages pour chaque contenu, et le retrait d’un lien acteur supprime les personnages associés à ce lien."
+        ]
+      },
+      {
+        "title": "Retrouver un contenu avec ses titres alternatifs",
+        "items": [
+          "Les vidéos et les séries peuvent recevoir plusieurs titres alternatifs facultatifs, séparés par |, lors de leur création ou depuis leur gestion dans l’administration.",
+          "Par exemple, un contenu intitulé The Meg peut être retrouvé avec Mégalodon ou En eau trouble en renseignant Mégalodon | En eau trouble. Le titre principal reste celui affiché dans le catalogue.",
+          "Un bouton copie le séparateur | ; si la copie automatique est indisponible, un champ permet de le copier manuellement.",
+          "Les titres alternatifs sont conservés dans les imports classiques, le multi-encodage et les transferts de vidéos entre instances."
+        ]
+      },
+      {
+        "title": "Une recherche cohérente entre les suggestions et le catalogue",
+        "items": [
+          "Les suggestions de la barre de recherche et les résultats complets utilisent les mêmes règles sur le titre principal et sur chacun des titres alternatifs, avec la même tolérance aux accents, aux séparateurs et aux petites fautes de saisie.",
+          "La recherche de contenus porte uniquement sur les titres : une correspondance présente seulement dans le résumé ne fait plus apparaître un film ou une série.",
+          "Les anciennes suggestions sont effacées dès que la saisie change ; les réponses devenues obsolètes sont ignorées pour éviter qu’une recherche précédente remplace les résultats actuels."
+        ]
+      },
+      {
+        "title": "Fiabiliser les sources partagées du multi-encodage",
+        "items": [
+          "Lorsque plusieurs slots d’un même clone traitent une source identique, un seul téléchargement est effectué et les autres tâches réutilisent le fichier une fois disponible.",
+          "Les téléchargements de vidéos différentes peuvent continuer en parallèle. Les tâches qui attendent une source partagée conservent leur réservation pendant cette attente."
+        ]
+      }
+    ]
+  },
+  {
+    "version": "8.5.0",
+    "title": "Sous-titres IA, multi-encodage et navigation dans les sagas",
+    "date": "14 octobre 2026",
+    "sections": [
+      {
+        "title": "Parcourir une saga directement depuis la page Lecture",
+        "items": [
+          "Lorsqu’un film ou un épisode appartient à une seule saga, la page Lecture affiche directement ses films et séries dans l’ordre défini pour la saga.",
+          "L’affiche du contenu en cours est assombrie et porte la mention « Contenu actuel ». Pour un épisode représenté par sa série dans la saga, ce repère apparaît sur l’affiche de la série.",
+          "Dans une saga unique, le lecteur propose « Contenu suivant » au début du dernier générique validé s’il commence après la moitié de la vidéo, ou à 90 % sans générique admissible. Le contenu suivant démarre à zéro.",
+          "Les séries conservent le passage à l’épisode suivant, y compris entre saisons. Le passage au contenu suivant de la saga est proposé uniquement sur le dernier épisode de toute la série. Aucun contenu suivant n’est proposé à la fin de la saga, ni si la prochaine entrée est inaccessible.",
+          "Les autres contenus restent accessibles depuis leurs cards. Lorsqu’un contenu appartient à plusieurs sagas, la page conserve les cards permettant de choisir la saga à ouvrir."
+        ]
+      },
+      {
+        "title": "Savoir quel serveur génère un sous-titre",
+        "items": [
+          "La section « Sous-titres français manquants » indique le nom du clone ou du primary chargé de la génération, avec la progression du traitement.",
+          "La préparation audio est identifiée comme une étape réalisée sur le primary ; l’attente d’un clone ou d’une autorisation administrative est également précisée.",
+          "Des cards dans « Fonctionnalités expérimentales → Sous-titres générés par IA » présentent les serveurs enregistrés, leurs moteurs et modèles, leur disponibilité et la raison d’une éventuelle attente."
+        ]
+      },
+      {
+        "title": "Des sous-titres confiés aux clones en priorité",
+        "items": [
+          "Dès qu’un clone IA prêt et compatible est connecté, le primary ne peut plus prendre de nouveau sous-titre, même si ce clone termine déjà un traitement.",
+          "En l’absence de clone IA compatible connecté, un administrateur ou super administrateur doit utiliser « Autoriser le primary » pour chaque sous-titre concerné. Cette autorisation est réinitialisée lors d’une relance ou d’une recréation.",
+          "Les encodages compatibles en attente sur un serveur passent avant les sous-titres. Un autre clone IA libre peut prendre le relais ; une capacité libre sans encodage compatible en attente reste utilisable pour les sous-titres.",
+          "Plusieurs clones libres peuvent générer des sous-titres différents en parallèle, avec un sous-titre à la fois par clone. Les encodages, doublages et traitements vocaux déjà en cours sur le même serveur conservent leur capacité.",
+          "Le suivi distingue désormais la transcription, la traduction et le contrôle qualité, avec une progression remontée par le moteur. Une double réservation de capacité qui pouvait laisser un traitement indéfiniment en attente a été corrigée."
+        ]
+      },
+      {
+        "title": "Des limites de multi-encodage modifiables pour chaque serveur",
+        "items": [
+          "Le super administrateur peut modifier le nom, la priorité de performance, la résolution maximale et le nombre de slots des clones depuis leurs cards d’encodage. Une card dédiée permet aussi de régler le primary.",
+          "Un slot reste configuré par défaut ; jusqu’à 32 slots peuvent être définis par serveur pour traiter plusieurs tâches simultanément. Les réglages sont conservés lors des reconnexions et des redémarrages.",
+          "Le primary respecte son plafond de résolution tant que des clones d’encodage compatibles répondent. Il peut dépasser cette limite après cinq minutes sans réponse des clones.",
+          "L’option « Pas d’encodage » réserve le primary au relais de secours après cinq minutes, pour la vidéo comme pour l’audio. L’encodage classique en solo conserve son fonctionnement."
+        ]
+      },
+      {
+        "title": "Les pistes audio peuvent aussi être encodées par les clones",
+        "items": [
+          "Les clones capables d’encoder en AAC peuvent prendre les pistes audio séparées du multi-encodage, y compris celles des anciennes tâches encore en attente.",
+          "Les tâches simultanées d’un même clone partagent leur source sans lancer plusieurs téléchargements concurrents du même fichier. La vérification et la publication finale restent réalisées sur le primary."
+        ]
+      }
+    ]
+  },
+  {
     "version": "8.4.0",
     "title": "Des interfaces adaptées à chaque appareil et une première interface TV",
     "date": "1 octobre 2026",

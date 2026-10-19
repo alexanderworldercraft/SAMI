@@ -1,3 +1,4 @@
+import { CHARACTER_INCLUDE, characterNames, charactersToAppend } from "./personCharacterService.js";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -401,6 +402,7 @@ async function mergeLinks(tx, { delegateName, idColumn, primaryKey, keeperId, me
       PersonneID: true,
       EstActeur: true,
       EstRealisateur: true,
+      Personnages: CHARACTER_INCLUDE,
     },
   });
   const keeperLinks = new Map(
@@ -424,8 +426,15 @@ async function mergeLinks(tx, { delegateName, idColumn, primaryKey, keeperId, me
       EstActeur: keeperLink.EstActeur || sourceLink.EstActeur,
       EstRealisateur: keeperLink.EstRealisateur || sourceLink.EstRealisateur,
     };
-    if (nextRoles.EstActeur !== keeperLink.EstActeur || nextRoles.EstRealisateur !== keeperLink.EstRealisateur) {
-      await delegate.update({ where: { [primaryKey]: keeperLink[primaryKey] }, data: nextRoles });
+    const additions = charactersToAppend(keeperLink.Personnages, characterNames(sourceLink.Personnages));
+    if (nextRoles.EstActeur !== keeperLink.EstActeur || nextRoles.EstRealisateur !== keeperLink.EstRealisateur || additions.length) {
+      await delegate.update({
+        where: { [primaryKey]: keeperLink[primaryKey] },
+        data: { ...nextRoles, ...(additions.length ? { Personnages: { createMany: { data: additions, skipDuplicates: true } } } : {}) },
+      });
+      keeperLink.EstActeur = nextRoles.EstActeur;
+      keeperLink.EstRealisateur = nextRoles.EstRealisateur;
+      keeperLink.Personnages = [...(keeperLink.Personnages || []), ...additions];
     }
     await delegate.delete({ where: { [primaryKey]: sourceLink[primaryKey] } });
     combined += 1;

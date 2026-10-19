@@ -175,8 +175,8 @@ describe("personDuplicateService - décisions", () => {
 describe("personDuplicateService - fusion", () => {
   it("transfère les liens et réunit les rôles avant de placer la fiche secondaire dans la corbeille", async () => {
     const videoLinks = [
-      { VideoPersonneID: 101, VideoID: 10, PersonneID: 1, EstActeur: true, EstRealisateur: false },
-      { VideoPersonneID: 102, VideoID: 10, PersonneID: 2, EstActeur: false, EstRealisateur: true },
+      { VideoPersonneID: 101, VideoID: 10, PersonneID: 1, EstActeur: true, EstRealisateur: false, Personnages: [{ Nom: "Akeem", Position: 0 }] },
+      { VideoPersonneID: 102, VideoID: 10, PersonneID: 2, EstActeur: true, EstRealisateur: true, Personnages: [{ Nom: "akeem", Position: 0 }, { Nom: "Randy", Position: 1 }] },
       { VideoPersonneID: 103, VideoID: 20, PersonneID: 2, EstActeur: true, EstRealisateur: false },
     ];
     const seriesLinks = [
@@ -186,7 +186,9 @@ describe("personDuplicateService - fusion", () => {
       findMany: vi.fn(async () => links.map((link) => ({ ...link }))),
       update: vi.fn(async ({ where, data }) => {
         const link = links.find((item) => item[primaryKey] === where[primaryKey]);
-        Object.assign(link, data);
+        const { Personnages, ...flags } = data;
+        Object.assign(link, flags);
+        if (Personnages) link.Personnages = [...(link.Personnages || []), ...Personnages.createMany.data];
         return link;
       }),
       delete: vi.fn(async ({ where }) => {
@@ -227,6 +229,7 @@ describe("personDuplicateService - fusion", () => {
       }),
       expect.objectContaining({ VideoPersonneID: 103, PersonneID: 1 }),
     ]);
+    expect(videoLinks[0].Personnages.map((row) => row.Nom)).toEqual(["Akeem", "Randy"]);
     expect(seriesLinks).toEqual([
       expect.objectContaining({ SeriesPersonneID: 201, PersonneID: 1 }),
     ]);

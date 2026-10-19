@@ -1,5 +1,6 @@
 import { ETAT } from "../constants.js";
 import { normalizePersonName, splitPersonName } from "../prisma/seedCreditsPersonnes.js";
+import { CHARACTER_INCLUDE, charactersToAppend, normalizeCharacters } from "./personCharacterService.js";
 
 const MAX_PEOPLE_PER_IMPORT = 50;
 const TRANSACTION_OPTIONS = { maxWait: 10_000, timeout: 120_000 };
@@ -27,9 +28,17 @@ export function parsePeopleList(value) {
   }
 
   const people = [];
-  const seen = new Set();
+  const seen = new Map();
   let duplicateCount = 0;
-  for (const displayName of rawNames) {
+  for (const entry of rawNames) {
+    const displayName = entry.split("(")[0].trim();
+    const suffix = entry.slice(displayName.length).trim();
+    const groups = [...suffix.matchAll(/\(([^()]*)\)/g)];
+    if (suffix.replace(/\([^()]*\)/g, "").trim() || groups.some((group) => !group[1].trim())) {
+      throw new PersonCreditImportError(`Format invalide pour « ${entry} ». Utilise Nom (Personnage 1) (Personnage 2).`);
+    }
+    const characters = normalizeCharacters(groups.map((group) => group[1]));
+    if (/[()]/.test(displayName)) throw new PersonCreditImportError("Les parenthèses sont réservées aux personnages.");
     if (displayName.length > 160) {
       throw new PersonCreditImportError(`Le nom « ${displayName.slice(0, 40)}… » est trop long.`);
     }
@@ -37,10 +46,13 @@ export function parsePeopleList(value) {
     if (!key) throw new PersonCreditImportError(`Le nom « ${displayName} » n'est pas exploitable.`);
     if (seen.has(key)) {
       duplicateCount += 1;
+      const person = seen.get(key);
+      person.characters = normalizeCharacters([...person.characters, ...characters]);
       continue;
     }
-    seen.add(key);
-    people.push({ key, displayName });
+    const person = { key, displayName, characters };
+    seen.set(key, person);
+    people.push(person);
   }
 
   return { people, duplicateCount };
@@ -92,14 +104,14 @@ async function ensureContent(tx, type, contentId) {
   return { id: series.SeriesID, title: series.Titre, type };
 }
 
-async function linkPerson(tx, { type, contentId, personId, role }) {
+async function linkPerson(tx, { type, contentId, personId, role, characters }) {
   const isVideo = type === "video";
   const delegate = isVideo ? tx.videoPersonne : tx.seriesPersonne;
   const idColumn = isVideo ? "VideoID" : "SeriesID";
   const uniqueColumn = isVideo ? "VideoID_PersonneID" : "SeriesID_PersonneID";
   const roleColumn = role === "actor" ? "EstActeur" : "EstRealisateur";
   const uniqueWhere = { [uniqueColumn]: { [idColumn]: contentId, PersonneID: personId } };
-  const existing = await delegate.findUnique({ where: uniqueWhere });
+  const existing = await delegate.findUnique({ where: uniqueWhere, include: { Personnages: CHARACTER_INCLUDE } });
 
   if (!existing) {
     await delegate.create({
@@ -108,13 +120,21 @@ async function linkPerson(tx, { type, contentId, personId, role }) {
         PersonneID: personId,
         EstActeur: role === "actor",
         EstRealisateur: role === "director",
+        ...(characters.length ? { Personnages: { create: charactersToAppend([], characters) } } : {}),
       },
     });
     return "created";
   }
-  if (existing[roleColumn]) return "unchanged";
+  const additions = charactersToAppend(existing.Personnages, characters);
+  if (existing[roleColumn] && !additions.length) return "unchanged";
 
-  await delegate.update({ where: uniqueWhere, data: { [roleColumn]: true } });
+  await delegate.update({
+    where: uniqueWhere,
+    data: {
+      [roleColumn]: true,
+      ...(additions.length ? { Personnages: { createMany: { data: additions, skipDuplicates: true } } } : {}),
+    },
+  });
   return "updated";
 }
 
@@ -130,6 +150,9 @@ export async function importPeopleCredits({ prisma, type, contentId, role, names
     throw new PersonCreditImportError("Identifiant de contenu invalide.");
   }
   const parsed = parsePeopleList(names);
+  if (role === "director" && parsed.people.some((person) => person.characters.length)) {
+    throw new PersonCreditImportError("Les personnages sont réservés à l'import Acteurs.");
+  }
 
   return prisma.$transaction(async (tx) => {
     const content = await ensureContent(tx, type, numericContentId);
@@ -194,10 +217,12 @@ export async function importPeopleCredits({ prisma, type, contentId, role, names
         contentId: numericContentId,
         personId: person.PersonneID,
         role,
+        characters: requestedPerson.characters,
       });
       results.push({
         PersonneID: person.PersonneID,
         name: requestedPerson.displayName,
+        Personnages: requestedPerson.characters,
         personStatus,
         linkStatus,
         hadImage: person.ImageStatut === "CUSTOM" && Boolean(person.CheminImage),

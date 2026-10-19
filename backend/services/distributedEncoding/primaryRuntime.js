@@ -9,7 +9,7 @@ import {
   ENCODING_TASK_KIND,
   ENCODING_TASK_PHASE,
 } from "./constants.js";
-import { acquireEncodingCapacity } from "./capacity.js";
+import { acquireEncodingCapacity, setEncodingMaxSlots } from "./capacity.js";
 import { buildDistributedArtifactManifest } from "./artifactManifest.js";
 import {
   completeEncodingArtifacts,
@@ -22,13 +22,11 @@ import {
 } from "./ffmpeg/index.js";
 import { advanceDistributedEncodingJob } from "./finalizationService.js";
 import {
-  buildPrimaryEncodingHeartbeat,
   ensurePrimaryEncodingWorkerRegistered,
   getPrimaryEncodingCapabilities,
 } from "./jobService.js";
 import {
   failEncodingTaskLease,
-  heartbeatEncodingWorker,
   recalculateEncodingJobProgress,
   releaseEncodingTaskLease,
   renewEncodingTaskLease,
@@ -191,10 +189,11 @@ export async function runOnePrimaryEncodingClaim({
 } = {}) {
   if (!isDistributedEncodingEnvironmentEnabled()) return null;
   const config = assertDistributedPrimaryConfig();
-  const release = await acquireEncodingCapacity({ wait: false });
+  const worker = await ensurePrimaryEncodingWorkerRegistered();
+  setEncodingMaxSlots(worker.MaxSlots || 1);
+  const release = await acquireEncodingCapacity({ wait: false, exclusive: false });
   if (!release) return null;
   try {
-    await ensurePrimaryEncodingWorkerRegistered();
     const next = await claim({ instanceId: config.instanceId });
     if (!next) return null;
     await execute(next, { config, signal });
@@ -208,33 +207,37 @@ export async function startPrimaryDistributedEncodingRuntime() {
   if (!isDistributedEncodingEnvironmentEnabled()) {
     return { enabled: false, stop() {} };
   }
-  const config = assertDistributedPrimaryConfig();
   const capabilities = await getPrimaryEncodingCapabilities();
   await ensurePrimaryEncodingWorkerRegistered({ capabilities });
-  const heartbeatPayload = buildPrimaryEncodingHeartbeat({ config, capabilities });
+  const config = assertDistributedPrimaryConfig();
   let stopped = false;
-  let running = null;
-  let activeController = null;
+  const running = new Set();
+  const controllers = new Set();
+  let maxSlots = 1;
 
-  const heartbeat = () => heartbeatEncodingWorker(
-    config.instanceId,
-    heartbeatPayload
-  ).catch((error) => {
+  const heartbeat = () => ensurePrimaryEncodingWorkerRegistered({ capabilities }).then((worker) => {
+    maxSlots = worker.MaxSlots || 1;
+    setEncodingMaxSlots(maxSlots);
+  }).catch((error) => {
     console.error("[distributed-encoding:primary-heartbeat]", error.message);
   });
   const tick = () => {
-    if (stopped || running) return;
-    const controller = new AbortController();
-    activeController = controller;
-    running = runOnePrimaryEncodingClaim({ signal: controller.signal })
-      .catch((error) => {
-        console.error("[distributed-encoding:primary-worker]", error);
-      })
-      .finally(() => {
-        running = null;
-        if (activeController === controller) activeController = null;
-      });
+    if (stopped || running.size >= maxSlots) return;
+    for (let slot = running.size; slot < maxSlots; slot += 1) {
+      const controller = new AbortController();
+      controllers.add(controller);
+      const run = runOnePrimaryEncodingClaim({ signal: controller.signal })
+        .catch((error) => {
+          console.error("[distributed-encoding:primary-worker]", error);
+        })
+        .finally(() => {
+          running.delete(run);
+          controllers.delete(controller);
+        });
+      running.add(run);
+    }
   };
+  await heartbeat();
   const heartbeatTimer = setInterval(heartbeat, config.heartbeatIntervalMs);
   const claimTimer = setInterval(tick, CLAIM_INTERVAL_MS);
   heartbeatTimer.unref?.();
@@ -247,10 +250,8 @@ export async function startPrimaryDistributedEncodingRuntime() {
       stopped = true;
       clearInterval(heartbeatTimer);
       clearInterval(claimTimer);
-      if (activeController && !activeController.signal.aborted) {
-        activeController.abort(new Error("Arrêt du runtime primary."));
-      }
-      await running?.catch(() => {});
+      for (const controller of controllers) controller.abort(new Error("Arrêt du runtime primary."));
+      await Promise.allSettled([...running]);
     },
   };
 }

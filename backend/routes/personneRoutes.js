@@ -9,6 +9,7 @@ import {
   mergePersonDuplicates,
   updatePersonnePhoto,
   updatePersonne,
+  updatePersonCharacters,
   searchPeople,
   linkPersonne,
   unlinkPersonne,
@@ -43,6 +44,7 @@ export default async function (fastify) {
   fastify.get("/:id", getPersonDetails);
   
   // Liaison / Déliaison
+  fastify.put("/:id/characters", { preHandler: authMiddleware }, updatePersonCharacters);
   fastify.post("/:id/link", { preHandler: authMiddleware }, linkPersonne);
   fastify.delete("/:id/unlink", { preHandler: authMiddleware }, unlinkPersonne);
 

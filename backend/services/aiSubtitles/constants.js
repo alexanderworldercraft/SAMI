@@ -17,6 +17,7 @@ export const AI_SUBTITLE_PHASE = Object.freeze({
   DOWNLOADING: "downloading",
   TRANSCRIBING: "transcribing",
   TRANSLATING: "translating",
+  CHECKING: "checking",
   PUBLISHING: "publishing",
   COMPLETED: "completed",
   FAILED: "failed",

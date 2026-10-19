@@ -28,15 +28,18 @@ function createFakePrisma({ inactivePerson = false } = {}) {
       )) ?? null;
     },
     create: async ({ data }) => {
-      collection.push({ ...data });
-      return data;
+      const link = { ...data, Personnages: data.Personnages?.create || [] };
+      collection.push(link);
+      return link;
     },
     update: async ({ where, data }) => {
       const key = where[uniqueColumn];
       const link = collection.find((item) => (
         item[idColumn] === key[idColumn] && item.PersonneID === key.PersonneID
       ));
-      Object.assign(link, data);
+      const { Personnages, ...flags } = data;
+      Object.assign(link, flags);
+      if (Personnages) link.Personnages = [...(link.Personnages || []), ...Personnages.createMany.data];
       return link;
     },
   });
@@ -116,6 +119,38 @@ describe("personCreditImportService", () => {
         EstRealisateur: false,
       }),
     ]));
+  });
+
+  it("sépare les personnages de l'identité et réunit les entrées répétées", () => {
+    const { people, duplicateCount } = parsePeopleList("Eddie Murphy (Akeem) (Clarence) | eddie murphy (Randy) (akeem) | Omar Sy");
+    expect(people).toEqual([
+      expect.objectContaining({ displayName: "Eddie Murphy", characters: ["Akeem", "Clarence", "Randy"] }),
+      expect.objectContaining({ displayName: "Omar Sy", characters: [] }),
+    ]);
+    expect(duplicateCount).toBe(1);
+  });
+
+  it.each(["Tom Hanks (", "Tom Hanks ()", "Tom Hanks (Viktor) suite", "Tom Hanks)", "(Viktor)"])("refuse une entrée mal formée : %s", (names) => {
+    expect(() => parsePeopleList(names)).toThrow();
+  });
+
+  it.each([["video", 10, "videoLinks"], ["series", 20, "seriesLinks"]])("ajoute les personnages sans doublons lors des réimports %s", async (type, contentId, collection) => {
+    const { prisma, state } = createFakePrisma();
+    const args = { prisma, type, contentId, role: "actor" };
+    await importPeopleCredits({ ...args, names: "Tom Hanks (Viktor) (Autre rôle)" });
+    const result = await importPeopleCredits({ ...args, names: "Tom Hanks (viktor) (Nouveau rôle)" });
+    expect(state[collection][0].Personnages.map((row) => row.Nom)).toEqual(["Viktor", "Autre rôle", "Nouveau rôle"]);
+    expect(state[collection][0].Personnages.map((row) => row.Position)).toEqual([0, 1, 2]);
+    expect(result.summary.linksUpdated).toBe(1);
+    const unchanged = await importPeopleCredits({ ...args, names: "Tom Hanks (Viktor)" });
+    expect(unchanged.summary.linksUnchanged).toBe(1);
+    expect(state.people).toHaveLength(1);
+  });
+
+  it("refuse les personnages dans un import réalisateurs", async () => {
+    const { prisma } = createFakePrisma();
+    await expect(importPeopleCredits({ prisma, type: "video", contentId: 10, role: "director", names: "Tom Hanks (Viktor)" }))
+      .rejects.toMatchObject({ statusCode: 400 });
   });
 
   it("refuse de recréer une personne présente dans la corbeille", async () => {

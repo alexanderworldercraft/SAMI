@@ -30,6 +30,7 @@ import {
   sendRemoteAiHeartbeat,
 } from "./workerClient.js";
 import { AI_SUBTITLE_REPETITIVE_TRANSCRIPTION } from "./transcriptQuality.js";
+import { getEncodingCapacityState } from "../distributedEncoding/capacity.js";
 
 const safeLog = (logger, method, ...args) => {
   try { logger?.[method]?.(...args); } catch { /* le log ne bloque jamais */ }
@@ -134,6 +135,7 @@ export async function startAiSubtitleWorkerRuntime(options = {}) {
     : collectAiSubtitleCapabilities({ config }));
   let stopped = false;
   let active = null;
+  let claiming = false;
   let activeController = null;
   let lastError = capabilities.error || null;
   let unavailableUntil = 0;
@@ -212,6 +214,12 @@ export async function startAiSubtitleWorkerRuntime(options = {}) {
         targetLanguage: claim.job.targetLanguage,
         signal: controller.signal,
         config,
+        onProgress: (update) => {
+          if (![AI_SUBTITLE_PHASE.TRANSCRIBING, AI_SUBTITLE_PHASE.TRANSLATING, AI_SUBTITLE_PHASE.CHECKING].includes(update.phase)) return;
+          if (phase !== update.phase) safeLog(logger, "info", `[ai-subtitles:${claim.job.id}] étape : ${update.phase}.`);
+          phase = update.phase;
+          progress = Math.max(progress, Math.min(94, Math.round(Number(update.progress) || 0)));
+        },
       });
       phase = AI_SUBTITLE_PHASE.PUBLISHING;
       progress = 95;
@@ -254,9 +262,13 @@ export async function startAiSubtitleWorkerRuntime(options = {}) {
     if (
       stopped
       || active
+      || claiming
       || !capabilities.ready
       || Date.now() < unavailableUntil
     ) return;
+    const capacity = getEncodingCapacityState();
+    if (capacity.active || capacity.queued) return;
+    claiming = true;
     try {
       const response = await dependencies.claim();
       if (!response?.lease) return;
@@ -277,6 +289,8 @@ export async function startAiSubtitleWorkerRuntime(options = {}) {
       await active;
     } catch (error) {
       recordConnectivityError("[ai-subtitles] attribution impossible, nouvelle tentative automatique", error);
+    } finally {
+      claiming = false;
     }
   };
 

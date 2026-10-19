@@ -1484,6 +1484,10 @@
     min-height: calc(var(--spacing) * 80);
   }
 
+  .min-h-\[30\%\] {
+    min-height: 30%;
+  }
+
   .min-h-\[116px\] {
     min-height: 116px;
   }
@@ -3419,6 +3423,16 @@
     }
   }
 
+  .bg-black\/70 {
+    background-color: #000000b3;
+  }
+
+  @supports (color: color-mix(in lab, red, red)) {
+    .bg-black\/70 {
+      background-color: color-mix(in oklab, var(--color-black) 70%, transparent);
+    }
+  }
+
   .bg-black\/75 {
     background-color: #000000bf;
   }
@@ -4224,6 +4238,16 @@
   @supports (color: color-mix(in lab, red, red)) {
     .bg-slate-950\/85 {
       background-color: color-mix(in oklab, var(--color-slate-950) 85%, transparent);
+    }
+  }
+
+  .bg-slate-950\/90 {
+    background-color: #020618e6;
+  }
+
+  @supports (color: color-mix(in lab, red, red)) {
+    .bg-slate-950\/90 {
+      background-color: color-mix(in oklab, var(--color-slate-950) 90%, transparent);
     }
   }
 
@@ -6069,6 +6093,10 @@
     color: var(--color-red-900);
   }
 
+  .text-rose-600 {
+    color: var(--color-rose-600);
+  }
+
   .text-rose-700 {
     color: var(--color-rose-700);
   }
@@ -7718,6 +7746,16 @@
       background-color: var(--color-red-700);
     }
 
+    .hover\:bg-rose-500\/10:hover {
+      background-color: #ff23571a;
+    }
+
+    @supports (color: color-mix(in lab, red, red)) {
+      .hover\:bg-rose-500\/10:hover {
+        background-color: color-mix(in oklab, var(--color-rose-500) 10%, transparent);
+      }
+    }
+
     .hover\:bg-rose-500\/25:hover {
       background-color: #ff235740;
     }
@@ -7812,6 +7850,10 @@
       background-color: var(--color-sky-600);
     }
 
+    .hover\:bg-sky-700:hover {
+      background-color: var(--color-sky-700);
+    }
+
     .hover\:bg-sky-800:hover {
       background-color: var(--color-sky-800);
     }
@@ -7852,16 +7894,6 @@
 
     .hover\:bg-slate-700:hover {
       background-color: var(--color-slate-700);
-    }
-
-    .hover\:bg-violet-500\/10:hover {
-      background-color: #8d54ff1a;
-    }
-
-    @supports (color: color-mix(in lab, red, red)) {
-      .hover\:bg-violet-500\/10:hover {
-        background-color: color-mix(in oklab, var(--color-violet-500) 10%, transparent);
-      }
     }
 
     .hover\:bg-violet-500\/20:hover {
@@ -8113,6 +8145,17 @@
         background-color: color-mix(in oklab, var(--color-sky-500) 25%, transparent);
       }
     }
+  }
+
+  .focus\:not-sr-only:focus {
+    clip-path: none;
+    white-space: normal;
+    width: auto;
+    height: auto;
+    margin: 0;
+    padding: 0;
+    position: static;
+    overflow: visible;
   }
 
   .focus\:z-10:focus {

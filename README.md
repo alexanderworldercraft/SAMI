@@ -2,7 +2,7 @@
 
 SAMI (**Système d’Archivage Multimédia Intégré**) est une médiathèque web privée permettant d’organiser, diffuser et suivre des films, séries et musiques depuis une seule interface.
 
-La version actuelle est la **8.4.0**. Elle repose sur un backend Fastify, une interface React, Prisma avec MySQL, un pipeline vidéo FFmpeg/HLS et Socket.IO pour le retour en temps réel des traitements.
+La version actuelle est la **8.6.0**. Elle repose sur un backend Fastify, une interface React, Prisma avec MySQL, un pipeline vidéo FFmpeg/HLS et Socket.IO pour le retour en temps réel des traitements.
 
 ## Fonctionnalités
 
@@ -15,12 +15,13 @@ La version actuelle est la **8.4.0**. Elle repose sur un backend Fastify, une in
 - aperçus Open Graph et Twitter spécifiques aux pages `/lecture/:id`, y compris pour les épisodes ;
 - **Preview Live** expérimentale : aperçu au survol de la barre de lecture à partir de spritesheets et d’un fichier WebVTT ;
 - import et transcodage FFmpeg avec suivi de progression via Socket.IO ;
-- encodage multi-server expérimental : une résolution par worker, redistribution dynamique et publication finale sur le serveur principal ;
-- sous-titres IA locaux expérimentaux : français automatique pour les nouveaux imports qui en sont dépourvus, quinze langues à la demande, catalogue administratif recherché et regroupé par vidéo, correction textuelle ou temporelle et affectation complète au meilleur worker disponible ;
+- encodage multi-server expérimental : tâches vidéo et audio distribuées, limites et slots configurables par serveur, redistribution dynamique et publication finale sur le serveur principal ;
+- sous-titres IA locaux expérimentaux : français automatique pour les nouveaux imports qui en sont dépourvus, quinze langues à la demande, suivi du serveur responsable, priorité aux clones et à l’encodage, autorisation du primary par sous-titre, catalogue administratif recherché et correction textuelle ou temporelle ;
 - doublages IA locaux distribués en anglais, français et japonais, avec calcul Qwen3-TTS sur clone NVIDIA, séparation de l'ambiance, profils vocaux verrouillés entre extrait et piste complète, filigrane audio et double validation administrative avant publication ;
 - export sécurisé et reprenable d’une vidéo traitée depuis un clone vers l’instance principale ;
 - historique de lecture, reprise intelligente et remise à zéro d’une série ;
 - recherche tolérante aux accents, séparateurs et petites fautes de saisie pour les films et les séries ;
+- titres alternatifs facultatifs (`TitreAlternatif`) pour les vidéos et séries : saisir par exemple `Mégalodon | En eau trouble` pour le titre principal `The Meg`, dans les formulaires de `/nouvelle-video` ou de gestion des contenus de l’administration ; un bouton copie `|`, et chaque titre est recherché séparément dans les suggestions et le catalogue ;
 - tendances, calendrier des ajouts et contenus mis en avant par genre, avec une grille adaptée aux smartphones ;
 - favoris, sagas et univers, avec des actions allégées au repos sur les affiches.
 
@@ -40,6 +41,7 @@ La version actuelle est la **8.4.0**. Elle repose sur un backend Fastify, une in
 - annuaire et fiches publiques des personnes avec recherche du nom complet à 80 %, filmographie regroupée et aperçus de partage dédiés ;
 - édition des personnes avec photos, suppression réversible et corbeille réservée au super administrateur ;
 - association semi-automatique d’acteurs et réalisateurs à un film ou une série, avec création contrôlée et recherche des photos manquantes ;
+- plusieurs personnages par acteur et par film ou série, import par parenthèses, affichage sur les photos et édition depuis la filmographie par les administrateurs ;
 - détection des personnes potentiellement dupliquées, enrichie par les contenus partagés, classement des doutes et fusion réservée au super administrateur ;
 - messages généraux, fonctionnalités expérimentales et statistiques ;
 - journalisation des actions et sauvegardes manuelles ou planifiées de MySQL ;
@@ -96,6 +98,40 @@ Les URL, les droits d'accès, les services et les contextes restent communs.
 indique le mode réellement affiché. Aucun changement de BDD pour cette étape.
 Voir [l'organisation et le contrat des interfaces](frontend/src/interfaces/README.md).
 
+## Nouveautés de la version 8.6.0
+
+- association de plusieurs personnages à un acteur pour un même film ou une même série, avec des personnages définis pour toute la série ;
+- affichage des personnages séparés par des virgules sur les cards de la page Lecture, en blanc sur un dégradé noir vers transparent en bas de la photo ;
+- import au format `Eddie Murphy (Akeem) (Clarence) (Randy) | Omar Sy (Driss)`, avec noms seuls toujours acceptés et ajout sans doublons lors des réimports ;
+- correction, ajout et suppression des personnages depuis chaque contenu de la distribution sur la fiche personne, par les admins et superadmins ; saisie également possible lors d’une liaison manuelle et conservation des personnages lors des fusions ;
+- titres alternatifs facultatifs séparés par `|` pour les vidéos et séries, bouton de copie du séparateur avec solution manuelle, et conservation dans les imports classiques, le multi-encodage et les transferts de vidéos ;
+- suggestions et recherche complète limitées aux titres principaux et alternatifs, avec les mêmes règles de correspondance ; suppression des suggestions périmées et exclusion des correspondances présentes seulement dans les résumés ;
+- téléchargement unique d’une source partagée entre plusieurs slots d’un clone, téléchargements de vidéos différentes en parallèle et maintien des réservations pendant l’attente.
+
+Avant déploiement, appliquer les migrations
+`20261016120000_add_alternative_titles` et
+`20261019090000_add_person_characters` si elles ne sont pas encore présentes,
+régénérer le client Prisma, redémarrer les backends concernés et reconstruire le
+frontend. Les nouvelles tables `VideoPersonnage` et `SeriesPersonnage` complètent
+les liens existants sans modifier les identités des personnes.
+
+## Nouveautés de la version 8.5.0
+
+- affichage direct des films et séries d’une saga unique sur la page Lecture, dans l’ordre de la saga, avec une affiche assombrie et la mention « Contenu actuel » sur le film ou la série en cours ; maintien du choix des sagas lorsqu’il y en a plusieurs ;
+- bouton « Contenu suivant » dans une saga unique au début du dernier générique validé après 50 % de la vidéo, ou à 90 % sans générique admissible ; démarrage du contenu suivant à zéro, uniquement au dernier épisode de toute la série pour les épisodes, dans l’ordre de la saga et sans sauter une entrée Premium inaccessible ;
+- identification du serveur chargé de chaque sous-titre dans « Sous-titres français manquants » et cards des serveurs IA avec modèles, disponibilité et raisons d’attente ;
+- exclusion du primary dès qu’un clone IA prêt et compatible est connecté, même occupé ; sans clone, autorisation explicite par sous-titre par un admin ou superadmin, réinitialisée à la relance ou à la recréation ;
+- priorité aux encodages compatibles en attente sur le même serveur, avec possibilité d’utiliser un autre clone IA libre ;
+- sous-titres parallèles sur plusieurs clones libres, à raison d’un sous-titre par clone, avec suivi réel de la transcription, de la traduction et du contrôle qualité ; correction d’une double réservation de capacité qui pouvait bloquer le démarrage du moteur ;
+- édition du nom, de la priorité, de la résolution maximale et des slots des clones et du primary par le superadmin, avec un slot par défaut et jusqu’à 32 slots par serveur ;
+- plafond du primary respecté tant que des clones d’encodage répondent, puis relais autorisé après cinq minutes sans réponse ; option « Pas d’encodage » pour réserver le primary à ce secours, sans modifier l’encodage classique ;
+- prise en charge des pistes audio AAC par les clones, y compris les anciennes tâches en attente, et accès partagé à la source entre les slots d’un même clone.
+
+Avant déploiement, appliquer la migration
+`20261014120000_add_ai_subtitle_primary_approval`, régénérer le client Prisma,
+puis redémarrer les backends du primary et des clones avec cette version. La
+migration n’a pas encore été appliquée sur la base de déploiement.
+
 ## Nouveautés de la version 8.4.0
 
 - trois interfaces classic, tactile et remote, choisies par détection locale ou préférence par appareil ;
@@ -140,7 +176,7 @@ le déploiement. Les détails sont dans la section « Génériques proposés par
 
 Les consignes de déploiement, la migration et les limites sont détaillées dans [la documentation de la bibliothèque de voix](backend/docs/voice-library.md).
 
-L’historique complet des versions, de la 6.1.0 à la 8.4.0, est disponible dans l’application à l’adresse `/updates` et dans `frontend/src/interfaces/classic/pages/UpdatesPage.js`.
+L’historique complet des versions, de la 6.1.0 à la 8.6.0, est disponible dans l’application à l’adresse `/updates` et dans `frontend/src/interfaces/classic/pages/UpdatesPage.js`.
 
 ## Stack technique
 
@@ -636,13 +672,37 @@ ne reçoivent pas de nouvelle limite de temps ; la limite globale reste inchang�
 ### Encodage vidéo multi-server expérimental
 
 Le primary reçoit la source depuis la page `/nouvelle-video`, construit le plan
-d’encodage et attribue au maximum une tâche à chaque worker. Au lancement, le
+d’encodage et attribue les tâches selon les slots de chaque worker (un par défaut,
+réglables de 1 à 32 par le superadmin). Au lancement, le
 clone ayant la priorité de performance la plus élevée reçoit la résolution la
 plus lourde, les clones suivants reçoivent les profils suivants, puis le primary
 reçoit en dernier le plus petit profil encore disponible. Dès qu’un worker termine,
-il réclame la prochaine tâche compatible. Le primary est normalement limité à
-360p ; il ne peut prendre un profil plus grand qu’après cinq minutes continues
-sans heartbeat ni progression d’un clone compatible.
+il réclame la prochaine tâche compatible. Les pistes audio séparées sont aussi
+attribuables aux clones compatibles AAC. Les cards de « Fonctionnalités
+expérimentales → Encodage multi-server » permettent de modifier le nom, la
+priorité, la résolution maximale et les slots des clones et du primary ; les
+heartbeats et redémarrages préservent ces réglages. Le primary est limité par
+défaut à 360p et ne dépasse son plafond qu’après cinq minutes sans réponse des
+clones d’encodage actifs. Son option « Pas d’encodage » supprime toute attribution
+normale en multi-encodage, vidéo comme audio, tout en conservant ce relais après
+cinq minutes. L’encodage classique reste exclusif et conserve son fonctionnement.
+
+Les sous-titres IA passent après les tâches d’encodage en attente compatibles
+avec le même serveur. Chaque clone libre peut prendre un sous-titre différent :
+la limite s’applique par clone, sans verrou global entre serveurs. Un clone déjà
+occupé par un sous-titre, un encodage, un doublage ou une tâche vocale reste réservé.
+Le moteur possède seul la réservation locale de calcul ; le runtime ne doit pas
+réserver cette même capacité avant de l’appeler. Un clone IA connecté, prêt et compatible exclut le primary,
+même si ce clone est occupé. Sans clone IA connecté, un admin ou superadmin doit
+autoriser chaque sous-titre via « Sous-titres français manquants → Autoriser le
+primary ». Cette autorisation est réinitialisée à la relance ou à la recréation.
+La liste indique le serveur chargé du traitement ; les cards « Sous-titres générés
+par IA » affichent les modèles et la disponibilité des serveurs. Le moteur remonte
+les étapes de transcription, traduction et contrôle qualité, relayées lors des
+renouvellements du bail. L’ancien affichage fixe à 15 % ne permettait pas de
+conclure à un calcul en cours. Déployer la
+migration `20261014120000_add_ai_subtitle_primary_approval` avant de redémarrer
+les backends mis à jour, puis redémarrer aussi les clones pour appliquer les slots.
 
 Les clones n’ont pas besoin d’être publiquement joignables : ils ouvrent les
 connexions vers `SAMI_PRIMARY_BASE_URL`. La source est reprise par `Range`,
@@ -707,12 +767,12 @@ coordonnées dans le processus Node.
 
 ### Sous-titres IA locaux expérimentaux
 
-La fonctionnalité utilise une file indépendante de l’encodage vidéo. Une vidéo
-est traitée de bout en bout par un seul worker ; le coordinateur choisit le
-worker prêt ayant la priorité `SAMI_AI_SUBTITLE_PERFORMANCE_SCORE` la plus
-élevée. Tant qu’il reste en ligne et opérationnel, ce worker traite seul la file
-IA. Le suivant ne prend le relais que s’il devient indisponible. Si le worker
-prioritaire termine un encodage distribué, la file IA attend qu’il soit libre.
+La fonctionnalité utilise une file indépendante de l’encodage vidéo. Chaque
+sous-titre est traité de bout en bout par un seul worker. Le coordinateur choisit
+les clones libres selon `SAMI_AI_SUBTITLE_PERFORMANCE_SCORE` ; plusieurs clones
+peuvent traiter des sous-titres distincts simultanément, avec un sous-titre par
+clone. Si un clone termine un encodage ou possède un encodage compatible en attente,
+un autre clone libre peut prendre un sous-titre sans attendre le plus performant.
 Après une erreur moteur, le worker concerné sort temporairement du pool afin
 qu'une machine de priorité inférieure puisse retenter la tâche.
 La transcription source horodatée est conservée en base, ce qui permet de

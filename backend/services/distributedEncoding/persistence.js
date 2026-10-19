@@ -4,6 +4,7 @@ import {
   ACTIVE_ENCODING_JOB_STATUSES,
   DISTRIBUTED_ENCODING_LEASE_DURATION_MS,
   DISTRIBUTED_ENCODING_MAX_SLOTS,
+  DISTRIBUTED_ENCODING_SLOT_LIMIT,
   DISTRIBUTED_ENCODING_RETRY_BACKOFF_MS,
   ENCODING_ATTEMPT_STATUS,
   ENCODING_JOB_STATUS,
@@ -113,13 +114,9 @@ const workerUpdateData = (data = {}) => mapDefined([
   )],
   ["SupportsH264", data.supportsH264],
   ["SupportsAac", data.supportsAac],
-  // La V1 ne permet volontairement qu'un seul encodage simultané.
   ["MaxSlots", data.maxSlots === undefined
     ? undefined
-    : Math.min(
-      DISTRIBUTED_ENCODING_MAX_SLOTS,
-      optionalNumber(data.maxSlots, "maxSlots", { min: 1 })
-    )],
+    : normalizeEncodingMaxSlots(data.maxSlots)],
   ["PerformanceScore", optionalNumber(
     data.performanceScore,
     "performanceScore",
@@ -130,6 +127,14 @@ const workerUpdateData = (data = {}) => mapDefined([
   ["LastHeartbeatAt", data.lastHeartbeatAt],
   ["LastError", data.lastError],
 ]);
+
+export function normalizeEncodingMaxSlots(value) {
+  const slots = Number(value);
+  if (!Number.isInteger(slots) || slots < 1 || slots > DISTRIBUTED_ENCODING_SLOT_LIMIT) {
+    throw new TypeError(`maxSlots doit être un entier entre 1 et ${DISTRIBUTED_ENCODING_SLOT_LIMIT}.`);
+  }
+  return slots;
+}
 
 export const getEncodingWorker = (
   instanceId,
@@ -163,7 +168,7 @@ export const listEncodingWorkers = (
 
 export async function upsertEncodingWorker(
   { instanceId, ...data },
-  { database = prisma } = {}
+  { database = prisma, preserveAdministration = false } = {}
 ) {
   const id = String(instanceId || "").trim();
   if (!id) throw new TypeError("instanceId est requis.");
@@ -180,9 +185,13 @@ export async function upsertEncodingWorker(
       Role: role,
       PipelineVersion: pipelineVersion,
       Enabled: data.enabled ?? false,
-      MaxSlots: DISTRIBUTED_ENCODING_MAX_SLOTS,
+      MaxSlots: mapped.MaxSlots ?? DISTRIBUTED_ENCODING_MAX_SLOTS,
     },
-    update: mapped,
+    update: preserveAdministration
+      ? Object.fromEntries(Object.entries(mapped).filter(([key]) => ![
+          "DisplayName", "Enabled", "Draining", "MaxSlots", "MaxNominalHeight", "PerformanceScore",
+        ].includes(key)))
+      : mapped,
   });
 }
 
@@ -212,7 +221,6 @@ export async function heartbeatEncodingWorker(
     // reste dans Capabilities et un heartbeat ne peut jamais élargir ce plafond.
     supportsH264: heartbeat.supportsH264,
     supportsAac: heartbeat.supportsAac,
-    maxSlots: heartbeat.maxSlots,
     capabilities: heartbeat.capabilities,
     bootId: heartbeat.bootId,
     lastError: heartbeat.lastError ?? null,

@@ -20,6 +20,7 @@ const mockAdminApi = ({ gradeId = 1, role = "primary" } = {}) => {
         data: { active: false, environmentEnabled: true, languages: [] },
       });
     }
+    if (url === "/ai-subtitles/admin/workers") return Promise.resolve({ data: { workers: [] } });
     if (url === "/users/me") return Promise.resolve({ data: { GradeID: gradeId } });
     if (url === "/video-encoding/config") {
       return Promise.resolve({
@@ -151,6 +152,7 @@ describe("AdminExperimentalFeatures - encodage multi-server", () => {
         displayName: "Aero 15 XC",
         performanceScore: 25,
         maxNominalHeight: 2160,
+        maxSlots: 1,
         enabled: true,
       });
     });

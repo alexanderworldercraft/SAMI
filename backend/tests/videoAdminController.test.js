@@ -34,6 +34,7 @@ describe("videoController - catalogue administrable", () => {
     prisma.video.findMany.mockResolvedValue([{
       VideoID: 12,
       Titre: "Film récent",
+      TitreAlternatif: null,
       CheminImage: "film.webp",
       SaisonID: null,
       CreateDate: createDate,
@@ -49,6 +50,7 @@ describe("videoController - catalogue administrable", () => {
       select: {
         VideoID: true,
         Titre: true,
+        TitreAlternatif: true,
         CheminImage: true,
         SaisonID: true,
         CreateDate: true,
@@ -68,6 +70,7 @@ describe("videoController - catalogue administrable", () => {
     expect(reply.send).toHaveBeenCalledWith([{
       VideoID: 12,
       Titre: "Film récent",
+      TitreAlternatif: null,
       CheminImage: "film.webp",
       SaisonID: null,
       CreateDate: createDate,

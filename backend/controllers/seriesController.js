@@ -1,3 +1,4 @@
+import { AlternativeTitlesValidationError, normalizeAlternativeTitles } from "../services/alternativeTitles.js";
 // controllers/seriesController.js
 
 import { prisma } from "../services/db.js";
@@ -50,6 +51,7 @@ export const createSeries = async (request, reply) => {
 
     const parts = request.parts({ limits: { fileSize: MULTIPART_LIMITS.IMAGE_FILE_SIZE } });
     let Titre = "";
+    let TitreAlternatif = null;
     let Resumer = "";
     let CheminImage = null;
     let imageTempPath = null;
@@ -85,6 +87,7 @@ export const createSeries = async (request, reply) => {
         // Gestion des champs texte
         console.log(`Champ texte détecté : ${part.fieldname} = ${part.value}`);
         if (part.fieldname === "Titre") Titre = part.value;
+        if (part.fieldname === "TitreAlternatif") TitreAlternatif = part.value;
         if (part.fieldname === "Resumer") Resumer = part.value;
         if (part.fieldname === "EtatID") EtatID = parseInt(part.value);
         if (part.fieldname === "GenreIDs") GenreIDs = JSON.parse(part.value);
@@ -103,6 +106,7 @@ export const createSeries = async (request, reply) => {
     const series = await prisma.series.create({
       data: {
         Titre,
+        TitreAlternatif: normalizeAlternativeTitles(TitreAlternatif),
         Resumer,
         CheminImage: CheminImage || "",
         EtatID,
@@ -144,6 +148,7 @@ export const createSeries = async (request, reply) => {
     reply.status(201).send(responseSeries);
   } catch (error) {
     if (isMultipartFileTooLargeError(error)) return sendMultipartFileTooLarge(reply);
+    if (error instanceof AlternativeTitlesValidationError) return reply.code(400).send({ error: error.message });
     console.error("Erreur lors de la création de la série :", error);
     reply.status(500).send({ error: "Erreur lors de la création de la série." });
   }
@@ -234,6 +239,7 @@ export const getAllSeries = async (request, reply) => {
       select: {
         SeriesID: true,
         Titre: true,
+        TitreAlternatif: true,
         Resumer: true,
         Premium: true,
         CheminImage: true,
@@ -266,6 +272,7 @@ export const getAllSeries = async (request, reply) => {
           id: serie.SeriesID,
           type: "series",
           Titre: serie.Titre,
+          TitreAlternatif: serie.TitreAlternatif ?? null,
           Resumer: serie.Resumer,
           Premium: serie.Premium,
           CheminImage: serie.CheminImage,
@@ -295,6 +302,7 @@ export const getSeriesById = async (request, reply) => {
       select: {
         SeriesID: true,
         Titre: true,
+        TitreAlternatif: true,
         Resumer: true,
         CheminImage: true,
         Premium: true,

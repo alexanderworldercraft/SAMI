@@ -1,3 +1,4 @@
+import { normalizeAlternativeTitles } from "./alternativeTitles.js";
 import fs from "fs";
 import path from "path";
 import { randomUUID, createHash } from "crypto";
@@ -292,6 +293,7 @@ const createBlockedDestination = async ({
   const video = await database.video.create({
     data: {
       Titre: metadata.title,
+      TitreAlternatif: normalizeAlternativeTitles(metadata.alternativeTitles),
       Resumer: metadata.summary || null,
       CheminAcces: toStoragePath(
         "uploads",

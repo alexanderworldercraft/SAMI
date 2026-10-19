@@ -18,6 +18,10 @@ import {
   PersonDuplicateError,
   reviewDuplicatePair,
 } from "../services/personDuplicateService.js";
+import {
+  CHARACTER_INCLUDE, characterNames, charactersToAppend, normalizeCharacters,
+  PersonCharacterError, replacePersonCharacters,
+} from "../services/personCharacterService.js";
 import { createLog } from "./logController.js";
 
 // Util
@@ -395,7 +399,7 @@ export const bulkLinkPeople = async (request, reply) => {
 
     return reply.send({ ...importResult, imageSearch });
   } catch (error) {
-    if (error instanceof PersonCreditImportError) {
+    if (error instanceof PersonCreditImportError || error instanceof PersonCharacterError) {
       return reply.code(error.statusCode).send({ error: error.message, code: error.code });
     }
     console.error("bulkLinkPeople:", error);
@@ -668,7 +672,10 @@ export const linkPersonne = async (request, reply) => {
     if (!admin) return;
 
     const { id } = request.params;
-    const { type, contenuId, EstActeur = false, EstRealisateur = false } = request.body || {};
+    const { type, contenuId: rawContentId, EstActeur = false, EstRealisateur = false, Personnages = [] } = request.body || {};
+    const contenuId = parsePersonId(rawContentId);
+    const characters = normalizeCharacters(Personnages);
+    if (characters.length && !EstActeur) return reply.code(400).send({ error: "Les personnages nécessitent le rôle acteur." });
 
     if (!["video", "series"].includes(String(type))) {
       return reply.code(400).send({ error: "type invalide (video|series)." });
@@ -680,7 +687,8 @@ export const linkPersonne = async (request, reply) => {
       return reply.code(400).send({ error: "Au moins un rôle (EstActeur/EstRealisateur) doit être vrai." });
     }
 
-    const PersonneID = parseInt(id, 10);
+    const PersonneID = parsePersonId(id);
+    if (!PersonneID) return reply.code(400).send({ error: "PersonneID invalide." });
     const person = await prisma.personne.findFirst({
       where: { PersonneID, EtatID: ACTIVE_ETAT_ID },
       select: { PersonneID: true },
@@ -692,8 +700,10 @@ export const linkPersonne = async (request, reply) => {
 
       // upsert: s'il existe, maj des flags, sinon création
       const existing = await prisma.videoPersonne.findUnique({
-        where: { VideoID_PersonneID: { VideoID: contenuId, PersonneID } }
-      }).catch(() => null);
+        where: { VideoID_PersonneID: { VideoID: contenuId, PersonneID } },
+        include: { Personnages: CHARACTER_INCLUDE },
+      });
+      const additions = charactersToAppend(existing?.Personnages, characters);
 
       const res = existing
         ? await prisma.videoPersonne.update({
@@ -701,17 +711,20 @@ export const linkPersonne = async (request, reply) => {
           data: {
             EstActeur: !!(EstActeur || existing.EstActeur),
             EstRealisateur: !!(EstRealisateur || existing.EstRealisateur),
+            ...(additions.length ? { Personnages: { createMany: { data: additions, skipDuplicates: true } } } : {}),
           }
         })
         : await prisma.videoPersonne.create({
-          data: { VideoID: contenuId, PersonneID, EstActeur, EstRealisateur }
+          data: { VideoID: contenuId, PersonneID, EstActeur, EstRealisateur, Personnages: { create: additions } }
         });
 
       return reply.send(res);
     } else {
       const existing = await prisma.seriesPersonne.findUnique({
-        where: { SeriesID_PersonneID: { SeriesID: contenuId, PersonneID } }
-      }).catch(() => null);
+        where: { SeriesID_PersonneID: { SeriesID: contenuId, PersonneID } },
+        include: { Personnages: CHARACTER_INCLUDE },
+      });
+      const additions = charactersToAppend(existing?.Personnages, characters);
 
       const res = existing
         ? await prisma.seriesPersonne.update({
@@ -719,15 +732,17 @@ export const linkPersonne = async (request, reply) => {
           data: {
             EstActeur: !!(EstActeur || existing.EstActeur),
             EstRealisateur: !!(EstRealisateur || existing.EstRealisateur),
+            ...(additions.length ? { Personnages: { createMany: { data: additions, skipDuplicates: true } } } : {}),
           }
         })
         : await prisma.seriesPersonne.create({
-          data: { SeriesID: contenuId, PersonneID, EstActeur, EstRealisateur }
+          data: { SeriesID: contenuId, PersonneID, EstActeur, EstRealisateur, Personnages: { create: additions } }
         });
 
       return reply.send(res);
     }
   } catch (e) {
+    if (e instanceof PersonCharacterError) return reply.code(e.statusCode).send({ error: e.message });
     console.error("linkPersonne:", e);
     return reply.code(500).send({ error: "Erreur lors du rattachement." });
   }
@@ -766,7 +781,10 @@ export const unlinkPersonne = async (request, reply) => {
       if (!link) return reply.code(404).send({ error: "Lien (vidéo) introuvable." });
 
       const dataUpdate = {};
-      if (EstActeur) dataUpdate.EstActeur = false;
+      if (EstActeur) {
+        dataUpdate.EstActeur = false;
+        dataUpdate.Personnages = { deleteMany: {} };
+      }
       if (EstRealisateur) dataUpdate.EstRealisateur = false;
 
       const updated = await prisma.videoPersonne.update({
@@ -789,7 +807,10 @@ export const unlinkPersonne = async (request, reply) => {
       if (!link) return reply.code(404).send({ error: "Lien (série) introuvable." });
 
       const dataUpdate = {};
-      if (EstActeur) dataUpdate.EstActeur = false;
+      if (EstActeur) {
+        dataUpdate.EstActeur = false;
+        dataUpdate.Personnages = { deleteMany: {} };
+      }
       if (EstRealisateur) dataUpdate.EstRealisateur = false;
 
       const updated = await prisma.seriesPersonne.update({
@@ -813,6 +834,32 @@ export const unlinkPersonne = async (request, reply) => {
 };
 
 
+/** PUT /api/people/:id/characters — remplace la liste des personnages du lien acteur. */
+export const updatePersonCharacters = async (request, reply) => {
+  const admin = await ensureAdmin(request, reply);
+  if (!admin) return;
+  try {
+    const { type, contenuId, Personnages } = request.body || {};
+    const result = await replacePersonCharacters(prisma, {
+      personId: Number(request.params.id), type, contentId: Number(contenuId), characters: Personnages,
+    });
+    await createLog({
+      request,
+      UtilisateurID: admin.userId,
+      ActionNom: "person_update",
+      Champ: "Personnages",
+      AncienneValeur: JSON.stringify(result.previous),
+      NouvelleValeur: JSON.stringify(result.Personnages),
+      Meta: { personId: Number(request.params.id), type, contenuId: Number(contenuId) },
+    });
+    return reply.send({ Personnages: result.Personnages });
+  } catch (error) {
+    if (error instanceof PersonCharacterError) return reply.code(error.statusCode).send({ error: error.message });
+    console.error("updatePersonCharacters:", error);
+    return reply.code(500).send({ error: "Impossible de mettre à jour les personnages." });
+  }
+};
+
 /**
  * GET /api/videos/:id/people
  * GET /api/series/:id/people
@@ -826,7 +873,7 @@ export const getPeopleForVideo = async (request, reply) => {
       Video: { EtatID: ETAT.ACTIVE },
       Personne: { EtatID: ACTIVE_ETAT_ID },
     },
-    include: { Personne: true },
+    include: { Personne: true, Personnages: CHARACTER_INCLUDE },
     orderBy: { VideoPersonneID: "asc" }
   });
   return reply.send(items);
@@ -836,7 +883,7 @@ export const getPeopleForSeries = async (request, reply) => {
   const { id } = request.params;
   const items = await prisma.seriesPersonne.findMany({
     where: { SeriesID: parseInt(id, 10), Personne: { EtatID: ACTIVE_ETAT_ID } },
-    include: { Personne: true },
+    include: { Personne: true, Personnages: CHARACTER_INCLUDE },
     orderBy: { SeriesPersonneID: "asc" }
   });
   return reply.send(items);
@@ -867,6 +914,7 @@ export const getPersonDetails = async (request, reply) => {
         Video: { EtatID: ETAT.ACTIVE },
       },
       include: {
+        Personnages: CHARACTER_INCLUDE,
         Video: {
           select: {
             VideoID: true,
@@ -891,6 +939,7 @@ export const getPersonDetails = async (request, reply) => {
       .filter(l => l.EstActeur && l.Video)
       .map(l => ({
         VideoID: l.Video.VideoID,
+        Personnages: l.EstActeur ? characterNames(l.Personnages) : [],
         Titre: l.Video.Titre,
         Resumer: l.Video.Resumer,
         CheminImage: l.Video.CheminImage,
@@ -901,6 +950,7 @@ export const getPersonDetails = async (request, reply) => {
       .filter(l => l.EstRealisateur && l.Video)
       .map(l => ({
         VideoID: l.Video.VideoID,
+        Personnages: l.EstActeur ? characterNames(l.Personnages) : [],
         Titre: l.Video.Titre,
         Resumer: l.Video.Resumer,
         CheminImage: l.Video.CheminImage,
@@ -911,6 +961,7 @@ export const getPersonDetails = async (request, reply) => {
     const slinks = await prisma.seriesPersonne.findMany({
       where: { PersonneID },
       include: {
+        Personnages: CHARACTER_INCLUDE,
         Series: {
           select: {
             SeriesID: true,
@@ -956,6 +1007,7 @@ export const getPersonDetails = async (request, reply) => {
       .filter(l => l.EstActeur && l.Series)
       .map(l => ({
         SeriesID: l.Series.SeriesID,
+        Personnages: l.EstActeur ? characterNames(l.Personnages) : [],
         Titre: l.Series.Titre,
         Resumer: l.Series.Resumer,
         CheminImage: l.Series.CheminImage,
@@ -967,6 +1019,7 @@ export const getPersonDetails = async (request, reply) => {
       .filter(l => l.EstRealisateur && l.Series)
       .map(l => ({
         SeriesID: l.Series.SeriesID,
+        Personnages: l.EstActeur ? characterNames(l.Personnages) : [],
         Titre: l.Series.Titre,
         Resumer: l.Series.Resumer,
         CheminImage: l.Series.CheminImage,

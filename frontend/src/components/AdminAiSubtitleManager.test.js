@@ -41,3 +41,46 @@ it("liste 40 vidéos par page et planifie le français", async () => {
   ));
   expect(await screen.findByText(/ajoutée à la file/)).toBeInTheDocument();
 });
+
+it("identifie le clone qui génère le sous-titre", async () => {
+  api.get.mockImplementation(async (url) => ({ data: url.endsWith("/workers") ? { workers: [] } : {
+    items: [{ videoId: 42, title: "En cours", job: { id: "job-42", status: "LEASED", progress: 35,
+      assignedWorkerId: "clone-aero", assignedWorker: { role: "CLONE", displayName: "Aero 15" } } }],
+    pagination: { page: 1, total: 1, totalPages: 1 },
+  } }));
+  render(<AdminAiSubtitleManager />);
+  expect(await screen.findByText(/Traitement par le clone : Aero 15/)).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Autoriser le primary" })).not.toBeInTheDocument();
+});
+
+it("affiche le contrôle qualité au lieu du libellé générique de génération", async () => {
+  api.get.mockImplementation(async (url) => ({ data: url.endsWith("/workers") ? { workers: [] } : {
+    items: [{ videoId: 42, title: "Film en traduction", job: { id: "job-42", status: "LEASED", phase: "checking", progress: 88,
+      assignedWorkerId: "aero", assignedWorker: { role: "CLONE", displayName: "Aero 15 XC" } } }],
+    pagination: { page: 1, total: 1, totalPages: 1 },
+  } }));
+  render(<AdminAiSubtitleManager />);
+  expect(await screen.findByRole("button", { name: "Contrôle qualité 88 %" })).toBeDisabled();
+  expect(screen.getByText(/Traitement par le clone : Aero 15 XC/)).toBeInTheDocument();
+});
+
+it("autorise le primary pour un sous-titre en attente sans clone connecté", async () => {
+  api.get.mockImplementation(async (url) => ({ data: url.endsWith("/workers") ? { workers: [] } : {
+    items: [{ videoId: 42, title: "En attente", job: { id: "job-42", status: "QUEUED" } }],
+    pagination: { page: 1, total: 1, totalPages: 1 },
+  } }));
+  render(<AdminAiSubtitleManager />);
+  fireEvent.click(await screen.findByRole("button", { name: "Autoriser le primary" }));
+  await waitFor(() => expect(api.post).toHaveBeenCalledWith("/ai-subtitles/admin/jobs/job-42/authorize-primary"));
+  expect(await screen.findByText(/Le primary est autorisé pour le sous-titre/)).toBeInTheDocument();
+});
+
+it("cache l’autorisation du primary lorsqu’un clone compatible connecté est occupé", async () => {
+  api.get.mockImplementation(async (url) => ({ data: url.endsWith("/workers") ? { workers: [{ role: "CLONE", eligible: true, available: false }] } : {
+    items: [{ videoId: 42, title: "En attente", job: { id: "job-42", status: "QUEUED" } }],
+    pagination: { page: 1, total: 1, totalPages: 1 },
+  } }));
+  render(<AdminAiSubtitleManager />);
+  expect(await screen.findByText(/Clones IA occupés/)).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Autoriser le primary" })).not.toBeInTheDocument();
+});

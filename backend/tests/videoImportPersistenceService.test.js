@@ -45,13 +45,14 @@ describe("réservation atomique d'une vidéo d'encodage distribué", () => {
     const { database, transaction } = createDatabase();
 
     await expect(reserveImportedVideoForEncodingJob({
-      data: { titre: "Film", resumer: "Résumé", SaisonID: null },
+      data: { titre: "Film", TitreAlternatif: " Alias | Autre film ", resumer: "Résumé", SaisonID: null },
       adminUserId: 7,
       jobId: "11111111-1111-4111-8111-111111111111",
       database,
       videoRoot,
     })).resolves.toEqual({ VideoID: 42 });
 
+    expect(transaction.video.create).toHaveBeenCalledWith({ data: expect.objectContaining({ TitreAlternatif: "Alias | Autre film" }) });
     expect(database.$transaction).toHaveBeenCalledTimes(1);
     expect(transaction.videoEncodingJob.updateMany).toHaveBeenCalledWith({
       where: {

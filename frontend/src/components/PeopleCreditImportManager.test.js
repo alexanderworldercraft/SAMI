@@ -84,4 +84,16 @@ describe("PeopleCreditImportManager", () => {
     expect(screen.getByText("Photo ajoutée")).toBeInTheDocument();
     expect(screen.getByText("Photo déjà présente")).toBeInTheDocument();
   });
+  test("transmet les parenthèses des personnages dans un import acteurs", async () => {
+    api.post.mockResolvedValue({ data: { summary: {}, results: [{ PersonneID: 1, name: "Tom Hanks", Personnages: ["Viktor", "Autre"], linkStatus: "updated" }] } });
+    render(<PeopleCreditImportManager />);
+    await waitFor(() => expect(api.get).toHaveBeenCalledTimes(2));
+    fireEvent.click(screen.getByRole("button", { name: "Choisir un film ou une série..." }));
+    fireEvent.click(await screen.findByText("Le Terminal"));
+    fireEvent.change(screen.getByLabelText("Liste des personnes"), { target: { value: "Tom Hanks (Viktor) (Autre)" } });
+    fireEvent.click(screen.getByRole("button", { name: "Vérifier, créer et lier" }));
+    await waitFor(() => expect(api.post).toHaveBeenCalledWith("/people/bulk-link", expect.objectContaining({ role: "actor", names: "Tom Hanks (Viktor) (Autre)" })));
+    expect(await screen.findByText("Personnages : Viktor, Autre")).toBeInTheDocument();
+  });
+
 });

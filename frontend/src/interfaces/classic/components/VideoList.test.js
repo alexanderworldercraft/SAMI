@@ -25,6 +25,15 @@ describe("VideoList - navigation vers la lecture", () => {
     api.post.mockReturnValue(new Promise(() => {}));
   });
 
+  test("le repère du contenu actuel distingue les films et les séries ayant le même identifiant", () => {
+    const { container } = render(<VideoList videos={[
+      { id: 20, type: "video", Titre: "Film", Genres: [] },
+      { id: 20, type: "series", Titre: "Série", FirstVideoID: 201, Genres: [] },
+    ]} currentContent={{ id: "20", type: "video" }} />);
+    expect(screen.getAllByText("Contenu actuel")).toHaveLength(1);
+    expect(container.querySelector('a[aria-current="true"]')).toHaveAttribute("href", "/lecture/20");
+  });
+
   test("ajoute l'ancre et signale le clic sur un contenu", () => {
     const onContentClick = jest.fn();
     const video = {
@@ -74,6 +83,13 @@ describe("VideoList - navigation vers la lecture", () => {
 
     fireEvent.click(link);
     expect(onPersonClick).toHaveBeenCalledWith(person);
+  });
+
+  test("affiche tous les personnages sur un dégradé en bas de la photo", () => {
+    render(<VideoList videos={[{ type: "person", id: 7, Titre: "Eddie Murphy", CheminImage: "photo.jpg", Personnages: ["Akeem", "Clarence", "Randy"] }]} />);
+    const caption = screen.getByText("Akeem, Clarence, Randy");
+    expect(caption.parentElement).toHaveClass("absolute", "bottom-0", "min-h-[30%]", "text-white");
+    expect(caption).not.toHaveClass("line-clamp-2");
   });
 
   test("masque un bouton non favori au repos et conserve un favori visible", () => {

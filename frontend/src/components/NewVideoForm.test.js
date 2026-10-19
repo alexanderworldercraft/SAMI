@@ -138,6 +138,7 @@ describe("NewVideoForm - encodage multi-server", () => {
       />
     );
     fillRequiredFields(container);
+    fireEvent.change(screen.getByLabelText("Titres alternatifs (facultatif)"), { target: { value: "Mégalodon | En eau trouble" } });
 
     fireEvent.click(
       screen.getByRole("button", { name: "Ajouter la vidéo via le multi server" })
@@ -153,6 +154,7 @@ describe("NewVideoForm - encodage multi-server", () => {
         })
       );
     });
+    expect(api.post.mock.calls[0][1].get("TitreAlternatif")).toBe("Mégalodon | En eau trouble");
     expect(api.post).not.toHaveBeenCalledWith(
       "/videos/add",
       expect.anything(),
@@ -222,4 +224,14 @@ describe("NewVideoForm - encodage multi-server", () => {
       expect.anything()
     );
   });
+  test("transmet les titres alternatifs lors d'un import classique", async () => {
+    api.post.mockResolvedValue({ status: 200, data: {} });
+    const { container } = render(<NewVideoForm user={{ GradeID: 2, UtilisateurID: 7 }} />);
+    fillRequiredFields(container);
+    fireEvent.change(screen.getByLabelText("Titres alternatifs (facultatif)"), { target: { value: "Mégalodon | En eau trouble" } });
+    fireEvent.click(screen.getByRole("button", { name: "Ajouter la vidéo" }));
+    await waitFor(() => expect(api.post).toHaveBeenCalledWith("/videos/add", expect.any(FormData), { headers: {} }));
+    expect(api.post.mock.calls[0][1].get("TitreAlternatif")).toBe("Mégalodon | En eau trouble");
+  });
+
 });

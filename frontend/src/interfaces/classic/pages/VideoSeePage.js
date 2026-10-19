@@ -1,4 +1,5 @@
 import { getNextCreditEpisode } from "../../../utils/videoCredits";
+import { getNextSagaContent } from "../../../utils/sagaPlayback";
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { XMarkIcon } from "@heroicons/react/24/outline";
 import { Helmet } from "react-helmet-async";
@@ -16,6 +17,7 @@ import VideoExportDrawer from "../../../components/VideoExportDrawer";
 import { buildCookieValue } from "../../../utils/cookieValue";
 import PaginationPage from "../components/PaginationPage";
 import ContentUniverseSection from "../components/ContentUniverseSection";
+import SingleSagaSection from "../components/SingleSagaSection";
 import ResumePlaybackDialog from "../components/ResumePlaybackDialog";
 import { buildVideoPageMetadata } from "../../../utils/videoPageMetadata";
 
@@ -69,6 +71,7 @@ const VideoSeePage = ({ PlayerComponent = VideoPlayer }) => {
   const [multiAudioEnabled, setMultiAudioEnabled] = useState(false);
   const [resumeChoicePulse, setResumeChoicePulse] = useState(false);
   const [contentSagas, setContentSagas] = useState([]);
+  const [singleSagaPlayback, setSingleSagaPlayback] = useState(null);
   const [contentUniverses, setContentUniverses] = useState([]);
   const [sagaPage, setSagaPage] = useState(1);
   const [sagaTotalPages, setSagaTotalPages] = useState(1);
@@ -76,6 +79,7 @@ const VideoSeePage = ({ PlayerComponent = VideoPlayer }) => {
   const [selectedSaga, setSelectedSaga] = useState(null);
   const [selectedSagaDetails, setSelectedSagaDetails] = useState(null);
   const [selectedSagaLoading, setSelectedSagaLoading] = useState(false);
+  const sagaRequestRef = useRef(0);
   const progressDeletedRef = useRef(false);
   const resumeProgressRef = useRef(null);
   const activeProgressLogActionRef = useRef("video_first_play");
@@ -386,6 +390,15 @@ const VideoSeePage = ({ PlayerComponent = VideoPlayer }) => {
   const NameApp = process.env.REACT_APP_NAME || "SAMI";
   const currentVideoId = video?.VideoID || null;
   const nextCreditEpisode = getNextCreditEpisode(series, currentVideoId, isPremiumUser);
+  const hasCurrentSagaContents = singleSagaPlayback?.videoId === currentVideoId
+    && singleSagaPlayback?.sagaId === contentSagas[0]?.SagaID;
+  const nextSagaContent = getNextSagaContent({
+    contents: hasCurrentSagaContents ? singleSagaPlayback.contents : [],
+    sagaCount: sagaTotalItems,
+    videoId: currentVideoId,
+    series,
+    premium: isPremiumUser,
+  });
   const startNextFromZero = location.state?.creditNextVideoId === currentVideoId;
   const previewParam = new URLSearchParams(location.search).get("creditStart");
   const creditPreview = isAdmin && previewParam !== null && Number.isFinite(Number(previewParam)) && Number(previewParam) >= 0 ? Number(previewParam) : null;
@@ -415,6 +428,12 @@ const VideoSeePage = ({ PlayerComponent = VideoPlayer }) => {
     navigate(`/lecture/${nextCreditEpisode.VideoID}`, { state: { creditNextVideoId: nextCreditEpisode.VideoID } });
     scrollToLectureTop();
   };
+  const playNextSagaContent = () => {
+    if (!nextSagaContent) return;
+    videoElement?.pause();
+    navigate(`/lecture/${nextSagaContent.VideoID}`, { state: { creditNextVideoId: nextSagaContent.VideoID } });
+    scrollToLectureTop();
+  };
   const sagaItemsPerPage = 8;
   const pageOrigin = typeof window !== "undefined" ? window.location.origin : apiUrl;
   const metadataVideo = String(video?.VideoID || "") === String(id) ? video : null;
@@ -428,29 +447,38 @@ const VideoSeePage = ({ PlayerComponent = VideoPlayer }) => {
     assetOrigin: apiUrl || pageOrigin,
   });
 
-  const fetchContentSagas = async (page = 1) => {
+  const fetchContentSagas = useCallback(async (page = 1) => {
     if (!currentVideoId) return;
+    const requestId = ++sagaRequestRef.current;
 
     try {
       const response = await api.get(`/sagas/content/video/${currentVideoId}`, {
         params: { page, limit: sagaItemsPerPage },
       });
+      if (requestId !== sagaRequestRef.current) return;
       setContentSagas(response.data?.items || []);
       setSagaTotalItems(response.data?.totalItems || 0);
       setSagaTotalPages(response.data?.totalPages || 1);
       setSagaPage(page);
     } catch (error) {
+      if (requestId !== sagaRequestRef.current) return;
       console.error("Erreur lors de la récupération des sagas du contenu :", error);
       setContentSagas([]);
       setSagaTotalItems(0);
       setSagaTotalPages(1);
       setSagaPage(1);
     }
-  };
+  }, [currentVideoId]);
 
   useEffect(() => {
+    setContentSagas([]);
+    setSingleSagaPlayback(null);
+    setSagaTotalItems(0);
+    setSagaPage(1);
+    setSagaTotalPages(1);
     fetchContentSagas(1);
-  }, [currentVideoId]);
+    return () => { sagaRequestRef.current += 1; };
+  }, [fetchContentSagas]);
 
   useEffect(() => {
     let cancelled = false;
@@ -686,6 +714,12 @@ const VideoSeePage = ({ PlayerComponent = VideoPlayer }) => {
 
   const renderSagaSection = () => {
     if (!contentSagas.length) return null;
+    if (sagaTotalItems === 1 && contentSagas.length === 1) {
+      return <SingleSagaSection key={`${currentVideoId}:${contentSagas[0].SagaID}`}
+        saga={contentSagas[0]} videoId={currentVideoId} seriesId={seriesId}
+        onContentsLoaded={setSingleSagaPlayback}
+        linkAnchor={LECTURE_TOP_ANCHOR} onContentClick={scrollToLectureTop} />;
+    }
 
     return (
       <section className="container mx-auto overflow-hidden rounded-2xl border border-sky-500/10 bg-white/80 shadow-xl shadow-slate-950/5 backdrop-blur dark:bg-slate-950/70 dark:shadow-sky-950/20">
@@ -790,6 +824,8 @@ const VideoSeePage = ({ PlayerComponent = VideoPlayer }) => {
                 creditSegments={creditData?.videoId === currentVideoId ? creditData.items : []}
                 nextEpisode={nextCreditEpisode}
                 onNextEpisode={playNextCreditEpisode}
+                nextSagaContent={nextSagaContent}
+                onNextSagaContent={playNextSagaContent}
                 initialPlaybackTime={creditPreview ?? (startNextFromZero ? 0 : null)}
                 autoPlayOnLoad={startNextFromZero}
               />

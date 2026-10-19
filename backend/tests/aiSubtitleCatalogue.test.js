@@ -3,9 +3,17 @@ import { describe, expect, it, vi } from "vitest";
 import {
   listVideosWithoutFrenchSubtitles,
   videoHasFullSubtitle,
+  serializeAiSubtitleJob,
 } from "../services/aiSubtitles/jobService.js";
 
 describe("catalogue des sous-titres français manquants", () => {
+  it("affiche le nom et le rôle du worker depuis le registre sans exposer le bail", () => {
+    expect(serializeAiSubtitleJob({ AiSubtitleJobID: "job", AssignedWorkerID: "clone-1",
+      LeaseTokenHash: "secret", PrimaryApprovedAt: new Date("2026-10-14T10:00:00Z"),
+      AssignedWorker: { Role: "CLONE", Registry: { DisplayName: "Aero", Role: "CLONE" } },
+    })).toMatchObject({ assignedWorker: { id: "clone-1", displayName: "Aero", role: "CLONE" } });
+    expect(serializeAiSubtitleJob({ LeaseTokenHash: "secret" })).not.toHaveProperty("leaseTokenHash");
+  });
   it("utilise une pagination fixe de 40", async () => {
     const database = {
       video: {

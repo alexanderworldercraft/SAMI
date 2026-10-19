@@ -17,6 +17,22 @@ import {
 import { canEncodingWorkerClaimTask } from "../services/distributedEncoding/scheduler.js";
 
 describe("persistance de l'encodage distribué", () => {
+  it("préserve les réglages du primary lors de sa réinscription automatique", async () => {
+    const upsert = vi.fn(async (query) => query);
+    await upsertEncodingWorker({ instanceId: "primary", role: "PRIMARY", pipelineVersion: "encoding-v1",
+      displayName: "Automatique", enabled: true, maxSlots: 1, maxNominalHeight: 360, performanceScore: 0.1 },
+    { database: { videoEncodingWorker: { upsert } }, preserveAdministration: true });
+    const update = upsert.mock.calls[0][0].update;
+    for (const key of ["DisplayName", "Enabled", "MaxSlots", "MaxNominalHeight", "PerformanceScore"]) expect(update).not.toHaveProperty(key);
+  });
+
+  it("les heartbeats ne remplacent pas le nombre de slots administrateur", async () => {
+    const updateMany = vi.fn(async () => ({ count: 1 }));
+    const database = { videoEncodingWorker: { updateMany, findUnique: vi.fn(async () => ({ MaxSlots: 4 })) } };
+    const worker = await heartbeatEncodingWorker("clone", { maxSlots: 1 }, { database });
+    expect(updateMany.mock.calls[0][0].data).not.toHaveProperty("MaxSlots");
+    expect(worker.MaxSlots).toBe(4);
+  });
   it("ne trie pas en SQL les gros manifestes et allège la lecture de maintenance", async () => {
     const findUnique = vi.fn(async () => null);
     const findMany = vi.fn(async () => []);
@@ -61,7 +77,7 @@ describe("persistance de l'encodage distribué", () => {
     expect(createMany).not.toHaveBeenCalled();
   });
 
-  it("ajoute un worker désactivé par défaut et impose un seul slot en V1", async () => {
+  it("ajoute un worker désactivé par défaut avec les slots administrateur", async () => {
     const upsert = vi.fn(async (query) => query);
     await upsertEncodingWorker({
       instanceId: "clone-01",
@@ -77,9 +93,9 @@ describe("persistance de l'encodage distribué", () => {
         VideoEncodingWorkerID: "clone-01",
         Role: "CLONE",
         Enabled: false,
-        MaxSlots: 1,
+        MaxSlots: 8,
       }),
-      update: expect.objectContaining({ MaxSlots: 1 }),
+      update: expect.objectContaining({ MaxSlots: 8 }),
     }));
   });
 

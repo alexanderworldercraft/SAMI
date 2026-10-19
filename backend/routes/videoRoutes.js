@@ -1,3 +1,4 @@
+import { updateVideoAlternativeTitles } from "../controllers/alternativeTitlesController.js";
 import { listVideoCredits, listCreditQueue, createVideoCredit, updateVideoCredit, deleteVideoCredit } from "../controllers/videoCreditController.js";
 import { 
   updateVideoTitle, 
@@ -84,6 +85,7 @@ export default async function (fastify) {
   fastify.get("/:id/progress", { preHandler: authMiddleware }, getVideoProgress);
 
 
+  fastify.put("/:id/alternative-titles", { preHandler: authMiddleware }, updateVideoAlternativeTitles);
   fastify.put("/:id/title", { preHandler: authMiddleware }, updateVideoTitle);
   fastify.put("/:id/resumer", { preHandler: authMiddleware }, updateVideoResumer);
   fastify.put("/move-to-season", { preHandler: authMiddleware }, moveVideoToSeason);

@@ -1,3 +1,4 @@
+import { AlternativeTitlesValidationError, normalizeAlternativeTitles } from "../services/alternativeTitles.js";
 import fs from "fs";
 import path from "path";
 
@@ -113,6 +114,8 @@ export const addVideo = async (request, reply, fastify) => {
       processingTimer,
       workspace,
     });
+
+    data.TitreAlternatif = normalizeAlternativeTitles(data.TitreAlternatif);
 
     if (!data.titre) {
       throw new VideoImportValidationError("Le titre est obligatoire.");
@@ -305,7 +308,7 @@ export const addVideo = async (request, reply, fastify) => {
   } catch (error) {
     if (dedupeKey) addVideoDedupeCache.delete(dedupeKey);
     if (isMultipartFileTooLargeError(error)) return sendMultipartFileTooLarge(reply);
-    if (error instanceof VideoImportValidationError) {
+    if (error instanceof VideoImportValidationError || error instanceof AlternativeTitlesValidationError) {
       return reply.code(error.statusCode).send({ error: error.message });
     }
     if (error instanceof VideoTranscodingError) {

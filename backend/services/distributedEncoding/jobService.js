@@ -1,3 +1,4 @@
+import { normalizeAlternativeTitles } from "../alternativeTitles.js";
 import fs from "fs";
 import { randomUUID } from "crypto";
 
@@ -33,6 +34,7 @@ import {
 import {
   ACTIVE_ENCODING_JOB_STATUSES,
   DISTRIBUTED_ENCODING_PIPELINE_VERSION,
+  DISTRIBUTED_ENCODING_SLOT_LIMIT,
   ENCODING_JOB_STATUS,
   ENCODING_TASK_KIND,
   ENCODING_TASK_STATUS,
@@ -202,6 +204,7 @@ const sanitizeRequestSnapshot = ({
   season,
 }) => ({
   title: data.titre,
+  alternativeTitles: normalizeAlternativeTitles(data.TitreAlternatif),
   summary: data.resumer || null,
   seasonId: data.SaisonID ?? null,
   requestedGenreIds,
@@ -262,7 +265,7 @@ export const buildDistributedEncodingTasks = ({ plan, encodingSpecHash }) => {
     const spec = {
       specVersion: VIDEO_ENCODING_SPEC_VERSION,
       track,
-      primaryOnly: true,
+      primaryOnly: false,
       durationSeconds: plan.durationSeconds,
       segmentDurationSeconds: plan.segmentDurationSeconds,
       audioBitrateKbps: plan.audioBitrateKbps,
@@ -340,8 +343,10 @@ export async function ensurePrimaryEncodingWorkerRegistered(options = {}) {
     enabled: true,
     ...heartbeat,
     performanceScore: 0.1,
-  });
-  return heartbeatEncodingWorker(config.instanceId, heartbeat);
+  }, { preserveAdministration: true });
+  // Un primary désactivé reste enregistré, sans réactiver ses réglages.
+  const registered = await getEncodingWorker(config.instanceId);
+  return registered.Enabled ? heartbeatEncodingWorker(config.instanceId, heartbeat) : registered;
 }
 
 export async function getAvailableEncodingClones({ now = new Date() } = {}) {
@@ -539,6 +544,7 @@ export async function createDistributedVideoJob({ request, adminUserId }) {
     const reservedVideo = await reserveImportedVideoForEncodingJob({
       data: {
         titre: requestSnapshot.title,
+        TitreAlternatif: requestSnapshot.alternativeTitles,
         resumer: requestSnapshot.summary,
         SaisonID: requestSnapshot.seasonId,
       },
@@ -808,8 +814,9 @@ const normalizeWorkerPerformanceScore = (value, fallback = 1) => {
   return score;
 };
 
-const normalizeWorkerMaxHeight = (value, fallback = 2160) => {
+const normalizeWorkerMaxHeight = (value, fallback = 2160, allowZero = false) => {
   const height = value === undefined ? fallback : Number(value);
+  if (allowZero && height === 0) return 0;
   if (!Number.isInteger(height) || height < 240 || height > 16_384) {
     throw distributedEncodingError(
       "La résolution maximale du worker est invalide.",
@@ -817,6 +824,17 @@ const normalizeWorkerMaxHeight = (value, fallback = 2160) => {
     );
   }
   return height;
+};
+
+const normalizeWorkerMaxSlots = (value = 1) => {
+  const slots = Number(value);
+  if (!Number.isInteger(slots) || slots < 1 || slots > DISTRIBUTED_ENCODING_SLOT_LIMIT) {
+    throw distributedEncodingError(
+      `Le nombre de slots doit être un entier entre 1 et ${DISTRIBUTED_ENCODING_SLOT_LIMIT}.`,
+      "INVALID_ENCODING_WORKER_SLOTS"
+    );
+  }
+  return slots;
 };
 
 const normalizeOptionalWorkerBoolean = (payload, field, fallback) => {
@@ -858,24 +876,17 @@ export async function registerDistributedEncodingWorker(payload) {
     maxNominalHeight: normalizeWorkerMaxHeight(payload.maxNominalHeight),
     supportsH264: true,
     supportsAac: true,
-    maxSlots: 1,
+    maxSlots: normalizeWorkerMaxSlots(payload.maxSlots),
     performanceScore: normalizeWorkerPerformanceScore(payload.performanceScore),
   });
   return serializeEncodingWorker(worker);
 }
 
 export async function patchDistributedEncodingWorker(instanceId, payload) {
-  const config = assertDistributedPrimaryConfig();
+  assertDistributedPrimaryConfig();
   const worker = await getEncodingWorker(instanceId);
   if (!worker) {
     throw distributedEncodingError("Worker introuvable.", "ENCODING_WORKER_NOT_FOUND", 404);
-  }
-  if (worker.VideoEncodingWorkerID === config.instanceId) {
-    throw distributedEncodingError(
-      "Le primary est géré automatiquement.",
-      "PRIMARY_WORKER_MANAGED_AUTOMATICALLY",
-      409
-    );
   }
   const updated = await prisma.videoEncodingWorker.update({
     where: { VideoEncodingWorkerID: worker.VideoEncodingWorkerID },
@@ -893,7 +904,10 @@ export async function patchDistributedEncodingWorker(instanceId, payload) {
         ? { PerformanceScore: normalizeWorkerPerformanceScore(payload.performanceScore) }
         : {}),
       ...(payload.maxNominalHeight !== undefined
-        ? { MaxNominalHeight: normalizeWorkerMaxHeight(payload.maxNominalHeight) }
+        ? { MaxNominalHeight: normalizeWorkerMaxHeight(payload.maxNominalHeight, 2160, worker.Role === "PRIMARY") }
+        : {}),
+      ...(payload.maxSlots !== undefined
+        ? { MaxSlots: normalizeWorkerMaxSlots(payload.maxSlots) }
         : {}),
     },
   });

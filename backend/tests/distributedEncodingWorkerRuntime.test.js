@@ -122,6 +122,21 @@ afterEach(async () => {
 });
 
 describe("runtime du worker d'encodage distribué", () => {
+  it("ouvre les slots reçus du primary et refuse un claim au-delà de la limite", async () => {
+    const root = await createTemporaryRoot();
+    const pending = [];
+    const dependencies = createDependencies({ claim: null, sourcePath: null,
+      sendHeartbeat: vi.fn().mockResolvedValue({ worker: { maxSlots: 2 } }),
+      claimTask: vi.fn(() => new Promise((resolve) => pending.push(resolve))),
+    });
+    const runtime = startDistributedEncodingWorkerRuntime({ config: createConfig(root), dependencies,
+      capabilities: { supportsH264: true, supportsAac: true }, logger: null });
+    await runtime.ready;
+    expect(dependencies.claimTask).toHaveBeenCalledTimes(2);
+    expect(await runtime.runOneClaim()).toMatchObject({ busy: true, claimed: false });
+    for (const resolve of pending) resolve(null);
+    await runtime.stop();
+  });
   it("encode, manifeste, transfère et termine un profil vidéo dans un workspace isolé", async () => {
     const root = await createTemporaryRoot();
     const sourcePath = path.join(root, "source.mkv");
@@ -229,7 +244,7 @@ describe("runtime du worker d'encodage distribué", () => {
         kind: "AUDIO_RENDITION",
         spec: {
           track,
-          primaryOnly: false,
+          primaryOnly: true,
           durationSeconds: 120,
           segmentDurationSeconds: 4,
           audioBitrateKbps: 192,

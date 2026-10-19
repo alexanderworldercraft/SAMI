@@ -1298,6 +1298,13 @@ const normalizeMetadata = (metadata) => {
   return {
     ...metadata,
     title,
+    ...(metadata.alternativeTitles !== undefined ? {
+      alternativeTitles: metadata.alternativeTitles === null ? null : requireTrimmedString(
+        metadata.alternativeTitles,
+        "metadata.alternativeTitles",
+        { minLength: 0, maxLength: 10000 }
+      ),
+    } : {}),
     summary,
     premium: metadata.premium,
     masterPlaylistPath,

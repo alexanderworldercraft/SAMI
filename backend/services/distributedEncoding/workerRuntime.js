@@ -24,7 +24,7 @@ import {
   purgeDistributedSourceCache,
   unpinDistributedSource,
 } from "./cacheService.js";
-import { withEncodingCapacity } from "./capacity.js";
+import { withEncodingCapacity, setEncodingMaxSlots } from "./capacity.js";
 import {
   encodeAudioRendition,
   encodeSingleVideoProfile,
@@ -469,13 +469,6 @@ const encodeClaim = async ({
     });
   }
   if (claim.task.kind === ENCODING_TASK_KIND.AUDIO_RENDITION) {
-    if (spec.primaryOnly === true) {
-      throw distributedEncodingError(
-        "Cette rendition audio est réservée au serveur principal.",
-        "DISTRIBUTED_PRIMARY_ONLY_TASK",
-        409
-      );
-    }
     return dependencies.encodeAudio({
       ...common,
       track: spec.track,
@@ -580,8 +573,7 @@ const reportClaimFailure = async ({
 };
 
 /**
- * Démarre le worker clone. Le runtime ne traite jamais plus d'un claim à la
- * fois et expose runOneClaim pour les tests et les démarrages pilotés.
+ * Démarre le clone avec le nombre de claims configuré par le primary.
  */
 export function startDistributedEncodingWorkerRuntime(options = {}) {
   const config = options.config || assertDistributedWorkerConfig();
@@ -605,8 +597,9 @@ export function startDistributedEncodingWorkerRuntime(options = {}) {
     Number(options.claimPollIntervalMs) || DEFAULT_CLAIM_POLL_INTERVAL_MS
   );
   let stopped = false;
-  let activeRun = null;
-  let activeController = null;
+  const activeRuns = new Set();
+  const activeControllers = new Set();
+  let maxSlots = 1;
   let claimTimer = null;
   let heartbeatTimer = null;
   let heartbeatInFlight = null;
@@ -654,6 +647,11 @@ export function startDistributedEncodingWorkerRuntime(options = {}) {
         bootId,
         lastError: heartbeatError,
       }, { signal: controller.signal });
+      const configuredSlots = Number(response?.worker?.maxSlots);
+      if (Number.isInteger(configuredSlots) && configuredSlots >= 1 && configuredSlots <= 32) {
+        maxSlots = configuredSlots;
+        setEncodingMaxSlots(maxSlots);
+      }
       const purgeHashes = Array.isArray(response?.purgeSourceSha256)
         ? response.purgeSourceSha256
         : [];
@@ -708,17 +706,6 @@ export function startDistributedEncodingWorkerRuntime(options = {}) {
       });
       await keeper.start();
 
-      if (
-        claim.task.kind === ENCODING_TASK_KIND.AUDIO_RENDITION
-        && claim.task.spec.primaryOnly === true
-      ) {
-        throw distributedEncodingError(
-          "Cette rendition audio est réservée au serveur principal.",
-          "DISTRIBUTED_PRIMARY_ONLY_TASK",
-          409
-        );
-      }
-
       workspace = await createAttemptWorkspace({
         config,
         attemptId: claim.attempt.id,
@@ -748,7 +735,7 @@ export function startDistributedEncodingWorkerRuntime(options = {}) {
           dependencies,
           signal: controller.signal,
         }),
-        { signal: controller.signal }
+        { signal: controller.signal, exclusive: false }
       );
       if (keeper.fatalError) throw keeper.fatalError;
 
@@ -861,11 +848,11 @@ export function startDistributedEncodingWorkerRuntime(options = {}) {
 
   const runOneClaim = () => {
     if (stopped) return Promise.resolve({ claimed: false, stopped: true });
-    if (activeRun) return Promise.resolve({ claimed: false, busy: true });
+    if (activeRuns.size >= maxSlots) return Promise.resolve({ claimed: false, busy: true });
 
     const controller = new AbortController();
-    activeController = controller;
-    activeRun = (async () => {
+    activeControllers.add(controller);
+    const run = (async () => {
       const response = await dependencies.claimTask({}, {
         signal: controller.signal,
       });
@@ -878,23 +865,28 @@ export function startDistributedEncodingWorkerRuntime(options = {}) {
       );
       return processClaim(claim, controller);
     })().finally(() => {
-      activeRun = null;
-      if (activeController === controller) activeController = null;
+      activeRuns.delete(run);
+      activeControllers.delete(controller);
     });
-    return activeRun;
+    activeRuns.add(run);
+    return run;
   };
 
   const runClaimLoop = async () => {
     if (stopped) return;
-    let delay = claimPollIntervalMs;
-    try {
-      const result = await runOneClaim();
-      consecutiveClaimErrors = 0;
-      if (result.claimed) delay = 250;
-    } catch (error) {
-      if (!stopped) {
+    const freeSlots = maxSlots - activeRuns.size;
+    for (let slot = 0; slot < freeSlots; slot += 1) {
+      void runOneClaim().then((result) => {
+        consecutiveClaimErrors = 0;
+        if (!stopped && result.claimed) {
+          clearTimeout(claimTimer);
+          claimTimer = setTimeout(runClaimLoop, 250);
+          claimTimer.unref?.();
+        }
+      }).catch((error) => {
+        if (stopped) return;
         lastError = errorMessage(error);
-        delay = CLAIM_ERROR_BACKOFF_MS[Math.min(
+        const delay = CLAIM_ERROR_BACKOFF_MS[Math.min(
           consecutiveClaimErrors,
           CLAIM_ERROR_BACKOFF_MS.length - 1
         )];
@@ -905,10 +897,13 @@ export function startDistributedEncodingWorkerRuntime(options = {}) {
           "[distributed-encoding-worker] claim impossible",
           error
         );
-      }
+        clearTimeout(claimTimer);
+        claimTimer = setTimeout(runClaimLoop, delay);
+        claimTimer.unref?.();
+      });
     }
     if (stopped) return;
-    claimTimer = setTimeout(runClaimLoop, delay);
+    claimTimer = setTimeout(runClaimLoop, claimPollIntervalMs);
     claimTimer.unref?.();
   };
 
@@ -934,8 +929,8 @@ export function startDistributedEncodingWorkerRuntime(options = {}) {
       if (heartbeatController && !heartbeatController.signal.aborted) {
         heartbeatController.abort(new Error("Arrêt du runtime worker."));
       }
-      if (activeController && !activeController.signal.aborted) {
-        activeController.abort(
+      for (const controller of activeControllers) {
+        controller.abort(
           distributedEncodingError(
             "Le runtime worker distribué s'arrête.",
             "DISTRIBUTED_WORKER_STOPPED",
@@ -943,7 +938,7 @@ export function startDistributedEncodingWorkerRuntime(options = {}) {
           )
         );
       }
-      await activeRun?.catch(() => {});
+      await Promise.allSettled([...activeRuns]);
       await heartbeatInFlight?.catch(() => {});
     })();
     return stopPromise;

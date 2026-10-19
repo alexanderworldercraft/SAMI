@@ -22,7 +22,7 @@ const imageStatusLabels = {
 
 const relationStatusLabels = {
   created: "Lien créé",
-  updated: "Rôle ajouté",
+  updated: "Rôle ou personnages ajoutés",
   unchanged: "Lien déjà présent",
 };
 
@@ -222,10 +222,11 @@ export default function PeopleCreditImportManager() {
               onChange={(event) => setNames(event.target.value)}
               rows={5}
               className={fieldClass}
-              placeholder="Tom Hanks | Catherine Zeta-Jones | Stanley Tucci | Chi McBride"
+              placeholder={role === "actor" ? "Eddie Murphy (Akeem) (Clarence) (Randy) | Omar Sy (Driss)" : "Tom Hanks | Catherine Zeta-Jones | Stanley Tucci | Chi McBride"}
             />
             <p className="mt-2 text-xs font-medium text-slate-500 dark:text-slate-400">
               Sépare chaque nom avec |. Les retours à la ligne sont également acceptés. Maximum 50 personnes par import.
+              {role === "actor" && " Ajoute chaque personnage entre parenthèses après le nom : Eddie Murphy (Akeem) (Clarence). Les personnages sont facultatifs et s’ajoutent sans doublons à ceux déjà présents."}
             </p>
           </div>
 
@@ -261,6 +262,7 @@ export default function PeopleCreditImportManager() {
                 return (
                   <li key={person.PersonneID} className="flex flex-col gap-1 px-4 py-3 md:flex-row md:items-center md:justify-between">
                     <div>
+                      {person.Personnages?.length > 0 && <p className="text-sm text-slate-600 dark:text-slate-300">Personnages : {person.Personnages.join(", ")}</p>}
                       <p className="font-bold text-slate-900 dark:text-white">{person.name} <span className="text-xs text-slate-400">#{person.PersonneID}</span></p>
                       <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
                         {person.personStatus === "created" ? "Personne créée" : "Personne existante"} · {relationStatusLabels[person.linkStatus]}

@@ -18,6 +18,24 @@ from worker import (
 
 
 class ContextualSubtitleQualityTests(unittest.TestCase):
+    def test_progress_file_contains_only_phase_and_percentage(self):
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "progress.json"
+            with patch.object(worker, "_PROGRESS_PATH", output), patch.object(worker, "_LAST_PROGRESS", None):
+                worker.report_progress("checking", 88)
+                self.assertEqual(json.loads(output.read_text()), {"phase": "checking", "progress": 88})
+                self.assertFalse(Path(f"{output}.tmp").exists())
+
+    def test_whisper_cpp_progress_is_reported_without_capturing_speech(self):
+        with patch.object(worker.subprocess, "Popen") as popen, patch.object(worker, "load_json", return_value={"result": {"language": "fr"}, "transcription": []}), patch.object(worker, "report_progress") as progress:
+            process = popen.return_value.__enter__.return_value
+            process.stderr = iter(["whisper_print_progress_callback: progress =  50%\n"])
+            process.wait.return_value = 0
+            worker.transcribe_whisper_cpp({"whisperCppPath": "whisper-cli", "modelPath": "/models/model.bin"}, "/source.wav", Path("/tmp"))
+            self.assertIn("--print-progress", popen.call_args.args[0])
+            self.assertEqual(popen.call_args.kwargs["stdout"], worker.subprocess.DEVNULL)
+            progress.assert_called_once_with("transcribing", 35)
+
     def test_transcription_only_never_translates_source(self):
         with tempfile.TemporaryDirectory() as directory:
             audio = Path(directory) / "source.wav"

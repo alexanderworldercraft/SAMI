@@ -139,6 +139,7 @@ const formatSagaContent = (link) => {
       Titre: video.Titre,
       Resumer: video.Resumer,
       Premium: !!video.Premium,
+      PlaybackPremium: !!(video.Premium || video.Saison?.Series?.Premium),
       CheminImage: video.CheminImage,
       Genres: video.VideoGenres?.map((vg) => vg.Genre.Nom) || [],
       VideoID: video.VideoID,
@@ -156,6 +157,7 @@ const formatSagaContent = (link) => {
       Titre: series.Titre,
       Resumer: series.Resumer,
       Premium: !!series.Premium,
+      PlaybackPremium: !!(series.Premium || firstVideo?.Premium),
       CheminImage: series.CheminImage,
       Genres: series.SeriesGenres?.map((sg) => sg.Genre.Nom) || [],
       FirstVideoID: firstVideo?.VideoID || null,
@@ -171,6 +173,7 @@ const sagaContentInclude = {
   Video: {
     include: {
       VideoGenres: { include: { Genre: true } },
+      Saison: { select: { Series: { select: { Premium: true } } } },
     },
   },
   Series: {
@@ -180,7 +183,7 @@ const sagaContentInclude = {
         include: {
           Episodes: {
             where: { EtatID: ACTIVE_ETAT_ID },
-            select: { VideoID: true, Titre: true },
+            select: { VideoID: true, Titre: true, Premium: true },
             orderBy: { Titre: "asc" },
             take: 1,
           },

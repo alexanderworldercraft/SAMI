@@ -1,5 +1,6 @@
 // src/components/PersonLinkContentForm.js
 import React, { useEffect, useMemo, useState } from "react";
+import PersonCharacterFields from "./PersonCharacterFields";
 import api from "../services/api";
 import { Listbox, ListboxButton, ListboxOptions, ListboxOption } from "@headlessui/react";
 import { CheckIcon, ChevronUpDownIcon } from "@heroicons/react/16/solid";
@@ -34,6 +35,7 @@ export default function PersonLinkContentForm({ personId, onLinked }) {
   const [selectedContent, setSelectedContent] = useState(null);
 
   // Rôles
+  const [characters, setCharacters] = useState([]);
   const [EstActeur, setEstActeur] = useState(true);
   const [EstRealisateur, setEstRealisateur] = useState(false);
 
@@ -132,12 +134,14 @@ export default function PersonLinkContentForm({ personId, onLinked }) {
         contenuId: selectedContent.id,
         EstActeur,
         EstRealisateur,
+        Personnages: EstActeur ? characters.map((name) => name.trim()).filter(Boolean) : [],
       });
+      setCharacters([]);
       setMsg({ type: "success", text: "Lien créé." });
       if (onLinked) onLinked({ type: selectedContent.type, contenuId: selectedContent.id, EstActeur, EstRealisateur });
     } catch (e) {
       console.error(e);
-      setMsg({ type: "error", text: "Échec de la liaison." });
+      setMsg({ type: "error", text: e.response?.data?.error || "Échec de la liaison." });
     } finally {
       setLoading(false);
     }
@@ -240,6 +244,8 @@ export default function PersonLinkContentForm({ personId, onLinked }) {
               </label>
             </div>
           </div>
+
+          {EstActeur && <PersonCharacterFields names={characters} onChange={setCharacters} disabled={loading} />}
 
           {/* Submit */}
           <button

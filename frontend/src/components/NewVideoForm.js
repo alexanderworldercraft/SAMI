@@ -1,3 +1,4 @@
+import AlternativeTitlesInput from "./AlternativeTitlesInput";
 import React, { useEffect, useRef, useState } from "react";
 import GenreList from "./GenreList";
 import ImageUploader from "./ImageUploader";
@@ -46,6 +47,7 @@ const NewVideoForm = ({
         };
     }, []);
     const [title, setTitle] = useState(extensionDraft?.title || "");
+    const [alternativeTitles, setAlternativeTitles] = useState("");
     const [summary, setSummary] = useState(extensionDraft?.description || "");
     const [videoFile, setVideoFile] = useState(null);
     const [imageFile, setImageFile] = useState(null);
@@ -110,6 +112,7 @@ const NewVideoForm = ({
 
         formData.append("utilisateurID", user?.UtilisateurID || "");
         formData.append("titre", title.trim() || "");
+        formData.append("TitreAlternatif", alternativeTitles);
         formData.append("resumer", summary.trim() || "");
         formData.append("file", videoFile || "");
         formData.append("genres", selectedGenres.length ? JSON.stringify(selectedGenres) : "[]");
@@ -274,6 +277,12 @@ const NewVideoForm = ({
                                 required
                             />
                         </div>
+                        <AlternativeTitlesInput
+                            value={alternativeTitles}
+                            onChange={setAlternativeTitles}
+                            fieldClass={fieldClass}
+                            labelClass={labelClass}
+                        />
                         {/* Résumé */}
                         <div>
                             <div className="flex justify-between">

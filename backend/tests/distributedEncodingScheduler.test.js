@@ -47,6 +47,30 @@ const task = (height, overrides = {}) => ({
 });
 
 describe("scheduler d'encodage distribué", () => {
+  it("applique le plafond personnalisé du primary tant qu’un clone répond, même incapable de cette résolution", () => {
+    const primary = worker("primary", "PRIMARY", 1, { MaxNominalHeight: 720 });
+    const clone = worker("clone", "CLONE", 10, { MaxNominalHeight: 480 });
+    const highTask = task(1080, { CreatedAt: new Date(now.getTime() - 600_000) });
+    expect(canEncodingWorkerClaimTask({ worker: primary, task: highTask, cloneWorkers: [clone], now })).toBe(false);
+    expect(canEncodingWorkerClaimTask({ worker: primary, task: task(720), cloneWorkers: [clone], now })).toBe(true);
+  });
+
+  it("Pas d’encodage exclut vidéo et audio du primary puis autorise le relais à cinq minutes", () => {
+    const primary = worker("primary", "PRIMARY", 1, { MaxNominalHeight: 0 });
+    const clone = worker("clone", "CLONE", 10, { LastHeartbeatAt: new Date(now.getTime() - 300_000) });
+    for (const pending of [task(240), task(0, { Kind: "AUDIO_RENDITION" })]) {
+      pending.CreatedAt = new Date(now.getTime() - 600_000);
+      expect(canEncodingWorkerClaimTask({ worker: primary, task: pending, cloneWorkers: [clone], now: new Date(now.getTime() - 1) })).toBe(false);
+      expect(canEncodingWorkerClaimTask({ worker: primary, task: pending, cloneWorkers: [clone], now })).toBe(true);
+      expect(canEncodingWorkerClaimTask({ worker: primary, task: pending, cloneWorkers: [{ ...clone, LastHeartbeatAt: now }], now })).toBe(false);
+    }
+  });
+
+  it("autorise une piste audio sur un clone AAC quelle que soit sa résolution", () => {
+    const clone = worker("clone", "CLONE", 1, { SupportsH264: false, MaxNominalHeight: 240 });
+    expect(canEncodingWorkerClaimTask({ worker: clone, task: task(0, { Kind: "AUDIO_RENDITION", Spec: { primaryOnly: false } }), now })).toBe(true);
+  });
+
   it("réserve la plus petite résolution au principal et la plus lourde au clone le plus rapide", () => {
     const primary = worker("primary", "PRIMARY", 1, {
       MaxNominalHeight: 2160,
@@ -141,7 +165,7 @@ describe("scheduler d'encodage distribué", () => {
   });
 
   it("un heartbeat tardif bloque immédiatement les prochains fallbacks sans préempter les leases", () => {
-    const primary = worker("primary", "PRIMARY", 1);
+    const primary = worker("primary", "PRIMARY", 1, { MaxNominalHeight: 360 });
     const highTask = task(1080, {
       CreatedAt: new Date(now.getTime() - 10 * 60_000),
     });
@@ -163,7 +187,7 @@ describe("scheduler d'encodage distribué", () => {
     })).toBe(true);
   });
 
-  it("garde les rendus audio primaryOnly sur le serveur principal en V1", () => {
+  it("autorise aussi les anciennes pistes audio primaryOnly sur les clones mis à jour", () => {
     const audioTask = task(0, {
       Kind: "AUDIO_RENDITION",
       Spec: { primaryOnly: true },
@@ -177,7 +201,7 @@ describe("scheduler d'encodage distribué", () => {
       task: audioTask,
       cloneWorkers: [clone],
       now,
-    })).toBe(false);
+    })).toBe(true);
     expect(canEncodingWorkerClaimTask({
       worker: primary,
       task: audioTask,

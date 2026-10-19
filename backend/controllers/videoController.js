@@ -1,3 +1,4 @@
+import { CHARACTER_INCLUDE, characterNames } from "../services/personCharacterService.js";
 import fs from 'fs';
 import path from 'path';
 import { prisma } from "../services/db.js";
@@ -39,8 +40,7 @@ import {
   getFavoriteKeysForItems,
 } from "../services/favoriteContentService.js";
 import {
-  getVideoContentSearchMatch,
-  getVideoTitleSearchMatch,
+  getContentTitleSearchMatch,
 } from "../services/video/videoSearchService.js";
 import { serializeUserAiPreference } from "../services/userAiPreferenceService.js";
 import {
@@ -103,6 +103,7 @@ const mapLinkedPeople = (links, roleField) =>
       Nom: link.Personne.Nom,
       Surnom: link.Personne.Surnom,
       CheminImage: link.Personne.CheminImage,
+      Personnages: roleField === "EstActeur" ? characterNames(link.Personnages) : [],
     }));
 
 export const getVideoPreviewFrames = async (request, reply) => {
@@ -855,6 +856,7 @@ export const getVideosAndSeries = async (request, reply) => {
         id: serie.SeriesID,
         type: "series",
         Titre: serie.Titre,
+        TitreAlternatif: serie.TitreAlternatif ?? null,
         Resumer: serie.Resumer,
         Premium: serie.Premium,
         CheminImage: serie.CheminImage,
@@ -875,6 +877,7 @@ export const getVideosAndSeries = async (request, reply) => {
       id: video.VideoID,
       type: "video",
       Titre: video.Titre,
+      TitreAlternatif: video.TitreAlternatif ?? null,
       Resumer: video.Resumer,
       Premium: video.Premium,
       CheminImage: video.CheminImage,
@@ -1041,7 +1044,7 @@ export const getVideosAndSeries = async (request, reply) => {
 
     if (searchText) {
       allItems = allItems.flatMap((item) => {
-        const match = getVideoContentSearchMatch(item, searchText);
+        const match = getContentTitleSearchMatch(item, searchText);
         return match
           ? [{ ...item, SearchRank: match.rank, SearchScore: match.score }]
           : [];
@@ -1184,6 +1187,7 @@ export const getAdminVideos = async (request, reply) => {
       select: {
         VideoID: true,
         Titre: true,
+        TitreAlternatif: true,
         CheminImage: true,
         SaisonID: true,
         CreateDate: true,
@@ -1205,6 +1209,7 @@ export const getAdminVideos = async (request, reply) => {
       videos.map((video) => ({
         VideoID: video.VideoID,
         Titre: video.Titre,
+        TitreAlternatif: video.TitreAlternatif ?? null,
         CheminImage: video.CheminImage,
         SaisonID: video.SaisonID,
         CreateDate: video.CreateDate ?? null,
@@ -1497,12 +1502,12 @@ export const getVideoDetails = async (request, reply) => {
     const [videoLinks, seriesLinks, favoriteKeys] = await Promise.all([
       prisma.videoPersonne.findMany({
         where: { VideoID: videoId, Personne: { EtatID: ACTIVE_ETAT_ID } },
-        include: { Personne: true },
+        include: { Personne: true, Personnages: CHARACTER_INCLUDE },
       }),
       seriesId
         ? prisma.seriesPersonne.findMany({
             where: { SeriesID: seriesId, Personne: { EtatID: ACTIVE_ETAT_ID } },
-            include: { Personne: true },
+            include: { Personne: true, Personnages: CHARACTER_INCLUDE },
           })
         : [],
       getFavoriteKeysForItems(
@@ -1540,6 +1545,7 @@ export const getVideoDetails = async (request, reply) => {
         video: {
           VideoID: video.VideoID,
           Titre: video.Titre,
+          TitreAlternatif: video.TitreAlternatif ?? null,
           Resumer: video.Resumer,
           CheminAcces: protectedVideoMasterPath(video.VideoID),
           CheminImage: video.CheminImage,
@@ -1573,6 +1579,7 @@ export const getVideoDetails = async (request, reply) => {
         series: {
           SeriesID: series.SeriesID,
           Titre: series.Titre,
+          TitreAlternatif: series.TitreAlternatif ?? null,
           Resumer: series.Resumer,
           Saisons: saisons,
           Premium: !!series.Premium,
@@ -1590,6 +1597,7 @@ export const getVideoDetails = async (request, reply) => {
         video: {
           VideoID: video.VideoID,
           Titre: video.Titre,
+          TitreAlternatif: video.TitreAlternatif ?? null,
           Resumer: video.Resumer,
           CheminAcces: protectedVideoMasterPath(video.VideoID),
           CheminImage: video.CheminImage,
@@ -2149,6 +2157,7 @@ export const quickSearchVideos = async (request, reply) => {
         select: {
           VideoID: true,
           Titre: true,
+          TitreAlternatif: true,
           CheminImage: true,
         },
       }),
@@ -2159,6 +2168,7 @@ export const quickSearchVideos = async (request, reply) => {
         select: {
           SeriesID: true,
           Titre: true,
+          TitreAlternatif: true,
           CheminImage: true,
           Saisons: {
             orderBy: { Numero: "asc" },
@@ -2181,12 +2191,14 @@ export const quickSearchVideos = async (request, reply) => {
         id: video.VideoID,
         type: "video",
         Titre: video.Titre,
+        TitreAlternatif: video.TitreAlternatif ?? null,
         CheminImage: video.CheminImage || null,
       })),
       ...series.map((serie) => ({
         id: serie.SeriesID,
         type: "series",
         Titre: serie.Titre,
+        TitreAlternatif: serie.TitreAlternatif ?? null,
         CheminImage: serie.CheminImage || null,
         FirstVideoID: serie.Saisons[0]?.Episodes[0]?.VideoID || null,
       })),
@@ -2194,7 +2206,7 @@ export const quickSearchVideos = async (request, reply) => {
 
     const items = candidates
       .flatMap((item) => {
-        const match = q ? getVideoTitleSearchMatch(item.Titre, q) : { rank: 0, score: 0 };
+        const match = q ? getContentTitleSearchMatch(item, q) : { rank: 0, score: 0 };
         return match ? [{ item, match }] : [];
       })
       .sort(

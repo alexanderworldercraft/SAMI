@@ -48,7 +48,7 @@ const personDetails = {
   },
   videos: {
     Realisateur: [{ VideoID: 1, Titre: "Film réalisé" }],
-    Acteur: [{ VideoID: 2, Titre: "Film joué" }],
+    Acteur: [{ VideoID: 2, Titre: "Film joué", Personnages: ["Viktor", "Ancien rôle"] }],
   },
   series: {
     Realisateur: [{ SeriesID: 3, Titre: "Série réalisée", FirstVideoID: 31 }],
@@ -97,6 +97,53 @@ describe("PersonDetailsPage", () => {
 
     expect(toggle).toHaveAttribute("aria-expanded", "true");
     expect(screen.getByTestId("person-link-form")).toHaveTextContent("Personne 7");
+  });
+
+  test("réserve les modifications des personnages aux administrateurs", async () => {
+    render(<PersonDetailsPage />);
+    await screen.findAllByTestId("person-content-list");
+    expect(screen.queryByRole("button", { name: /modifier les personnages/i })).not.toBeInTheDocument();
+  });
+
+  test("corrige, ajoute et supprime des personnages puis conserve le résultat à la réouverture", async () => {
+    mockRequests({ GradeID: 2 });
+    api.put.mockResolvedValue({ data: { Personnages: ["Viktor corrigé", "Nouveau"] } });
+    render(<PersonDetailsPage />);
+    const edit = await screen.findByRole("button", { name: "Modifier les personnages de Film joué" });
+    fireEvent.click(edit);
+    await screen.findByRole("dialog");
+    expect(screen.getByLabelText("Personnage 1")).toHaveValue("Viktor");
+    fireEvent.change(screen.getByLabelText("Personnage 1"), { target: { value: "Viktor corrigé" } });
+    fireEvent.click(screen.getByRole("button", { name: "Supprimer le personnage 2" }));
+    fireEvent.click(screen.getByRole("button", { name: "Ajouter un personnage" }));
+    fireEvent.change(screen.getByLabelText("Personnage 2"), { target: { value: "Nouveau" } });
+    fireEvent.click(screen.getByRole("button", { name: "Enregistrer" }));
+    await waitFor(() => expect(api.put).toHaveBeenCalledWith("/people/7/characters", {
+      type: "video", contenuId: 2, Personnages: ["Viktor corrigé", "Nouveau"],
+    }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    fireEvent.click(edit);
+    await screen.findByRole("dialog");
+    expect(screen.getByLabelText("Personnage 1")).toHaveValue("Viktor corrigé");
+    fireEvent.change(screen.getByLabelText("Personnage 1"), { target: { value: "Changement annulé" } });
+    fireEvent.click(screen.getByRole("button", { name: "Annuler" }));
+    expect(api.put).toHaveBeenCalledTimes(1);
+    fireEvent.click(edit);
+    await screen.findByRole("dialog");
+    expect(screen.getByLabelText("Personnage 1")).toHaveValue("Viktor corrigé");
+  });
+
+  test("conserve les champs et affiche l'erreur si l'enregistrement échoue", async () => {
+    mockRequests({ GradeID: 1 });
+    api.put.mockRejectedValueOnce({ response: { data: { error: "Contenu verrouillé" } } });
+    render(<PersonDetailsPage />);
+    fireEvent.click(await screen.findByRole("button", { name: "Modifier les personnages de Film joué" }));
+    await screen.findByRole("dialog");
+    fireEvent.change(screen.getByLabelText("Personnage 1"), { target: { value: "Correction" } });
+    fireEvent.click(screen.getByRole("button", { name: "Enregistrer" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Contenu verrouillé");
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    expect(screen.getByLabelText("Personnage 1")).toHaveValue("Correction");
   });
 
   test("demande confirmation avant un retrait puis affiche le résultat", async () => {

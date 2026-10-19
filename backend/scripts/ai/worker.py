@@ -7,7 +7,7 @@ import os
 import re
 import subprocess
 import unicodedata
-from collections import Counter
+from collections import Counter, deque
 from pathlib import Path
 
 
@@ -28,6 +28,8 @@ _CONFIGURED_CUDA_PATHS = None
 REPETITIVE_TRANSCRIPTION_CODE = "AI_SUBTITLE_REPETITIVE_TRANSCRIPTION"
 CONTEXTUAL_TRANSLATION_CODE = "AI_SUBTITLE_CONTEXTUAL_TRANSLATION_QUALITY"
 TRANSLATION_QUALITY_LOG = "translation-quality-error.json"
+_PROGRESS_PATH = None
+_LAST_PROGRESS = None
 SENTENCE_END_PATTERN = re.compile(r"[.!?…。！？][\"'»）)]*$")
 
 
@@ -41,6 +43,18 @@ def write_json(filename, value):
     with open(temporary, "w", encoding="utf-8") as handle:
         json.dump(value, handle, ensure_ascii=False)
     os.replace(temporary, filename)
+
+
+def report_progress(phase, progress):
+    global _LAST_PROGRESS
+    value = {"phase": phase, "progress": max(0, min(94, int(progress)))}
+    if not _PROGRESS_PATH or value == _LAST_PROGRESS:
+        return
+    try:
+        write_json(_PROGRESS_PATH, value)
+        _LAST_PROGRESS = value
+    except OSError:
+        pass  # Le suivi ne doit pas interrompre le moteur.
 
 
 def normalize_language(value):
@@ -233,6 +247,9 @@ def transcribe_faster_whisper(manifest, audio_path):
     )
     normalized = []
     for segment in segments:
+        duration = float(getattr(info, "duration", 0) or 0)
+        if duration > 0:
+            report_progress("transcribing", 15 + 40 * min(1, float(segment.end) / duration))
         text = segment.text.strip()
         if not text:
             continue
@@ -339,7 +356,7 @@ def transcribe_whisper_cpp(manifest, audio_path, output_root):
     command = [
         manifest["whisperCppPath"], "-m", manifest["modelPath"],
         "-f", audio_path, "-l", "auto", "-ojf", "-of", prefix,
-        "-mc", "0", "-nf", "-sns", "-lpt", "-0.8",
+        "-mc", "0", "-nf", "-sns", "-lpt", "-0.8", "--print-progress",
     ]
     vad_model_path = manifest.get("vadModelPath")
     vad_candidates = [Path(vad_model_path)] if vad_model_path else []
@@ -356,7 +373,16 @@ def transcribe_whisper_cpp(manifest, audio_path, output_root):
             "--vad-max-speech-duration-s", "30",
             "--vad-speech-pad-ms", "200",
         ])
-    subprocess.run(command, check=True, capture_output=True, text=True)
+    errors = deque(maxlen=30)
+    with subprocess.Popen(command, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True) as process:
+        for line in process.stderr:
+            errors.append(line)
+            match = re.search(r"progress\s*=\s*(\d+)%", line)
+            if match:
+                report_progress("transcribing", 15 + 0.4 * min(100, int(match.group(1))))
+        returncode = process.wait()
+        if returncode:
+            raise RuntimeError(f"whisper.cpp a échoué ({returncode}): {''.join(errors)[-3000:]}")
     return parse_whisper_cpp_transcription(load_json(f"{prefix}.json"))
 
 
@@ -829,6 +855,7 @@ def write_translation_quality_log(output_path, source_language, target_language,
 
 
 def translate_segments(manifest, segments, source_language, target_language):
+    report_progress("translating", 60)
     source_units = contextualize_segments(segments)
     if source_language == target_language:
         return [
@@ -869,12 +896,14 @@ def translate_segments(manifest, segments, source_language, target_language):
         translated_texts.extend(translate_text_batch(
             model, tokenizer, [item["text"] for item in batch], target_language, device
         ))
+        report_progress("translating", 60 + 20 * min(1, (offset + len(batch)) / max(1, len(source_units))))
     reverse_tokenizer = AutoTokenizer.from_pretrained(
         manifest["translationModelPath"],
         src_lang=NLLB_LANGUAGES[target_language],
         local_files_only=True,
     )
     back_translated_texts = []
+    report_progress("checking", 80)
     for offset in range(0, len(translated_texts), batch_size):
         back_translated_texts.extend(translate_text_batch(
             model,
@@ -883,6 +912,7 @@ def translate_segments(manifest, segments, source_language, target_language):
             source_language,
             device,
         ))
+        report_progress("checking", 80 + 14 * min(1, (offset + batch_size) / max(1, len(translated_texts))))
     quality = contextual_translation_quality(
         source_units, translated_texts, back_translated_texts, target_language
     )
@@ -910,6 +940,7 @@ def execute(manifest, payload, output_path):
         source_segments = transcript.get("segments") or []
         include_source = False
     else:
+        report_progress("transcribing", 15)
         audio_path = payload.get("audioPath")
         if not audio_path or not Path(audio_path).is_file():
             raise ValueError("La source audio IA est absente.")
@@ -923,6 +954,8 @@ def execute(manifest, payload, output_path):
     if not source_segments:
         raise ValueError("Aucune parole exploitable n'a été détectée.")
     source_segments = tighten_transcript_segments(source_segments)
+    if include_source:
+        report_progress("transcribing", 55)
     assert_transcript_quality(source_segments, "transcription source")
     if payload.get("transcriptionOnly") is True:
         write_json(output_path, {
@@ -933,6 +966,7 @@ def execute(manifest, payload, output_path):
     target_segments, quality_report = translate_segments(
         manifest, source_segments, source_language, target_language
     )
+    report_progress("checking", 94)
     assert_transcript_quality(target_segments, "piste de sous-titres")
     if quality_report.get("blockingCount", 0) > 0:
         diagnostic_path = write_translation_quality_log(
@@ -972,12 +1006,15 @@ def execute(manifest, payload, output_path):
 
 
 def main():
+    global _PROGRESS_PATH
     parser = argparse.ArgumentParser()
     parser.add_argument("--manifest", required=True)
     parser.add_argument("--probe", action="store_true")
     parser.add_argument("--input")
     parser.add_argument("--output")
+    parser.add_argument("--progress")
     args = parser.parse_args()
+    _PROGRESS_PATH = args.progress
     manifest = load_json(args.manifest)
     configure_cuda_library_paths(manifest)
     if args.probe:

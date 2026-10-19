@@ -25,6 +25,8 @@ describe("routes d'administration des sous-titres IA", () => {
       "GET /config",
       "PUT /config",
       "GET /admin/videos-without-french",
+      "GET /admin/workers",
+      "POST /admin/jobs/:jobId/authorize-primary",
       "GET /admin/generated",
       "GET /admin/subtitles/:subtitleId",
       "PUT /admin/subtitles/:subtitleId/text",

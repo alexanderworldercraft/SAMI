@@ -46,6 +46,7 @@ model Genre {
 model Series {
   SeriesID             Int                    @id @default(autoincrement())
   Titre                String                 @db.VarChar(100)
+  TitreAlternatif      String?                @db.Text
   Resumer              String                 @db.Text
   CheminImage          String                 @db.VarChar(255)
   EtatID               Int
@@ -98,6 +99,7 @@ model Saison {
 model Video {
   VideoID              Int                    @id @default(autoincrement())
   Titre                String                 @db.VarChar(100)
+  TitreAlternatif      String?                @db.Text
   Resumer              String?                @db.Text
   CheminAcces          String                 @db.VarChar(255)
   CheminImage          String?                @db.VarChar(255)
@@ -318,6 +320,8 @@ model AiSubtitleJob {
   SourceSize         BigInt?
   SourceSha256       String?           @db.Char(64)
   AssignedWorkerID   String?           @db.VarChar(100)
+  PrimaryApprovedAt DateTime?
+  PrimaryApprovedByUserID Int?
   LeaseTokenHash     String?           @db.Char(64)
   LeaseGeneration    Int               @default(0)
   LeaseExpiresAt     DateTime?
@@ -336,6 +340,7 @@ model AiSubtitleJob {
   UpdatedAt          DateTime          @default(now()) @updatedAt
   Video              Video             @relation(fields: [VideoID], references: [VideoID], onDelete: Cascade)
   RequestedBy        Utilisateur?      @relation(fields: [RequestedByUserID], references: [UtilisateurID], onDelete: SetNull)
+  PrimaryApprovedBy  Utilisateur?      @relation("AiSubtitlePrimaryApproval", fields: [PrimaryApprovedByUserID], references: [UtilisateurID], onDelete: SetNull)
   AssignedWorker     AiSubtitleWorker? @relation(fields: [AssignedWorkerID], references: [AiSubtitleWorkerID], onDelete: SetNull)
   GeneratedSubtitle  VideoSubtitle?
 
@@ -633,6 +638,7 @@ model Utilisateur {
   AiPreference            UserAiPreference?
   PersonDuplicateReviews  PersonDuplicateReview[]
   AiSubtitleJobs          AiSubtitleJob[]
+  AiSubtitlePrimaryApprovals AiSubtitleJob[] @relation("AiSubtitlePrimaryApproval")
   AiDubbingJobsRequested  AiDubbingJob[]          @relation("AiDubbingRequestedBy")
   AiDubbingPreviewReviews AiDubbingJob[]          @relation("AiDubbingPreviewApprovedBy")
   AiDubbingFinalReviews   AiDubbingJob[]          @relation("AiDubbingFinalApprovedBy")
@@ -1084,6 +1090,7 @@ model VideoPersonne {
   CreateDate      DateTime? @default(now())
   Personne        Personne  @relation(fields: [PersonneID], references: [PersonneID])
   Video           Video     @relation(fields: [VideoID], references: [VideoID])
+  Personnages     VideoPersonnage[]
 
   @@unique([VideoID, PersonneID])
   @@index([PersonneID])
@@ -1099,10 +1106,31 @@ model SeriesPersonne {
   CreateDate       DateTime? @default(now())
   Personne         Personne  @relation(fields: [PersonneID], references: [PersonneID])
   Series           Series    @relation(fields: [SeriesID], references: [SeriesID])
+  Personnages      SeriesPersonnage[]
 
   @@unique([SeriesID, PersonneID])
   @@index([PersonneID])
   @@index([SeriesID])
+}
+
+model VideoPersonnage {
+  VideoPersonnageID Int           @id @default(autoincrement())
+  VideoPersonneID   Int
+  Nom              String        @db.VarChar(160)
+  Position         Int           @default(0)
+  VideoPersonne    VideoPersonne @relation(fields: [VideoPersonneID], references: [VideoPersonneID], onDelete: Cascade)
+
+  @@unique([VideoPersonneID, Nom])
+}
+
+model SeriesPersonnage {
+  SeriesPersonnageID Int            @id @default(autoincrement())
+  SeriesPersonneID   Int
+  Nom               String         @db.VarChar(160)
+  Position          Int            @default(0)
+  SeriesPersonne    SeriesPersonne @relation(fields: [SeriesPersonneID], references: [SeriesPersonneID], onDelete: Cascade)
+
+  @@unique([SeriesPersonneID, Nom])
 }
 
 enum StatutImage {

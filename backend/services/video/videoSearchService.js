@@ -97,20 +97,14 @@ export const getVideoTitleSearchMatch = (
     : null;
 };
 
-export const getVideoContentSearchMatch = (
-  item,
-  query,
-  threshold = VIDEO_TITLE_SIMILARITY_THRESHOLD
-) => {
-  const titleMatch = getVideoTitleSearchMatch(item?.Titre, query, threshold);
-  if (titleMatch) return titleMatch;
-
-  const normalizedQuery = normalizeVideoSearchText(query);
-  const normalizedSummary = normalizeVideoSearchText(item?.Resumer);
-  if (normalizedQuery && normalizedSummary.includes(normalizedQuery)) {
-    return { type: "summary", rank: 0, score: 1 };
+export const getContentTitleSearchMatch = (content, query) => {
+  const titles = [content.Titre, ...(content.TitreAlternatif || "").split("|")];
+  let best = null;
+  for (const title of titles) {
+    const match = getVideoTitleSearchMatch(title, query);
+    if (match && (!best || match.rank > best.rank || (match.rank === best.rank && match.score > best.score))) {
+      best = match;
+    }
   }
-
-  return null;
+  return best;
 };
-

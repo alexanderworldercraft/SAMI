@@ -33,6 +33,7 @@ describe("création des tâches d'encodage distribué", () => {
       key: "audio-0",
       profileLabel: "Audio 1",
       spec: {
+        primaryOnly: false,
         track: {
           label: fullLabel,
           order: 0,

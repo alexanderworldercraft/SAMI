@@ -1,3 +1,4 @@
+import { updateSeriesAlternativeTitles } from "../controllers/alternativeTitlesController.js";
 import {
     createSeries,
     deleteSeries,
@@ -33,6 +34,7 @@ export default async function (fastify) {
     fastify.delete("/:id", { preHandler: authMiddleware }, deleteSeries);
 
     fastify.put("/saisons/:saisonId", { preHandler: authMiddleware }, updateSaison);
+    fastify.put("/:id/alternative-titles", { preHandler: authMiddleware }, updateSeriesAlternativeTitles);
     fastify.put("/:id/title", { preHandler: authMiddleware }, updateSerieTitle); // Mise à jour du titre de la série
     fastify.put("/:id/resumer", { preHandler: authMiddleware }, updateSerieResumer); // Mise à jour du résumer de la série
     fastify.put("/:id/image", { preHandler: authMiddleware }, updateSerieImage); // ⬅️ nouvelle route (multipart)

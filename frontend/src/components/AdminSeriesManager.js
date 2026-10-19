@@ -1,3 +1,4 @@
+import AlternativeTitlesInput from "./AlternativeTitlesInput";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Listbox, ListboxButton, ListboxOption, ListboxOptions } from "@headlessui/react";
 import { CheckIcon, ChevronUpDownIcon } from "@heroicons/react/16/solid";
@@ -15,6 +16,7 @@ const listboxOptionsClass = "z-[9999] max-h-72 w-[var(--button-width)] overflow-
 
 const emptyForm = {
   Titre: "",
+  TitreAlternatif: "",
   Resumer: "",
   Premium: false,
   CheminImage: "",
@@ -42,7 +44,9 @@ const AdminSeriesManager = () => {
   const filteredSeries = useMemo(
     () =>
       series.filter((serie) =>
-        serie.Titre.toLowerCase().includes(searchTerm.toLowerCase())
+        [serie.Titre, serie.TitreAlternatif].some((title) =>
+          (title || "").toLowerCase().includes(searchTerm.toLowerCase())
+        )
       ),
     [series, searchTerm]
   );
@@ -98,6 +102,7 @@ const AdminSeriesManager = () => {
       const data = response.data;
       const nextForm = {
         Titre: data.Titre || "",
+        TitreAlternatif: data.TitreAlternatif || "",
         Resumer: data.Resumer || "",
         Premium: Boolean(data.Premium),
         CheminImage: data.CheminImage || "",
@@ -206,6 +211,10 @@ const AdminSeriesManager = () => {
 
       if (title !== initialForm.Titre) {
         requests.push(api.put(`/series/${seriesId}/title`, { Titre: title }));
+      }
+
+      if (form.TitreAlternatif !== initialForm.TitreAlternatif) {
+        requests.push(api.put(`/series/${seriesId}/alternative-titles`, { TitreAlternatif: form.TitreAlternatif }));
       }
 
       if (form.Resumer !== initialForm.Resumer) {
@@ -411,6 +420,12 @@ const AdminSeriesManager = () => {
                           required
                         />
                       </div>
+                      <AlternativeTitlesInput
+                        value={form.TitreAlternatif}
+                        onChange={(value) => handleFieldChange("TitreAlternatif", value)}
+                        fieldClass={fieldClass}
+                        labelClass={labelClass}
+                      />
                       <div>
                         <label className={labelClass}>Résumé</label>
                         <textarea

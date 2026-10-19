@@ -1,3 +1,4 @@
+import AlternativeTitlesInput from "./AlternativeTitlesInput";
 import React, { useState, useEffect } from "react";
 import ImageUploader from "./ImageUploader"; // Import du composant ImageUploader
 import Notification from "./Notification";
@@ -10,6 +11,7 @@ const submitClass = "inline-flex items-center justify-center rounded-lg border b
 
 const SeriesManager = () => {
     const [newSeriesTitle, setNewSeriesTitle] = useState("");
+    const [alternativeTitles, setAlternativeTitles] = useState("");
     const [newSeriesSummary, setNewSeriesSummary] = useState("");
     const [newSeriesImage, setNewSeriesImage] = useState(null);
     const [notification, setNotification] = useState(null);
@@ -40,6 +42,7 @@ const SeriesManager = () => {
 
         const formData = new FormData();
         formData.append("Titre", newSeriesTitle);
+        formData.append("TitreAlternatif", alternativeTitles);
         formData.append("Resumer", newSeriesSummary);
         formData.append("GenreIDs", JSON.stringify(selectedGenres));
         if (newSeriesImage) formData.append("CheminImage", newSeriesImage);
@@ -51,6 +54,7 @@ const SeriesManager = () => {
             if (response.status >= 200 && response.status < 300) {
                 showNotification("Série ajoutée avec succès !", "✅", "success");
                 setNewSeriesTitle("");
+                setAlternativeTitles("");
                 setNewSeriesSummary("");
                 setNewSeriesImage(null);
             } else {
@@ -104,6 +108,12 @@ const SeriesManager = () => {
                             required
                         />
                     </div>
+                    <AlternativeTitlesInput
+                        value={alternativeTitles}
+                        onChange={setAlternativeTitles}
+                        fieldClass={fieldClass}
+                        labelClass={labelClass}
+                    />
                     <div>
                         <div className="flex justify-between">
                             <label className={labelClass}>Résumé</label>

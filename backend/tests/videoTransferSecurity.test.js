@@ -620,6 +620,15 @@ describe("confinement des chemins vidéo", () => {
 });
 
 describe("validation du manifeste", () => {
+  it("conserve les titres alternatifs et reste compatible avec les anciens manifestes", () => {
+    expect(validateVideoTransferManifest(buildManifest()).metadata).not.toHaveProperty("alternativeTitles");
+    const manifest = buildManifest({ metadata: { alternativeTitles: "Mégalodon | En eau trouble" } });
+    expect(validateVideoTransferManifest(manifest).metadata.alternativeTitles).toBe("Mégalodon | En eau trouble");
+    expectSecurityCode(
+      () => validateVideoTransferManifest(buildManifest({ metadata: { alternativeTitles: "a".repeat(10001) } })),
+      "INVALID_TRANSFER_MANIFEST"
+    );
+  });
   it("normalise les tailles, conserve les métadonnées et calcule le total sûr", () => {
     const manifest = buildManifest();
     const normalized = validateVideoTransferManifest(manifest);

@@ -41,6 +41,8 @@ const workerId = (worker) =>
   String(field(worker, "VideoEncodingWorkerID", "id") || "");
 const workerRole = (worker) =>
   String(field(worker, "Role", "role") || "").toUpperCase();
+export const getEncodingWorkerMaxSlots = (worker) => Math.max(1,
+  Number(field(worker, "MaxSlots", "maxSlots")) || DISTRIBUTED_ENCODING_MAX_SLOTS);
 const taskId = (task) =>
   String(field(task, "VideoEncodingTaskID", "id") || "");
 const taskKind = (task) =>
@@ -86,14 +88,16 @@ export const isEncodingWorkerCompatible = (worker, task) => {
   }
 
   const spec = field(task, "Spec", "spec") || {};
+  // Les anciens jobs marquaient leurs pistes audio primaryOnly. Les clones
+  // savent désormais encoder ces mêmes specs sans modifier leur hash.
+  if (taskKind(task) === ENCODING_TASK_KIND.AUDIO_RENDITION) {
+    return Boolean(field(worker, "SupportsAac", "supportsAac"));
+  }
   if (
     spec.primaryOnly === true
     && workerRole(worker) !== ENCODING_WORKER_ROLE.PRIMARY
   ) return false;
 
-  if (taskKind(task) === ENCODING_TASK_KIND.AUDIO_RENDITION) {
-    return Boolean(field(worker, "SupportsAac", "supportsAac"));
-  }
   if (taskKind(task) !== ENCODING_TASK_KIND.VIDEO_PROFILE) return false;
 
   if (!field(worker, "SupportsH264", "supportsH264")) return false;
@@ -102,10 +106,7 @@ export const isEncodingWorkerCompatible = (worker, task) => {
     && !field(worker, "SupportsAac", "supportsAac")
   ) return false;
 
-  // MaxNominalHeight est une limite normale pour le primary, pas une limite
-  // matérielle absolue : au-delà de 360p, le garde-fou des cinq minutes
-  // ci-dessous autorise explicitement le dépassement d'urgence. Pour un clone,
-  // cette valeur reste une capacité stricte annoncée par le heartbeat.
+  // Le dépassement du plafond du primary est arbitré par le fallback.
   return workerRole(worker) === ENCODING_WORKER_ROLE.PRIMARY
     || Number(field(worker, "MaxNominalHeight", "maxNominalHeight") || 0)
       >= taskHeight(task);
@@ -119,7 +120,9 @@ export const getCompatibleCloneHeartbeatAnchor = ({
     .filter((worker) => workerRole(worker) === ENCODING_WORKER_ROLE.CLONE)
     .filter((worker) => field(worker, "Enabled", "enabled"))
     .filter((worker) => !field(worker, "Draining", "draining"))
-    .filter((worker) => isEncodingWorkerCompatible(worker, task))
+    .filter((worker) => Number(worker.ProtocolVersion) === DISTRIBUTED_ENCODING_PROTOCOL_VERSION)
+    .filter((worker) => worker.PipelineVersion === (task.Job?.PipelineVersion ?? task.job?.pipelineVersion))
+    .filter((worker) => worker.SupportsH264 || worker.SupportsAac)
     .map((worker) => timestamp(
       field(worker, "LastHeartbeatAt", "lastHeartbeatAt")
     ))
@@ -137,18 +140,26 @@ export const getPrimaryFallbackAnchor = ({ task, cloneWorkers = [] }) => {
 };
 
 export const isPrimaryHighResolutionFallbackReady = ({
+  worker,
   task,
   cloneWorkers = [],
   now = new Date(),
   fallbackAfterMs = DISTRIBUTED_ENCODING_PRIMARY_FALLBACK_AFTER_MS,
 }) => {
+  const maximumHeight = Number(field(worker, "MaxNominalHeight", "maxNominalHeight")
+    ?? DISTRIBUTED_ENCODING_PRIMARY_MAX_NOMINAL_HEIGHT);
   if (
-    taskKind(task) !== ENCODING_TASK_KIND.VIDEO_PROFILE
-    || taskHeight(task) <= DISTRIBUTED_ENCODING_PRIMARY_MAX_NOMINAL_HEIGHT
+    maximumHeight > 0 && (taskKind(task) !== ENCODING_TASK_KIND.VIDEO_PROFILE
+      || taskHeight(task) <= maximumHeight)
   ) {
     return true;
   }
-  const anchor = getPrimaryFallbackAnchor({ task, cloneWorkers });
+  const relevantClones = cloneWorkers.filter((clone) => workerRole(clone) === "CLONE"
+    && clone.PipelineVersion === (task.Job?.PipelineVersion ?? task.job?.pipelineVersion)
+    && Number(clone.ProtocolVersion) === DISTRIBUTED_ENCODING_PROTOCOL_VERSION
+    && (clone.SupportsH264 || clone.SupportsAac));
+  if (relevantClones.some((clone) => isEncodingWorkerOnline(clone, { now }))) return false;
+  const anchor = getPrimaryFallbackAnchor({ task, cloneWorkers: relevantClones });
   return anchor !== null && new Date(now).getTime() - anchor >= fallbackAfterMs;
 };
 
@@ -194,7 +205,7 @@ export const canEncodingWorkerClaimTask = ({
   }
 
   if (workerRole(worker) !== ENCODING_WORKER_ROLE.PRIMARY) return true;
-  return isPrimaryHighResolutionFallbackReady({ task, cloneWorkers, now });
+  return isPrimaryHighResolutionFallbackReady({ worker, task, cloneWorkers, now });
 };
 
 const compareTaskIdentity = (left, right) =>
@@ -246,7 +257,7 @@ export const buildInitialTaskPreferences = ({
     .filter((worker) => !reservedWorkers.has(workerId(worker)))
     .filter((worker) => Number(
       field(worker, "ActiveLeaseCount", "activeLeaseCount") || 0
-    ) < DISTRIBUTED_ENCODING_MAX_SLOTS);
+    ) < getEncodingWorkerMaxSlots(worker));
   const primaryWorkers = availableWorkers
     .filter((worker) => workerRole(worker) === ENCODING_WORKER_ROLE.PRIMARY)
     .sort(compareWorkersByPerformance);
@@ -325,6 +336,14 @@ const taskQueueWhere = (now) => ({
   },
 });
 
+export async function hasPendingEncodingForWorker({ worker, cloneWorkers = [], database = prisma, now = new Date() }) {
+  const tasks = await database.videoEncodingTask.findMany({
+    where: taskQueueWhere(now),
+    include: { Job: true },
+  });
+  return tasks.some((task) => canEncodingWorkerClaimTask({ worker, task, cloneWorkers, now }));
+}
+
 const updateJobNoCloneWindows = async ({ tx, tasks, workers, now }) => {
   const jobs = new Map();
   for (const task of tasks) {
@@ -396,7 +415,7 @@ export async function claimNextEncodingTask({
         LeaseExpiresAt: { gt: instant },
       },
     });
-    if (activeLeaseCount >= DISTRIBUTED_ENCODING_MAX_SLOTS) return null;
+    if (activeLeaseCount >= getEncodingWorkerMaxSlots(worker)) return null;
 
     let tasks = await tx.videoEncodingTask.findMany({
       where: taskQueueWhere(instant),
@@ -436,7 +455,7 @@ export async function claimNextEncodingTask({
       ),
       activeLeases
     );
-    const cloneWorkers = workers.filter(
+    const cloneWorkers = registeredWorkers.filter(
       (candidate) => workerRole(candidate) === ENCODING_WORKER_ROLE.CLONE
     );
 

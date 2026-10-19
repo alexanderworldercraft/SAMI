@@ -59,6 +59,7 @@ describe("videoTranscodingService", () => {
       },
       parts: async function* parts() {
         yield { type: "field", fieldname: "Titre", value: "Démo" };
+        yield { type: "field", fieldname: "titrealternatif", value: " Autre titre | Alias " };
         yield { type: "field", fieldname: "genres", value: "[1,2]" };
         yield {
           type: "file",
@@ -79,6 +80,7 @@ describe("videoTranscodingService", () => {
 
     expect(result.data).toMatchObject({
       titre: "Démo",
+      TitreAlternatif: "Autre titre | Alias",
       genres: "[1,2]",
       videoOriginalName: "demo.mp4",
     });

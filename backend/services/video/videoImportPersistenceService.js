@@ -1,3 +1,4 @@
+import { normalizeAlternativeTitles } from "../alternativeTitles.js";
 import fs from "fs";
 import path from "path";
 
@@ -11,6 +12,7 @@ const toStoragePath = (...segments) => path.posix.join(...segments.map(String));
 
 const reservedVideoData = ({ data, adminUserId }) => ({
   Titre: data.titre,
+  TitreAlternatif: normalizeAlternativeTitles(data.TitreAlternatif),
   Resumer: data.resumer || null,
   CheminAcces: toStoragePath("uploads", "video", "pending", "master.m3u8"),
   CheminImage: "",

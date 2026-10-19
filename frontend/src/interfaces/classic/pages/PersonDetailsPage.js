@@ -12,6 +12,7 @@ import {
 } from "@heroicons/react/24/outline";
 import api from "../../../services/api";
 import VideoList from "../components/VideoList";
+import PersonCharacterEditor from "../../../components/PersonCharacterEditor";
 import PersonLinkContentForm from "../../../components/PersonLinkContentForm";
 import ImageUploader from "../../../components/ImageUploader";
 import Notification from "../../../components/Notification";
@@ -30,6 +31,7 @@ const toVideoCards = (items = []) =>
     CheminImage: video.CheminImage,
     Resumer: video.Resumer,
     Genres: video.Genres || [],
+    Personnages: video.Personnages || [],
   }));
 
 const toSeriesCards = (items = []) =>
@@ -41,6 +43,7 @@ const toSeriesCards = (items = []) =>
     Resumer: serie.Resumer,
     FirstVideoID: serie.FirstVideoID || null,
     Genres: serie.Genres || [],
+    Personnages: serie.Personnages || [],
   }));
 
 const mergeContents = (videos = [], series = []) =>
@@ -68,6 +71,7 @@ export default function PersonDetailsPage() {
   const [isSavingImage, setIsSavingImage] = useState(false);
   const [adminPanelOpen, setAdminPanelOpen] = useState(false);
   const [unlinkingKey, setUnlinkingKey] = useState("");
+  const [editingCharacters, setEditingCharacters] = useState(null);
   const [notification, setNotification] = useState(null);
 
   const canEdit = Boolean(me && (me.GradeID === 1 || me.GradeID === 2));
@@ -251,7 +255,18 @@ export default function PersonDetailsPage() {
           videos={items}
           linkAnchor="#lecture-top"
           onContentClick={scrollToPageTop}
-          overlayActions={canEdit ? (item) => renderRemoveButton(item, role) : undefined}
+          overlayActions={canEdit ? (item) => (
+            <div className="flex flex-col items-end gap-2">
+              {role === "distribution" && (
+                <button type="button" onClick={() => setEditingCharacters(item)}
+                  aria-label={`Modifier les personnages de ${item.Titre}`}
+                  className="rounded-lg border border-sky-300/40 bg-slate-950/90 px-2.5 py-1.5 text-xs font-bold text-white shadow-lg hover:bg-sky-700">
+                  Modifier les personnages
+                </button>
+              )}
+              {renderRemoveButton(item, role)}
+            </div>
+          ) : undefined}
         />
       </div>
     </section>
@@ -415,6 +430,21 @@ export default function PersonDetailsPage() {
           </div>
         </div>
       </section>
+
+      {canEdit && editingCharacters && (
+        <PersonCharacterEditor
+          key={`${id}-${editingCharacters.type}-${editingCharacters.id}`}
+          personId={data.personne.PersonneID}
+          content={editingCharacters}
+          onClose={() => setEditingCharacters(null)}
+          onSaved={(names) => {
+            setDistribution((items) => items.map((item) => item.type === editingCharacters.type && item.id === editingCharacters.id
+              ? { ...item, Personnages: names } : item));
+            setEditingCharacters(null);
+            setNotification({ type: "success", message: "Les personnages ont été mis à jour." });
+          }}
+        />
+      )}
 
       <PersonVoiceSection personId={id} />
 

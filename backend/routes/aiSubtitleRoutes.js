@@ -1,4 +1,6 @@
 import {
+  getAdminAiSubtitleWorkers,
+  authorizeAdminAiSubtitlePrimary,
   deleteAdminGeneratedAiSubtitle,
   getAdminGeneratedAiSubtitle,
   getAdminGeneratedAiSubtitles,
@@ -20,6 +22,8 @@ export default async function aiSubtitleRoutes(fastify) {
   fastify.get("/config", protectedRoute, getAiSubtitleConfiguration);
   fastify.put("/config", protectedRoute, updateAiSubtitleConfiguration);
   fastify.get("/admin/videos-without-french", protectedRoute, getAdminVideosWithoutFrenchSubtitles);
+  fastify.get("/admin/workers", protectedRoute, getAdminAiSubtitleWorkers);
+  fastify.post("/admin/jobs/:jobId/authorize-primary", protectedRoute, authorizeAdminAiSubtitlePrimary);
   fastify.get("/admin/generated", protectedRoute, getAdminGeneratedAiSubtitles);
   fastify.get("/admin/subtitles/:subtitleId", protectedRoute, getAdminGeneratedAiSubtitle);
   fastify.put("/admin/subtitles/:subtitleId/text", protectedRoute, updateAdminGeneratedAiSubtitleText);

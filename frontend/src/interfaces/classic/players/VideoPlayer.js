@@ -171,6 +171,8 @@ const VideoPlayer = ({
   creditSegments = [],
   nextEpisode = null,
   onNextEpisode,
+  nextSagaContent = null,
+  onNextSagaContent,
   initialPlaybackTime = null,
   autoPlayOnLoad = false,
   interactionMode = "classic",
@@ -1511,6 +1513,8 @@ const VideoPlayer = ({
   };
 
   const creditActions = getCreditActions(creditSegments, currentTime, duration);
+  const nextCreditContent = nextEpisode || nextSagaContent;
+  const onNextCreditContent = nextEpisode ? onNextEpisode : onNextSagaContent;
   const playedPercent = duration > 0 ? Math.min(100, (currentTime / duration) * 100) : 0;
   const bufferedPercent = duration > 0 ? Math.min(100, (bufferedTime / duration) * 100) : 0;
   const subtitleTracks = (video?.subtitles || []).filter(
@@ -1659,10 +1663,10 @@ const VideoPlayer = ({
           aria-hidden="true"
         />
 
-        {(creditActions.active || (creditActions.showNext && nextEpisode)) && (
+        {(creditActions.active || (creditActions.showNext && nextCreditContent)) && (
           <div className="pointer-events-none absolute inset-x-0 bottom-24 z-30 flex items-end justify-between gap-2 px-3 sm:px-5" data-testid="credit-actions">
             <div>{creditActions.active && <button type="button" className="pointer-events-auto rounded-lg border border-white/40 bg-black/80 px-3 py-2 text-sm font-bold text-white shadow-lg hover:bg-black" onClick={() => seekTo(creditActions.active.End)}>Passer le générique</button>}</div>
-            {creditActions.showNext && nextEpisode && <button type="button" className="pointer-events-auto rounded-lg border border-white/40 bg-black/80 px-3 py-2 text-sm font-bold text-white shadow-lg hover:bg-black" onClick={onNextEpisode}>Épisode suivant</button>}
+            {creditActions.showNext && nextCreditContent && <button type="button" className="pointer-events-auto rounded-lg border border-white/40 bg-black/80 px-3 py-2 text-sm font-bold text-white shadow-lg hover:bg-black" onClick={onNextCreditContent} title={!nextEpisode ? nextSagaContent?.Titre : undefined}>{nextEpisode ? "Épisode suivant" : "Contenu suivant"}</button>}
           </div>
         )}
 

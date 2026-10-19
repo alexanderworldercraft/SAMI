@@ -182,6 +182,7 @@ const SerieDetails = ({
       Titre: [p.Prenom, p.Nom].filter(Boolean).join(" ") || p.Surnom || "Personne sans nom",
       Surnom: p.Surnom,
       CheminImage: p.CheminImage,
+      Personnages: p.Personnages || [],
       MissingImageLabel: p.CheminImage ? null : "Photo manquante pour cette personne",
       Genres: [],
     }));

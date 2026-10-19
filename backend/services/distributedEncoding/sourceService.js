@@ -58,6 +58,7 @@ const assignTextField = (data, fieldName, value) => {
 
   data[normalizedField] = fieldValue;
   if (lowerName === "titre") data.titre = fieldValue;
+  if (lowerName === "titrealternatif") data.TitreAlternatif = fieldValue;
   if (lowerName === "resumer") data.resumer = fieldValue;
   if (compactName === "genres") data.genres = fieldValue;
   if (compactName === "saisonid") data.SaisonID = fieldValue;

@@ -364,6 +364,8 @@ export async function recreateGeneratedAiSubtitle(subtitleId, {
           SourceSize: null,
           SourceSha256: null,
           AssignedWorkerID: null,
+          PrimaryApprovedAt: null,
+          PrimaryApprovedByUserID: null,
           LeaseTokenHash: null,
           LeaseExpiresAt: null,
           AttemptCount: 0,

@@ -324,6 +324,7 @@ const buildExportManifest = async ({
     initiatedByNickname: transfer.InitiatedByNickname,
     metadata: {
       title: video.Titre,
+      ...(video.TitreAlternatif ? { alternativeTitles: video.TitreAlternatif } : {}),
       summary: video.Resumer || null,
       premium: Boolean(video.Premium),
       masterPlaylistPath,

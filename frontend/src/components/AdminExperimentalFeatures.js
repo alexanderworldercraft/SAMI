@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from "react";
 import api from "../services/api";
+import AdminEncodingWorkerCard from "./AdminEncodingWorkerCard";
+import AdminAiSubtitleWorkers from "./AdminAiSubtitleWorkers";
 import {
   countAvailableEncodingClones,
   getVideoEncodingWorkers,
@@ -31,6 +33,7 @@ const AdminExperimentalFeatures = () => {
     displayName: "",
     performanceScore: "1",
     maxNominalHeight: "2160",
+    maxSlots: "1",
   });
 
   useEffect(() => {
@@ -281,6 +284,7 @@ const AdminExperimentalFeatures = () => {
         displayName: workerDraft.displayName.trim() || instanceId,
         performanceScore: Number(workerDraft.performanceScore),
         maxNominalHeight: Number(workerDraft.maxNominalHeight),
+        maxSlots: Number(workerDraft.maxSlots),
         enabled: true,
       });
       const worker = normalizeVideoEncodingWorker(response.data?.worker);
@@ -293,12 +297,33 @@ const AdminExperimentalFeatures = () => {
         displayName: "",
         performanceScore: "1",
         maxNominalHeight: "2160",
+        maxSlots: "1",
       });
       setMessage(`Clone ${worker.displayName} enregistré.`);
     } catch (error) {
       setErrorMessage(
         error.response?.data?.error || "Impossible d'enregistrer ce clone."
       );
+    } finally {
+      setWorkerRegistrySaving(false);
+    }
+  };
+
+  const handleWorkerSettings = async (worker, settings) => {
+    setWorkerRegistrySaving(true);
+    setMessage("");
+    setErrorMessage("");
+    try {
+      const response = await api.patch(`/video-encoding/workers/${encodeURIComponent(worker.id)}`, settings);
+      const updated = normalizeVideoEncodingWorker(response.data?.worker);
+      setVideoEncodingWorkers((current) => current.map((item) =>
+        normalizeVideoEncodingWorker(item).id === updated.id ? updated : item
+      ));
+      setMessage(`Réglages de ${updated.displayName} enregistrés.`);
+      return true;
+    } catch (error) {
+      setErrorMessage(error.response?.data?.error || "Impossible de modifier ces réglages.");
+      return false;
     } finally {
       setWorkerRegistrySaving(false);
     }
@@ -332,8 +357,7 @@ const AdminExperimentalFeatures = () => {
   };
 
   const normalizedEncodingWorkers = videoEncodingWorkers
-    .map(normalizeVideoEncodingWorker)
-    .filter((worker) => worker.role !== "primary");
+    .map(normalizeVideoEncodingWorker);
   const activeEncodingWorkerCount = countAvailableEncodingClones(
     normalizedEncodingWorkers
   );
@@ -541,6 +565,12 @@ const AdminExperimentalFeatures = () => {
                       <option value="4320">8K</option>
                     </select>
                   </label>
+                  <label className="grid gap-1 text-sm font-bold text-slate-700 dark:text-slate-200">
+                    Slots maximum
+                    <input type="number" min="1" max="32" step="1" required value={workerDraft.maxSlots}
+                      onChange={(event) => setWorkerDraft((current) => ({ ...current, maxSlots: event.target.value }))}
+                      className="rounded-lg border border-violet-400/25 bg-white px-3 py-2 text-slate-900 dark:bg-slate-950 dark:text-white" />
+                  </label>
                   <p className="text-xs font-semibold leading-5 text-slate-500 dark:text-slate-400 sm:col-span-2">
                     L'identifiant est sensible à la casse. Une valeur de priorité plus élevée reçoit les résolutions les plus lourdes en premier.
                   </p>
@@ -553,57 +583,15 @@ const AdminExperimentalFeatures = () => {
                   </button>
                 </form>
 
-                <ul className="mt-3 grid gap-2" aria-label="Clones d'encodage enregistrés">
-                  {normalizedEncodingWorkers.map((worker) => {
-                    const online = ["online", "available", "active", "busy"].includes(worker.status)
-                      && worker.enabled
-                      && !worker.draining;
-                    return (
-                      <li key={worker.id} className="flex flex-col gap-2 rounded-lg border border-violet-400/15 bg-white/70 px-3 py-3 text-sm dark:bg-slate-950/45 sm:flex-row sm:items-center sm:justify-between">
-                        <div>
-                          <p className="font-black text-slate-900 dark:text-white">{worker.displayName}</p>
-                          <p className="mt-1 text-xs font-semibold text-slate-500 dark:text-slate-400">
-                            {worker.ffmpegVersion ? `FFmpeg ${worker.ffmpegVersion}` : "Version FFmpeg non communiquée"}
-                            {worker.maxNominalHeight ? ` · jusqu'à ${worker.maxNominalHeight}p` : ""}
-                          </p>
-                        </div>
-                        <div className="flex flex-wrap items-center gap-2">
-                          {worker.maxSlots > 0 && (
-                            <span className="text-xs font-bold text-slate-500 dark:text-slate-400">
-                              {worker.activeLeaseCount}/{worker.maxSlots} slot{worker.maxSlots > 1 ? "s" : ""}
-                            </span>
-                          )}
-                          <span className="text-xs font-bold text-slate-500 dark:text-slate-400">
-                            Priorité {worker.performanceScore || 1}
-                          </span>
-                          <span className={`rounded-full px-2.5 py-1 text-xs font-black ${
-                            online
-                              ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
-                              : "bg-slate-500/15 text-slate-700 dark:text-slate-300"
-                          }`}>
-                            {worker.draining
-                              ? "Drainage"
-                              : !worker.enabled
-                                ? "Désactivé"
-                                : online
-                                  ? "En ligne"
-                                  : "Hors ligne"}
-                          </span>
-                          <button
-                            type="button"
-                            disabled={workerRegistrySaving}
-                            onClick={() => handleWorkerAvailability(worker)}
-                            className="rounded-full border border-violet-400/25 px-2.5 py-1 text-xs font-black text-violet-700 transition hover:bg-violet-500/10 disabled:opacity-60 dark:text-violet-200"
-                          >
-                            {worker.enabled ? "Désactiver" : "Activer"}
-                          </button>
-                        </div>
-                      </li>
-                    );
-                  })}
+                <ul className="mt-3 grid gap-2" aria-label="Serveurs d'encodage enregistrés">
+                  {normalizedEncodingWorkers.map((worker) => (
+                    <AdminEncodingWorkerCard key={worker.id} worker={worker}
+                      saving={workerRegistrySaving} onSave={handleWorkerSettings}
+                      onAvailability={handleWorkerAvailability} />
+                  ))}
                   {normalizedEncodingWorkers.length === 0 && (
                     <li className="rounded-lg border border-dashed border-violet-400/20 px-3 py-3 text-sm font-semibold text-slate-500 dark:text-slate-400">
-                      Aucun clone n'est encore enregistré.
+                      Aucun serveur n'est encore enregistré.
                     </li>
                   )}
                 </ul>
@@ -641,45 +629,48 @@ const AdminExperimentalFeatures = () => {
             </button>
           </div>
 
-          <div className="mt-4 flex flex-col gap-4 rounded-xl border border-fuchsia-400/20 bg-fuchsia-500/5 p-5 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <div className="flex flex-wrap items-center gap-2">
-                <h3 className="text-base font-black text-slate-950 dark:text-white">
-                  Sous-titres générés par IA
-                </h3>
-                <span className="rounded-full bg-fuchsia-500/15 px-2.5 py-1 text-xs font-black text-fuchsia-700 dark:text-fuchsia-200">
-                  Usage privé
-                </span>
-              </div>
-              <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-300">
-                Génère automatiquement le français manquant sur les nouveaux imports et permet
-                aux utilisateurs connectés de demander d'autres langues. Les modèles restent
-                stockés et exécutés localement.
-              </p>
-              {aiSubtitlesConfig && !aiSubtitlesConfig.environmentEnabled && (
-                <p className="mt-2 text-xs font-bold text-amber-700 dark:text-amber-300">
-                  Le runtime doit d'abord être installé avec npm run setup:ai puis activé dans l'environnement.
+          <div className="mt-4 rounded-xl border border-fuchsia-400/20 bg-fuchsia-500/5 p-5">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <h3 className="text-base font-black text-slate-950 dark:text-white">
+                    Sous-titres générés par IA
+                  </h3>
+                  <span className="rounded-full bg-fuchsia-500/15 px-2.5 py-1 text-xs font-black text-fuchsia-700 dark:text-fuchsia-200">
+                    Usage privé
+                  </span>
+                </div>
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-300">
+                  Génère automatiquement le français manquant sur les nouveaux imports et permet
+                  aux utilisateurs connectés de demander d'autres langues. Les modèles restent
+                  stockés et exécutés localement.
                 </p>
-              )}
-            </div>
+                {aiSubtitlesConfig && !aiSubtitlesConfig.environmentEnabled && (
+                  <p className="mt-2 text-xs font-bold text-amber-700 dark:text-amber-300">
+                    Le runtime doit d'abord être installé avec npm run setup:ai puis activé dans l'environnement.
+                  </p>
+                )}
+              </div>
 
-            <button
-              type="button"
-              onClick={handleToggleAiSubtitles}
-              disabled={loading || saving || !aiSubtitlesConfig?.environmentEnabled}
-              className={`relative inline-flex h-8 w-16 shrink-0 items-center rounded-full border transition duration-200 ${
-                aiSubtitlesConfig?.active
-                  ? "border-emerald-300/70 bg-emerald-500/80"
-                  : "border-slate-300/70 bg-slate-300/70 dark:border-slate-700 dark:bg-slate-800"
-              } disabled:cursor-not-allowed disabled:opacity-60`}
-            >
-              <span className="sr-only">Activer les sous-titres générés par IA</span>
-              <span
-                className={`inline-block size-6 rounded-full bg-white shadow transition duration-200 ${
-                  aiSubtitlesConfig?.active ? "translate-x-9" : "translate-x-1"
-                }`}
-              />
-            </button>
+              <button
+                type="button"
+                onClick={handleToggleAiSubtitles}
+                disabled={loading || saving || !aiSubtitlesConfig?.environmentEnabled}
+                className={`relative inline-flex h-8 w-16 shrink-0 items-center rounded-full border transition duration-200 ${
+                  aiSubtitlesConfig?.active
+                    ? "border-emerald-300/70 bg-emerald-500/80"
+                    : "border-slate-300/70 bg-slate-300/70 dark:border-slate-700 dark:bg-slate-800"
+                } disabled:cursor-not-allowed disabled:opacity-60`}
+              >
+                <span className="sr-only">Activer les sous-titres générés par IA</span>
+                <span
+                  className={`inline-block size-6 rounded-full bg-white shadow transition duration-200 ${
+                    aiSubtitlesConfig?.active ? "translate-x-9" : "translate-x-1"
+                  }`}
+                />
+              </button>
+            </div>
+            <AdminAiSubtitleWorkers />
           </div>
         </div>
       </div>

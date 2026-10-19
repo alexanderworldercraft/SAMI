@@ -17,24 +17,27 @@ const SearchBar = () => {
   const containerRef = useRef(null);
 
   useEffect(() => {
+    let active = true;
+    setSuggestions([]);
+    if (!searchQuery.trim()) return;
+
     const fetchSuggestions = async () => {
-      if (searchQuery.trim().length === 0) {
-        setSuggestions([]);
-        return;
-      }
       try {
         const res = await fetch(
           `${apiUrl}/api/videos/search?search=${encodeURIComponent(searchQuery)}&limit=6`
         );
         const data = await res.json();
-        setSuggestions(data.items || []);
+        if (active) setSuggestions(data.items || []);
       } catch (err) {
-        console.error("Erreur lors de la recherche :", err);
+        if (active) console.error("Erreur lors de la recherche :", err);
       }
     };
 
     const delay = setTimeout(fetchSuggestions, 300); // debounce 300ms
-    return () => clearTimeout(delay);
+    return () => {
+      active = false;
+      clearTimeout(delay);
+    };
   }, [searchQuery]);
 
   useEffect(() => {

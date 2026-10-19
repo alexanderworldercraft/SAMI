@@ -10,6 +10,7 @@ import { openRemoteEncodingSource } from "./workerClient.js";
 const DEFAULT_CACHE_MAX_BYTES = 50 * 1024 * 1024 * 1024;
 const SHA256_PATTERN = /^[a-f0-9]{64}$/i;
 const pinnedEntries = new Map();
+const sourceLocks = new Map();
 
 const normalizeSha = (value) => {
   const normalized = String(value || "").toLowerCase();
@@ -104,7 +105,23 @@ export async function enforceDistributedCacheLimit({ requiredBytes = 0 } = {}) {
   return { totalBytes, maxBytes };
 }
 
-export async function ensureDistributedSourceCached({
+export async function ensureDistributedSourceCached(options) {
+  const key = cacheEntryPaths(options).root;
+  const previous = sourceLocks.get(key) || Promise.resolve();
+  let release;
+  const pending = new Promise((resolve) => { release = resolve; });
+  sourceLocks.set(key, pending);
+  await previous;
+  try {
+    options.signal?.throwIfAborted();
+    return await ensureSourceCachedSerially(options);
+  } finally {
+    release();
+    if (sourceLocks.get(key) === pending) sourceLocks.delete(key);
+  }
+}
+
+async function ensureSourceCachedSerially({
   jobId,
   sha256,
   size,

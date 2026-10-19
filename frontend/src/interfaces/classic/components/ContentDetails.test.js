@@ -23,6 +23,7 @@ jest.mock("./VideoList", () => ({ videos = [], onPersonClick }) => (
     {videos.map((item) => (
       <div key={item.id}>
         <span>{item.Titre}</span>
+        {item.Personnages?.length > 0 && <span>{item.Personnages.join(", ")}</span>}
         {item.MissingImageLabel && <span>{item.MissingImageLabel}</span>}
       </div>
     ))}
@@ -98,11 +99,12 @@ describe("champs d'édition des détails de contenu", () => {
     render(<VideoDetails video={createContent({
       VideoID: 12,
       Realisateurs: [{ PersonneID: 1, Prenom: "Steven", Nom: "Spielberg", CheminImage: null }],
-      Acteurs: [{ PersonneID: 2, Prenom: "Tom", Nom: "Hanks", CheminImage: null }],
+      Acteurs: [{ PersonneID: 2, Prenom: "Tom", Nom: "Hanks", CheminImage: null, Personnages: ["Viktor", "Autre"] }],
     })} />);
 
     expect(screen.getByText("Steven Spielberg")).toBeInTheDocument();
     expect(screen.getByText("Tom Hanks")).toBeInTheDocument();
+    expect(screen.getByText("Viktor, Autre")).toBeInTheDocument();
     expect(screen.getAllByText("Photo manquante pour cette personne")).toHaveLength(2);
     screen.getAllByTestId("credit-video-list").forEach((list) => {
       expect(list).toHaveAttribute("data-person-scroll", "true");
@@ -113,10 +115,11 @@ describe("champs d'édition des détails de contenu", () => {
     render(<SerieDetails series={createContent({
       SeriesID: 34,
       Realisateurs: [],
-      Acteurs: [{ PersonneID: 3, Prenom: "Catherine", Nom: "Zeta-Jones", CheminImage: null }],
+      Acteurs: [{ PersonneID: 3, Prenom: "Catherine", Nom: "Zeta-Jones", CheminImage: null, Personnages: ["Personnage série"] }],
     })} />);
 
     expect(screen.getByText("Catherine Zeta-Jones")).toBeInTheDocument();
+    expect(screen.getByText("Personnage série")).toBeInTheDocument();
     expect(screen.getByText("Photo manquante pour cette personne")).toBeInTheDocument();
     expect(screen.getByTestId("credit-video-list")).toHaveAttribute("data-person-scroll", "true");
   });

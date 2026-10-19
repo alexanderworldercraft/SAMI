@@ -934,6 +934,52 @@ it("propose l’épisode suivant à 90 % sans générique, uniquement avec un é
   expect(screen.queryByText("Épisode suivant")).not.toBeInTheDocument();
 });
 
+it.each(["classic", "tactile", "remote"])("propose le contenu suivant de la saga au générique de fin en mode %s", (interactionMode) => {
+  const onNextSagaContent = jest.fn();
+  const { container } = render(<VideoPlayer interactionMode={interactionMode}
+    video={{ VideoID: 1, CheminAcces: "film.mp4", subtitles: [] }} backgroundBlur={{ current: null }}
+    creditSegments={[{ Start: 80, End: 90, Status: "APPROVED" }]}
+    nextSagaContent={{ VideoID: 2, Titre: "X2" }} onNextSagaContent={onNextSagaContent} />);
+  const media = container.querySelector("video");
+  Object.defineProperty(media, "duration", { configurable: true, value: 100 });
+  fireEvent.durationChange(media);
+  media.currentTime = 79; fireEvent.timeUpdate(media);
+  expect(screen.queryByRole("button", { name: "Contenu suivant" })).not.toBeInTheDocument();
+  media.currentTime = 80; fireEvent.timeUpdate(media);
+  const next = screen.getByRole("button", { name: "Contenu suivant" });
+  expect(next).toHaveAttribute("title", "X2");
+  fireEvent.click(next);
+  expect(onNextSagaContent).toHaveBeenCalledTimes(1);
+  media.currentTime = 100; fireEvent.timeUpdate(media);
+  expect(screen.getByRole("button", { name: "Contenu suivant" })).toBeInTheDocument();
+});
+
+it("utilise 90 % sans générique après 50 %, masque le bouton sans suite et conserve la priorité des épisodes", () => {
+  const video = { VideoID: 1, CheminAcces: "film.mp4", subtitles: [] };
+  const backgroundBlur = { current: null };
+  const onNextEpisode = jest.fn();
+  const onNextSagaContent = jest.fn();
+  const { container, rerender } = render(<VideoPlayer video={video} backgroundBlur={backgroundBlur}
+    creditSegments={[{ Start: 50, End: 60, Status: "APPROVED" }]} nextSagaContent={{ VideoID: 2 }} onNextSagaContent={onNextSagaContent} />);
+  const media = container.querySelector("video");
+  Object.defineProperty(media, "duration", { configurable: true, value: 100 });
+  fireEvent.durationChange(media);
+  media.currentTime = 89.9; fireEvent.timeUpdate(media);
+  expect(screen.queryByRole("button", { name: "Contenu suivant" })).not.toBeInTheDocument();
+  media.currentTime = 90; fireEvent.timeUpdate(media);
+  fireEvent.click(screen.getByRole("button", { name: "Contenu suivant" }));
+  expect(onNextSagaContent).toHaveBeenCalledTimes(1);
+  rerender(<VideoPlayer video={video} backgroundBlur={backgroundBlur}
+    nextEpisode={{ VideoID: 15 }} onNextEpisode={onNextEpisode}
+    nextSagaContent={{ VideoID: 2 }} onNextSagaContent={onNextSagaContent} />);
+  expect(screen.queryByRole("button", { name: "Contenu suivant" })).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Épisode suivant" }));
+  expect(onNextEpisode).toHaveBeenCalledTimes(1);
+  expect(onNextSagaContent).toHaveBeenCalledTimes(1);
+  rerender(<VideoPlayer video={video} backgroundBlur={backgroundBlur} />);
+  expect(screen.queryByRole("button", { name: "Contenu suivant" })).not.toBeInTheDocument();
+});
+
 it("le lecteur tactile révèle ses contrôles au toucher sans dépendre du survol", () => {
   const { container } = render(<VideoPlayer interactionMode="tactile" video={{ VideoID: 7, CheminAcces: "test.mp4", subtitles: [] }} backgroundBlur={{ current: null }} />);
   const video = container.querySelector("video");

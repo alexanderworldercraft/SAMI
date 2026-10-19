@@ -5,6 +5,8 @@ import {
   listVideosWithoutFrenchSubtitles,
   queueAiSubtitleJob,
   serializeAiSubtitleJob,
+  approveAiSubtitlePrimary,
+  getAiSubtitleWorkers,
 } from "../services/aiSubtitles/jobService.js";
 import {
   getAiSubtitleSetting,
@@ -113,6 +115,30 @@ export const getAdminVideosWithoutFrenchSubtitles = async (request, reply) => {
     return reply.send(await listVideosWithoutFrenchSubtitles({ page: request.query?.page }));
   } catch (error) {
     return sendAiSubtitleError(reply, error, "Liste des vidéos sans sous-titres français indisponible.");
+  }
+};
+
+export const getAdminAiSubtitleWorkers = async (request, reply) => {
+  try {
+    if (!await ensureAdmin(request, reply)) return;
+    const workers = isAiSubtitleEnvironmentEnabled() ? await getAiSubtitleWorkers() : [];
+    return reply.send({ workers });
+  } catch (error) {
+    return sendAiSubtitleError(reply, error, "Liste des serveurs IA indisponible.");
+  }
+};
+
+export const authorizeAdminAiSubtitlePrimary = async (request, reply) => {
+  try {
+    const admin = await ensureAdmin(request, reply);
+    if (!admin) return;
+    const job = await approveAiSubtitlePrimary(request.params?.jobId, admin.userId);
+    await createLog({ request, UtilisateurID: admin.userId,
+      ActionNom: "ai_subtitle_primary_approved", VideoID: job.VideoID,
+      Champ: "ai_subtitle_job", NouvelleValeur: job.AiSubtitleJobID });
+    return reply.send({ job: serializeAiSubtitleJob(job) });
+  } catch (error) {
+    return sendAiSubtitleError(reply, error, "Autorisation du primary impossible.");
   }
 };
 

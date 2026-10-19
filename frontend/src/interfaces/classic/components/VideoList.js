@@ -25,6 +25,7 @@ const VideoList = ({
   linkAnchor = "",
   onContentClick,
   onPersonClick,
+  currentContent,
 }) => {
   const favoriteItems = useMemo(
     () =>
@@ -96,6 +97,15 @@ const VideoList = ({
       />
     );
   };
+
+  const isCurrentContent = (item) => currentContent != null
+    && item.type === currentContent.type && String(item.id) === String(currentContent.id);
+
+  const renderCurrentContent = (item) => isCurrentContent(item) ? (
+    <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center bg-slate-950/65 px-3 text-center">
+      <span className="rounded-lg border border-white/30 bg-slate-950/75 px-3 py-2 text-sm font-black text-white">Contenu actuel</span>
+    </div>
+  ) : null;
 
   const renderBadges = (item) => {
     const badges = [];
@@ -209,6 +219,14 @@ const VideoList = ({
                     </span>
                   </div>
                 )}
+                {item.Personnages?.length > 0 && (
+                  <div
+                    className="absolute inset-x-0 bottom-0 flex min-h-[30%] max-h-full items-end overflow-y-auto px-2 pb-3 pt-8 text-center text-white"
+                    style={{ background: "linear-gradient(to top, #000 0%, rgba(0,0,0,0.75) 45%, transparent 100%)" }}
+                  >
+                    <p className="w-full break-words text-sm font-semibold leading-snug">{item.Personnages.join(", ")}</p>
+                  </div>
+                )}
                 {typeof overlayActions === "function" && (
                   <div
                     className="absolute top-2 right-2 z-10"
@@ -271,6 +289,7 @@ const VideoList = ({
             <div key={`series-${item.id}`} className="group relative hover:-translate-y-2 duration-300">
               <Link
                 to={item.FirstVideoID ? `/lecture/${item.FirstVideoID}${linkAnchor}` : "#"}
+                aria-current={isCurrentContent(item) ? "true" : undefined}
                 onClick={() => item.FirstVideoID && onContentClick?.(item)}
                 className="block"
               >
@@ -299,6 +318,7 @@ const VideoList = ({
                   <div className="px-4 py-2 rounded-xl h-full w-full absolute top-0 left-0 opacity-0 group-hover:opacity-100 group-hover:bg-neutral-950/50 group-hover:backdrop-blur-2xl duration-300">
                     <p className="line-clamp-5 pr-12 text-xs text-neutral-50 text-justify">{item.Resumer} {/* Affichage résumer */}</p>
                   </div>
+                  {renderCurrentContent(item)}
                 </div>
                 <div className="relative capitalize text-center px-2 py-1 font-bold dark:text-neutral-300">
                   <p className="group-hover:opacity-0 opacity-100 duration-300 text-sm line-clamp-2">{item.Titre} ({item.Saisons} Saisons)</p>
@@ -341,6 +361,7 @@ const VideoList = ({
               <div key={`video-${item.id}`} className="group relative hover:-translate-y-2 duration-300">
               <Link
                 to={`/lecture/${item.id}${linkAnchor}`}
+                aria-current={isCurrentContent(item) ? "true" : undefined}
                 onClick={() => onContentClick?.(item)}
                 className="block"
               >
@@ -368,6 +389,7 @@ const VideoList = ({
                     <div className="px-4 py-2 rounded-xl h-full w-full absolute top-0 left-0 opacity-0 group-hover:opacity-100 group-hover:bg-neutral-950/50 group-hover:backdrop-blur-2xl duration-300">
                       <p className="line-clamp-5 pr-12 text-xs text-neutral-50 text-justify">{item.Resumer} {/* Affichage résumer */}</p>
                     </div>
+                    {renderCurrentContent(item)}
                   </div>
                   <div className="relative capitalize text-center px-2 py-1 font-bold dark:text-neutral-300">
                     <p className="group-hover:opacity-0 opacity-100 duration-300 text-sm line-clamp-2">{item.Titre}</p>
