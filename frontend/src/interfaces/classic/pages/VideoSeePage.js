@@ -8,6 +8,8 @@ import { useParams, useNavigate, useLocation } from "react-router-dom";
 import VideoPlayer from "../players/VideoPlayer";
 import VideoDetails from "../components/VideoDetails";
 import SerieDetails from "../components/SerieDetails";
+import ContentCredits from "../components/ContentCredits";
+import PlaybackContentTabs from "../components/PlaybackContentTabs";
 import SeasonList from "../components/SeasonList";
 import EpisodeList from "../components/EpisodeList";
 import Notification from "../../../components/Notification";
@@ -385,6 +387,7 @@ const VideoSeePage = ({ PlayerComponent = VideoPlayer }) => {
 
   const isAdmin = user?.GradeID === 1 || user?.GradeID === 2;
   const isEpisode = Boolean(video?.SaisonID);
+  const isSeries = type === "series" && Boolean(series);
   const isPremiumUser = isAdmin || !!(user?.PremiumEndDate && new Date(user.PremiumEndDate) > new Date());
 
   const NameApp = process.env.REACT_APP_NAME || "SAMI";
@@ -716,64 +719,76 @@ const VideoSeePage = ({ PlayerComponent = VideoPlayer }) => {
     if (!contentSagas.length) return null;
     if (sagaTotalItems === 1 && contentSagas.length === 1) {
       return <SingleSagaSection key={`${currentVideoId}:${contentSagas[0].SagaID}`}
-        saga={contentSagas[0]} videoId={currentVideoId} seriesId={seriesId}
+        saga={contentSagas[0]} videoId={currentVideoId} seriesId={seriesId} embedded
         onContentsLoaded={setSingleSagaPlayback}
         linkAnchor={LECTURE_TOP_ANCHOR} onContentClick={scrollToLectureTop} />;
     }
 
     return (
-      <section className="container mx-auto overflow-hidden rounded-2xl border border-sky-500/10 bg-white/80 shadow-xl shadow-slate-950/5 backdrop-blur dark:bg-slate-950/70 dark:shadow-sky-950/20">
-        <div className="border-b border-sky-500/10 bg-gradient-to-r from-sky-500/15 via-blue-500/10 to-transparent px-6 py-5">
-          <p className="text-sm font-bold uppercase text-sky-500 dark:text-sky-400">Sagas</p>
-          <h2 className="mt-1 text-2xl font-black text-slate-950 dark:text-white">
-            Ce contenu fait partie de
-          </h2>
+      <div>
+        <div className="container mx-auto grid grid-cols-2 gap-4 sm:grid-cols-4 xl:grid-cols-8">
+          {contentSagas.map((saga) => (
+            <button
+              key={saga.SagaID}
+              type="button"
+              onClick={() => openSaga(saga)}
+              className="group text-left transition duration-300 hover:-translate-y-2"
+            >
+              <div className="min-h-full h-max max-h-max">
+                <div className="rounded-xl overflow-hidden border border-neutral-400 bg-gradient-to-br from-slate-950 to-slate-900 mb-2 relative transition duration-300 ease-in-out group-hover:border-blue-500">
+                  <img
+                    src={saga.CheminImage ? `${apiUrl}/${saga.CheminImage}` : "/imageDefault.png"}
+                    alt={saga.Titre}
+                    className="aspect-2/3 h-full w-full object-cover duration-300 group-hover:scale-110"
+                  />
+                  {saga.Premium && (
+                    <span className="absolute left-2 top-2 z-10 inline-flex rounded-full border border-amber-200/40 bg-gradient-to-br from-amber-300/95 via-yellow-400/95 to-orange-400/95 px-2.5 py-1 text-[10px] font-black uppercase text-slate-950">
+                      Premium
+                    </span>
+                  )}
+                </div>
+                <p className="px-2 py-1 text-center text-sm font-bold capitalize text-slate-900 line-clamp-2 dark:text-neutral-300">
+                  {saga.Titre}
+                </p>
+              </div>
+            </button>
+          ))}
         </div>
-        <div className="relative p-6">
-          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_12%_20%,rgba(14,165,233,0.10),transparent_26%),radial-gradient(circle_at_88%_0%,rgba(139,92,246,0.08),transparent_22%)]" />
-          <div className="relative">
-            <div className="container mx-auto grid grid-cols-2 gap-4 sm:grid-cols-4 xl:grid-cols-8">
-              {contentSagas.map((saga) => (
-                <button
-                  key={saga.SagaID}
-                  type="button"
-                  onClick={() => openSaga(saga)}
-                  className="group text-left transition duration-300 hover:-translate-y-2"
-                >
-                  <div className="min-h-full h-max max-h-max">
-                    <div className="rounded-xl overflow-hidden border border-neutral-400 bg-gradient-to-br from-slate-950 to-slate-900 mb-2 relative transition duration-300 ease-in-out group-hover:border-blue-500">
-                      <img
-                        src={saga.CheminImage ? `${apiUrl}/${saga.CheminImage}` : "/imageDefault.png"}
-                        alt={saga.Titre}
-                        className="aspect-2/3 h-full w-full object-cover duration-300 group-hover:scale-110"
-                      />
-                      {saga.Premium && (
-                        <span className="absolute left-2 top-2 z-10 inline-flex rounded-full border border-amber-200/40 bg-gradient-to-br from-amber-300/95 via-yellow-400/95 to-orange-400/95 px-2.5 py-1 text-[10px] font-black uppercase text-slate-950">
-                          Premium
-                        </span>
-                      )}
-                    </div>
-                    <p className="px-2 py-1 text-center text-sm font-bold capitalize text-slate-900 line-clamp-2 dark:text-neutral-300">
-                      {saga.Titre}
-                    </p>
-                  </div>
-                </button>
-              ))}
-            </div>
-            {sagaTotalItems > sagaItemsPerPage && (
-              <PaginationPage
-                currentPage={sagaPage}
-                totalPages={sagaTotalPages}
-                totalItems={sagaTotalItems}
-                itemsPerPage={sagaItemsPerPage}
-                onPageChange={fetchContentSagas}
-              />
-            )}
-          </div>
-        </div>
-      </section>
+        {sagaTotalItems > sagaItemsPerPage && (
+          <PaginationPage
+            currentPage={sagaPage}
+            totalPages={sagaTotalPages}
+            totalItems={sagaTotalItems}
+            itemsPerPage={sagaItemsPerPage}
+            onPageChange={fetchContentSagas}
+          />
+        )}
+      </div>
     );
   };
+
+  const renderVideoDetails = (embedded = false) => (
+    <VideoDetails
+      video={video}
+      embedded={embedded}
+      showCredits={!embedded}
+      videoElement={videoElement}
+      creditData={creditData?.videoId === currentVideoId ? creditData : null}
+      creditError={creditError}
+      onCreditsRefresh={refreshCredits}
+      isAdmin={isAdmin}
+      onTitleUpdate={handleTitleUpdate}
+      onResumerUpdate={handleResumerUpdate}
+      onImageUpdate={handleImageUpdate}
+      onPremiumUpdate={(newPremium) =>
+        setVideo((prev) => ({ ...prev, Premium: newPremium }))
+      }
+      isFavorite={!!video.IsFavorite}
+      onFavoriteChange={(nextValue) =>
+        setVideo((prev) => ({ ...prev, IsFavorite: nextValue }))
+      }
+    />
+  );
 
   return (
     <div id={LECTURE_TOP_ID} className="relative scroll-mt-4">
@@ -833,97 +848,70 @@ const VideoSeePage = ({ PlayerComponent = VideoPlayer }) => {
           </section>
 
           <div className="container px-4 mx-auto grid gap-12">
-            <div className="flex flex-col gap-12">
-              {isEpisode && (
+            {isEpisode && (
+              <div className="flex flex-col gap-12">
                 <button
                   onClick={() => setShowDetails((prev) => !prev)}
                   className="self-start rounded-lg border border-sky-300/40 bg-sky-500/15 px-5 py-2.5 text-sm font-bold text-slate-900 transition duration-200 hover:border-sky-300/80 hover:bg-sky-500/25 dark:text-white"
                 >
                   {showDetails ? "Masquer les détails" : "Afficher les détails"}
                 </button>
-              )}
+                {showDetails && renderVideoDetails()}
+              </div>
+            )}
 
-              {(!isEpisode || showDetails) && (
-                <VideoDetails
-                  video={video}
-                  videoElement={videoElement}
-                  creditData={creditData?.videoId === currentVideoId ? creditData : null}
-                  creditError={creditError}
-                  onCreditsRefresh={refreshCredits}
+            <PlaybackContentTabs
+              key={`${currentVideoId}:${type}`}
+              isSeries={isSeries}
+              details={!isSeries && renderVideoDetails(true)}
+              episodes={isSeries && (
+                <>
+                  <div className="mb-6 flex justify-end">
+                    <button
+                      type="button"
+                      onClick={handleResetSeriesWatchStatus}
+                      disabled={isResettingSeries}
+                      className="inline-flex items-center justify-center rounded-lg border border-rose-300/40 bg-rose-500/15 px-5 py-2.5 text-sm font-bold text-rose-700 transition duration-200 hover:border-rose-300/80 hover:bg-rose-500/25 disabled:cursor-not-allowed disabled:opacity-60 dark:text-rose-200"
+                    >
+                      {isResettingSeries ? "Remise à zéro..." : "Recommencer la série"}
+                    </button>
+                  </div>
+                  <SeasonList
+                    seasons={series.Saisons}
+                    currentSeason={currentSeason}
+                    onSeasonChange={handleSeasonChange}
+                  />
+                  <EpisodeList
+                    episodes={episodes}
+                    currentEpisode={currentEpisode}
+                    canAccessPremium={isPremiumUser}
+                    linkAnchor={LECTURE_TOP_ANCHOR}
+                    onEpisodeClick={scrollToLectureTop}
+                  />
+                </>
+              )}
+              series={isSeries && (
+                <SerieDetails
+                  series={series}
+                  embedded
+                  showCredits={false}
                   isAdmin={isAdmin}
-                  onTitleUpdate={handleTitleUpdate}
-                  onResumerUpdate={handleResumerUpdate}
-                  onImageUpdate={handleImageUpdate}
+                  onTitleUpdate={handleSeriesTitleUpdate}
+                  onResumerUpdate={handleSeriesResumerUpdate}
+                  onImageUpdate={handleSeriesImageUpdate}
                   onPremiumUpdate={(newPremium) =>
-                    setVideo((prev) => ({ ...prev, Premium: newPremium }))
+                    setSeries((prev) => ({ ...prev, Premium: newPremium }))
                   }
-                  isFavorite={!!video.IsFavorite}
+                  isFavorite={!!series.IsFavorite}
                   onFavoriteChange={(nextValue) =>
-                    setVideo((prev) => ({ ...prev, IsFavorite: nextValue }))
+                    setSeries((prev) => ({ ...prev, IsFavorite: nextValue }))
                   }
                 />
               )}
-            </div>
-
-            {type === "series" && series && (
-              <>
-                <div className="grid gap-12">
-                  <section className="container mx-auto overflow-visible rounded-2xl border border-sky-500/10 bg-white/80 shadow-xl shadow-slate-950/5 backdrop-blur dark:bg-slate-950/70 dark:shadow-sky-950/20">
-                    <div className="rounded-t-2xl border-b border-sky-500/10 bg-gradient-to-r from-sky-500/15 via-blue-500/10 to-transparent px-6 py-5">
-                      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                        <div>
-                          <p className="text-sm font-bold uppercase text-sky-500 dark:text-sky-400">Épisodes</p>
-                          <h2 className="mt-1 text-2xl font-black text-slate-950 dark:text-white">
-                            Saisons et épisodes
-                          </h2>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={handleResetSeriesWatchStatus}
-                          disabled={isResettingSeries}
-                          className="inline-flex items-center justify-center rounded-lg border border-rose-300/40 bg-rose-500/15 px-5 py-2.5 text-sm font-bold text-rose-700 transition duration-200 hover:border-rose-300/80 hover:bg-rose-500/25 disabled:cursor-not-allowed disabled:opacity-60 dark:text-rose-200"
-                        >
-                          {isResettingSeries ? "Remise à zéro..." : "Recommencer la série"}
-                        </button>
-                      </div>
-                    </div>
-                    <div className="relative p-6">
-                      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_12%_20%,rgba(14,165,233,0.10),transparent_26%),radial-gradient(circle_at_88%_0%,rgba(139,92,246,0.08),transparent_22%)]" />
-                      <div className="relative">
-                        <SeasonList
-                          seasons={series.Saisons}
-                          currentSeason={currentSeason}
-                          onSeasonChange={handleSeasonChange}
-                        />
-                        <EpisodeList
-                          episodes={episodes}
-                          currentEpisode={currentEpisode}
-                          canAccessPremium={isPremiumUser}
-                          linkAnchor={LECTURE_TOP_ANCHOR}
-                          onEpisodeClick={scrollToLectureTop}
-                        />
-                      </div>
-                    </div>
-                  </section>
-                  <div>
-                    <SerieDetails
-                      series={series}
-                      isAdmin={isAdmin}
-                      onTitleUpdate={handleSeriesTitleUpdate}
-                      onResumerUpdate={handleSeriesResumerUpdate}
-                      onImageUpdate={handleSeriesImageUpdate}
-                      onPremiumUpdate={(newPremium) =>
-                        setSeries((prev) => ({ ...prev, Premium: newPremium }))
-                      }
-                      isFavorite={!!series.IsFavorite}
-                      onFavoriteChange={(nextValue) =>
-                        setSeries((prev) => ({ ...prev, IsFavorite: nextValue }))
-                      }
-                    />
-                  </div>
-                </div>
-              </>
-            )}
+              credits={<ContentCredits content={isSeries ? series : video} isSeries={isSeries} embedded />}
+              sagas={renderSagaSection()}
+              universes={contentUniverses.length > 0 && <ContentUniverseSection universes={contentUniverses} embedded />}
+            />
 
             {(user?.GradeID === 1 || user?.GradeID === 2) && (
               <section className="container mx-auto overflow-visible rounded-2xl border border-sky-500/10 bg-white/80 shadow-xl shadow-slate-950/5 backdrop-blur dark:bg-slate-950/70 dark:shadow-sky-950/20">
@@ -979,10 +967,6 @@ const VideoSeePage = ({ PlayerComponent = VideoPlayer }) => {
                 </div>
               </section>
             )}
-
-            <ContentUniverseSection universes={contentUniverses} />
-
-            {renderSagaSection()}
 
             {/* recommandations personnalisées */}
             {renderRecommendationSection("Recommandations proches de vos goûts", similarPanel)}

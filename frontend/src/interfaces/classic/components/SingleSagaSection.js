@@ -3,7 +3,7 @@ import api from "../../../services/api";
 import VideoList from "./VideoList";
 import { getCurrentSagaContent, orderSagaContents } from "../../../utils/sagaPlayback";
 
-const SingleSagaSection = ({ saga, videoId, seriesId, linkAnchor, onContentClick, onContentsLoaded }) => {
+const SingleSagaSection = ({ saga, videoId, seriesId, linkAnchor, onContentClick, onContentsLoaded, embedded = false }) => {
   const [contents, setContents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -34,13 +34,15 @@ const SingleSagaSection = ({ saga, videoId, seriesId, linkAnchor, onContentClick
   const currentContent = getCurrentSagaContent(orderedContents, videoId, seriesId);
 
   return (
-    <section className="container mx-auto overflow-hidden rounded-2xl border border-sky-500/10 bg-white/80 shadow-xl shadow-slate-950/5 backdrop-blur dark:bg-slate-950/70 dark:shadow-sky-950/20" aria-label={`Contenus de la saga ${saga.Titre}`}>
-      <div className="border-b border-sky-500/10 bg-gradient-to-r from-sky-500/15 via-blue-500/10 to-transparent px-6 py-5">
-        <p className="text-sm font-bold uppercase text-sky-500 dark:text-sky-400">Sagas</p>
-        <h2 className="mt-1 text-2xl font-black text-slate-950 dark:text-white">{saga.Titre}</h2>
-      </div>
-      <div className="relative p-6" aria-busy={loading}>
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_12%_20%,rgba(14,165,233,0.10),transparent_26%),radial-gradient(circle_at_88%_0%,rgba(139,92,246,0.08),transparent_22%)]" />
+    <section className={embedded ? undefined : "container mx-auto overflow-hidden rounded-2xl border border-sky-500/10 bg-white/80 shadow-xl shadow-slate-950/5 backdrop-blur dark:bg-slate-950/70 dark:shadow-sky-950/20"} aria-label={`Contenus de la saga ${saga.Titre}`}>
+      {embedded ? <h3 className="mb-5 text-xl font-black text-slate-950 dark:text-white">{saga.Titre}</h3> : (
+        <div className="border-b border-sky-500/10 bg-gradient-to-r from-sky-500/15 via-blue-500/10 to-transparent px-6 py-5">
+          <p className="text-sm font-bold uppercase text-sky-500 dark:text-sky-400">Sagas</p>
+          <h2 className="mt-1 text-2xl font-black text-slate-950 dark:text-white">{saga.Titre}</h2>
+        </div>
+      )}
+      <div className={embedded ? "relative" : "relative p-6"} aria-busy={loading}>
+        {!embedded && <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_12%_20%,rgba(14,165,233,0.10),transparent_26%),radial-gradient(circle_at_88%_0%,rgba(139,92,246,0.08),transparent_22%)]" />}
         <div className="relative">
           {loading ? <p className="text-sm font-semibold text-slate-500 dark:text-slate-300">Chargement des contenus de la saga…</p>
             : error ? <div role="alert" className="text-sm text-red-700 dark:text-red-300">

@@ -95,6 +95,20 @@ describe("champs d'édition des détails de contenu", () => {
     );
   });
 
+  test.each(["film", "série"])("intègre les détails du %s sans carte ni en-tête et conserve l'édition", async (kind) => {
+    const content = createContent({ VideoID: 12, SeriesID: 34,
+      Acteurs: [{ PersonneID: 2, Prenom: "Acteur", Nom: "Crédits séparés" }],
+    });
+    const { container } = render(kind === "film"
+      ? <VideoDetails video={content} embedded showCredits={false} />
+      : <SerieDetails series={content} embedded showCredits={false} />);
+    expect(container.querySelector("section")).not.toHaveAttribute("class");
+    expect(screen.getAllByRole("heading", { name: content.Titre })).toHaveLength(1);
+    expect(screen.queryByText("Acteur Crédits séparés")).not.toBeInTheDocument();
+    fireEvent.click(await screen.findByTitle("Modifier le titre"));
+    expect(screen.getByLabelText(kind === "film" ? "Titre du film" : "Titre de la série")).toBeVisible();
+  });
+
   test("conserve les acteurs et réalisateurs sans photo dans les crédits du film", () => {
     render(<VideoDetails video={createContent({
       VideoID: 12,

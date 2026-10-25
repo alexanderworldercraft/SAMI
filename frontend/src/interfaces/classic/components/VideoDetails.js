@@ -8,7 +8,7 @@ import {
 } from "@heroicons/react/24/outline";
 import api from '../../../services/api';
 import ImageUploader from "../../../components/ImageUploader"; // ⬅️ nouveau
-import VideoList from "./VideoList";
+import ContentCredits from "./ContentCredits";
 import GenreList from "../../../components/GenreList";
 import FavoriteButton from "../../../components/FavoriteButton";
 import {
@@ -18,7 +18,6 @@ import {
   editButtonClass,
   saveButtonClass,
 } from "./contentDetailStyles";
-import { scrollToPageTop } from "../../../utils/scrollToPageTop";
 
 const apiUrl = process.env.REACT_APP_URL_LOCAL;
 
@@ -36,6 +35,8 @@ const VideoDetails = ({
   onNotify,
   isFavorite = false,
   onFavoriteChange,
+  embedded = false,
+  showCredits = true,
 }) => {
   // --- états existants
   const [isEditingTitle, setIsEditingTitle] = useState(false);
@@ -223,21 +224,6 @@ const VideoDetails = ({
     }
   };
 
-  const toPersonCards = (arr = []) =>
-    arr.map(p => ({
-      type: "person",
-      id: p.PersonneID,
-      Titre: [p.Prenom, p.Nom].filter(Boolean).join(" ") || p.Surnom || "Personne sans nom",
-      Surnom: p.Surnom,
-      CheminImage: p.CheminImage,
-      Personnages: p.Personnages || [],
-      MissingImageLabel: p.CheminImage ? null : "Photo manquante pour cette personne",
-      Genres: [], // inutilisé
-    }));
-
-  const realisateurCards = toPersonCards(video?.Realisateurs);
-  const acteurCards = toPersonCards(video?.Acteurs);
-
   const canEdit = user && (user.GradeID === 1 || user.GradeID === 2);
   const imageUrl = video?.CheminImage ? `${apiUrl}/${video.CheminImage}` : null;
 
@@ -262,12 +248,14 @@ const VideoDetails = ({
 
   return (
     <>
-      <section className="container mx-auto overflow-visible rounded-2xl border border-sky-500/10 bg-white/80 shadow-xl shadow-slate-950/5 backdrop-blur dark:bg-slate-950/70 dark:shadow-sky-950/20">
-        <div className="rounded-t-2xl border-b border-sky-500/10 bg-gradient-to-r from-sky-500/15 via-blue-500/10 to-transparent px-6 py-5">
-          <p className="text-sm font-bold uppercase text-sky-500 dark:text-sky-400">Détails</p>
-          <h2 className="mt-1 text-2xl font-black text-slate-950 dark:text-white">{video.Titre}</h2>
-        </div>
-      <div className="relative grid gap-4 p-6 sm:grid-cols-2 md:grid-cols-4 xl:grid-cols-8">
+      <section className={embedded ? undefined : "container mx-auto overflow-visible rounded-2xl border border-sky-500/10 bg-white/80 shadow-xl shadow-slate-950/5 backdrop-blur dark:bg-slate-950/70 dark:shadow-sky-950/20"}>
+        {!embedded && (
+          <div className="rounded-t-2xl border-b border-sky-500/10 bg-gradient-to-r from-sky-500/15 via-blue-500/10 to-transparent px-6 py-5">
+            <p className="text-sm font-bold uppercase text-sky-500 dark:text-sky-400">Détails</p>
+            <h2 className="mt-1 text-2xl font-black text-slate-950 dark:text-white">{video.Titre}</h2>
+          </div>
+        )}
+      <div className={`relative grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-4 xl:grid-cols-8 ${embedded ? "" : "p-6"}`}>
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_12%_20%,rgba(14,165,233,0.10),transparent_26%),radial-gradient(circle_at_88%_0%,rgba(139,92,246,0.08),transparent_22%)]" />
         {/* --- Bloc visuel --- */}
         <div className="relative md:col-span-2 xl:col-span-2">
@@ -594,35 +582,9 @@ const VideoDetails = ({
 
 
       </div>
-        <div className="px-6 pb-6"><VideoCreditPanel key={video.VideoID} videoId={video.VideoID} videoElement={videoElement} data={creditData} error={creditError} onRefresh={onCreditsRefresh} /></div>
+        <div className={embedded ? undefined : "px-6 pb-6"}><VideoCreditPanel key={video.VideoID} videoId={video.VideoID} videoElement={videoElement} data={creditData} error={creditError} onRefresh={onCreditsRefresh} /></div>
       </section>
-      {(realisateurCards.length > 0 || acteurCards.length > 0) && (
-        <section className="container mx-auto overflow-hidden rounded-2xl border border-sky-500/10 bg-white/80 shadow-xl shadow-slate-950/5 backdrop-blur dark:bg-slate-950/70 dark:shadow-sky-950/20">
-          <div className="border-b border-sky-500/10 bg-gradient-to-r from-sky-500/15 via-blue-500/10 to-transparent px-6 py-5">
-            <p className="text-sm font-bold uppercase text-sky-500 dark:text-sky-400">Crédits</p>
-            <h2 className="mt-1 text-2xl font-black text-slate-950 dark:text-white">Détails de production</h2>
-          </div>
-          <div className="relative p-6">
-            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_12%_20%,rgba(14,165,233,0.10),transparent_26%),radial-gradient(circle_at_88%_0%,rgba(139,92,246,0.08),transparent_22%)]" />
-            <div className="relative">
-          {realisateurCards.length > 0 && (
-            <div className="mt-6">
-              <h3 className="mb-3 text-lg font-black text-slate-950 dark:text-white">Réalisation</h3>
-              <VideoList videos={realisateurCards} onPersonClick={scrollToPageTop} />
-            </div>
-          )}
-
-          {acteurCards.length > 0 && (
-            <div className="mt-6">
-              <h3 className="mb-3 text-lg font-black text-slate-950 dark:text-white">Distribution</h3>
-              {/* même grille que VideoListPage: les cartes s’alignent par lignes */}
-              <VideoList videos={acteurCards} onPersonClick={scrollToPageTop} />
-            </div>
-          )}
-            </div>
-          </div>
-        </section>
-      )}
+      {showCredits && <ContentCredits content={video} />}
     </>
   );
 };
