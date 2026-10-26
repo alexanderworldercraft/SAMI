@@ -9,6 +9,11 @@ import {
   VIDEO_MEDIA_TOKEN_USE,
 } from "../services/videoMediaAccessToken.js";
 
+const database = vi.hoisted(() => ({ userSession: { findUnique: vi.fn() } }));
+vi.mock("../services/db.js", () => ({ prisma: database }));
+const sessionId = "00000000-0000-4000-8000-000000000007";
+const session = { UserSessionID: sessionId, UtilisateurID: 7, Scope: "session", AuthVersion: 1,
+  ExpiresAt: new Date(Date.now()+3600000), Utilisateur: { UtilisateurID: 7, EtatID: 1, AuthVersion: 1, PasswordChangeRequired: false } };
 const createReply = () => ({
   statusCode: 200,
   payload: null,
@@ -28,7 +33,7 @@ describe("videoMediaAccessToken", () => {
     const token = createVideoMediaAccessToken({
       userId: 7,
       videoId: 42,
-      sessionExpiresAt: now + 900,
+      sessionExpiresAt: now + 900, sessionId, authVersion: 1,
     });
 
     const decoded = verifyVideoMediaAccessToken(token, 42);
@@ -42,23 +47,24 @@ describe("videoMediaAccessToken", () => {
   });
 
   it("autorise le HLS avec l'en-tête média sans rendre le jeton valable sur l'API", async () => {
-    const token = createVideoMediaAccessToken({ userId: 7, videoId: 42 });
+    const token = createVideoMediaAccessToken({ userId: 7, videoId: 42, sessionId, authVersion: 1 });
     const mediaRequest = {
       headers: { [VIDEO_MEDIA_TOKEN_HEADER]: token },
       params: { videoId: "42" },
     };
+    database.userSession.findUnique.mockResolvedValue(session);
     const mediaReply = createReply();
 
     await mediaAuthMiddleware(mediaRequest, mediaReply);
     expect(mediaReply.statusCode).toBe(200);
-    expect(mediaRequest.user).toMatchObject({ userId: 7, videoId: 42 });
+    expect(mediaRequest.user).toMatchObject({ userId: 7, videoId: 42, sessionId, authVersion: 1 });
 
     const apiReply = createReply();
     await authMiddleware({
       headers: { authorization: `Bearer ${token}` },
     }, apiReply);
     expect(apiReply.statusCode).toBe(401);
-    expect(apiReply.payload).toEqual({ error: "Invalid token scope" });
+    expect(apiReply.payload.code).toBe("INVALID_SESSION");
   });
 
   it("refuse un jeton signé qui n'est pas une autorisation média SAMI", async () => {

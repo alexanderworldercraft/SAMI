@@ -244,7 +244,7 @@ export const getRecommandation1 = async (request, reply) => {
   const { genre } = request.params;
   // Genre
   let currentGenres = [genre];
-  const userId = getUserIdFromRequest(request);
+  const userId = await getUserIdFromRequest(request);
 
   try {
     // Récupérer les vidéos indépendantes
@@ -332,7 +332,7 @@ export const getRecommandation1 = async (request, reply) => {
 export const getRecommandationsParGenres = async (request, reply) => {
   const { id } = request.params;
   //console.log(`Récupération des recommandations pour l'ID : ${id}`);
-  const userId = getUserIdFromRequest(request);
+  const userId = await getUserIdFromRequest(request);
 
   try {
     // Récupérer les détails du film/série actuel
@@ -963,7 +963,7 @@ export const getVideosAndSeries = async (request, reply) => {
 
     // Fusion
     let allItems = [...seriesWithFirstVideo, ...filmItems];
-    const userId = getUserIdFromRequest(request);
+    const userId = await getUserIdFromRequest(request);
 
     // ---- ONGOING SERIES (filtre global) ----
     if (isOngoingRequested) {
@@ -1361,7 +1361,7 @@ export const getMostWatchedLast30Days = async (request, reply) => {
       .slice(0, 8)
       .map((entry) => entry.item);
 
-    const userId = getUserIdFromRequest(request);
+    const userId = await getUserIdFromRequest(request);
     const withWatchStatus = await attachWatchStatus(sorted, userId);
 
     return reply.send(withWatchStatus);
@@ -1451,6 +1451,8 @@ export const getVideoDetails = async (request, reply) => {
       userId,
       videoId,
       sessionExpiresAt: request.user?.exp,
+      sessionId: request.user?.sessionId,
+      authVersion: request.user?.authVersion,
     });
 
     // 3) Contrôle d'accès premium

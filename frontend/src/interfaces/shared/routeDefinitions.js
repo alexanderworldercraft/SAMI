@@ -4,6 +4,7 @@ export const APP_ROUTES = Object.freeze([
   { path: "/login", page: "login", access: "public", withoutShell: true },
   // L'inscription reste désactivée : même page de connexion qu'auparavant.
   { path: "/register", page: "login", access: "public", withoutShell: true },
+  { path: "/recuperation-mot-de-passe", page: "passwordRecovery", access: "public", withoutShell: true },
   { path: "/profile", page: "profile", access: "user", withFooter: false },
   { path: "/settings", page: "settings", access: "user", withFooter: false },
   { path: "/videos", page: "videos", access: "user" },

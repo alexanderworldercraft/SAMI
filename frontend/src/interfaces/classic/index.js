@@ -1,3 +1,4 @@
+import PasswordRecoveryPage from "../../components/PasswordRecoveryPage";
 import ClassicShell from "./layout/ClassicShell";
 import ClassicPersistentMusicPlayer from "./players/ClassicPersistentMusicPlayer";
 import HomePage from "./pages/HomePage";
@@ -27,6 +28,7 @@ export const classicInterface = Object.freeze({
   pages: Object.freeze({
     home: HomePage,
     login: LoginPage,
+    passwordRecovery: PasswordRecoveryPage,
     profile: ProfilePage,
     settings: SettingsPage,
     videos: VideoListPage,

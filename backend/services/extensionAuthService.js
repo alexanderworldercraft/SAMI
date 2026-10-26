@@ -22,14 +22,16 @@ export function normalizeExtensionClient({ clientId, redirectUri }) {
 
 export async function createExtensionAuthorizationCode({
   userId,
+  authVersion,
   clientId,
   redirectUri,
   codeChallenge,
   extensionName,
 }) {
   const client = normalizeExtensionClient({ clientId, redirectUri });
+  if (!Number.isSafeInteger(authVersion) || authVersion < 0) throw new Error("Session invalide.");
   const challenge = String(codeChallenge || "").trim();
-  if (!/^[A-Za-z0-9_-]{43,128}$/.test(challenge)) {
+  if (!/^[A-Za-z0-9_-]{43}$/.test(challenge)) {
     throw new Error("Challenge PKCE invalide.");
   }
   const code = randomToken();
@@ -37,6 +39,7 @@ export async function createExtensionAuthorizationCode({
     data: {
       ExtensionAuthCodeID: crypto.randomUUID(),
       CodeHash: sha256(code),
+      AuthVersion: authVersion,
       ClientID: client.clientId,
       RedirectURI: client.redirectUri,
       CodeChallenge: challenge,
@@ -68,19 +71,19 @@ export async function exchangeExtensionAuthorizationCode({ code, codeVerifier, c
   const accessToken = `sami_ext_${randomToken(36)}`;
   const tokenId = crypto.randomUUID();
   const expiresAt = new Date(Date.now() + ACCESS_TOKEN_TTL_MS);
-  await prisma.$transaction([
-    prisma.extensionAuthCode.delete({ where: { ExtensionAuthCodeID: record.ExtensionAuthCodeID } }),
-    prisma.extensionAccessToken.create({
-      data: {
-        ExtensionAccessTokenID: tokenId,
-        TokenHash: sha256(accessToken),
-        ClientID: record.ClientID,
-        ExtensionName: record.ExtensionName,
-        UtilisateurID: record.UtilisateurID,
-        ExpiresAt: expiresAt,
-      },
-    }),
-  ]);
+  await prisma.$transaction(async tx => {
+    const user = await tx.utilisateur.findUnique({ where: { UtilisateurID: record.UtilisateurID },
+      select: { EtatID: true, AuthVersion: true, PasswordChangeRequired: true } });
+    if (!user || user.EtatID !== 1 || user.PasswordChangeRequired || user.AuthVersion !== record.AuthVersion) {
+      throw new Error("Autorisation révoquée.");
+    }
+    await tx.extensionAuthCode.delete({ where: { ExtensionAuthCodeID: record.ExtensionAuthCodeID } });
+    await tx.extensionAccessToken.create({ data: {
+      ExtensionAccessTokenID: tokenId, TokenHash: sha256(accessToken), ClientID: record.ClientID,
+      ExtensionName: record.ExtensionName, UtilisateurID: record.UtilisateurID,
+      ExpiresAt: expiresAt, AuthVersion: record.AuthVersion,
+    } });
+  });
   return { accessToken, expiresAt };
 }
 
@@ -88,9 +91,9 @@ export async function findExtensionAccessToken(rawToken) {
   if (!String(rawToken || "").startsWith("sami_ext_")) return null;
   const token = await prisma.extensionAccessToken.findUnique({
     where: { TokenHash: sha256(rawToken) },
-    include: { Utilisateur: { select: { UtilisateurID: true, Surnom: true, GradeID: true, EtatID: true } } },
+    include: { Utilisateur: { select: { UtilisateurID: true, Surnom: true, GradeID: true, EtatID: true, AuthVersion: true, PasswordChangeRequired: true } } },
   });
-  if (!token || token.RevokedAt || token.ExpiresAt <= new Date() || token.Utilisateur.EtatID !== 1) return null;
+  if (!token || token.RevokedAt || token.ExpiresAt <= new Date() || token.Utilisateur.EtatID !== 1 || token.AuthVersion !== token.Utilisateur.AuthVersion || token.Utilisateur.PasswordChangeRequired) return null;
   await prisma.extensionAccessToken.update({
     where: { ExtensionAccessTokenID: token.ExtensionAccessTokenID },
     data: { LastUsedAt: new Date() },

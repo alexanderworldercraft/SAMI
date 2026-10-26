@@ -23,7 +23,7 @@ describe("autorisation administrative du primary IA", () => {
     mocks.approve.mockResolvedValue({ AiSubtitleJobID: "job-42", VideoID: 42 });
   });
   it.each([1, 2])("autorise le grade %i et écrit l’audit avec l’admin authentifié", async (grade) => {
-    mocks.user.mockResolvedValue({ GradeID: grade });
+    mocks.user.mockResolvedValue({ GradeID: grade, EtatID: 1 });
     const request = { user: { userId: 7 }, params: { jobId: "job-42" }, body: { userId: 999 } };
     const reply = replyFor();
     await authorizeAdminAiSubtitlePrimary(request, reply);
@@ -32,7 +32,7 @@ describe("autorisation administrative du primary IA", () => {
     expect(reply.payload).toEqual({ job: { id: "job-42" } });
   });
   it("refuse un utilisateur ordinaire avant toute mutation", async () => {
-    mocks.user.mockResolvedValue({ GradeID: 3 });
+    mocks.user.mockResolvedValue({ GradeID: 3, EtatID: 1 });
     const reply = replyFor();
     await authorizeAdminAiSubtitlePrimary({ user: { userId: 9 }, params: { jobId: "job-42" } }, reply);
     expect(reply.statusCode).toBe(403);

@@ -1,3 +1,4 @@
+import { notifySessionChanged } from "../../../utils/sessionEvents";
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import axios from 'axios';
@@ -74,7 +75,6 @@ const LoginPage = () => {
   const [resetEmail, setResetEmail] = useState('');
   const [resetError, setResetError] = useState('');
   const [resetSuccess, setResetSuccess] = useState('');
-  const [resetTempPassword, setResetTempPassword] = useState('');
 
   // ⬇️ États pour la protection brute-force
   const [isLocked, setIsLocked] = useState(false);        // formulaire bloqué ou non
@@ -209,7 +209,7 @@ const LoginPage = () => {
     }
 
     try {
-      await axios.post(`${apiBaseUrl}/api/users/login`, {
+      const response = await axios.post(`${apiBaseUrl}/api/users/login`, {
         surnom,
         motDePasse,
       }, {
@@ -223,6 +223,8 @@ const LoginPage = () => {
       setError('');
       localStorage.removeItem('token');
 
+      notifySessionChanged(response.data.passwordChangeRequired === true);
+      if (response.data.passwordChangeRequired) return;
       if (extensionRequest) {
         setExtensionAuthenticated(true);
       } else {
@@ -304,7 +306,6 @@ const LoginPage = () => {
     e.preventDefault();
     setResetError('');
     setResetSuccess('');
-    setResetTempPassword('');
 
     const apiBaseUrl = process.env.REACT_APP_URL_LOCAL;
 
@@ -316,16 +317,11 @@ const LoginPage = () => {
 
       setResetSuccess(response.data.message || 'Un email de réinitialisation a été envoyé.');
 
-      // 🧪 Mode dev : si l’API renvoie un mot de passe temporaire, on l’affiche
-      if (response.data.tempPassword) {
-        setResetTempPassword(response.data.tempPassword);
-      }
     } catch (err) {
       console.error('Reset password failed:', err.response?.data || err.message);
       setResetError(err.response?.data?.error || 'Une erreur est survenue lors de la réinitialisation.');
       setResetSuccess('');
-      setResetTempPassword('');
-    }
+      }
   };
 
   return (
@@ -463,19 +459,6 @@ const LoginPage = () => {
               </p>
             )}
 
-            {resetTempPassword && (
-              <div className="mb-3 text-xs text-amber-300 border border-amber-500/50 rounded p-2 bg-amber-950/30">
-                <p className="font-semibold mb-1">Mode développement :</p>
-                <p>Mot de passe temporaire :</p>
-                <p className="font-mono break-all text-amber-200">
-                  {resetTempPassword}
-                </p>
-                <p className="mt-1">
-                  Utilise-le pour te connecter puis change-le dans les paramètres.
-                </p>
-              </div>
-            )}
-
             <form onSubmit={handleResetPassword}>
               <div className="mb-3">
                 <label className="block text-gray-200 text-sm">Surnom</label>
@@ -503,7 +486,7 @@ const LoginPage = () => {
                 type="submit"
                 className="w-full bg-sky-700 hover:bg-sky-800 text-white py-2 rounded text-sm font-semibold"
               >
-                Demander un mot de passe temporaire
+                Envoyer le lien de confirmation
               </button>
             </form>
           </div>

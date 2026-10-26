@@ -1,14 +1,14 @@
-import jwt from "jsonwebtoken";
+import { verifyUserSession } from "../userSessionService.js";
 import { prisma } from "../db.js";
 import { getJwtFromRequest } from "../../middlewares/authMiddleware.js";
 import { ETAT } from "../../constants.js";
 
-export const getUserIdFromRequest = (request) => {
+export const getUserIdFromRequest = async (request) => {
   const token = getJwtFromRequest(request);
   if (!token) return null;
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const decoded = await verifyUserSession(token);
     const userId = decoded?.userId;
     return Number.isFinite(Number(userId)) ? Number(userId) : null;
   } catch (err) {

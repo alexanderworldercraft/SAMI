@@ -263,6 +263,6 @@ describe("createServer", () => {
     });
 
     expect(response.statusCode).toBe(401);
-    expect(response.json()).toEqual({ error: "No token provided" });
+    expect(response.json()).toMatchObject({ code: "INVALID_SESSION" });
   });
 });

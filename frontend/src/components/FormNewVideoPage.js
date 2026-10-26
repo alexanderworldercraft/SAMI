@@ -293,7 +293,7 @@ const FormNewVideoPage = () => {
   };
 
   useEffect(() => {
-    const socket = io(apiUrl);
+    const socket = io(apiUrl, { withCredentials: true });
 
     socket.on("progress", (data) => {
       setTasksHistory((prev) => {

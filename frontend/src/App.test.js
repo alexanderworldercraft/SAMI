@@ -14,7 +14,7 @@ jest.mock("axios", () => ({
   post: jest.fn(),
   put: jest.fn(),
   delete: jest.fn(),
-  create: () => ({ get: jest.fn(), post: jest.fn(), put: jest.fn(), delete: jest.fn() }),
+  create: () => ({ interceptors: { response: { use: jest.fn() } }, get: jest.fn(), post: jest.fn(), put: jest.fn(), delete: jest.fn() }),
 }));
 
 import App from "./App";

@@ -3,13 +3,11 @@
 import { userController } from '../controllers/userController.js';
 import { userRepository } from '../models/user.js';
 import bcrypt from 'bcrypt';
-import jwt from 'jsonwebtoken';
 import dotenv from 'dotenv';
 import { describe, it, expect, vi } from 'vitest';
 
 dotenv.config();
 
-const secretKey = process.env.JWT_SECRET;
 
 describe('userController - Error Cases', () => {
   it('should return 400 error if required fields are missing during registration', async () => {
@@ -64,7 +62,7 @@ describe('userController - Error Cases', () => {
   });
 
   it('should return 403 error if forbidden during user deletion', async () => {
-    const request = { body: { surnom: 'user2' }, headers: { authorization: `Bearer ${jwt.sign({ userId: 1, surnom: 'user1' }, secretKey, { expiresIn: '1h' })}` } };
+    const request = { body: { surnom: 'user2' }, user: { userId: 1, surnom: 'user1' } };
     const reply = { send: vi.fn(), status: vi.fn().mockReturnThis() };
 
     await userController.deleteUser(request, reply);
@@ -74,7 +72,7 @@ describe('userController - Error Cases', () => {
   });
 
   it('should return 400 error if new surnom is missing during surnom update', async () => {
-    const request = { body: { newSurnom: '' }, headers: { authorization: `Bearer ${jwt.sign({ userId: 1, surnom: 'user1' }, secretKey, { expiresIn: '1h' })}` } };
+    const request = { body: { newSurnom: '' }, user: { userId: 1, surnom: 'user1' } };
     const reply = { send: vi.fn(), status: vi.fn().mockReturnThis() };
 
     await userController.updateSurnom(request, reply);
@@ -84,7 +82,7 @@ describe('userController - Error Cases', () => {
   });
 
   it('should return 400 error if new email is missing during email update', async () => {
-    const request = { body: { newEmail: '' }, headers: { authorization: `Bearer ${jwt.sign({ userId: 1, surnom: 'user1' }, secretKey, { expiresIn: '1h' })}` } };
+    const request = { body: { newEmail: '' }, user: { userId: 1, surnom: 'user1' } };
     const reply = { send: vi.fn(), status: vi.fn().mockReturnThis() };
 
     await userController.updateEmail(request, reply);

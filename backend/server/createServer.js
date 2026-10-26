@@ -1,3 +1,4 @@
+import { registerSocketSessionSecurity } from "../services/socketSessionSecurity.js";
 import Fastify from "fastify";
 import fastifyCors from "@fastify/cors";
 import fastifyMultipart from "@fastify/multipart";
@@ -34,6 +35,7 @@ import videoEncodingRoutes from "../routes/videoEncodingRoutes.js";
 import videoRoutes from "../routes/videoRoutes.js";
 import extensionAuthRoutes from "../routes/extensionAuthRoutes.js";
 import { registerSocialPreviewRoute } from "../routes/socialPreviewRoutes.js";
+import { socketAuthMiddleware } from "../middlewares/socketAuthMiddleware.js";
 import { globalRateLimit } from "../middlewares/rateLimitMiddleware.js";
 import {
   createCorsOriginValidator,
@@ -236,7 +238,7 @@ export function createServer({
 } = {}) {
   const server = Fastify({
     ...(https ? { https } : {}),
-    ...(trustProxy ? { trustProxy: true } : {}),
+    ...(trustProxy ? { trustProxy: trustProxy === true ? String(process.env.SAMI_TRUSTED_PROXIES || "loopback").split(",").map(value => value.trim()).filter(Boolean) : trustProxy } : {}),
     ajv: {
       customOptions: { removeAdditional: true },
     },
@@ -245,9 +247,13 @@ export function createServer({
   const io = new SocketIOServer(server.server, {
     cors: {
       origin: getSocketCorsOrigin(publicUrl),
+      credentials: true,
       methods: ["GET", "POST"],
     },
   });
+  io.use(socketAuthMiddleware);
+  const removeSocketSessionListeners = registerSocketSessionSecurity(io);
+  server.addHook("onClose", async () => { removeSocketSessionListeners(); io.disconnectSockets(true); });
   server.decorate("io", io);
 
   registerDocumentation(server, publicHost);

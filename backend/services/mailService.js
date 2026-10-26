@@ -69,10 +69,10 @@ export async function verifySmtpConnection(env = process.env) {
   }
 }
 
-export async function sendPasswordResetEmail(
+export async function sendPasswordRecoveryEmail(
   to,
   surnom,
-  tempPassword,
+  confirmationUrl,
   env = process.env,
   createTransport = nodemailer.createTransport
 ) {
@@ -80,13 +80,16 @@ export async function sendPasswordResetEmail(
   const subject = "Réinitialisation de votre mot de passe SAMI";
   const text = `Bonjour ${surnom},
 
-Un nouveau mot de passe temporaire a été généré pour votre compte SAMI.
+Une récupération de ton compte SAMI a été demandée.
+Confirme cette demande avec ce lien, valable quinze minutes :
+${confirmationUrl}
 
-Nouveau mot de passe temporaire : ${tempPassword}
+Ton mot de passe actuel reste inchangé jusqu’à la confirmation du lien.
+Les sessions existantes sont déconnectées dès que cette demande est envoyée.
+Après confirmation, un mot de passe temporaire sera affiché une seule fois.
+Sa première utilisation imposera de choisir un nouveau mot de passe personnel.
 
-Connectez-vous avec ce mot de passe puis changez-le dans vos paramètres dès que possible.
-
-Si vous n'êtes pas à l'origine de cette demande, il est conseillé de prévenir l'administrateur.
+Si tu n’es pas à l’origine de cette demande, ignore ce message et contacte l’administrateur.
 
 — SAMI`;
 

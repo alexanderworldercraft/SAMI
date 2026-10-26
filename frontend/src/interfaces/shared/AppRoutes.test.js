@@ -24,9 +24,9 @@ const definition = { Shell, pages: Object.fromEntries(APP_ROUTES.filter((route) 
 const routes = () => AppRoutes({ interfaceDefinition: definition }).props.children;
 const find = (path) => routes().find((route) => route.props.path === path).props.element;
 
-test("conserve les 20 URL de l'application, y compris les paramètres des fiches et du lecteur", () => {
+test("conserve les URL et ajoute la récupération de l'application, y compris les paramètres des fiches et du lecteur", () => {
   expect(routes().map((route) => route.props.path)).toEqual([
-    "/login", "/register", "/profile", "/settings", "/videos", "/sagas", "/musique", "/voix",
+    "/login", "/register", "/recuperation-mot-de-passe", "/profile", "/settings", "/videos", "/sagas", "/musique", "/voix",
     "/personnes", "/personnes/:id", "/lecture/:id", "/administration", "/nouvelle-video", "/nouvelle-musique",
     "/updates", "/stats", "/politique-confidentialite", "/conditions-utilisation", "/conformite-donnees", "/",
   ]);

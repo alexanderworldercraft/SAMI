@@ -3,13 +3,16 @@
 import { userController } from '../controllers/userController.js';
 import { userRepository } from '../models/user.js';
 import bcrypt from 'bcrypt';
-import jwt from 'jsonwebtoken';
 import dotenv from 'dotenv';
 import { describe, it, expect, vi } from 'vitest';
 
 dotenv.config();
 
-const secretKey = process.env.JWT_SECRET;
+vi.mock("../services/db.js", () => ({ prisma: {
+  utilisateur: { update: vi.fn().mockResolvedValue({}) },
+  action: { findUnique: vi.fn().mockResolvedValue(null) },
+  userSession: { create: vi.fn().mockResolvedValue({}), deleteMany: vi.fn().mockResolvedValue({count:0}) },
+} }));
 
 describe('userController', () => {
   it('should register a new user', async () => {
@@ -34,13 +37,13 @@ describe('userController', () => {
 
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash('password123', salt);
-    const mockUser = { UtilisateurID: 1, Surnom: 'user1', MotDePasse: hashedPassword, Salt: salt };
+    const mockUser = { UtilisateurID: 1, Surnom: 'user1', MotDePasse: hashedPassword, Salt: salt, EtatID: 1, GradeID: 3, AuthVersion: 0, PasswordChangeRequired: false };
 
     vi.spyOn(userRepository, 'getUserBySurnom').mockResolvedValue(mockUser);
 
     await userController.login(request, reply);
 
-    expect(reply.send).toHaveBeenCalled();
+    expect(reply.send).toHaveBeenCalledWith({ message: 'Connexion réussie', passwordChangeRequired: false });
   });
 
   it('should update user password', async () => {
@@ -60,7 +63,7 @@ describe('userController', () => {
   });
 
   it('should delete user', async () => {
-    const request = { body: { surnom: 'user1' }, headers: { authorization: `Bearer ${jwt.sign({ userId: 1, surnom: 'user1' }, secretKey, { expiresIn: '1h' })}` } };
+    const request = { body: { surnom: 'user1' }, user: { userId: 1, surnom: 'user1' } };
     const reply = { send: vi.fn(), status: vi.fn().mockReturnThis() };
 
     const mockUser = { UtilisateurID: 1, surnom: 'user1' };
@@ -83,7 +86,7 @@ describe('userController', () => {
   });
 
   it('should not delete user if forbidden', async () => {
-    const request = { body: { surnom: 'user2' }, headers: { authorization: `Bearer ${jwt.sign({ userId: 1, surnom: 'user1' }, secretKey, { expiresIn: '1h' })}` } };
+    const request = { body: { surnom: 'user2' }, user: { userId: 1, surnom: 'user1' } };
     const reply = { send: vi.fn(), status: vi.fn().mockReturnThis() };
 
     await userController.deleteUser(request, reply);
@@ -92,7 +95,7 @@ describe('userController', () => {
   });
 
   it('should update user surnom', async () => {
-    const request = { body: { newSurnom: 'newUser1' }, headers: { authorization: `Bearer ${jwt.sign({ userId: 1, surnom: 'user1' }, secretKey, { expiresIn: '1h' })}` } };
+    const request = { body: { newSurnom: 'newUser1' }, user: { userId: 1, surnom: 'user1' } };
     const reply = { send: vi.fn(), status: vi.fn().mockReturnThis() };
 
     vi.spyOn(userRepository, 'updateUserSurnom').mockResolvedValue({});
@@ -103,7 +106,7 @@ describe('userController', () => {
   });
 
   it('should update user email', async () => {
-    const request = { body: { newEmail: 'newuser1@example.com' }, headers: { authorization: `Bearer ${jwt.sign({ userId: 1, surnom: 'user1' }, secretKey, { expiresIn: '1h' })}` } };
+    const request = { body: { newEmail: 'newuser1@example.com' }, user: { userId: 1, surnom: 'user1' } };
     const reply = { send: vi.fn(), status: vi.fn().mockReturnThis() };
 
     vi.spyOn(userRepository, 'updateUserEmail').mockResolvedValue({});
@@ -114,7 +117,7 @@ describe('userController', () => {
   });
 
   it('should update user profile image', async () => {
-    const request = { body: { cheminImage: 'path/to/new/image.jpg' }, headers: { authorization: `Bearer ${jwt.sign({ userId: 1, surnom: 'user1' }, secretKey, { expiresIn: '1h' })}` } };
+    const request = { body: { cheminImage: 'path/to/new/image.jpg' }, user: { userId: 1, surnom: 'user1' } };
     const reply = { send: vi.fn(), status: vi.fn().mockReturnThis() };
 
     vi.spyOn(userRepository, 'updateUserProfileImage').mockResolvedValue({});
@@ -125,7 +128,7 @@ describe('userController', () => {
   });
 
   it('should delete user profile image', async () => {
-    const request = { headers: { authorization: `Bearer ${jwt.sign({ userId: 1, surnom: 'user1' }, secretKey, { expiresIn: '1h' })}` } };
+    const request = { user: { userId: 1, surnom: 'user1' } };
     const reply = { send: vi.fn(), status: vi.fn().mockReturnThis() };
 
     vi.spyOn(userRepository, 'deleteUserProfileImage').mockResolvedValue({});

@@ -1,4 +1,5 @@
 import React from "react";
+import PasswordChangeGate from "./components/PasswordChangeGate";
 import { BrowserRouter as Router } from "react-router-dom";
 import { NavProvider } from "./context/NavContext";
 import { MusicPlayerProvider } from "./context/MusicPlayerContext";
@@ -13,11 +14,13 @@ export default function App() {
     <NavProvider>
       <MusicPlayerProvider>
         <Router>
+          <PasswordChangeGate>
           <AiFeaturePreferenceProvider>
             <InterfacePreferenceProvider>
               <InterfaceRenderer />
             </InterfacePreferenceProvider>
           </AiFeaturePreferenceProvider>
+          </PasswordChangeGate>
         </Router>
       </MusicPlayerProvider>
     </NavProvider>

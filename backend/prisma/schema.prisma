@@ -614,6 +614,12 @@ model Utilisateur {
   CreateDate              DateTime?               @default(now())
   LastLogin               DateTime?
   PremiumEndDate          DateTime?
+  AuthVersion             Int                     @default(0)
+  PasswordChangeRequired  Boolean                 @default(false)
+  RecoveryPasswordExpiresAt DateTime?
+  RecoveryPasswordUsedAt  DateTime?
+  Sessions                UserSession[]
+  PasswordRecoveries      PasswordRecovery[]
   Log                     Log[]
   Albums                  Album[]
   AlbumMusiques           AlbumMusique[]
@@ -649,7 +655,43 @@ model Utilisateur {
   @@index([EtatID], map: "Utilisateur_EtatID_fkey")
 }
 
+model UserSession {
+  UserSessionID String @id @db.VarChar(36)
+  UtilisateurID Int
+  AuthVersion Int
+  Scope String @db.VarChar(24)
+  ExpiresAt DateTime
+  CreatedAt DateTime @default(now())
+  Utilisateur Utilisateur @relation(fields: [UtilisateurID], references: [UtilisateurID], onDelete: Cascade)
+
+  @@index([UtilisateurID])
+  @@index([ExpiresAt])
+}
+
+model PasswordRecovery {
+  PasswordRecoveryID String @id @db.VarChar(36)
+  TokenHash String @unique @db.Char(64)
+  UtilisateurID Int
+  ExpiresAt DateTime
+  DeliveredAt DateTime?
+  ConsumedAt DateTime?
+  CreatedAt DateTime @default(now())
+  Utilisateur Utilisateur @relation(fields: [UtilisateurID], references: [UtilisateurID], onDelete: Cascade)
+
+  @@index([UtilisateurID, ConsumedAt])
+  @@index([ExpiresAt])
+}
+
+model SecurityRateLimit {
+  KeyHash String @id @db.Char(64)
+  Count Int @default(0)
+  ResetAt DateTime
+
+  @@index([ResetAt])
+}
+
 model ExtensionAuthCode {
+  AuthVersion Int @default(0)
   ExtensionAuthCodeID String      @id @db.VarChar(36)
   CodeHash            String      @unique @db.Char(64)
   ClientID            String      @db.VarChar(64)
@@ -666,6 +708,7 @@ model ExtensionAuthCode {
 }
 
 model ExtensionAccessToken {
+  AuthVersion Int @default(0)
   ExtensionAccessTokenID String      @id @db.VarChar(36)
   TokenHash              String      @unique @db.Char(64)
   ClientID               String      @db.VarChar(64)

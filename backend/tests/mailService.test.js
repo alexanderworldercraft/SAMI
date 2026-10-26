@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   createSmtpTransport,
   getSmtpConfig,
-  sendPasswordResetEmail,
+  sendPasswordRecoveryEmail,
 } from "../services/mailService.js";
 
 const smtpEnv = (overrides = {}) => ({
@@ -67,10 +67,10 @@ describe("service SMTP", () => {
     const close = vi.fn();
     const createTransport = vi.fn(() => ({ sendMail, close }));
 
-    await sendPasswordResetEmail(
+    await sendPasswordRecoveryEmail(
       "patrick@example.com",
       "Patrick",
-      "Temporaire-123!",
+      "https://sami.test/recuperation-mot-de-passe#token=synthetic",
       smtpEnv(),
       createTransport
     );
@@ -79,7 +79,7 @@ describe("service SMTP", () => {
       from: '"SAMI" <no-reply@example.com>',
       to: "patrick@example.com",
       subject: "Réinitialisation de votre mot de passe SAMI",
-      text: expect.stringContaining("Temporaire-123!"),
+      text: expect.stringContaining("https://sami.test/recuperation-mot-de-passe#token=synthetic"),
     }));
     expect(close).toHaveBeenCalledOnce();
   });

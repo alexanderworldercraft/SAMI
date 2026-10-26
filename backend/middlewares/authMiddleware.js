@@ -1,58 +1,23 @@
-// middlewares/authMiddleware.js
-
-import jwt from 'jsonwebtoken';
-import dotenv from 'dotenv';
 import { AUTH_COOKIE_NAME } from "../constants.js";
-import { isVideoMediaAccessToken } from "../services/videoMediaAccessToken.js";
-
-dotenv.config();
-const secretKey = process.env.JWT_SECRET;
+import { verifyUserSession } from "../services/userSessionService.js";
 
 export function getCookieValue(request, name) {
-  const cookieHeader = request.headers.cookie;
-  if (!cookieHeader) return null;
-
-  const cookies = cookieHeader.split(";").map((cookie) => cookie.trim());
-  const prefix = `${name}=`;
-  const cookie = cookies.find((entry) => entry.startsWith(prefix));
+  const cookie = String(request.headers.cookie || "").split(";").map(value => value.trim()).find(value => value.startsWith(`${name}=`));
   if (!cookie) return null;
-
-  return decodeURIComponent(cookie.slice(prefix.length));
+  try { return decodeURIComponent(cookie.slice(name.length + 1)); } catch { return null; }
 }
-
 export function getJwtFromRequest(request) {
-  const authHeader = request.headers["authorization"];
-  if (authHeader?.startsWith("Bearer ")) {
-    return authHeader.split(" ")[1] || null;
-  }
-
-  return getCookieValue(request, AUTH_COOKIE_NAME);
+  const header = request.headers.authorization;
+  return typeof header === "string" && header.startsWith("Bearer ") ? header.slice(7).trim() : getCookieValue(request, AUTH_COOKIE_NAME);
 }
-
-export const authMiddleware = async (request, reply) => {
+const authenticate = allowPasswordChange => async (request, reply) => {
   try {
-    if (!secretKey) {
-      console.error("JWT_SECRET is not configured");
-      return reply.status(500).send({ error: "Authentication configuration error" });
-    }
-
     const token = getJwtFromRequest(request);
-    if (!token) {
-      return reply.status(401).send({ error: "No token provided" });
-    }
-
-    // Vérification du token (mode sync pour éviter double-callback)
-    const decoded = jwt.verify(token, secretKey);
-    if (isVideoMediaAccessToken(decoded)) {
-      return reply.status(401).send({ error: "Invalid token scope" });
-    }
-    request.user = decoded;
-  } catch (err) {
-    if (err?.name === "TokenExpiredError") {
-      console.error("Token expired at:", err.expiredAt);
-      return reply.status(401).send({ error: "Token expired", expiredAt: err.expiredAt });
-    }
-    console.error("Invalid token:", err?.message || err);
-    return reply.status(401).send({ error: "Invalid token" });
+    if (!token) return reply.status(401).send({ error: "Session requise.", code: "INVALID_SESSION" });
+    request.user = await verifyUserSession(token, { allowPasswordChange });
+  } catch (error) {
+    return reply.status(error.statusCode || 503).send({ error: error.statusCode ? error.message : "Authentification momentanément indisponible.", code: error.code || "AUTH_UNAVAILABLE" });
   }
 };
+export const authMiddleware = authenticate(false);
+export const sessionAuthMiddleware = authenticate(true);

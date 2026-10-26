@@ -15,13 +15,13 @@ export const extensionAuthController = {
       if (!/^[A-Za-z0-9_-]{32,128}$/.test(String(request.body?.state || ""))) {
         return reply.status(400).send({ error: "État d'autorisation invalide." });
       }
-      const result = await createExtensionAuthorizationCode({ userId: admin.userId, ...request.body });
+      const result = await createExtensionAuthorizationCode({ ...request.body, userId: admin.userId, authVersion: request.user.authVersion });
       const callback = new URL(result.redirectUri);
       callback.searchParams.set("code", result.code);
       callback.searchParams.set("state", String(request.body?.state || ""));
       return reply.send({ redirectUrl: callback.toString() });
     } catch (error) {
-      return reply.status(400).send({ error: error.message });
+      return reply.status(400).send({ error: "Autorisation de l’extension refusée ou expirée." });
     }
   },
 
@@ -34,7 +34,7 @@ export const extensionAuthController = {
         expiresAt: result.expiresAt.toISOString(),
       });
     } catch (error) {
-      return reply.status(400).send({ error: error.message });
+      return reply.status(400).send({ error: "Autorisation de l’extension refusée ou expirée." });
     }
   },
 

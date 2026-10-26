@@ -44,29 +44,9 @@ async function withDedupeLock(lockKey, fn) {
   }
 }
 
-/**
- * Récupère l'IP "réelle" de l'utilisateur en tenant compte du reverse proxy (Nginx).
- * - x-forwarded-for peut contenir plusieurs IP: "client, proxy1, proxy2"
- * - On prend la première (la plus à gauche).
- */
+/** Fastify resolves trusted proxy hops; never trust forwarding headers here. */
 export function getClientIp(request) {
-  const xff = request.headers["x-forwarded-for"];
-  if (typeof xff === "string") {
-    const first = xff.split(",")[0]?.trim();
-    if (first) return first;
-  } else if (Array.isArray(xff) && xff.length > 0) {
-    const first = String(xff[0] || "").split(",")[0]?.trim();
-    if (first) return first;
-  }
-
-  const xRealIp = request.headers["x-real-ip"];
-  if (typeof xRealIp === "string" && xRealIp.trim()) return xRealIp.trim();
-
-  // Fastify peut fournir request.ip
-  if (request.ip) return request.ip;
-
-  // Fallback Node
-  return request.socket?.remoteAddress || null;
+  return request.ip || request.socket?.remoteAddress || null;
 }
 
 export function getUserAgent(request) {

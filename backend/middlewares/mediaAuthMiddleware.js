@@ -1,3 +1,4 @@
+import { validateSessionClaims } from "../services/userSessionService.js";
 import { authMiddleware } from "./authMiddleware.js";
 import { verifyVideoMediaAccessToken } from "../services/videoMediaAccessToken.js";
 
@@ -9,7 +10,9 @@ export const mediaAuthMiddleware = async (request, reply) => {
   if (!mediaToken) return authMiddleware(request, reply);
 
   try {
-    request.user = verifyVideoMediaAccessToken(mediaToken, request.params?.videoId);
+    const decoded = verifyVideoMediaAccessToken(mediaToken, request.params?.videoId);
+    const session = await validateSessionClaims({ ...decoded, tokenUse: "session" });
+    request.user = { ...session, tokenUse: decoded.tokenUse, videoId: decoded.videoId };
   } catch (error) {
     console.error("Invalid video media token:", error?.message || error);
     return reply.status(401).send({ error: "Invalid media access token" });

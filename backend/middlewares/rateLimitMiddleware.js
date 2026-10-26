@@ -24,12 +24,21 @@ export function createRateLimit({
   skip,
 } = {}) {
   const store = getStore(keyPrefix);
+  let lastCleanup = 0;
 
   return async function rateLimitMiddleware(request, reply) {
     if (skip?.(request)) return;
 
     const now = Date.now();
+    if (now - lastCleanup >= 60_000) {
+      for (const [key, value] of store) if (value.resetAt <= now) store.delete(key);
+      lastCleanup = now;
+    }
     const key = getRateLimitKey(request, keyPrefix, keyGenerator);
+    if (!store.has(key) && store.size >= 10_000) {
+      reply.header("Retry-After", "60");
+      return reply.status(429).send({ error: "Trop de requêtes. Réessaie plus tard.", retryAfter: 60 });
+    }
     const existing = store.get(key);
     const entry = existing && existing.resetAt > now
       ? existing
@@ -92,12 +101,6 @@ export const registerRateLimit = createRateLimit({
   keyPrefix: "register",
   windowMs: 60 * 60_000,
   max: 10,
-});
-
-export const passwordResetRateLimit = createRateLimit({
-  keyPrefix: "password-reset",
-  windowMs: 60 * 60_000,
-  max: 5,
 });
 
 export const videoExportAuthorizationRateLimit = createRateLimit({

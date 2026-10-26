@@ -2,7 +2,7 @@
 
 SAMI (**Système d’Archivage Multimédia Intégré**) est une médiathèque web privée permettant d’organiser, diffuser et suivre des films, séries et musiques depuis une seule interface.
 
-La version actuelle est la **8.6.0**. Elle repose sur un backend Fastify, une interface React, Prisma avec MySQL, un pipeline vidéo FFmpeg/HLS et Socket.IO pour le retour en temps réel des traitements.
+La version actuelle est la **8.7.0**. Elle repose sur un backend Fastify, une interface React, Prisma avec MySQL, un pipeline vidéo FFmpeg/HLS et Socket.IO pour le retour en temps réel des traitements.
 
 ## Fonctionnalités
 
@@ -98,6 +98,19 @@ Les URL, les droits d'accès, les services et les contextes restent communs.
 indique le mode réellement affiché. Aucun changement de BDD pour cette étape.
 Voir [l'organisation et le contrat des interfaces](frontend/src/interfaces/README.md).
 
+## Nouveautés de la version 8.7.0
+
+- récupération par lien email à usage unique, puis mot de passe temporaire affiché une seule fois, valable quinze minutes et pour une seule connexion ;
+- modale obligatoire avec nouveau mot de passe et confirmation, restriction également contrôlée par les API et conservée après rafraîchissement ;
+- sessions web persistées et révocables, invalidation des médias et des accès extension, refus des comptes inactifs et authentification des sockets administratives ;
+- compteurs de récupération MySQL partagés, IP calculées avec proxies de confiance, correctifs Fastify/Busboy et retrait de la dépendance Next.js inutilisée ;
+- simulation Premium désactivée en production.
+
+Avant sa mise en service, appliquer `20261026120000_secure_password_recovery`,
+régénérer le client Prisma et reconstruire le frontend. Les anciennes sessions
+web nécessitent une reconnexion. Le parcours et la configuration des proxies
+sont détaillés dans [la documentation de sécurité](docs/security-password-recovery.md).
+
 ## Nouveautés de la version 8.6.0
 
 - association de plusieurs personnages à un acteur pour un même film ou une même série, avec des personnages définis pour toute la série ;
@@ -176,7 +189,7 @@ le déploiement. Les détails sont dans la section « Génériques proposés par
 
 Les consignes de déploiement, la migration et les limites sont détaillées dans [la documentation de la bibliothèque de voix](backend/docs/voice-library.md).
 
-L’historique complet des versions, de la 6.1.0 à la 8.6.0, est disponible dans l’application à l’adresse `/updates` et dans `frontend/src/interfaces/classic/pages/UpdatesPage.js`.
+L’historique complet des versions, de la 6.1.0 à la 8.7.0, est disponible dans l’application à l’adresse `/updates` et dans `frontend/src/interfaces/classic/pages/UpdatesPage.js`.
 
 ## Stack technique
 
@@ -235,7 +248,7 @@ Le fichier source est `backend/prisma/schema.prisma`. Un diagramme est égalemen
 
 ## Prérequis
 
-- Node.js 18 ou une version plus récente ;
+- Node.js 24.22.1 ou une version de sécurité plus récente de la branche 24 LTS ;
 - npm ;
 - une base MySQL accessible ;
 - `ffmpeg` et `ffprobe` pour analyser et convertir les médias ;
@@ -303,6 +316,11 @@ doivent porter le même nom, et `PUBLIC_URL` doit contenir en premier l'origine 
 publique qui sert l'application.
 
 Ne versionnez jamais les fichiers `.env`, les secrets, les certificats privés ou les sauvegardes de production.
+
+Le parcours sécurisé de récupération, les limites par IP fiable, les sessions
+révocables et le déploiement de la migration `20261026120000_secure_password_recovery`
+sont décrits dans [la documentation de sécurité](docs/security-password-recovery.md).
+Les anciens JWT web nécessitent une reconnexion après sa mise en service.
 
 ### Doublage IA : références vocales guidées (V5 R4)
 

@@ -1,10 +1,10 @@
+import { passwordRecoveryController } from "../controllers/passwordRecoveryController.js";
 import { userInterfaceController } from "../controllers/userInterfaceController.js";
 // routes/userRoutes.js
 import { userController } from '../controllers/userController.js';
-import { authMiddleware } from '../middlewares/authMiddleware.js';
+import { authMiddleware, sessionAuthMiddleware } from '../middlewares/authMiddleware.js';
 import {
   authRateLimit,
-  passwordResetRateLimit,
   registerRateLimit,
 } from "../middlewares/rateLimitMiddleware.js";
 import { userRepository } from '../models/user.js';
@@ -29,7 +29,9 @@ export default async function userRoutes(fastify, options) {
   fastify.post('/register', { preHandler: registerRateLimit }, userController.register);
   fastify.post('/admin/register', { preHandler: [registerRateLimit, authMiddleware] }, userController.registerAdmin);
   fastify.post('/login', { preHandler: authRateLimit }, userController.login);
-  fastify.post('/reset-password', { preHandler: passwordResetRateLimit }, userController.resetPassword);
+  fastify.post('/reset-password', passwordRecoveryController.request);
+  fastify.post('/password-recovery/confirm', passwordRecoveryController.confirm);
+  fastify.post('/password-recovery/complete', { preHandler: sessionAuthMiddleware }, passwordRecoveryController.complete);
   fastify.post('/premium/fake-checkout', { preHandler: authMiddleware }, userController.createFakePremiumCheckout);
   fastify.post('/premium/webhook/fake', userController.fakePremiumPaymentWebhook);
   fastify.post('/favorites/status', { preHandler: authMiddleware }, userController.getFavoriteStatus);
@@ -63,9 +65,13 @@ export default async function userRoutes(fastify, options) {
   fastify.get('/favorites/summary', { preHandler: authMiddleware }, userController.getFavoriteSummary);
   fastify.get('/favorites/:userId', { preHandler: authMiddleware }, userController.getUserFavorites);
 
-  fastify.get('/me', { preHandler: authMiddleware }, async (request, reply) => {
+  fastify.get('/me', { preHandler: sessionAuthMiddleware }, async (request, reply) => {
   try {
     const { userId } = request.user;
+  reply.header("Cache-Control", "no-store");
+  if (request.user.passwordChangeRequired) {
+    return reply.send({ UtilisateurID: userId, passwordChangeRequired: true });
+  }
     const user = await userRepository.getUserById(userId);
 
     if (!user) {

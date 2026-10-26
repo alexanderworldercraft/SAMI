@@ -15,10 +15,11 @@ const positiveInteger = (value) => {
   return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
 };
 
-export function createVideoMediaAccessToken({ userId, videoId, sessionExpiresAt } = {}) {
+export function createVideoMediaAccessToken({ userId, videoId, sessionExpiresAt, sessionId, authVersion } = {}) {
   const parsedUserId = positiveInteger(userId);
   const parsedVideoId = positiveInteger(videoId);
-  if (!parsedUserId || !parsedVideoId) {
+  if (!parsedUserId || !parsedVideoId || !Number.isSafeInteger(authVersion) || authVersion < 0
+    || typeof sessionId !== "string" || !/^[a-f0-9-]{36}$/i.test(sessionId)) {
     throw new TypeError("Utilisateur ou vidéo invalide pour le jeton média.");
   }
 
@@ -35,6 +36,8 @@ export function createVideoMediaAccessToken({ userId, videoId, sessionExpiresAt 
       userId: parsedUserId,
       videoId: parsedVideoId,
       tokenUse: VIDEO_MEDIA_TOKEN_USE,
+      jti: sessionId,
+      authVersion,
     },
     getSecret(),
     {
@@ -48,7 +51,7 @@ export function verifyVideoMediaAccessToken(token, expectedVideoId) {
   const parsedVideoId = positiveInteger(expectedVideoId);
   if (!token || !parsedVideoId) throw new Error("Jeton média ou vidéo invalide.");
 
-  const decoded = jwt.verify(token, getSecret(), { audience: VIDEO_MEDIA_AUDIENCE });
+  const decoded = jwt.verify(token, getSecret(), { audience: VIDEO_MEDIA_AUDIENCE, algorithms: ["HS256"] });
   if (
     decoded?.tokenUse !== VIDEO_MEDIA_TOKEN_USE
     || positiveInteger(decoded.videoId) !== parsedVideoId

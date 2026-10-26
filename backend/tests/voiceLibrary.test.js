@@ -27,7 +27,7 @@ await app.register(voiceRoutes, { prefix: "/voices" });
 afterAll(() => app.close());
 beforeEach(() => {
   vi.clearAllMocks();
-  db.utilisateur.findUnique.mockResolvedValue({ GradeID: 3 });
+  db.utilisateur.findUnique.mockResolvedValue({ GradeID: 3, EtatID: 1 });
   db.userAiPreference.findUnique.mockResolvedValue({ Accepted: true, DisclosureVersion: AI_DISCLOSURE_VERSION });
   db.voiceAudio.findMany.mockResolvedValue([]); db.voiceAudio.count.mockResolvedValue(0);
 });
@@ -75,7 +75,7 @@ describe("accès à la bibliothèque vocale", () => {
     expect(db.voiceAudio.updateMany).not.toHaveBeenCalled();
   });
   it.each([1, 2])("les grades administrateurs %s voient les audios privés", async GradeID => {
-    db.utilisateur.findUnique.mockResolvedValue({ GradeID });
+    db.utilisateur.findUnique.mockResolvedValue({ GradeID, EtatID: 1 });
     expect((await app.inject({ url: "/voices", headers: { "x-user": "7" } })).json().admin).toBe(true);
     expect(db.voiceAudio.findMany.mock.calls[0][0].where.IsPublic).toBeUndefined();
   });
@@ -92,7 +92,7 @@ describe("accès à la bibliothèque vocale", () => {
 });
 describe("intégrité des originaux et des générations", () => {
   it("importe un fichier, le conserve intact et sert l'écoute par plages et le téléchargement admin", async () => {
-    db.utilisateur.findUnique.mockResolvedValue({ GradeID: 2 });
+    db.utilisateur.findUnique.mockResolvedValue({ GradeID: 2, EtatID: 1 });
     db.personne.findFirst.mockResolvedValue({ PersonneID: 4 });
     let saved;
     db.voiceAudio.create.mockImplementation(async ({ data }) => { saved = { ...data, IsPublic: false, Status: "READY" }; return saved; });

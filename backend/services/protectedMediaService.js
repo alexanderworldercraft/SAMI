@@ -126,6 +126,7 @@ export async function getVideoMediaAccess(videoId, userId, { database = prisma }
       select: {
         UtilisateurID: true,
         GradeID: true,
+        EtatID: true,
         PremiumEndDate: true,
         AiPreference: true,
       },
@@ -135,7 +136,7 @@ export async function getVideoMediaAccess(videoId, userId, { database = prisma }
   if (!video || video.EtatID !== ETAT.ACTIVE) {
     return { error: { statusCode: 404, message: "Vidéo introuvable." } };
   }
-  if (!user) {
+  if (!user || user.EtatID !== ETAT.ACTIVE) {
     return { error: { statusCode: 401, message: "Utilisateur introuvable." } };
   }
   if (isVideoPremium(video) && !canAccessPremium(user)) {

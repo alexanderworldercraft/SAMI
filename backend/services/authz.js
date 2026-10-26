@@ -1,4 +1,4 @@
-import { ADMIN_GRADE_IDS, GRADE } from "../constants.js";
+import { ADMIN_GRADE_IDS, ETAT, GRADE } from "../constants.js";
 import { prisma } from "./db.js";
 
 export const getRequestUserId = (request) => {
@@ -16,10 +16,10 @@ export const ensureAdmin = async (request, reply, options = {}) => {
 
   const user = await prisma.utilisateur.findUnique({
     where: { UtilisateurID: userId },
-    select: { GradeID: true },
+    select: { GradeID: true, EtatID: true },
   });
 
-  if (!user || !ADMIN_GRADE_IDS.includes(user.GradeID)) {
+  if (!user || user.EtatID !== ETAT.ACTIVE || !ADMIN_GRADE_IDS.includes(user.GradeID)) {
     reply.status(403).send({ error: "Accès réservé aux administrateurs." });
     return null;
   }

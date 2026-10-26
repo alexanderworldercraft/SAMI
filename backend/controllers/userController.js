@@ -1,8 +1,9 @@
 // controllers/userController.js
 
 import { userRepository } from '../models/user.js';
+import crypto from 'node:crypto';
 import bcrypt from 'bcrypt';
-import jwt from 'jsonwebtoken';
+
 import dotenv from 'dotenv';
 import fs from 'fs';
 import path from 'path';
@@ -10,7 +11,7 @@ import { fileURLToPath } from 'url';
 import { subDays } from 'date-fns';
 import { createLog, getClientIp } from "./logController.js";
 import { prisma } from "../services/db.js";
-import { ADMIN_GRADE_IDS, AUTH_COOKIE_NAME, ETAT, GRADE, MULTIPART_LIMITS } from "../constants.js";
+import { ADMIN_GRADE_IDS, ETAT, GRADE, MULTIPART_LIMITS } from "../constants.js";
 import { ensureSuperAdmin } from "../services/authz.js";
 import { getJwtFromRequest } from "../middlewares/authMiddleware.js";
 import { isMultipartFileTooLargeError, sendMultipartFileTooLarge } from "../utils/multipartErrors.js";
@@ -26,79 +27,16 @@ import {
   getFavoriteStatus,
   toggleFavoriteContent,
 } from "../services/favoriteContentService.js";
-import { sendPasswordResetEmail } from "../services/mailService.js";
+import { issueUserSession, verifyUserSession, invalidateUserSessions, notifySessionsRevoked, notifySessionRevoked } from "../services/userSessionService.js";
+import { passwordRecoveryService } from "../services/passwordRecoveryService.js";
+import { validatePassword } from "../services/passwordPolicy.js";
+import { buildAuthCookie, clearAuthCookie, setReplyHeader } from "../services/authCookie.js";
 
-// Durée de vie des tokens par GradeID
-// 1 = SuperAdmin, 2 = Admin, 3 = Utilisateur
-const TOKEN_EXPIRATIONS_BY_GRADE = {
-  1: '4h',   // SuperAdmin
-  2: '8h',   // Admin
-  3: '30d',  // Utilisateur standard
-};
-
-// Valeur par défaut si GradeID est absent ou non mappé
-const TOKEN_DEFAULT_EXPIRATION = '12h';
-
-const TOKEN_EXPIRATION_SECONDS = Object.freeze({
-  "4h": 4 * 60 * 60,
-  "8h": 8 * 60 * 60,
-  "12h": 12 * 60 * 60,
-  "30d": 30 * 24 * 60 * 60,
-});
-
-// Choisit la durée de vie du token en fonction du grade de l'utilisateur
-function getTokenExpirationForUser(user) {
-  if (user.GradeID && TOKEN_EXPIRATIONS_BY_GRADE[user.GradeID]) {
-    return TOKEN_EXPIRATIONS_BY_GRADE[user.GradeID];
-  }
-
-  return TOKEN_DEFAULT_EXPIRATION;
-}
-
-function getTokenMaxAgeSeconds(expiration) {
-  return TOKEN_EXPIRATION_SECONDS[expiration] || TOKEN_EXPIRATION_SECONDS[TOKEN_DEFAULT_EXPIRATION];
-}
-
-function shouldUseSecureCookie() {
-  return process.env.COOKIE_SECURE === "true"
-    || process.env.NODE_ENV === "production"
-    || (process.env.PUBLIC_URL || "").startsWith("https://")
-    || Boolean(process.env.HTTPS);
-}
-
-function buildAuthCookie(value, maxAgeSeconds) {
-  const secure = shouldUseSecureCookie() ? " Secure;" : "";
-  return [
-    `${AUTH_COOKIE_NAME}=${encodeURIComponent(value)}`,
-    "Path=/",
-    "HttpOnly",
-    "SameSite=Lax",
-    `Max-Age=${maxAgeSeconds}`,
-    secure.trim(),
-  ].filter(Boolean).join("; ");
-}
-
-function setReplyHeader(reply, name, value) {
-  if (typeof reply.header === "function") {
-    reply.header(name, value);
-  }
-}
-
-function clearAuthCookie(reply) {
-  setReplyHeader(
-    reply,
-    "Set-Cookie",
-    `${AUTH_COOKIE_NAME}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0${shouldUseSecureCookie() ? "; Secure" : ""}`
-  );
-}
-
-function getDecodedAuthUser(request) {
+const isFakePremiumEnabled = () => process.env.NODE_ENV !== "production" && process.env.SAMI_ENABLE_FAKE_PREMIUM === "true";
+async function getDecodedAuthUser(request) {
   if (request.user) return request.user;
-
   const token = getJwtFromRequest(request);
-  if (!token) return null;
-
-  return jwt.verify(token, secretKey);
+  return token ? verifyUserSession(token) : null;
 }
 
 function isUserPremium(user) {
@@ -319,7 +257,8 @@ async function getLastActivityByUserIds(userIds) {
 }
 
 // 🔐 Protection anti-brute-force (en mémoire, par process)
-const loginAttempts = new Map(); // key: "user:surnom" ou "ip:xxx"
+const loginAttempts = new Map();
+let lastLoginAttemptCleanup = 0; // key: "user:surnom" ou "ip:xxx"
 const LOGIN_MAX_ATTEMPTS = 3;
 const LOGIN_LOCK_DURATION_MS = 15 * 60 * 1000; // 15 minutes
 
@@ -328,7 +267,7 @@ function getClientKey(request) {
   try {
     const { surnom } = request.body || {};
     if (surnom) {
-      return `user:${surnom}`;
+      return `user:${String(surnom).trim().normalize("NFKC").toLowerCase()}`;
     }
   } catch (e) {
     // ignore
@@ -345,6 +284,7 @@ function getLockInfo(key) {
   if (!entry) return null;
 
   const now = Date.now();
+  if (entry.expiresAt <= now) { loginAttempts.delete(key); return null; }
 
   if (entry.lockUntil && entry.lockUntil > now) {
     return {
@@ -364,10 +304,16 @@ function getLockInfo(key) {
 // Enregistre un échec et retourne si on vient de passer en mode "lock"
 function registerFailedLogin(key) {
   const now = Date.now();
+  if (now - lastLoginAttemptCleanup >= 60_000) {
+    for (const [entryKey, entry] of loginAttempts) if (entry.expiresAt <= now) loginAttempts.delete(entryKey);
+    lastLoginAttemptCleanup = now;
+  }
+  if (!loginAttempts.has(key) && loginAttempts.size >= 10000) return { justLocked: true, remainingAttempts: 0 };
   const entry = loginAttempts.get(key) || { attempts: 0, lockUntil: null };
 
   // On incrémente le compteur
   entry.attempts += 1;
+  entry.expiresAt = now + LOGIN_LOCK_DURATION_MS;
   let justLocked = false;
 
   if (entry.attempts >= LOGIN_MAX_ATTEMPTS) {
@@ -398,7 +344,6 @@ const __dirname = path.dirname(__filename);
 
 dotenv.config();
 
-const secretKey = process.env.JWT_SECRET;
 
 async function createUserFromMultipart(request, reply, gradeId) {
   const fields = {};
@@ -465,54 +410,6 @@ async function createUserFromMultipart(request, reply, gradeId) {
   });
 }
 
-function validatePassword(password) {
-  const minLength = 8;
-  const maxLength = 20;
-  const hasUpperCase = /[A-Z]/.test(password);
-  const hasLowerCase = /[a-z]/.test(password);
-  const hasNumber = /[0-9]/.test(password);
-  const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(password);
-
-  if (
-    password.length < minLength ||
-    password.length > maxLength ||
-    !hasUpperCase ||
-    !hasLowerCase ||
-    !hasNumber ||
-    !hasSpecialChar
-  ) {
-    return false;
-  }
-  return true;
-}
-
-// Génère un mot de passe temporaire conforme aux règles de complexité
-function generateTemporaryPassword(length = 12) {
-  const upper = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-  const lower = "abcdefghijklmnopqrstuvwxyz";
-  const digits = "0123456789";
-  const special = "!@#$%^&*(),.?\":{}|<>";
-  const all = upper + lower + digits + special;
-
-  // on s'assure d'avoir au moins un caractère de chaque type
-  let password = "";
-  password += upper[Math.floor(Math.random() * upper.length)];
-  password += lower[Math.floor(Math.random() * lower.length)];
-  password += digits[Math.floor(Math.random() * digits.length)];
-  password += special[Math.floor(Math.random() * special.length)];
-
-  // le reste au hasard
-  for (let i = password.length; i < length; i++) {
-    password += all[Math.floor(Math.random() * all.length)];
-  }
-
-  // petite permutation pour éviter d'avoir toujours les 4 premiers types dans le même ordre
-  return password
-    .split("")
-    .sort(() => Math.random() - 0.5)
-    .join("");
-}
-
 export const userController = {
 
   async register(request, reply) {
@@ -524,7 +421,7 @@ export const userController = {
     } catch (err) {
       if (isMultipartFileTooLargeError(err)) return sendMultipartFileTooLarge(reply);
       console.error('Error in register:', err);
-      reply.status(500).send({ error: 'Internal Server Error', message: err.message });
+      reply.status(500).send({ error: 'Internal Server Error' });
     }
   },
 
@@ -552,7 +449,7 @@ export const userController = {
     } catch (err) {
       if (isMultipartFileTooLargeError(err)) return sendMultipartFileTooLarge(reply);
       console.error("Error in registerAdmin:", err);
-      reply.status(500).send({ error: "Internal Server Error", message: err.message });
+      reply.status(500).send({ error: "Internal Server Error" });
     }
   },
 
@@ -560,7 +457,8 @@ export const userController = {
     try {
       const { surnom, motDePasse } = request.body;
 
-      if (!surnom || !motDePasse) {
+      if (typeof surnom !== "string" || !surnom || surnom.length > 100
+        || typeof motDePasse !== "string" || !motDePasse || motDePasse.length > 128) {
         return reply.status(400).send({ error: 'Surnom and Mot de Passe are required' });
       }
 
@@ -600,9 +498,9 @@ export const userController = {
       }
 
       // 3) Compte explicitement bloqué côté BDD
-      if (user.EtatID === 3) {
+      if (user.EtatID !== ETAT.ACTIVE) {
         return reply.status(403).send({
-          error: 'Votre compte est bloqué. Veuillez contacter l\'administrateur.',
+          error: 'Ce compte est inactif. Veuillez contacter l\'administrateur.',
         });
       }
 
@@ -666,8 +564,9 @@ export const userController = {
       // 5) Connexion réussie → on nettoie les tentatives brute-force
       clearLoginAttempts(clientKey);
 
-      // 6) Durée de vie dynamique du token selon le grade
-      const tokenExpiration = getTokenExpirationForUser(user);
+      if (user.PasswordChangeRequired) {
+        await passwordRecoveryService.consumeTemporaryPassword(user);
+      }
 
       // 🔥 AJOUT : mise à jour de LastLogin
       try {
@@ -682,12 +581,7 @@ export const userController = {
         // On ne bloque pas la connexion pour un souci de log / BDD
       }
 
-      // Génération du token JWT avec durée personnalisée
-      const token = jwt.sign(
-        { userId: user.UtilisateurID, surnom: user.Surnom },
-        process.env.JWT_SECRET,
-        { expiresIn: tokenExpiration }
-      );
+      const session = await issueUserSession(user, { scope: user.PasswordChangeRequired ? "password-change" : "session" });
 
       // 7) Log de la connexion
       try {
@@ -708,38 +602,34 @@ export const userController = {
         console.error("Erreur lors du log de connexion :", logErr);
       }
 
-      setReplyHeader(reply, "Set-Cookie", buildAuthCookie(token, getTokenMaxAgeSeconds(tokenExpiration)));
-      reply.send({ message: "Connexion réussie" });
+      setReplyHeader(reply, "Set-Cookie", buildAuthCookie(session.token, session.maxAge));
+      reply.header?.("Cache-Control", "no-store");
+      reply.send({ message: "Connexion réussie", passwordChangeRequired: Boolean(user.PasswordChangeRequired) });
     } catch (err) {
-      console.error('Error in login:', err);
-      reply.status(500).send({ error: 'Internal Server Error', message: err.message });
+      if (!err.statusCode) console.error('Login unavailable.');
+      reply.status(err.statusCode || 500).send({ error: err.statusCode ? err.message : 'Connexion momentanément indisponible.' });
     }
   },
 
   async logout(request, reply) {
+    const token = getJwtFromRequest(request);
     try {
-      const token = getJwtFromRequest(request);
-      const decoded = token ? jwt.verify(token, process.env.JWT_SECRET) : null;
-      const userId = decoded?.userId;
-
-      const action = userId
-        ? await prisma.action.findUnique({ where: { Nom: 'deconnexion' } })
-        : null;
-
-      if (action && userId) {
-        await createLog({
-          request,
-          UtilisateurID: userId,
-          ActionNom: "deconnexion",
-        });
+      if (token) {
+        let session;
+        try { session = await verifyUserSession(token, { allowPasswordChange: true }); }
+        catch (error) { if (error.statusCode !== 401) throw error; }
+        if (session) {
+          await prisma.userSession.deleteMany({ where: { UserSessionID: session.sessionId } });
+          notifySessionRevoked(session.sessionId);
+          try { await createLog({ request, UtilisateurID: session.userId, ActionNom: "deconnexion" }); }
+          catch { console.warn("Journal de déconnexion indisponible."); }
+        }
       }
-
       clearAuthCookie(reply);
-      reply.send({ message: 'Déconnexion enregistrée' });
-    } catch (err) {
-      console.error('Error in logout:', err);
-      clearAuthCookie(reply);
-      reply.status(200).send({ message: 'Déconnexion enregistrée' });
+      return reply.send({ message: "Déconnexion enregistrée" });
+    } catch {
+      // Keep the cookie so a retry can revoke the server-side session too.
+      return reply.status(503).send({ error: "Déconnexion momentanément indisponible. Réessaie." });
     }
   },
 
@@ -764,7 +654,7 @@ export const userController = {
 
   async deleteUser(request, reply) {
     try {
-      const decoded = getDecodedAuthUser(request);
+      const decoded = await getDecodedAuthUser(request);
       if (!decoded?.surnom) {
         return reply.status(401).send({ error: 'Unauthorized' });
       }
@@ -783,7 +673,7 @@ export const userController = {
 
   async updateSurnom(request, reply) {
     try {
-      const decoded = getDecodedAuthUser(request);
+      const decoded = await getDecodedAuthUser(request);
       if (!decoded?.surnom) {
         return reply.status(401).send({ error: 'Unauthorized' });
       }
@@ -802,7 +692,7 @@ export const userController = {
 
   async updateEmail(request, reply) {
     try {
-      const decoded = getDecodedAuthUser(request);
+      const decoded = await getDecodedAuthUser(request);
       if (!decoded?.surnom) {
         return reply.status(401).send({ error: 'Unauthorized' });
       }
@@ -821,7 +711,7 @@ export const userController = {
 
   async updateProfileImage(request, reply) {
     try {
-      const decoded = getDecodedAuthUser(request);
+      const decoded = await getDecodedAuthUser(request);
       if (!decoded?.surnom) {
         return reply.status(401).send({ error: 'Unauthorized' });
       }
@@ -836,7 +726,7 @@ export const userController = {
 
   async deleteProfileImage(request, reply) {
     try {
-      const decoded = getDecodedAuthUser(request);
+      const decoded = await getDecodedAuthUser(request);
       if (!decoded?.surnom) {
         return reply.status(401).send({ error: 'Unauthorized' });
       }
@@ -1005,8 +895,9 @@ export const userController = {
           });
         }
 
-        const hashedPassword = await bcrypt.hash(newPassword, user.Salt);
-        updateData.MotDePasse = hashedPassword;
+        const salt = await bcrypt.genSalt(10);
+        updateData.MotDePasse = await bcrypt.hash(newPassword, salt);
+        updateData.Salt = salt;
       }
 
       if (surnom) updateData.Surnom = surnom;
@@ -1021,7 +912,21 @@ export const userController = {
       }
 
       // Mettre à jour les données de l'utilisateur
-      const updatedUser = await userRepository.updateUserById(userId, updateData);
+      const updatedUser = await prisma.$transaction(async tx => {
+        const changed = await tx.utilisateur.updateMany({ where: { UtilisateurID: userId,
+          AuthVersion: request.user.authVersion, EtatID: ETAT.ACTIVE }, data: updateData });
+        if (changed.count !== 1) throw Object.assign(new Error("Session expirée."), { statusCode: 401 });
+        if (updateData.MotDePasse || updateData.Email) {
+          await tx.passwordRecovery.updateMany({ where: { UtilisateurID: userId, ConsumedAt: null }, data: { ConsumedAt: new Date() } });
+          if (updateData.MotDePasse) return invalidateUserSessions(tx, userId);
+        }
+        return tx.utilisateur.findUnique({ where: { UtilisateurID: userId } });
+      });
+      if (updateData.MotDePasse) {
+        notifySessionsRevoked(userId);
+        const renewed = await issueUserSession(updatedUser);
+        setReplyHeader(reply, "Set-Cookie", buildAuthCookie(renewed.token, renewed.maxAge));
+      }
 
       // Supprimer l'ancienne image si une nouvelle est ajoutée ou si l'image est supprimée
       if ((removeImage === 'true' || newImagePath) && oldImagePath) {
@@ -1054,11 +959,12 @@ export const userController = {
         console.error("Erreur lors du log de mise à jour de paramètres :", logErr);
       }
 
-      reply.send({ message: 'User updated successfully', user: updatedUser });
+      const { MotDePasse: _password, Salt: _salt, ...publicUser } = updatedUser;
+      reply.send({ message: 'User updated successfully', user: publicUser });
     } catch (err) {
       if (isMultipartFileTooLargeError(err)) return sendMultipartFileTooLarge(reply);
       console.error('Error in updateUser:', err);
-      reply.status(500).send({ error: 'Internal Server Error', message: err.message });
+      reply.status(500).send({ error: 'Internal Server Error' });
     }
   },
 
@@ -1093,7 +999,7 @@ export const userController = {
       reply.send(admins);
     } catch (err) {
       console.error("Error in getAdmins:", err);
-      reply.status(500).send({ error: "Internal Server Error", message: err.message });
+      reply.status(500).send({ error: "Internal Server Error" });
     }
   },
 
@@ -1117,7 +1023,7 @@ export const userController = {
       reply.send(users);
     } catch (err) {
       console.error("Error in getUsersByCriteria:", err);
-      reply.status(500).send({ error: "Internal Server Error", message: err.message });
+      reply.status(500).send({ error: "Internal Server Error" });
     }
   },
 
@@ -1142,21 +1048,22 @@ export const userController = {
       }
 
       // Met à jour l'état de l'utilisateur
-      const updatedUser = await userRepository.updateUserById(userId, {
-        EtatID: newEtat,
+      const updatedUser = await prisma.$transaction(async tx => {
+        await tx.utilisateur.update({ where: { UtilisateurID: Number(userId) }, data: { EtatID: newEtat } });
+        await tx.passwordRecovery.updateMany({ where: { UtilisateurID: Number(userId), ConsumedAt: null }, data: { ConsumedAt: new Date() } });
+        return invalidateUserSessions(tx, Number(userId));
       });
 
+      notifySessionsRevoked(Number(userId));
       if (!updatedUser) {
         return reply.status(404).send({ error: "User not found" });
       }
 
-      reply.send({
-        message: `L'état de l'utilisateur a été modifié avec succès.`,
-        user: updatedUser,
-      });
+      const { MotDePasse: _password, Salt: _salt, ...publicUser } = updatedUser;
+      reply.send({ message: "L'état de l'utilisateur a été modifié avec succès.", user: publicUser });
     } catch (err) {
       console.error("Error in changeUserEtat:", err);
-      reply.status(500).send({ error: "Internal Server Error", message: err.message });
+      reply.status(500).send({ error: "Internal Server Error" });
     }
   },
 
@@ -1167,7 +1074,7 @@ export const userController = {
         return reply.status(401).send({ error: "Unauthorized" });
       }
 
-      const decoded = jwt.verify(token, secretKey);
+      const decoded = await verifyUserSession(token);
       const user = await userRepository.getUserById(decoded.userId);
 
       // Vérifier si l'utilisateur est superadmin
@@ -1189,7 +1096,7 @@ export const userController = {
       reply.send({ message: "User state updated successfully." });
     } catch (err) {
       console.error("Error in changeEtat:", err);
-      reply.status(500).send({ error: "Internal Server Error", message: err.message });
+      reply.status(500).send({ error: "Internal Server Error" });
     }
   },
 
@@ -1286,7 +1193,6 @@ export const userController = {
       // ✅ Mot de passe OK → on réinitialise les tentatives
       clearLoginAttempts(clientKey);
 
-      console.log("User avant suppression:", user);
 
       const currentTimestamp = new Date().toISOString().replace(/[:.]/g, "-");
 
@@ -1295,7 +1201,7 @@ export const userController = {
           ? "Admin@delete.com"
           : "Utilisateur@delete.com";
 
-      const deletedMotDePasse = await bcrypt.hash("deleted", 10);
+      const deletedMotDePasse = await bcrypt.hash(crypto.randomBytes(32).toString("base64url"), 10);
 
       // Mettre à jour l'utilisateur dans la BDD
       let updatedUser;
@@ -1306,13 +1212,15 @@ export const userController = {
           MotDePasse: deletedMotDePasse,
           CheminImage: null,
           EtatID: ETAT.DELETED,
+          AuthVersion: { increment: 1 },
         });
-        console.log("Utilisateur mis à jour :", updatedUser);
       } catch (err) {
         console.error("Erreur lors de la mise à jour de l'utilisateur :", err);
         throw err;
       }
 
+      notifySessionsRevoked(user.UtilisateurID);
+      clearAuthCookie(reply);
       // Supprimer physiquement l'image de profil
       if (user.CheminImage) {
         const imagePath = path.join(__dirname, `..${user.CheminImage}`);
@@ -1350,159 +1258,10 @@ export const userController = {
       reply.send({ message: "Compte supprimé avec succès." });
     } catch (err) {
       console.error("Error in deleteAccount:", err);
-      reply.status(500).send({ error: "Erreur interne du serveur.", message: err.message });
+      reply.status(500).send({ error: "Erreur interne du serveur." });
     }
   },
 
-  async resetPassword(request, reply) {
-    try {
-      const { surnom, email } = request.body || {};
-
-      if (!surnom || !email) {
-        return reply
-          .status(400)
-          .send({ error: "Surnom et email sont obligatoires." });
-      }
-
-      const user = await prisma.utilisateur.findFirst({
-        where: {
-          Surnom: surnom,
-          Email: email,
-        },
-      });
-
-      if (!user) {
-        // 🔐 Tentative de reset avec combo Surnom + Email invalide
-        try {
-          // On récupère l'action d'échec
-          const actionFail = await prisma.action.findUnique({
-            where: { Nom: 'reset_mot_de_passe_echec' },
-          });
-
-          if (actionFail) {
-            const logsToCreate = [];
-
-            // 1) On vérifie si le surnom existe pour un user
-            const userBySurnom = await prisma.utilisateur.findFirst({
-              where: { Surnom: surnom },
-            });
-
-            if (userBySurnom) {
-              logsToCreate.push(userBySurnom.UtilisateurID);
-            }
-
-            // 2) On vérifie si l'email existe pour un user
-            const userByEmail = await prisma.utilisateur.findFirst({
-              where: { Email: email },
-            });
-
-            // Si l'email correspond à un autre compte, on log aussi
-            if (
-              userByEmail &&
-              (!userBySurnom || userByEmail.UtilisateurID !== userBySurnom.UtilisateurID)
-            ) {
-              logsToCreate.push(userByEmail.UtilisateurID);
-            }
-
-            // 3) Création des logs (un par utilisateur concerné)
-            await Promise.all(
-              logsToCreate.map((utilisateurId) =>
-                prisma.log.create({
-                  data: {
-                    UtilisateurID: utilisateurId,
-                    ActionID: actionFail.ActionID,
-                    // DateAction = now() par défaut
-                  },
-                })
-              )
-            );
-          } else {
-            console.warn("Action 'reset_mot_de_passe_echec' non trouvée dans la table Action");
-          }
-        } catch (logErr) {
-          console.error("Erreur lors du log de tentative de reset échouée :", logErr);
-          // On ne bloque pas la réponse pour un problème de log
-        }
-
-        // ⚠️ Côté API : on reste volontairement vague,
-        // pour ne pas donner d’info à un attaquant.
-        return reply
-          .status(404)
-          .send({ error: "Aucun compte ne correspond à ce surnom et cet email." });
-      }
-
-
-      const tempPassword = generateTemporaryPassword(12);
-
-      const salt = user.Salt || (await bcrypt.genSalt(10));
-      const hashedPassword = await bcrypt.hash(tempPassword, salt);
-
-      await prisma.utilisateur.update({
-        where: { UtilisateurID: user.UtilisateurID },
-        data: {
-          MotDePasse: hashedPassword,
-          Salt: salt,
-        },
-      });
-
-      // 🔎 Log de la réinitialisation de mot de passe
-      try {
-        // On récupère l'action correspondante dans la table Action
-        const action = await prisma.action.findUnique({
-          where: { Nom: 'reset_mot_de_passe' }, // ⚠️ doit exister en BDD
-        });
-
-        if (action) {
-          // On crée une entrée dans Log
-          await prisma.log.create({
-            data: {
-              UtilisateurID: user.UtilisateurID,
-              ActionID: action.ActionID,
-              // DateAction est auto @default(now()) dans le schéma
-            },
-          });
-        } else {
-          console.warn("Action 'reset_mot_de_passe' non trouvée dans la table Action");
-        }
-      } catch (logErr) {
-        console.error("Erreur lors de la création du log de reset mot de passe :", logErr);
-        // On ne bloque pas l'utilisateur pour un problème de log
-      }
-
-      const isDev = process.env.NODE_ENV !== 'production';
-
-      try {
-        await sendPasswordResetEmail(user.Email, user.Surnom, tempPassword);
-
-        // ✅ Cas normal : tout s'est bien passé
-        return reply.send({
-          message: "Un mot de passe temporaire a été généré et envoyé par email.",
-        });
-      } catch (mailErr) {
-        console.error("Erreur lors de l'envoi de l'email de reset:", mailErr);
-
-        if (isDev) {
-          // 💻 MODE DEV : on ne bloque pas, on renvoie le mot de passe temporaire
-          return reply.send({
-            message:
-              "Mot de passe temporaire généré, mais l'email n'a pas pu être envoyé (mode développement).",
-            tempPassword, // ⚠️ À NE SURTOUT PAS GARDER EN PROD
-          });
-        }
-
-        // 🌐 PROD : on reste strict
-        return reply.status(500).send({
-          error:
-            "Le mot de passe a été réinitialisé, mais l'email n'a pas pu être envoyé. Contacte l'administrateur.",
-        });
-      }
-    } catch (err) {
-      console.error("Error in resetPassword:", err);
-      return reply
-        .status(500)
-        .send({ error: "Internal Server Error", message: err.message });
-    }
-  },
   async getUserActivitySummary(request, reply) {
     try {
       const { userId } = request.user || {};
@@ -1618,7 +1377,7 @@ export const userController = {
       console.error("Error in getUserActivitySummary:", err);
       return reply
         .status(500)
-        .send({ error: "Internal Server Error", message: err.message });
+        .send({ error: "Internal Server Error" });
     }
   },
 
@@ -1643,7 +1402,7 @@ export const userController = {
       console.error("Error in getUserWatchHistory:", err);
       return reply
         .status(500)
-        .send({ error: "Internal Server Error", message: err.message });
+        .send({ error: "Internal Server Error" });
     }
   },
 
@@ -1663,7 +1422,7 @@ export const userController = {
       console.error("Error in getMyWatchHistory:", err);
       return reply
         .status(500)
-        .send({ error: "Internal Server Error", message: err.message });
+        .send({ error: "Internal Server Error" });
     }
   },
 
@@ -1680,7 +1439,7 @@ export const userController = {
       console.error("Error in getMyFavorites:", err);
       return reply
         .status(500)
-        .send({ error: "Internal Server Error", message: err.message });
+        .send({ error: "Internal Server Error" });
     }
   },
 
@@ -1702,7 +1461,7 @@ export const userController = {
       console.error("Error in getUserFavorites:", err);
       return reply
         .status(500)
-        .send({ error: "Internal Server Error", message: err.message });
+        .send({ error: "Internal Server Error" });
     }
   },
 
@@ -1724,7 +1483,7 @@ export const userController = {
       console.error("Error in getFavoriteSummary:", err);
       return reply
         .status(500)
-        .send({ error: "Internal Server Error", message: err.message });
+        .send({ error: "Internal Server Error" });
     }
   },
 
@@ -1742,7 +1501,7 @@ export const userController = {
       console.error("Error in getFavoriteStatus:", err);
       return reply
         .status(500)
-        .send({ error: "Internal Server Error", message: err.message });
+        .send({ error: "Internal Server Error" });
     }
   },
 
@@ -1777,7 +1536,7 @@ export const userController = {
       console.error("Error in toggleFavorite:", err);
       return reply
         .status(err.statusCode || 500)
-        .send({ error: err.statusCode ? err.message : "Internal Server Error", message: err.message });
+        .send({ error: err.statusCode ? err.message : "Internal Server Error" });
     }
   },
 
@@ -1816,11 +1575,14 @@ export const userController = {
       console.error("Error in getUsersForAdminPanel:", err);
       return reply
         .status(500)
-        .send({ error: "Internal Server Error", message: err.message });
+        .send({ error: "Internal Server Error" });
     }
   },
 
   async createFakePremiumCheckout(request, reply) {
+    if (!isFakePremiumEnabled()) {
+      return reply.status(404).send({ error: "Route API introuvable." });
+    }
     try {
       const { userId } = request.user;
       const { plan } = request.body;
@@ -1837,11 +1599,14 @@ export const userController = {
       console.error("Error in createFakePremiumCheckout:", err);
       return reply
         .status(500)
-        .send({ error: "Internal Server Error", message: err.message });
+        .send({ error: "Internal Server Error" });
     }
   },
 
   async fakePremiumPaymentWebhook(request, reply) {
+    if (!isFakePremiumEnabled()) {
+      return reply.status(404).send({ error: "Route API introuvable." });
+    }
     try {
       const signature = request.headers["x-fake-payment-signature"];
       return userController.handleFakePremiumPaymentEvent(request, reply, request.body, signature);
@@ -1849,11 +1614,14 @@ export const userController = {
       console.error("Error in fakePremiumPaymentWebhook:", err);
       return reply
         .status(500)
-        .send({ error: "Internal Server Error", message: err.message });
+        .send({ error: "Internal Server Error" });
     }
   },
 
   async handleFakePremiumPaymentEvent(request, reply, payload, signature) {
+    if (!isFakePremiumEnabled()) {
+      return reply.status(404).send({ error: "Route API introuvable." });
+    }
     try {
       if (!verifyFakePaymentPayload(payload, signature)) {
         return reply.status(401).send({ error: "Signature de paiement invalide." });
@@ -1916,7 +1684,7 @@ export const userController = {
       console.error("Error in handleFakePremiumPaymentEvent:", err);
       return reply
         .status(500)
-        .send({ error: "Internal Server Error", message: err.message });
+        .send({ error: "Internal Server Error" });
     }
   },
 

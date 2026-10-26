@@ -49,7 +49,7 @@ const createReply = () => {
 describe("universeController - contenus mixtes", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    prisma.utilisateur.findUnique.mockResolvedValue({ GradeID: 2 });
+    prisma.utilisateur.findUnique.mockResolvedValue({ GradeID: 2, EtatID: 1 });
     prisma.universe.findFirst.mockResolvedValue({ UniverseID: 12 });
     prisma.universeContent.findFirst.mockResolvedValue(null);
     prisma.universeSaga.aggregate.mockResolvedValue({ _max: { Ordre: 4 } });

@@ -2,6 +2,39 @@ import React, { useEffect, useState } from "react";
 
 const updates = [
   {
+    "version": "8.7.0",
+    "title": "Récupération sécurisée du compte et protection des sessions",
+    "date": "26 octobre 2026",
+    "sections": [
+      {
+        "title": "Récupérer son compte avec une confirmation par email",
+        "items": [
+          "La récupération envoie désormais un lien de confirmation valable quinze minutes. La réponse affichée reste identique pour protéger la confidentialité des comptes.",
+          "Ouvrir le lien ne change pas automatiquement le mot de passe : il faut confirmer la récupération. Un mot de passe temporaire est ensuite affiché une seule fois, sans être conservé dans le navigateur ni envoyé par email.",
+          "Le mot de passe temporaire expire après quinze minutes et ne permet qu’une seule connexion. Si le lien ou le mot de passe temporaire a expiré, une nouvelle demande permet de recommencer le parcours."
+        ]
+      },
+      {
+        "title": "Choisir obligatoirement un nouveau mot de passe",
+        "items": [
+          "La première connexion avec le mot de passe temporaire ouvre une modale obligatoire avec deux champs : le nouveau mot de passe et sa confirmation.",
+          "La fenêtre reste ouverte après Échap, un clic extérieur ou un refus de validation. Un rafraîchissement conserve cette obligation ; l’accès aux fonctions du compte attend la sauvegarde du nouveau mot de passe.",
+          "Les deux saisies doivent correspondre et respecter la politique du compte. Le mot de passe personnel doit être différent du mot de passe temporaire. Une déconnexion reste possible pour quitter la récupération."
+        ]
+      },
+      {
+        "title": "Invalider les anciennes sessions et protéger les accès",
+        "items": [
+          "Dès qu’une demande valide a été envoyée par email, les anciennes sessions du compte sont déconnectées, y compris les accès de l’extension. Le mot de passe courant reste inchangé jusqu’à la confirmation du lien ; une panne d’envoi ne le remplace pas.",
+          "Les liens de récupération sont à usage unique. Les anciennes autorisations sont aussi invalidées au changement du mot de passe ; les comptes bloqués ou supprimés ne peuvent plus utiliser leurs sessions antérieures.",
+          "Les demandes répétées sont limitées à partir de l’adresse réseau vérifiée et du compte concerné. Le suivi en direct des imports est réservé aux administrateurs authentifiés.",
+          "Les composants serveur concernés par les correctifs de sécurité sont mis à jour. La simulation des abonnements Premium est désactivée en production.",
+          "Lors de la mise en service de cette version, une reconnexion est nécessaire pour les anciennes sessions web."
+        ]
+      }
+    ]
+  },
+  {
     "version": "8.6.0",
     "title": "Personnages des acteurs, titres alternatifs et recherche du catalogue",
     "date": "19 octobre 2026",

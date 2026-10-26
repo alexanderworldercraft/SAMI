@@ -7,7 +7,7 @@ jest.mock("react-router-dom", () => ({
 }), { virtual: true });
 jest.mock("axios", () => ({
   get: jest.fn(), post: jest.fn(), put: jest.fn(), delete: jest.fn(),
-  create: () => ({ get: jest.fn(), post: jest.fn(), put: jest.fn(), delete: jest.fn() }),
+  create: () => ({ interceptors: { response: { use: jest.fn() } }, get: jest.fn(), post: jest.fn(), put: jest.fn(), delete: jest.fn() }),
 }));
 
 import { INTERFACES, resolveInterface } from "./registry";
