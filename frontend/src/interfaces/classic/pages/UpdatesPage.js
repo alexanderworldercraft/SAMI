@@ -7,6 +7,15 @@ const updates = [
     "date": "26 octobre 2026",
     "sections": [
       {
+        "title": "Conserver le temps Premium acquis et choisir son renouvellement",
+        "items": [
+          "Les formules Premium mensuelle et annuelle sont désormais distinguées. Un passage au gratuit arrête le renouvellement et conserve tout le temps restant jusqu'à la date de fin affichée.",
+          "Le passage au gratuit est accessible depuis la formule gratuite et sous l'abonnement actuel. Une confirmation affiche le nombre de films et de séries dont les contenus Premium ne seront plus accessibles à l'échéance.",
+          "Chaque souscription et changement de formule demande confirmation. Le passage du mensuel à l'annuel, ou l'inverse, prend effet au renouvellement : aucun temps supplémentaire n'est ajouté à la période en cours.",
+          "Les renouvellements restent factices et automatiques. Le super administrateur peut activer ou désactiver l'API depuis les fonctionnalités expérimentales ; les droits acquis et la possibilité de se désabonner restent conservés."
+        ]
+      },
+      {
         "title": "Récupérer son compte avec une confirmation par email",
         "items": [
           "La récupération envoie désormais un lien de confirmation valable quinze minutes. La réponse affichée reste identique pour protéger la confidentialité des comptes.",
@@ -28,7 +37,7 @@ const updates = [
           "Dès qu’une demande valide a été envoyée par email, les anciennes sessions du compte sont déconnectées, y compris les accès de l’extension. Le mot de passe courant reste inchangé jusqu’à la confirmation du lien ; une panne d’envoi ne le remplace pas.",
           "Les liens de récupération sont à usage unique. Les anciennes autorisations sont aussi invalidées au changement du mot de passe ; les comptes bloqués ou supprimés ne peuvent plus utiliser leurs sessions antérieures.",
           "Les demandes répétées sont limitées à partir de l’adresse réseau vérifiée et du compte concerné. Le suivi en direct des imports est réservé aux administrateurs authentifiés.",
-          "Les composants serveur concernés par les correctifs de sécurité sont mis à jour. La simulation des abonnements Premium est désactivée en production.",
+          "Les composants serveur concernés par les correctifs de sécurité sont mis à jour. Les abonnements Premium factices restent disponibles pour les comptes connectés, y compris en production.",
           "Lors de la mise en service de cette version, une reconnexion est nécessaire pour les anciennes sessions web."
         ]
       }

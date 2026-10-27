@@ -33,6 +33,7 @@ export default async function userRoutes(fastify, options) {
   fastify.post('/password-recovery/confirm', passwordRecoveryController.confirm);
   fastify.post('/password-recovery/complete', { preHandler: sessionAuthMiddleware }, passwordRecoveryController.complete);
   fastify.post('/premium/fake-checkout', { preHandler: authMiddleware }, userController.createFakePremiumCheckout);
+  fastify.get('/premium/subscription', { preHandler: authMiddleware }, userController.getPremiumSubscription);
   fastify.post('/premium/webhook/fake', userController.fakePremiumPaymentWebhook);
   fastify.post('/favorites/status', { preHandler: authMiddleware }, userController.getFavoriteStatus);
   fastify.post('/favorites/toggle', { preHandler: authMiddleware }, userController.toggleFavorite);

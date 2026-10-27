@@ -17,6 +17,7 @@ const AdminExperimentalFeatures = () => {
   const [contentPreviewActive, setContentPreviewActive] = useState(false);
   const [previewLiveActive, setPreviewLiveActive] = useState(false);
   const [multiAudioActive, setMultiAudioActive] = useState(false);
+  const [fakePremiumActive, setFakePremiumActive] = useState(false);
   const [aiSubtitlesConfig, setAiSubtitlesConfig] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -39,16 +40,18 @@ const AdminExperimentalFeatures = () => {
   useEffect(() => {
     const fetchSettings = async () => {
       try {
-        const [contentPreviewResponse, previewLiveResponse, multiAudioResponse, aiSubtitlesResponse] = await Promise.all([
+        const [contentPreviewResponse, previewLiveResponse, multiAudioResponse, aiSubtitlesResponse, fakePremiumResponse] = await Promise.all([
           api.get("/app-settings/content-preview"),
           api.get("/app-settings/preview-live"),
           api.get("/app-settings/multi-audio"),
           api.get("/ai-subtitles/config"),
+          api.get("/app-settings/fake-premium"),
         ]);
         setContentPreviewActive(Boolean(contentPreviewResponse.data?.active));
         setPreviewLiveActive(Boolean(previewLiveResponse.data?.active));
         setMultiAudioActive(Boolean(multiAudioResponse.data?.active));
         setAiSubtitlesConfig(aiSubtitlesResponse.data || null);
+        setFakePremiumActive(Boolean(fakePremiumResponse.data?.active));
       } catch (error) {
         console.error("Erreur lors du chargement des fonctionnalités expérimentales :", error);
         setErrorMessage(error.response?.data?.error || "Impossible de charger les fonctionnalités expérimentales.");
@@ -162,6 +165,21 @@ const AdminExperimentalFeatures = () => {
       console.error("Erreur lors de la mise à jour de la prévisualisation :", error);
       setContentPreviewActive(!nextActive);
       setErrorMessage(error.response?.data?.error || "Impossible de mettre à jour la prévisualisation.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleToggleFakePremium = async () => {
+    setSaving(true);
+    setMessage("");
+    setErrorMessage("");
+    try {
+      const response = await api.put("/app-settings/fake-premium", { active: !fakePremiumActive });
+      setFakePremiumActive(Boolean(response.data?.active));
+      setMessage(response.data?.active ? "API des abonnements factices activée." : "API des abonnements factices désactivée. Les droits acquis et le désabonnement sont conservés.");
+    } catch (error) {
+      setErrorMessage(error.response?.data?.error || "Impossible de modifier l’API des abonnements.");
     } finally {
       setSaving(false);
     }
@@ -385,6 +403,24 @@ const AdminExperimentalFeatures = () => {
           {errorMessage && (
             <div className="mb-5 rounded-xl border border-red-400/30 bg-red-500/10 px-4 py-3 text-sm font-semibold text-red-700 dark:text-red-200">
               {errorMessage}
+            </div>
+          )}
+
+          {isSuperAdmin && (
+            <div className="mb-4 flex flex-col gap-4 rounded-xl border border-sky-500/10 bg-white/70 p-5 dark:bg-slate-950/45 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h3 className="text-base font-black text-slate-950 dark:text-white">API des abonnements factices</h3>
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600 dark:text-slate-300">
+                  Autorise les souscriptions, changements de formule payante et renouvellements automatiques simulés.
+                  La désactivation conserve le temps déjà acquis et permet toujours d’arrêter le renouvellement.
+                  Aucun prélèvement réel n’est effectué.
+                </p>
+              </div>
+              <button type="button" role="switch" aria-checked={fakePremiumActive} aria-label="API des abonnements factices"
+                onClick={handleToggleFakePremium} disabled={loading || saving}
+                className={`relative inline-flex h-8 w-16 shrink-0 items-center rounded-full border transition disabled:opacity-60 ${fakePremiumActive ? "border-emerald-300/70 bg-emerald-500/80" : "border-slate-300/70 bg-slate-300/70 dark:border-slate-700 dark:bg-slate-800"}`}>
+                <span className={`inline-block size-6 rounded-full bg-white shadow transition ${fakePremiumActive ? "translate-x-9" : "translate-x-1"}`} />
+              </button>
             </div>
           )}
 

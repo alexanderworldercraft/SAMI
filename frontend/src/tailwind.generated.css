@@ -5473,6 +5473,14 @@
     padding: calc(var(--spacing) * 8);
   }
 
+  .p-16 {
+    padding: calc(var(--spacing) * 16);
+  }
+
+  .p-24 {
+    padding: calc(var(--spacing) * 24);
+  }
+
   .px-0 {
     padding-inline: 0;
   }
@@ -5507,10 +5515,6 @@
 
   .px-6 {
     padding-inline: calc(var(--spacing) * 6);
-  }
-
-  .px-16 {
-    padding-inline: calc(var(--spacing) * 16);
   }
 
   .py-0\.5 {
@@ -5567,10 +5571,6 @@
 
   .py-12 {
     padding-block: calc(var(--spacing) * 12);
-  }
-
-  .py-16 {
-    padding-block: calc(var(--spacing) * 16);
   }
 
   .pt-3 {
@@ -5951,10 +5951,6 @@
     color: var(--color-emerald-400);
   }
 
-  .text-emerald-500 {
-    color: var(--color-emerald-500);
-  }
-
   .text-emerald-600 {
     color: var(--color-emerald-600);
   }
@@ -6009,10 +6005,6 @@
 
   .text-gray-500 {
     color: var(--color-gray-500);
-  }
-
-  .text-gray-600 {
-    color: var(--color-gray-600);
   }
 
   .text-gray-700 {
@@ -6378,10 +6370,6 @@
 
   .opacity-70 {
     opacity: .7;
-  }
-
-  .opacity-75 {
-    opacity: .75;
   }
 
   .opacity-100 {
@@ -7721,6 +7709,10 @@
       background-color: var(--color-gray-50);
     }
 
+    .hover\:bg-gray-100:hover {
+      background-color: var(--color-gray-100);
+    }
+
     .hover\:bg-gray-700:hover {
       background-color: var(--color-gray-700);
     }
@@ -8116,11 +8108,6 @@
       box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow);
     }
 
-    .hover\:shadow-md:hover {
-      --tw-shadow: 0 4px 6px -1px var(--tw-shadow-color, #0000001a), 0 2px 4px -2px var(--tw-shadow-color, #0000001a);
-      box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow);
-    }
-
     .hover\:shadow-xl:hover {
       --tw-shadow: 0 20px 25px -5px var(--tw-shadow-color, #0000001a), 0 8px 10px -6px var(--tw-shadow-color, #0000001a);
       box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow);
@@ -8399,6 +8386,10 @@
     cursor: grabbing;
   }
 
+  .disabled\:cursor-default:disabled {
+    cursor: default;
+  }
+
   .disabled\:cursor-not-allowed:disabled {
     cursor: not-allowed;
   }
@@ -8413,6 +8404,14 @@
 
   .disabled\:bg-gray-100:disabled {
     background-color: var(--color-gray-100);
+  }
+
+  .disabled\:bg-gray-200:disabled {
+    background-color: var(--color-gray-200);
+  }
+
+  .disabled\:text-gray-600:disabled {
+    color: var(--color-gray-600);
   }
 
   .disabled\:opacity-30:disabled {
@@ -9392,12 +9391,12 @@
     border-color: var(--color-amber-800);
   }
 
-  .dark\:border-gray-700:is(.dark *) {
-    border-color: var(--color-gray-700);
+  .dark\:border-gray-600:is(.dark *) {
+    border-color: var(--color-gray-600);
   }
 
-  .dark\:border-indigo-400:is(.dark *) {
-    border-color: var(--color-indigo-400);
+  .dark\:border-gray-700:is(.dark *) {
+    border-color: var(--color-gray-700);
   }
 
   .dark\:border-neutral-200:is(.dark *) {
@@ -9522,10 +9521,6 @@
     .dark\:bg-indigo-400\/10:is(.dark *) {
       background-color: color-mix(in oklab, var(--color-indigo-400) 10%, transparent);
     }
-  }
-
-  .dark\:bg-indigo-500:is(.dark *) {
-    background-color: var(--color-indigo-500);
   }
 
   .dark\:bg-neutral-700:is(.dark *) {
@@ -10283,8 +10278,8 @@
       border-color: var(--color-slate-700);
     }
 
-    .dark\:hover\:bg-indigo-600:is(.dark *):hover {
-      background-color: var(--color-indigo-600);
+    .dark\:hover\:bg-gray-800:is(.dark *):hover {
+      background-color: var(--color-gray-800);
     }
 
     .dark\:hover\:bg-slate-800:is(.dark *):hover {
@@ -10338,6 +10333,14 @@
     .dark\:hover\:text-white:is(.dark *):hover, .hover\:dark\:text-white:hover:is(.dark *) {
       color: var(--color-white);
     }
+  }
+
+  .dark\:disabled\:bg-gray-800:is(.dark *):disabled {
+    background-color: var(--color-gray-800);
+  }
+
+  .dark\:disabled\:text-gray-300:is(.dark *):disabled {
+    color: var(--color-gray-300);
   }
 
   .dark\:data-\[focus\]\:bg-sky-500\/20:is(.dark *)[data-focus] {

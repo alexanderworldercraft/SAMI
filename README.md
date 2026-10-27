@@ -36,6 +36,7 @@ La version actuelle est la **8.7.0**. Elle repose sur un backend Fastify, une in
 
 - authentification JWT par cookie HttpOnly ;
 - profils utilisateur, grades, premium et préférences de genres ;
+- [abonnements Premium factices](docs/premium-subscriptions.md) mensuels/annuels, temps acquis conservé à la résiliation, changements à l'échéance et renouvellement automatique configurable ;
 - espaces protégés pour les administrateurs et super administrateurs ;
 - gestion des vidéos, séries, genres, personnes, sagas, univers et musiques ;
 - annuaire et fiches publiques des personnes avec recherche du nom complet à 80 %, filmographie regroupée et aperçus de partage dédiés ;

@@ -614,6 +614,9 @@ model Utilisateur {
   CreateDate              DateTime?               @default(now())
   LastLogin               DateTime?
   PremiumEndDate          DateTime?
+  PremiumPlan             String?                 @db.VarChar(10)
+  PremiumRenewalPlan      String?                 @db.VarChar(10)
+  PremiumPayments         PremiumPayment[]
   AuthVersion             Int                     @default(0)
   PasswordChangeRequired  Boolean                 @default(false)
   RecoveryPasswordExpiresAt DateTime?
@@ -653,6 +656,7 @@ model Utilisateur {
 
   @@index([GradeID], map: "Utilisateur_GradeID_fkey")
   @@index([EtatID], map: "Utilisateur_EtatID_fkey")
+  @@index([PremiumRenewalPlan, PremiumEndDate])
 }
 
 model UserSession {
@@ -995,6 +999,16 @@ model AdminMessage {
   ExpiresAt      DateTime?
   UpdatedAt      DateTime  @default(now()) @updatedAt
   CreateDate     DateTime? @default(now())
+}
+
+model PremiumPayment {
+  PaymentID     String      @id @db.VarChar(120)
+  UtilisateurID Int
+  Plan          String      @db.VarChar(10)
+  CreateDate    DateTime    @default(now())
+  Utilisateur   Utilisateur @relation(fields: [UtilisateurID], references: [UtilisateurID])
+
+  @@index([UtilisateurID, CreateDate])
 }
 
 model AppSetting {

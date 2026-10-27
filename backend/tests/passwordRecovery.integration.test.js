@@ -129,9 +129,10 @@ describe.skipIf(!enabled)("récupération et sessions — vrai MySQL isolé", ()
     expect((await server.inject({method:"POST",url:"/api/users/logout",headers:{cookie}})).statusCode).toBe(200);
     await expect(validateSessionClaims({...decoded,tokenUse:"session"},{database:db})).rejects.toThrow();
   });
-  it("ne publie ni secret ni stacktrace pour les liens invalides et conserve la simulation Premium désactivée",async()=>{
+  it("ne publie ni secret ni stacktrace pour les liens invalides et permet de désactiver explicitement la simulation Premium",async()=>{
+    await db.appSetting.upsert({where:{Cle:"fake_premium_api"},create:{Cle:"fake_premium_api",Valeur:{active:false}},update:{Valeur:{active:false}}});
     const bad=await server.inject({method:"POST",url:"/api/users/password-recovery/confirm",payload:{token:"invalid"}});expect(bad.statusCode).toBe(400);expect(bad.headers["cache-control"]).toBe("no-store");expect(bad.body).not.toMatch(/stack|password|TokenHash/);
-    const session=await login("Original-123!");const fake=await server.inject({method:"POST",url:"/api/users/premium/fake-checkout",headers:{cookie:cookieFrom(session)},payload:{plan:"YEARLY"}});expect(fake.statusCode).toBe(404);
+    const session=await login("Original-123!");const fake=await server.inject({method:"POST",url:"/api/users/premium/fake-checkout",headers:{cookie:cookieFrom(session)},payload:{plan:"YEARLY"}});expect(fake.statusCode).toBe(503);
   });
   it("invalide un ancien lien après une nouvelle demande envoyée",async()=>{
     const first=await requestRecovery();const second=await requestRecovery("198.51.100.8");

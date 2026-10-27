@@ -49,7 +49,7 @@ Le plafond par compte conserve la réponse générique 202. La limite IP renvoie
 - Refus des comptes bloqués/supprimés dans les contrôles d’identité, d’autorisation et de média ; mot de passe de remplacement aléatoire à la suppression.
 - Autorisation d’extension liée à l’identité authentifiée, sans possibilité de remplacer userId/authVersion par des champs du corps de requête.
 - Fastify 5.12.7 dans le lockfile, Busboy 3.2.2 ; suppression du plugin Next.js inutilisé. Les autres alertes de dépendances du rapport initial ne sont pas réputées corrigées.
-- Simulation Premium désactivée en production et par défaut. Activation possible hors production avec `SAMI_ENABLE_FAKE_PREMIUM=true`.
+- Simulation Premium disponible par défaut, y compris en production : les abonnements de SAMI sont actuellement factices. Le checkout exige une session valide et utilise uniquement l'identité du compte connecté ; les événements de paiement restent signés et vérifiés côté serveur. Le toggle dans Administration > Fonctionnalités expérimentales pilote les souscriptions, changements payants et renouvellements ; le temps acquis et le désabonnement restent préservés. `SAMI_ENABLE_FAKE_PREMIUM` initialise uniquement ce réglage s'il n'existe pas encore. Voir [le fonctionnement des abonnements](premium-subscriptions.md). Ce comportement corrige le blocage ajouté par erreur dans le patch de sécurité initial.
 - Suppression du retour de mot de passe temporaire en mode développement et de logs contenant l’objet utilisateur/hash.
 
 ## Déploiement

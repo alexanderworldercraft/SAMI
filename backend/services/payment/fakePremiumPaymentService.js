@@ -10,13 +10,12 @@ export const computePremiumEndDate = (plan, fromDate = new Date()) => {
   if (plan === "FREE") return null;
 
   const endDate = new Date(fromDate);
-  if (plan === "MONTHLY") {
-    endDate.setMonth(endDate.getMonth() + 1);
-    return endDate;
-  }
-
-  if (plan === "YEARLY") {
-    endDate.setFullYear(endDate.getFullYear() + 1);
+  if (plan === "MONTHLY" || plan === "YEARLY") {
+    const day = endDate.getUTCDate();
+    endDate.setUTCDate(1);
+    endDate.setUTCMonth(endDate.getUTCMonth() + (plan === "YEARLY" ? 12 : 1));
+    const lastDay = new Date(Date.UTC(endDate.getUTCFullYear(), endDate.getUTCMonth() + 1, 0)).getUTCDate();
+    endDate.setUTCDate(Math.min(day, lastDay));
     return endDate;
   }
 

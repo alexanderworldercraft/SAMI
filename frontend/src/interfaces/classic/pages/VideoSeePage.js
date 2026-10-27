@@ -830,7 +830,7 @@ const VideoSeePage = ({ PlayerComponent = VideoPlayer }) => {
       )}
       {video && (
         <main className="flex flex-col grow gap-12">
-          <section data-playback-stage data-cinema={cinemaActive ? "true" : undefined} className={`${cinemaActive ? 'h-dvh max-h-dvh' : 'h-[calc(100vh-4rem)] max-h-[calc(100vh-4rem)]'} box-border py-16 flex items-center px-16`}>
+          <section data-playback-stage data-cinema={cinemaActive ? "true" : undefined} className={`${cinemaActive ? 'h-dvh max-h-dvh p-24' : 'h-[calc(100vh-4rem)] max-h-[calc(100vh-4rem)] p-16'} box-border flex items-center`}>
             <div className="w-full h-full">
               <PlayerComponent
                 video={video}

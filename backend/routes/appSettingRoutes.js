@@ -2,6 +2,8 @@ import {
   getContentPreviewSetting,
   getMultiAudioSetting,
   getPreviewLiveSetting,
+  getFakePremiumApiSetting,
+  updateFakePremiumApiSetting,
   updateContentPreviewSetting,
   updateMultiAudioSetting,
   updatePreviewLiveSetting,
@@ -9,6 +11,8 @@ import {
 import { authMiddleware } from "../middlewares/authMiddleware.js";
 
 export default async function (fastify) {
+  fastify.get("/fake-premium", { preHandler: authMiddleware }, getFakePremiumApiSetting);
+  fastify.put("/fake-premium", { preHandler: authMiddleware }, updateFakePremiumApiSetting);
   fastify.get("/content-preview", getContentPreviewSetting);
   fastify.put("/content-preview", { preHandler: authMiddleware }, updateContentPreviewSetting);
   fastify.get("/preview-live", getPreviewLiveSetting);

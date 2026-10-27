@@ -1,6 +1,27 @@
 import { prisma } from "../services/db.js";
 import { createLog } from "./logController.js";
 import { ensureAdmin as ensureSharedAdmin } from "../services/authz.js";
+import { ensureSuperAdmin } from "../services/authz.js";
+import { getPremiumApiSetting, setPremiumApiSetting } from "../services/payment/premiumSubscriptionService.js";
+
+export const getFakePremiumApiSetting = async (_request, reply) => {
+  reply.header("Cache-Control", "no-store");
+  try { return reply.send(await getPremiumApiSetting()); }
+  catch (error) {
+    console.error("Erreur de lecture du réglage Premium :", error);
+    return reply.status(500).send({ error: "Impossible de charger le réglage des abonnements." });
+  }
+};
+
+export const updateFakePremiumApiSetting = async (request, reply) => {
+  try {
+    if (!await ensureSuperAdmin(request, reply)) return;
+    return reply.send(await setPremiumApiSetting(request.body?.active));
+  } catch (error) {
+    if (!error.statusCode) console.error("Erreur de mise à jour du réglage Premium :", error);
+    return reply.status(error.statusCode || 500).send({ error: error.statusCode ? error.message : "Impossible de modifier le réglage des abonnements." });
+  }
+};
 
 const CONTENT_PREVIEW_KEY = "content_preview_tooltip";
 const PREVIEW_LIVE_KEY = "preview_live";

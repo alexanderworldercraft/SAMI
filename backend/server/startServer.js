@@ -2,6 +2,7 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import cron from "node-cron";
+import { renewDuePremiumSubscriptions } from "../services/payment/premiumSubscriptionService.js";
 
 import { prisma } from "../services/db.js";
 import { deactivateExpiredAdminMessages } from "../services/adminMessageService.js";
@@ -272,6 +273,15 @@ function registerBackgroundJobs(server) {
 
   let keepAliveTimer = null;
   let distributedEncodingTimer = null;
+  let premiumRenewalPromise = null;
+  const renewPremium = () => {
+    if (!premiumRenewalPromise) {
+      premiumRenewalPromise = renewDuePremiumSubscriptions()
+        .catch(error => console.error("Erreur des renouvellements Premium :", error))
+        .finally(() => { premiumRenewalPromise = null; });
+    }
+    return premiumRenewalPromise;
+  };
   let scheduledTasks = [];
 
   server.addHook("onClose", async () => {
@@ -279,7 +289,7 @@ function registerBackgroundJobs(server) {
     if (distributedEncodingTimer) clearInterval(distributedEncodingTimer);
     scheduledTasks.forEach((task) => task.stop());
     await Promise.allSettled(
-      [videoTransferMaintenancePromise, distributedEncodingMaintenancePromise]
+      [videoTransferMaintenancePromise, distributedEncodingMaintenancePromise, premiumRenewalPromise]
         .filter(Boolean)
     );
   });
@@ -290,6 +300,7 @@ function registerBackgroundJobs(server) {
     keepAliveTimer = setInterval(pingDatabase, DATABASE_KEEP_ALIVE_MS);
     keepAliveTimer.unref?.();
     scheduledTasks = [
+      cron.schedule("* * * * *", renewPremium),
       cron.schedule("* * * * *", async () => {
         try {
           const result = await deactivateExpiredAdminMessages();
@@ -313,6 +324,7 @@ function registerBackgroundJobs(server) {
         }
       }),
     ];
+    void renewPremium();
     if (["clone", "primary"].includes(getInstanceRole())) {
       scheduledTasks.push(
         cron.schedule("17 * * * *", () => maintainVideoTransfers())

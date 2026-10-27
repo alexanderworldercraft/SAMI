@@ -16,11 +16,14 @@ import { ensureSuperAdmin } from "../services/authz.js";
 import { getJwtFromRequest } from "../middlewares/authMiddleware.js";
 import { isMultipartFileTooLargeError, sendMultipartFileTooLarge } from "../utils/multipartErrors.js";
 import {
-  computePremiumEndDate,
   createFakePaymentEvent,
   isAllowedPremiumPlan,
   verifyFakePaymentPayload,
 } from "../services/payment/fakePremiumPaymentService.js";
+import {
+  changePremiumPlan,
+  getPremiumSubscription,
+} from "../services/payment/premiumSubscriptionService.js";
 import {
   buildFavoriteContentSummaryPayload,
   buildUserFavoritesPayload,
@@ -32,7 +35,6 @@ import { passwordRecoveryService } from "../services/passwordRecoveryService.js"
 import { validatePassword } from "../services/passwordPolicy.js";
 import { buildAuthCookie, clearAuthCookie, setReplyHeader } from "../services/authCookie.js";
 
-const isFakePremiumEnabled = () => process.env.NODE_ENV !== "production" && process.env.SAMI_ENABLE_FAKE_PREMIUM === "true";
 async function getDecodedAuthUser(request) {
   if (request.user) return request.user;
   const token = getJwtFromRequest(request);
@@ -1579,13 +1581,20 @@ export const userController = {
     }
   },
 
-  async createFakePremiumCheckout(request, reply) {
-    if (!isFakePremiumEnabled()) {
-      return reply.status(404).send({ error: "Route API introuvable." });
+  async getPremiumSubscription(request, reply) {
+    reply.header("Cache-Control", "no-store");
+    try {
+      return reply.send(await getPremiumSubscription(Number(request.user.userId)));
+    } catch (error) {
+      if (!error.statusCode) console.error("Error in getPremiumSubscription:", error);
+      return reply.status(error.statusCode || 500).send({ error: error.statusCode ? error.message : "Impossible de charger l'abonnement." });
     }
+  },
+
+  async createFakePremiumCheckout(request, reply) {
     try {
       const { userId } = request.user;
-      const { plan } = request.body;
+      const { plan } = request.body || {};
 
       if (!isAllowedPremiumPlan(plan)) {
         return reply
@@ -1593,23 +1602,25 @@ export const userController = {
           .send({ error: "Plan d'abonnement invalide." });
       }
 
+      // Arrêter le renouvellement reste possible même lorsque l'API factice est désactivée.
+      if (plan === "FREE") {
+        const subscription = await changePremiumPlan(Number(userId), plan);
+        return reply.send({ ...subscription, message: "Renouvellement arrêté. Votre accès Premium reste valable jusqu'à son échéance." });
+      }
       const event = createFakePaymentEvent({ userId, plan });
-      return userController.handleFakePremiumPaymentEvent(request, reply, event.payload, event.signature);
+      return await userController.handleFakePremiumPaymentEvent(request, reply, event.payload, event.signature);
     } catch (err) {
-      console.error("Error in createFakePremiumCheckout:", err);
+      if (!err.statusCode) console.error("Error in createFakePremiumCheckout:", err);
       return reply
-        .status(500)
-        .send({ error: "Internal Server Error" });
+        .status(err.statusCode || 500)
+        .send({ error: err.statusCode ? err.message : "Internal Server Error" });
     }
   },
 
   async fakePremiumPaymentWebhook(request, reply) {
-    if (!isFakePremiumEnabled()) {
-      return reply.status(404).send({ error: "Route API introuvable." });
-    }
     try {
       const signature = request.headers["x-fake-payment-signature"];
-      return userController.handleFakePremiumPaymentEvent(request, reply, request.body, signature);
+      return await userController.handleFakePremiumPaymentEvent(request, reply, request.body, signature);
     } catch (err) {
       console.error("Error in fakePremiumPaymentWebhook:", err);
       return reply
@@ -1619,9 +1630,6 @@ export const userController = {
   },
 
   async handleFakePremiumPaymentEvent(request, reply, payload, signature) {
-    if (!isFakePremiumEnabled()) {
-      return reply.status(404).send({ error: "Route API introuvable." });
-    }
     try {
       if (!verifyFakePaymentPayload(payload, signature)) {
         return reply.status(401).send({ error: "Signature de paiement invalide." });
@@ -1633,58 +1641,38 @@ export const userController = {
 
       const userId = Number(payload.userId);
       const plan = payload.plan;
-      if (!Number.isInteger(userId) || !isAllowedPremiumPlan(plan)) {
+      if (!Number.isSafeInteger(userId) || userId <= 0 || !isAllowedPremiumPlan(plan)
+        || typeof payload.paymentId !== "string" || !/^[a-zA-Z0-9_.:-]{1,120}$/.test(payload.paymentId)) {
         return reply.status(400).send({ error: "Payload de paiement invalide." });
       }
 
-      const newPremiumEndDate = computePremiumEndDate(plan);
-
-      const updatedUser = await prisma.utilisateur.update({
-        where: { UtilisateurID: userId },
-        data: {
-          PremiumEndDate: newPremiumEndDate,
-        },
-        select: {
-          UtilisateurID: true,
-          PremiumEndDate: true,
-          GradeID: true,
-        },
-      });
-
-      let isPremium = false;
-      if (updatedUser.PremiumEndDate) {
-        const end = new Date(updatedUser.PremiumEndDate);
-        isPremium = end > new Date();
-      }
-
-      await createLog({
+      const subscription = await changePremiumPlan(userId, plan, { paymentId: payload.paymentId });
+      if (!subscription.replayed) await createLog({
         request,
         UtilisateurID: userId,
         ActionNom: "premium_payment_fake",
         Champ: "PremiumEndDate",
-        NouvelleValeur: updatedUser.PremiumEndDate ? updatedUser.PremiumEndDate.toISOString() : null,
+        NouvelleValeur: subscription.PremiumEndDate ? new Date(subscription.PremiumEndDate).toISOString() : null,
         Meta: {
           paymentId: payload.paymentId,
           plan,
           provider: payload.provider,
+          renewalPlan: subscription.renewalPlan,
         },
       });
 
       return reply.send({
+        ...subscription,
         message:
           plan === "FREE"
-            ? "Votre abonnement premium a été désactivé."
-            : plan === "MONTHLY"
-              ? "Abonnement premium mensuel activé (fake)."
-              : "Abonnement premium annuel activé (fake).",
-        PremiumEndDate: updatedUser.PremiumEndDate,
-        isPremium,
+            ? "Renouvellement arrêté. Votre accès Premium reste valable jusqu'à son échéance."
+            : "Formule enregistrée. Le renouvellement automatique utilisera la formule choisie à l'échéance de votre période en cours (paiement factice).",
       });
     } catch (err) {
-      console.error("Error in handleFakePremiumPaymentEvent:", err);
+      if (!err.statusCode) console.error("Error in handleFakePremiumPaymentEvent:", err);
       return reply
-        .status(500)
-        .send({ error: "Internal Server Error" });
+        .status(err.statusCode || 500)
+        .send({ error: err.statusCode ? err.message : "Internal Server Error" });
     }
   },
 

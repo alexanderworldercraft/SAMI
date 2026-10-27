@@ -184,4 +184,27 @@ describe("AdminExperimentalFeatures - encodage multi-server", () => {
     expect(await screen.findByText("Génération locale des sous-titres IA activée."))
       .toBeInTheDocument();
   });
+
+  test("pilote l'API des abonnements factices depuis son toggle", async () => {
+    mockAdminApi();
+    api.put.mockResolvedValue({ data: { active: true } });
+    render(<AdminExperimentalFeatures />);
+    const toggle = await screen.findByRole("switch", { name: "API des abonnements factices" });
+    await waitFor(() => expect(toggle).toBeEnabled());
+    expect(toggle).toHaveAttribute("aria-checked", "false");
+    fireEvent.click(toggle);
+    await waitFor(() => expect(api.put).toHaveBeenCalledWith("/app-settings/fake-premium", { active: true }));
+    await waitFor(() => expect(toggle).toHaveAttribute("aria-checked", "true"));
+  });
+
+  test("conserve l'état du toggle des abonnements si la sauvegarde échoue", async () => {
+    mockAdminApi();
+    api.put.mockRejectedValue({ response: { data: { error: "Sauvegarde impossible" } } });
+    render(<AdminExperimentalFeatures />);
+    const toggle = await screen.findByRole("switch", { name: "API des abonnements factices" });
+    await waitFor(() => expect(toggle).toBeEnabled());
+    fireEvent.click(toggle);
+    expect(await screen.findByText("Sauvegarde impossible")).toBeInTheDocument();
+    expect(toggle).toHaveAttribute("aria-checked", "false");
+  });
 });
