@@ -1,0 +1,13 @@
+
+ RUN  v2.1.9 /private/tmp/sami-audit-20261026-le6e1hib/backend
+
+ ✓ tests/baselineRecoveryEvidence.test.js (1 test) 41ms
+stderr | tests/baselineRecoveryEvidence.test.js > baseline recovery flow evidence > changes the password without verifying ownership of the email address
+Action 'reset_mot_de_passe' non trouvée dans la table Action
+
+
+ Test Files  1 passed (1)
+      Tests  1 passed (1)
+   Start at  09:10:53
+   Duration  516ms (transform 31ms, setup 0ms, collect 396ms, tests 41ms, environment 0ms, prepare 18ms)
+

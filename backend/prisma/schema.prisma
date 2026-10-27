@@ -726,6 +726,7 @@ model ExtensionAccessToken {
 
 model UserPlayerPreference {
   UtilisateurID           Int         @id
+  CinemaEnabled           Boolean     @default(false)
   AmbientLightEnabled     Boolean     @default(true)
   AmbientLightMode        String      @default("classic") @db.VarChar(16)
   AmbientLightRefreshRate Int         @default(6)

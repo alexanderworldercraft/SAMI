@@ -1,0 +1,218 @@
+
+ RUN  v2.1.9 /private/tmp/sami-audit-20261026-le6e1hib/backend
+
+stderr | tests/securityAudit20261026.test.js > security audit 2026-10-26 > rejects deleted-account login even with a valid password
+Action 'connexion' non trouvée dans la table Action
+
+stderr | tests/securityAudit20261026.test.js > security audit 2026-10-26 > disables createFakePremiumCheckout in production before any mutation
+⚠️ Action 'premium_payment_fake' introuvable en BDD (table Action).
+
+ ❯ tests/securityAudit20261026.test.js (12 tests | 11 failed) 80ms
+   × security audit 2026-10-26 > rejects an existing JWT when EtatID is 2 4ms
+     → expected "spy" to be called with arguments: [ 401 ]
+
+Received: 
+
+
+
+Number of calls: 0
+
+   × security audit 2026-10-26 > rejects an existing JWT when EtatID is 3 0ms
+     → expected "spy" to be called with arguments: [ 401 ]
+
+Received: 
+
+
+
+Number of calls: 0
+
+   × security audit 2026-10-26 > rejects deleted-account login even with a valid password 1ms
+     → expected "spy" to be called with arguments: [ 403 ]
+
+Received: 
+
+
+
+Number of calls: 0
+
+   × security audit 2026-10-26 > denies administrator rights to an inactive administrator 1ms
+     → expected { userId: 7, gradeId: 2 } to be null // Object.is equality
+   × security audit 2026-10-26 > denies media access for a blocked user including scoped media tokens 0ms
+     → expected undefined to be 401 // Object.is equality
+   × security audit 2026-10-26 > does not trust arbitrary forwarded headers in the IP helper 1ms
+     → expected '203.0.113.8' to be '198.51.100.7' // Object.is equality
+   × security audit 2026-10-26 > uses only the trusted loopback hop when proxy support is enabled 55ms
+     → expected '203.0.113.8' to be '198.51.100.7' // Object.is equality
+   × security audit 2026-10-26 > disables createFakePremiumCheckout in production before any mutation 1ms
+     → expected "spy" to be called with arguments: [ 404 ]
+
+Received: 
+
+
+
+Number of calls: 0
+
+   × security audit 2026-10-26 > disables fakePremiumPaymentWebhook in production before any mutation 1ms
+     → expected "spy" to be called with arguments: [ 404 ]
+
+Received: 
+
+  1st spy call:
+
+  Array [
+-   404,
++   401,
+  ]
+
+
+Number of calls: 1
+
+   × security audit 2026-10-26 > disables handleFakePremiumPaymentEvent in production before any mutation 0ms
+     → expected "spy" to be called with arguments: [ 404 ]
+
+Received: 
+
+  1st spy call:
+
+  Array [
+-   404,
++   401,
+  ]
+
+
+Number of calls: 1
+
+   × security audit 2026-10-26 > rejects unauthenticated socket connections 16ms
+     → expected 0 to be greater than 0
+
+⎯⎯⎯⎯⎯⎯ Failed Tests 11 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/securityAudit20261026.test.js > security audit 2026-10-26 > rejects an existing JWT when EtatID is 2
+ FAIL  tests/securityAudit20261026.test.js > security audit 2026-10-26 > rejects an existing JWT when EtatID is 3
+AssertionError: expected "spy" to be called with arguments: [ 401 ]
+
+Received: 
+
+
+
+Number of calls: 0
+
+ ❯ tests/securityAudit20261026.test.js:23:22
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/11]⎯
+
+ FAIL  tests/securityAudit20261026.test.js > security audit 2026-10-26 > rejects deleted-account login even with a valid password
+AssertionError: expected "spy" to be called with arguments: [ 403 ]
+
+Received: 
+
+
+
+Number of calls: 0
+
+ ❯ tests/securityAudit20261026.test.js:29:158
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/11]⎯
+
+ FAIL  tests/securityAudit20261026.test.js > security audit 2026-10-26 > denies administrator rights to an inactive administrator
+AssertionError: expected { userId: 7, gradeId: 2 } to be null // Object.is equality
+
+- Expected: 
+null
+
++ Received: 
+Object {
+  "gradeId": 2,
+  "userId": 7,
+}
+
+ ❯ tests/securityAudit20261026.test.js:31:207
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/11]⎯
+
+ FAIL  tests/securityAudit20261026.test.js > security audit 2026-10-26 > denies media access for a blocked user including scoped media tokens
+AssertionError: expected undefined to be 401 // Object.is equality
+
+- Expected: 
+401
+
++ Received: 
+undefined
+
+ ❯ tests/securityAudit20261026.test.js:32:367
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/11]⎯
+
+ FAIL  tests/securityAudit20261026.test.js > security audit 2026-10-26 > does not trust arbitrary forwarded headers in the IP helper
+AssertionError: expected '203.0.113.8' to be '198.51.100.7' // Object.is equality
+
+Expected: "198.51.100.7"
+Received: "203.0.113.8"
+
+ ❯ tests/securityAudit20261026.test.js:33:184
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/11]⎯
+
+ FAIL  tests/securityAudit20261026.test.js > security audit 2026-10-26 > uses only the trusted loopback hop when proxy support is enabled
+AssertionError: expected '203.0.113.8' to be '198.51.100.7' // Object.is equality
+
+Expected: "198.51.100.7"
+Received: "203.0.113.8"
+
+ ❯ tests/securityAudit20261026.test.js:34:356
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/11]⎯
+
+ FAIL  tests/securityAudit20261026.test.js > security audit 2026-10-26 > disables createFakePremiumCheckout in production before any mutation
+AssertionError: expected "spy" to be called with arguments: [ 404 ]
+
+Received: 
+
+
+
+Number of calls: 0
+
+ ❯ tests/securityAudit20261026.test.js:35:308
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/11]⎯
+
+ FAIL  tests/securityAudit20261026.test.js > security audit 2026-10-26 > disables fakePremiumPaymentWebhook in production before any mutation
+ FAIL  tests/securityAudit20261026.test.js > security audit 2026-10-26 > disables handleFakePremiumPaymentEvent in production before any mutation
+AssertionError: expected "spy" to be called with arguments: [ 404 ]
+
+Received: 
+
+  1st spy call:
+
+  Array [
+-   404,
++   401,
+  ]
+
+
+Number of calls: 1
+
+ ❯ tests/securityAudit20261026.test.js:35:308
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/11]⎯
+
+ FAIL  tests/securityAudit20261026.test.js > security audit 2026-10-26 > rejects unauthenticated socket connections
+AssertionError: expected 0 to be greater than 0
+ ❯ tests/securityAudit20261026.test.js:36:175
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/11]⎯
+
+ Test Files  1 failed (1)
+      Tests  11 failed | 1 passed (12)
+   Start at  09:08:45
+   Duration  876ms (transform 186ms, setup 0ms, collect 716ms, tests 80ms, environment 0ms, prepare 19ms)
+

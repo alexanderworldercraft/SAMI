@@ -5,6 +5,8 @@ import { XMarkIcon } from "@heroicons/react/24/outline";
 import { Helmet } from "react-helmet-async";
 import api from '../../../services/api';
 import { useParams, useNavigate, useLocation } from "react-router-dom";
+import { useNav } from "../../../context/NavContext";
+import { scrollToPageTop } from "../../../utils/scrollToPageTop";
 import VideoPlayer from "../players/VideoPlayer";
 import VideoDetails from "../components/VideoDetails";
 import SerieDetails from "../components/SerieDetails";
@@ -41,6 +43,10 @@ const VideoSeePage = ({ PlayerComponent = VideoPlayer }) => {
   const { id } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
+  const navigation = useNav();
+  const setCinemaMode = navigation?.setCinemaMode;
+  const cinemaActive = PlayerComponent === VideoPlayer && navigation?.cinemaMode;
+  useEffect(() => () => setCinemaMode?.(false), [setCinemaMode]);
   const [creditData, setCreditData] = useState(null);
   const [creditError, setCreditError] = useState("");
   const [creditRevision, setCreditRevision] = useState(0);
@@ -665,10 +671,7 @@ const VideoSeePage = ({ PlayerComponent = VideoPlayer }) => {
   };
 
   const scrollToLectureTop = () => {
-    document.getElementById(LECTURE_TOP_ID)?.scrollIntoView({
-      behavior: "smooth",
-      block: "start",
-    });
+    scrollToPageTop();
   };
 
   const handleSagaContentClick = () => {
@@ -791,7 +794,7 @@ const VideoSeePage = ({ PlayerComponent = VideoPlayer }) => {
   );
 
   return (
-    <div id={LECTURE_TOP_ID} className="relative scroll-mt-4">
+    <div id={LECTURE_TOP_ID} className={`relative ${cinemaActive ? 'scroll-mt-0' : 'scroll-mt-16'}`}>
       <Helmet>
         <title>{pageMetadata.title}</title>
         <meta name="description" content={pageMetadata.description} />
@@ -827,10 +830,11 @@ const VideoSeePage = ({ PlayerComponent = VideoPlayer }) => {
       )}
       {video && (
         <main className="flex flex-col grow gap-12">
-          <section data-playback-stage className="h-[calc(100vh-4rem)] max-h-[calc(100vh-4rem)] box-border py-16 flex items-center px-16">
+          <section data-playback-stage data-cinema={cinemaActive ? "true" : undefined} className={`${cinemaActive ? 'h-dvh max-h-dvh' : 'h-[calc(100vh-4rem)] max-h-[calc(100vh-4rem)]'} box-border py-16 flex items-center px-16`}>
             <div className="w-full h-full">
               <PlayerComponent
                 video={video}
+                onCinemaModeChange={setCinemaMode}
                 backgroundBlur={backgroundBlur}
                 onVideoElement={setVideoElement}
                 skipFirstPlayLogKey={skipFirstPlayLogKey}

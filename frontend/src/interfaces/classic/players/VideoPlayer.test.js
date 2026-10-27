@@ -275,6 +275,7 @@ it("affiche les sous-titres personnalisés au-dessus de la barre de progression"
   );
   const videoElement = container.querySelector("video");
   const trackElement = container.querySelector("track");
+  expect(trackElement).toHaveAttribute("srclang", "fr");
   const textTrack = new EventTarget();
   textTrack.mode = "disabled";
   textTrack.activeCues = [{ startTime: 1, endTime: 3, text: "Bonjour\nà tous" }];
@@ -581,6 +582,7 @@ it("migre une seule fois l'ancien toggle local vers le compte", async () => {
   await waitFor(() => expect(api.put).toHaveBeenCalledWith(
     "/users/player-preferences",
     {
+      cinemaEnabled: false,
       ambientLightEnabled: false,
       ambientLightMode: "classic",
       ambientLightRefreshRate: 6,
@@ -654,8 +656,103 @@ it("étend les secteurs du pourtour sur tout le dôme en mode avancé", async ()
   expect(ambientContext.fillRect).toHaveBeenCalledWith(1, 1, 1, 1);
   expect(videoElement.requestVideoFrameCallback).toHaveBeenCalledTimes(1);
 
+  // Le PiP suspend l'analyse sans modifier la préférence du compte.
+  await act(async () => {});
+  api.put.mockClear();
+  fireEvent(videoElement, new Event("enterpictureinpicture"));
+  expect(videoElement.cancelVideoFrameCallback).toHaveBeenCalledWith(41);
+  expect(ambientCanvas.width).toBe(1);
+  expect(ambientCanvas.style.backgroundColor).toBe("rgb(3, 3, 3)");
+  fireEvent(videoElement, new Event("leavepictureinpicture"));
+  expect(videoElement.requestVideoFrameCallback).toHaveBeenCalledTimes(2);
+  expect(ambientCanvas.width).toBe(3);
+  expect(api.put).not.toHaveBeenCalled();
+
+  fireEvent.click(screen.getByRole("switch", { name: "Lumière d'ambiance" }));
+  fireEvent(videoElement, new Event("enterpictureinpicture"));
+  fireEvent(videoElement, new Event("leavepictureinpicture"));
+  expect(videoElement.requestVideoFrameCallback).toHaveBeenCalledTimes(2);
+
   fireEvent.pause(videoElement);
   getContext.mockRestore();
+});
+
+it.each(["classic", "tactile", "remote"])("charge la préférence cinéma du compte avec les contrôles %s", async (interactionMode) => {
+  api.get.mockImplementation((url) => url === "/users/player-preferences"
+    ? Promise.resolve({ data: { initialized: true, preferences: { cinemaEnabled: true } } })
+    : new Promise(() => {}));
+  const onCinemaModeChange = jest.fn();
+  render(<VideoPlayer video={{ VideoID: 14 }} interactionMode={interactionMode} onCinemaModeChange={onCinemaModeChange} />);
+  await act(async () => {});
+  expect(onCinemaModeChange).toHaveBeenLastCalledWith(interactionMode === "classic");
+  openSettings();
+  fireEvent.click(screen.getByRole("menuitem", { name: /Ambiance Classique/ }));
+  if (interactionMode === "classic") {
+    const toggle = screen.getByRole("switch", { name: "Affichage cinéma" });
+    expect(toggle).toHaveAttribute("aria-checked", "true");
+    fireEvent.click(toggle);
+    expect(onCinemaModeChange).toHaveBeenLastCalledWith(false);
+    await waitFor(() => expect(api.put).toHaveBeenCalledWith("/users/player-preferences", expect.objectContaining({ cinemaEnabled: false, ambientLightEnabled: true })));
+  } else {
+    expect(screen.queryByRole("switch", { name: "Affichage cinéma" })).not.toBeInTheDocument();
+  }
+});
+
+it("désactive le bouton PiP si le navigateur ne le prend pas en charge", () => {
+  renderPlayer();
+  const button = screen.getByRole("button", { name: "Activer le Picture-in-Picture" });
+  expect(button).toBeDisabled();
+  expect(button.closest("[data-player-actions]")).toBeInTheDocument();
+  expect(button.closest("[data-player-pip]").nextElementSibling).toHaveAttribute("aria-label", "Basculer en plein écran");
+  openSettings();
+  expect(screen.queryByRole("menuitem", { name: /Picture-in-Picture/ })).not.toBeInTheDocument();
+});
+
+it("entre et sort du PiP depuis la barre de commandes et affiche les erreurs sans changer l'ambiance", async () => {
+  window.documentPictureInPicture = { requestWindow: jest.fn() };
+  const { container } = renderPlayer();
+  const element = container.querySelector("video");
+  Object.defineProperty(document, "pictureInPictureEnabled", { configurable: true, value: true });
+  element.requestPictureInPicture = jest.fn(async () => {
+    document.pictureInPictureElement = element;
+    fireEvent(element, new Event("enterpictureinpicture"));
+  });
+  document.exitPictureInPicture = jest.fn(async () => {
+    document.pictureInPictureElement = null;
+    fireEvent(element, new Event("leavepictureinpicture"));
+  });
+  try {
+    fireEvent.loadedMetadata(element);
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: "Activer le Picture-in-Picture" })));
+    expect(element.requestPictureInPicture).toHaveBeenCalledTimes(1);
+    expect(window.documentPictureInPicture.requestWindow).not.toHaveBeenCalled();
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: "Quitter le Picture-in-Picture" })));
+    expect(document.exitPictureInPicture).toHaveBeenCalledTimes(1);
+    element.requestPictureInPicture.mockRejectedValue(new Error("NotAllowedError"));
+    await act(async () => fireEvent.click(screen.getByRole("button", { name: "Activer le Picture-in-Picture" })));
+    expect(screen.getByRole("alert")).toHaveTextContent("Impossible de changer le mode Picture-in-Picture");
+    expect(api.put).not.toHaveBeenCalled();
+  } finally {
+    delete document.pictureInPictureEnabled;
+    delete document.pictureInPictureElement;
+    delete document.exitPictureInPicture;
+    delete window.documentPictureInPicture;
+  }
+});
+
+it("synchronise le PiP Safari avec son changement de présentation natif", async () => {
+  const { container } = renderPlayer();
+  const element = container.querySelector("video");
+  element.webkitSupportsPresentationMode = jest.fn(() => true);
+  element.webkitSetPresentationMode = jest.fn((mode) => {
+    element.webkitPresentationMode = mode;
+    fireEvent(element, new Event("webkitpresentationmodechanged"));
+  });
+  fireEvent.loadedMetadata(element);
+  await act(async () => fireEvent.click(screen.getByRole("button", { name: "Activer le Picture-in-Picture" })));
+  expect(element.webkitSetPresentationMode).toHaveBeenCalledWith("picture-in-picture");
+  await act(async () => fireEvent.click(screen.getByRole("button", { name: "Quitter le Picture-in-Picture" })));
+  expect(element.webkitSetPresentationMode).toHaveBeenCalledWith("inline");
 });
 
 describe("raccourcis clavier du lecteur", () => {

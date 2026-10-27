@@ -4,12 +4,13 @@ import FooterPage from "./FooterPage";
 import WallPaper from "./WallPaper";
 import GeneralMessageBanner from "../../../components/GeneralMessageBanner";
 import { useNav } from "../../../context/NavContext";
+import { useLocation } from "react-router-dom";
 
 export default function ClassicShell({ children, withFooter = true, contentClassName = "" }) {
-  const { navMode } = useNav();
-
-  // applique un décalage conditionnel
-  const paddingClass = navMode === 'hover' ? 'lg:pl-4' : 'lg:pl-72';
+  const { cinemaMode } = useNav();
+  const { pathname } = useLocation();
+  const cinemaActive = cinemaMode && /^\/lecture\/[^/]+\/?$/.test(pathname);
+  const paddingClass = cinemaActive ? '' : 'lg:pl-72';
 
   return (
     <>

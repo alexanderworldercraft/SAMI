@@ -5,6 +5,7 @@ import api from "../../../services/api";
 
 const mockNavigate = jest.fn();
 let mockLocation = { pathname: "/videos", search: "" };
+let mockCinemaMode = false;
 
 jest.mock(
   "react-router-dom",
@@ -54,10 +55,9 @@ jest.mock("../../../services/api", () => ({
 }));
 jest.mock("../components/SearchBar", () => () => <div>Recherche</div>);
 jest.mock("../../../components/ThemeToggle", () => () => <div>Thème</div>);
-jest.mock("./NavVisibilityToggle", () => () => <div>Visibilité</div>);
 jest.mock("../../../components/UserAvatar", () => () => <div>Avatar</div>);
 jest.mock("../../../context/NavContext", () => ({
-  useNav: () => ({ navMode: "fixed", setNavMode: jest.fn() }),
+  useNav: () => ({ cinemaMode: mockCinemaMode }),
 }));
 jest.mock("../../../utils/scrollToPageTop", () => ({ scrollToPageTop: jest.fn() }));
 
@@ -65,6 +65,7 @@ describe("NavBar - retour en haut", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockLocation = { pathname: "/videos", search: "" };
+    mockCinemaMode = false;
     api.get.mockReturnValue(new Promise(() => {}));
   });
 
@@ -82,6 +83,20 @@ describe("NavBar - retour en haut", () => {
     });
 
     expect(scrollToPageTop).toHaveBeenCalledTimes(10);
+  });
+
+  test("masque la barre horizontale uniquement sur une lecture en mode cinéma", () => {
+    mockCinemaMode = true;
+    mockLocation = { pathname: "/lecture/14", search: "" };
+    const { container, rerender } = render(<NavBar />);
+    expect(container.querySelector('[data-horizontal-navbar]')).toHaveClass('hidden');
+    expect(container.querySelector('.group\\/cinema-sidebar')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Ouvrir la navigation' })).toBeInTheDocument();
+    mockLocation = { pathname: "/videos", search: "" };
+    rerender(<NavBar />);
+    expect(container.querySelector('[data-horizontal-navbar]')).not.toHaveClass('hidden');
+    expect(container.querySelector('.group\\/cinema-sidebar')).not.toBeInTheDocument();
+    expect(screen.queryByText('Visibilité de la barre')).not.toBeInTheDocument();
   });
 
   test.each([1, 2])("navigation administrative commune mobile/desktop pour grade %s", async grade => {

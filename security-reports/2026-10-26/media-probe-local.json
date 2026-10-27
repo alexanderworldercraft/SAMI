@@ -1,0 +1,14 @@
+[
+  {
+    "case": "current",
+    "requested_loopback_resources": [],
+    "exit": 1,
+    "stderr": "[mov,mp4,m4a,3gp,3g2,mj2 @ 0xb49060000] moov atom not found\n/private/tmp/sami-local-media-katwzlam/synthetic.mp4: Invalid data found when processing input\n"
+  },
+  {
+    "case": "proposed",
+    "requested_loopback_resources": [],
+    "exit": 1,
+    "stderr": "[mov,mp4,m4a,3gp,3g2,mj2 @ 0x76ac60000] moov atom not found\n/private/tmp/sami-local-media-katwzlam/synthetic.mp4: Invalid data found when processing input\n"
+  }
+]

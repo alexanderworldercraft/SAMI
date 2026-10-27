@@ -27,6 +27,13 @@ const PLAYER_SEEK_SECONDS = 15;
 const PLAYER_VOLUME_STEP = 0.05;
 const PLAYER_SINGLE_CLICK_DELAY_MS = 300;
 const PLAYER_CONTROLS_HIDE_DELAY_MS = 3000;
+const supportsStandardPictureInPicture = (element) => Boolean(
+  document.pictureInPictureEnabled && typeof element?.requestPictureInPicture === "function"
+);
+const supportsWebkitPictureInPicture = (element) => Boolean(
+  typeof element?.webkitSetPresentationMode === "function"
+  && element.webkitSupportsPresentationMode?.("picture-in-picture")
+);
 const PLAYER_KEYBOARD_SHORTCUTS = [
   { key: "←", label: "Reculer de 15 secondes" },
   { key: "→", label: "Avancer de 15 secondes" },
@@ -175,6 +182,7 @@ const VideoPlayer = ({
   onNextSagaContent,
   initialPlaybackTime = null,
   autoPlayOnLoad = false,
+  onCinemaModeChange,
   interactionMode = "classic",
 }) => {
   const videoRef = useRef(null);
@@ -207,6 +215,10 @@ const VideoPlayer = ({
   const [controlsVisible, setControlsVisible] = useState(false);
   const [controlsDismissed, setControlsDismissed] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [isPictureInPicture, setIsPictureInPicture] = useState(false);
+  const [pictureInPictureSupported, setPictureInPictureSupported] = useState(false);
+  const [pictureInPicturePending, setPictureInPicturePending] = useState(false);
+  const [pictureInPictureError, setPictureInPictureError] = useState("");
   const [volume, setVolume] = useState(1);
   const [muted, setMuted] = useState(false);
   const [remoteVolumeOpen, setRemoteVolumeOpen] = useState(false);
@@ -235,6 +247,9 @@ const VideoPlayer = ({
     DEFAULT_AMBIENT_LIGHT_PREFERENCES
   );
   const [ambientPreferencesError, setAmbientPreferencesError] = useState("");
+  useEffect(() => {
+    onCinemaModeChange?.(interactionMode === "classic" && ambientLightPreferences.cinemaEnabled);
+  }, [onCinemaModeChange, interactionMode, ambientLightPreferences.cinemaEnabled]);
   const [aiSubtitleConfig, setAiSubtitleConfig] = useState(null);
   const [aiSubtitleJobs, setAiSubtitleJobs] = useState([]);
   const [aiSubtitleLanguage, setAiSubtitleLanguage] = useState("fr");
@@ -283,6 +298,8 @@ const VideoPlayer = ({
     setPlaying(false);
     setControlsVisible(false);
     setControlsDismissed(false);
+    setPictureInPicturePending(false);
+    setPictureInPictureError("");
     captionsEnabledRef.current = false;
     selectedSubtitleIndexRef.current = 0;
     setCaptionsEnabled(false);
@@ -633,6 +650,7 @@ const VideoPlayer = ({
         const track = document.createElement("track");
         track.kind = "subtitles";
         track.label = subtitle.label;
+        track.srclang = subtitle.language || "";
         track.src = subtitle.url;
         track.default = false;
         let registeredTextTrack = null;
@@ -676,6 +694,7 @@ const VideoPlayer = ({
     // 3) Events player
     // -------------------------
     const handleLoadedMetadata = () => {
+      updatePictureInPictureSupport();
       readyMediaIdRef.current = video.VideoID;
       setDuration(Number.isFinite(videoElement.duration) ? videoElement.duration : 0);
       setCurrentTime(videoElement.currentTime || 0);
@@ -779,6 +798,8 @@ const VideoPlayer = ({
 
     const handleEnterPictureInPicture = () => {
       isPictureInPictureRef.current = true;
+      setIsPictureInPicture(true);
+      setPictureInPictureError("");
       applySubtitleSelection(
         selectedSubtitleIndexRef.current,
         captionsEnabledRef.current
@@ -789,6 +810,7 @@ const VideoPlayer = ({
 
     const handleLeavePictureInPicture = () => {
       isPictureInPictureRef.current = false;
+      setIsPictureInPicture(false);
       applySubtitleSelection(
         selectedSubtitleIndexRef.current,
         captionsEnabledRef.current
@@ -817,6 +839,19 @@ const VideoPlayer = ({
       startBackgroundUpdate();
     };
 
+    const updatePictureInPictureSupport = () => setPictureInPictureSupported(
+      supportsStandardPictureInPicture(videoElement) || supportsWebkitPictureInPicture(videoElement)
+    );
+    const handlePresentationModeChange = () => {
+      const active = document.pictureInPictureElement === videoElement
+        || videoElement.webkitPresentationMode === "picture-in-picture";
+      if (active === isPictureInPictureRef.current) return;
+      if (active) handleEnterPictureInPicture();
+      else handleLeavePictureInPicture();
+    };
+    updatePictureInPictureSupport();
+    handlePresentationModeChange();
+    videoElement.addEventListener("webkitpresentationmodechanged", handlePresentationModeChange);
     videoElement.addEventListener("loadedmetadata", handleLoadedMetadata);
     videoElement.addEventListener("play", handlePlay);
     videoElement.addEventListener("pause", handlePause);
@@ -845,6 +880,7 @@ const VideoPlayer = ({
       }
 
       videoElement.removeEventListener("loadedmetadata", handleLoadedMetadata);
+      videoElement.removeEventListener("webkitpresentationmodechanged", handlePresentationModeChange);
       videoElement.removeEventListener("play", handlePlay);
       videoElement.removeEventListener("pause", handlePause);
       videoElement.removeEventListener("ended", handleEnded);
@@ -1127,6 +1163,30 @@ const VideoPlayer = ({
     ambientLightPreferencesRef.current = nextPreferences;
     setAmbientLightPreferences(nextPreferences);
     queueAmbientPreferenceSave(nextPreferences);
+  };
+
+  const togglePictureInPicture = async () => {
+    const element = videoRef.current;
+    if (!element || pictureInPicturePending) return;
+    setPictureInPicturePending(true);
+    setPictureInPictureError("");
+    try {
+      if (document.pictureInPictureElement === element) {
+        await document.exitPictureInPicture();
+      } else if (supportsStandardPictureInPicture(element)) {
+        await element.requestPictureInPicture();
+      } else if (supportsWebkitPictureInPicture(element)) {
+        element.webkitSetPresentationMode(
+          element.webkitPresentationMode === "picture-in-picture" ? "inline" : "picture-in-picture"
+        );
+      }
+    } catch (error) {
+      if (componentMountedRef.current) {
+        setPictureInPictureError("Impossible de changer le mode Picture-in-Picture.");
+      }
+    } finally {
+      if (componentMountedRef.current) setPictureInPicturePending(false);
+    }
   };
 
   // -------------------------
@@ -1652,6 +1712,7 @@ const VideoPlayer = ({
           crossOrigin="use-credentials"
           className="relative z-10 w-full h-full rounded-xl xl:rounded-2xl object-contain block"
           preload="auto"
+          playsInline
         />
 
         <div
@@ -1874,6 +1935,32 @@ const VideoPlayer = ({
 
                   {settingsPanel === SETTINGS_PANEL.AMBIENT && (
                     <div className="space-y-4 px-1 pb-1">
+                      {interactionMode === "classic" && (
+                        <button
+                          type="button"
+                          role="switch"
+                          aria-label="Affichage cinéma"
+                          aria-checked={ambientLightPreferences.cinemaEnabled}
+                          onClick={() => updateAmbientPreferences({ cinemaEnabled: !ambientLightPreferences.cinemaEnabled })}
+                          className="flex w-full items-center justify-between gap-4 rounded-xl border border-white/10 bg-white/5 px-3 py-3 text-sm text-white/85 transition hover:bg-white/10"
+                        >
+                          <span className="font-bold">Affichage cinéma</span>
+                          <span className="flex items-center gap-2 text-white/60">
+                            <span>{ambientLightPreferences.cinemaEnabled ? "Activé" : "Désactivé"}</span>
+                            <span
+                              className={`relative inline-flex h-5 w-10 shrink-0 items-center rounded-full transition-colors duration-200 ${
+                                ambientLightPreferences.cinemaEnabled ? "bg-sky-500" : "bg-neutral-700"
+                              }`}
+                              aria-hidden="true"
+                            >
+                              <span
+                                className="inline-block h-4 w-4 rounded-full bg-white shadow transition-transform duration-200"
+                                style={{ transform: ambientLightPreferences.cinemaEnabled ? "translateX(1.25rem)" : "translateX(0.25rem)" }}
+                              />
+                            </span>
+                          </span>
+                        </button>
+                      )}
                       <button
                         type="button"
                         role="switch"
@@ -2212,7 +2299,7 @@ const VideoPlayer = ({
               className="relative"
               onMouseEnter={interactionMode === "remote" ? undefined : openKeyboardHelp}
               onMouseLeave={(event) => {
-                if (!event.currentTarget.contains(document.activeElement)) {
+                if (!event.currentTarget.contains(event.currentTarget.ownerDocument.activeElement)) {
                   closeKeyboardHelp();
                 }
               }}
@@ -2289,6 +2376,28 @@ const VideoPlayer = ({
               </button>
             </div>
 
+            <div data-player-pip className="relative">
+              {pictureInPictureError && (
+                <p role="alert" className="absolute bottom-full right-0 z-50 mb-3 w-64 rounded-lg border border-white/15 bg-neutral-950/95 p-3 text-sm text-amber-200 shadow-xl">
+                  {pictureInPictureError}
+                </p>
+              )}
+              <button
+                type="button"
+                onClick={togglePictureInPicture}
+                disabled={!pictureInPictureSupported || pictureInPicturePending}
+                data-remote-action
+                aria-label={isPictureInPicture ? "Quitter le Picture-in-Picture" : "Activer le Picture-in-Picture"}
+                aria-pressed={isPictureInPicture}
+                title={pictureInPictureSupported ? "Picture-in-Picture" : "Picture-in-Picture indisponible dans ce navigateur"}
+                className="flex h-8 w-8 items-center justify-center rounded p-1 text-white/90 hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-35"
+              >
+                <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true">
+                  <rect x="2.5" y="4.5" width="19" height="15" rx="2" />
+                  <rect x="12" y="11" width="7" height="6" rx="1" fill="currentColor" stroke="none" />
+                </svg>
+              </button>
+            </div>
             <button
               type="button"
               onClick={toggleFullscreen}

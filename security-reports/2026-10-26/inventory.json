@@ -1,0 +1,426 @@
+{
+  "backend": {
+    "lockfileVersion": 3,
+    "count": 750,
+    "direct": {
+      "@fastify/cors": {
+        "declared": "^10.0.1",
+        "resolved": "10.1.0",
+        "installed": "10.1.0"
+      },
+      "@fastify/multipart": {
+        "declared": "^9.0.1",
+        "resolved": "9.4.0",
+        "installed": "9.4.0"
+      },
+      "@fastify/nextjs": {
+        "declared": "^11.0.0",
+        "resolved": "11.0.0",
+        "installed": "11.0.0"
+      },
+      "@fastify/static": {
+        "declared": "^8.0.3",
+        "resolved": "8.3.0",
+        "installed": "8.3.0"
+      },
+      "@fastify/swagger": {
+        "declared": "^9.4.0",
+        "resolved": "9.6.1",
+        "installed": "9.6.1"
+      },
+      "@fastify/swagger-ui": {
+        "declared": "^5.1.0",
+        "resolved": "5.2.4",
+        "installed": "5.2.4"
+      },
+      "@prisma/client": {
+        "declared": "^6.11.1",
+        "resolved": "6.19.2",
+        "installed": "6.19.2"
+      },
+      "bcrypt": {
+        "declared": "^5.1.1",
+        "resolved": "5.1.1",
+        "installed": "5.1.1"
+      },
+      "date-fns": {
+        "declared": "^4.1.0",
+        "resolved": "4.1.0",
+        "installed": "4.1.0"
+      },
+      "dotenv": {
+        "declared": "^16.4.5",
+        "resolved": "16.6.1",
+        "installed": "16.6.1"
+      },
+      "fastify": {
+        "declared": "^5.1.0",
+        "resolved": "5.7.1",
+        "installed": "5.7.1"
+      },
+      "fluent-ffmpeg": {
+        "declared": "^2.1.3",
+        "resolved": "2.1.3",
+        "installed": "2.1.3"
+      },
+      "jsonwebtoken": {
+        "declared": "^9.0.2",
+        "resolved": "9.0.3",
+        "installed": "9.0.3"
+      },
+      "mysql2": {
+        "declared": "^3.11.4",
+        "resolved": "3.16.1",
+        "installed": "3.16.1"
+      },
+      "node-cron": {
+        "declared": "^3.0.3",
+        "resolved": "3.0.3",
+        "installed": "3.0.3"
+      },
+      "nodemailer": {
+        "declared": "^7.0.10",
+        "resolved": "7.0.12",
+        "installed": "7.0.12"
+      },
+      "pino-pretty": {
+        "declared": "^13.0.0",
+        "resolved": "13.1.3",
+        "installed": "13.1.3"
+      },
+      "prisma": {
+        "declared": "^6.11.1",
+        "resolved": "6.19.2",
+        "installed": "6.19.2"
+      },
+      "promise-mysql": {
+        "declared": "^5.2.0",
+        "resolved": "5.2.0",
+        "installed": "5.2.0"
+      },
+      "socket.io": {
+        "declared": "^4.8.1",
+        "resolved": "4.8.3",
+        "installed": "4.8.3"
+      },
+      "vitest": {
+        "declared": "^2.1.6",
+        "resolved": "2.1.9",
+        "installed": "2.1.9"
+      },
+      "prisma-erd-generator": {
+        "declared": "^2.3.0",
+        "resolved": "2.4.2",
+        "installed": "2.4.2"
+      }
+    },
+    "transitive": [
+      {
+        "path": "node_modules/@fastify/swagger-ui/node_modules/glob",
+        "version": "13.0.0",
+        "dev": false
+      },
+      {
+        "path": "node_modules/ajv",
+        "version": "8.17.1",
+        "dev": false
+      },
+      {
+        "path": "node_modules/engine.io/node_modules/ws",
+        "version": "8.18.3",
+        "dev": false
+      },
+      {
+        "path": "node_modules/esbuild",
+        "version": "0.21.5",
+        "dev": false
+      },
+      {
+        "path": "node_modules/fast-uri",
+        "version": "3.1.0",
+        "dev": false
+      },
+      {
+        "path": "node_modules/find-my-way",
+        "version": "9.4.0",
+        "dev": false
+      },
+      {
+        "path": "node_modules/glob",
+        "version": "11.1.0",
+        "dev": false
+      },
+      {
+        "path": "node_modules/jsonwebtoken",
+        "version": "9.0.3",
+        "dev": false
+      },
+      {
+        "path": "node_modules/next",
+        "version": "13.5.11",
+        "dev": false
+      },
+      {
+        "path": "node_modules/rimraf/node_modules/glob",
+        "version": "7.2.3",
+        "dev": false
+      },
+      {
+        "path": "node_modules/rollup",
+        "version": "4.55.2",
+        "dev": false
+      },
+      {
+        "path": "node_modules/socket.io-adapter/node_modules/ws",
+        "version": "8.18.3",
+        "dev": false
+      },
+      {
+        "path": "node_modules/tar",
+        "version": "6.2.1",
+        "dev": false
+      },
+      {
+        "path": "node_modules/toad-cache",
+        "version": "3.7.0",
+        "dev": false
+      },
+      {
+        "path": "node_modules/vite",
+        "version": "5.4.21",
+        "dev": false
+      },
+      {
+        "path": "node_modules/ws",
+        "version": "8.19.0",
+        "dev": true
+      }
+    ]
+  },
+  "frontend": {
+    "lockfileVersion": 3,
+    "count": 1613,
+    "direct": {
+      "@headlessui/react": {
+        "declared": "^2.2.4",
+        "resolved": "2.2.9",
+        "installed": "2.2.9"
+      },
+      "@heroicons/react": {
+        "declared": "^2.2.0",
+        "resolved": "2.2.0",
+        "installed": "2.2.0"
+      },
+      "@testing-library/jest-dom": {
+        "declared": "^5.17.0",
+        "resolved": "5.17.0",
+        "installed": "5.17.0"
+      },
+      "@testing-library/react": {
+        "declared": "^13.4.0",
+        "resolved": "13.4.0",
+        "installed": "13.4.0"
+      },
+      "@testing-library/user-event": {
+        "declared": "^13.5.0",
+        "resolved": "13.5.0",
+        "installed": "13.5.0"
+      },
+      "axios": {
+        "declared": "^1.7.8",
+        "resolved": "1.13.6",
+        "installed": "1.13.6"
+      },
+      "date-fns": {
+        "declared": "^4.1.0",
+        "resolved": "4.1.0",
+        "installed": "4.1.0"
+      },
+      "hls.js": {
+        "declared": "^1.5.17",
+        "resolved": "1.6.15",
+        "installed": "1.6.15"
+      },
+      "js-cookie": {
+        "declared": "^3.0.5",
+        "resolved": "3.0.5",
+        "installed": "3.0.5"
+      },
+      "jwt-decode": {
+        "declared": "^4.0.0",
+        "resolved": "4.0.0",
+        "installed": "4.0.0"
+      },
+      "react": {
+        "declared": "^18.3.1",
+        "resolved": "18.3.1",
+        "installed": "18.3.1"
+      },
+      "react-dom": {
+        "declared": "^18.3.1",
+        "resolved": "18.3.1",
+        "installed": "18.3.1"
+      },
+      "react-helmet-async": {
+        "declared": "^2.0.5",
+        "resolved": "2.0.5",
+        "installed": "2.0.5"
+      },
+      "react-router-dom": {
+        "declared": "^7.0.1",
+        "resolved": "7.13.1",
+        "installed": "7.13.1"
+      },
+      "react-scripts": {
+        "declared": "5.0.1",
+        "resolved": "5.0.1",
+        "installed": "5.0.1"
+      },
+      "socket.io-client": {
+        "declared": "^4.8.1",
+        "resolved": "4.8.3",
+        "installed": "4.8.3"
+      },
+      "web-vitals": {
+        "declared": "^2.1.4",
+        "resolved": "2.1.4",
+        "installed": "2.1.4"
+      },
+      "@babel/plugin-proposal-private-property-in-object": {
+        "declared": "^7.21.11",
+        "resolved": "7.21.11",
+        "installed": "7.21.11"
+      },
+      "@tailwindcss/cli": {
+        "declared": "^4.3.1",
+        "resolved": "4.3.1",
+        "installed": "4.3.1"
+      },
+      "@tailwindcss/postcss": {
+        "declared": "^4.3.1",
+        "resolved": "4.3.1",
+        "installed": "4.3.1"
+      },
+      "concurrently": {
+        "declared": "^9.2.3",
+        "resolved": "9.2.3",
+        "installed": "9.2.3"
+      },
+      "postcss": {
+        "declared": "^8.5.15",
+        "resolved": "8.5.15",
+        "installed": "8.5.15"
+      },
+      "tailwindcss": {
+        "declared": "^4.3.1",
+        "resolved": "4.3.1",
+        "installed": "4.3.1"
+      }
+    },
+    "transitive": [
+      {
+        "path": "node_modules/ajv",
+        "version": "6.14.0",
+        "dev": false
+      },
+      {
+        "path": "node_modules/ajv-formats/node_modules/ajv",
+        "version": "8.18.0",
+        "dev": false
+      },
+      {
+        "path": "node_modules/axios",
+        "version": "1.13.6",
+        "dev": false
+      },
+      {
+        "path": "node_modules/engine.io-client/node_modules/ws",
+        "version": "8.18.3",
+        "dev": false
+      },
+      {
+        "path": "node_modules/fast-uri",
+        "version": "3.1.0",
+        "dev": false
+      },
+      {
+        "path": "node_modules/form-data",
+        "version": "4.0.5",
+        "dev": false
+      },
+      {
+        "path": "node_modules/glob",
+        "version": "7.2.3",
+        "dev": false
+      },
+      {
+        "path": "node_modules/jsdom/node_modules/form-data",
+        "version": "3.0.4",
+        "dev": false
+      },
+      {
+        "path": "node_modules/path-to-regexp",
+        "version": "0.1.12",
+        "dev": false
+      },
+      {
+        "path": "node_modules/qs",
+        "version": "6.14.2",
+        "dev": false
+      },
+      {
+        "path": "node_modules/rollup",
+        "version": "2.80.0",
+        "dev": false
+      },
+      {
+        "path": "node_modules/schema-utils/node_modules/ajv",
+        "version": "8.18.0",
+        "dev": false
+      },
+      {
+        "path": "node_modules/webpack-dev-server",
+        "version": "4.15.2",
+        "dev": false
+      },
+      {
+        "path": "node_modules/webpack-dev-server/node_modules/ws",
+        "version": "8.19.0",
+        "dev": false
+      },
+      {
+        "path": "node_modules/workbox-build/node_modules/ajv",
+        "version": "8.18.0",
+        "dev": false
+      },
+      {
+        "path": "node_modules/ws",
+        "version": "7.5.10",
+        "dev": false
+      }
+    ]
+  },
+  "extension/companion": {
+    "lockfileVersion": 3,
+    "count": 10,
+    "direct": {
+      "fast-xml-parser": {
+        "declared": "5.11.1",
+        "resolved": "5.11.1",
+        "installed": "5.11.1"
+      },
+      "googlevideo": {
+        "declared": "4.1.1",
+        "resolved": "4.1.1",
+        "installed": "4.1.1"
+      }
+    },
+    "transitive": [
+      {
+        "path": "node_modules/fast-xml-parser",
+        "version": "5.11.1",
+        "dev": false
+      }
+    ]
+  }
+}

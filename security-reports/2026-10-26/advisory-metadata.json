@@ -1,0 +1,194 @@
+[
+  {
+    "ghsa_id": "GHSA-xjh9-v7x6-24jw",
+    "cve_id": "CVE-2026-19484",
+    "published_at": "2026-10-02T23:16:17Z",
+    "updated_at": "2026-10-02T23:17:29Z",
+    "withdrawn_at": null,
+    "severity": "high",
+    "cvss": {
+      "vector_string": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H",
+      "score": 7.5
+    },
+    "vulnerabilities": [
+      {
+        "package": {
+          "ecosystem": "npm",
+          "name": "@fastify/busboy"
+        },
+        "vulnerable_version_range": ">= 3.1.0, < 3.2.1",
+        "first_patched_version": "3.2.1",
+        "vulnerable_functions": []
+      }
+    ],
+    "html_url": "https://github.com/advisories/GHSA-xjh9-v7x6-24jw"
+  },
+  {
+    "ghsa_id": "GHSA-x8mw-p69m-v3mx",
+    "cve_id": "CVE-2026-19481",
+    "published_at": "2026-10-02T23:16:36Z",
+    "updated_at": "2026-10-02T23:17:27Z",
+    "withdrawn_at": null,
+    "severity": "high",
+    "cvss": {
+      "vector_string": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H",
+      "score": 7.5
+    },
+    "vulnerabilities": [
+      {
+        "package": {
+          "ecosystem": "npm",
+          "name": "@fastify/busboy"
+        },
+        "vulnerable_version_range": ">= 1.0.0, < 3.2.1",
+        "first_patched_version": "3.2.1",
+        "vulnerable_functions": []
+      }
+    ],
+    "html_url": "https://github.com/advisories/GHSA-x8mw-p69m-v3mx"
+  },
+  {
+    "ghsa_id": "GHSA-gxm5-99cw-xjw9",
+    "cve_id": "CVE-2026-74866",
+    "published_at": "2026-10-05T22:33:44Z",
+    "updated_at": "2026-10-05T22:33:45Z",
+    "withdrawn_at": null,
+    "severity": "medium",
+    "cvss": {
+      "vector_string": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:C/C:N/I:L/A:N",
+      "score": 5.8
+    },
+    "vulnerabilities": [
+      {
+        "package": {
+          "ecosystem": "npm",
+          "name": "@fastify/busboy"
+        },
+        "vulnerable_version_range": "< 3.2.2",
+        "first_patched_version": "3.2.2",
+        "vulnerable_functions": []
+      }
+    ],
+    "html_url": "https://github.com/advisories/GHSA-gxm5-99cw-xjw9"
+  },
+  {
+    "ghsa_id": "GHSA-jx2c-rxcm-jvmq",
+    "cve_id": "CVE-2026-25223",
+    "published_at": "2026-02-02T22:23:29Z",
+    "updated_at": "2026-02-04T17:46:03Z",
+    "withdrawn_at": null,
+    "severity": "high",
+    "cvss": {
+      "vector_string": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:H/A:N",
+      "score": 7.5
+    },
+    "vulnerabilities": [
+      {
+        "package": {
+          "ecosystem": "npm",
+          "name": "fastify"
+        },
+        "vulnerable_version_range": "< 5.7.2",
+        "first_patched_version": "5.7.2",
+        "vulnerable_functions": []
+      }
+    ],
+    "html_url": "https://github.com/advisories/GHSA-jx2c-rxcm-jvmq"
+  },
+  {
+    "ghsa_id": "GHSA-247c-9743-5963",
+    "cve_id": "CVE-2026-33806",
+    "published_at": "2026-04-15T19:24:41Z",
+    "updated_at": "2026-04-24T20:42:06Z",
+    "withdrawn_at": null,
+    "severity": "high",
+    "cvss": {
+      "vector_string": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:H/A:N",
+      "score": 7.5
+    },
+    "vulnerabilities": [
+      {
+        "package": {
+          "ecosystem": "npm",
+          "name": "fastify"
+        },
+        "vulnerable_version_range": ">= 5.3.2, <= 5.8.4",
+        "first_patched_version": "5.8.5",
+        "vulnerable_functions": []
+      }
+    ],
+    "html_url": "https://github.com/advisories/GHSA-247c-9743-5963"
+  },
+  {
+    "ghsa_id": "GHSA-p68q-wchp-6fh7",
+    "cve_id": "CVE-2026-76169",
+    "published_at": "2026-09-30T23:45:34Z",
+    "updated_at": "2026-09-30T23:45:35Z",
+    "withdrawn_at": null,
+    "severity": "high",
+    "cvss": {
+      "vector_string": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N",
+      "score": 7.5
+    },
+    "vulnerabilities": [
+      {
+        "package": {
+          "ecosystem": "npm",
+          "name": "fastify"
+        },
+        "vulnerable_version_range": ">= 4.0.0, < 5.12.2",
+        "first_patched_version": "5.12.2",
+        "vulnerable_functions": []
+      }
+    ],
+    "html_url": "https://github.com/advisories/GHSA-p68q-wchp-6fh7"
+  },
+  {
+    "ghsa_id": "GHSA-83w8-p2f5-377r",
+    "cve_id": "CVE-2026-15074",
+    "published_at": "2026-07-24T16:43:21Z",
+    "updated_at": "2026-07-24T16:43:21Z",
+    "withdrawn_at": null,
+    "severity": "high",
+    "cvss": {
+      "vector_string": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N",
+      "score": 7.5
+    },
+    "vulnerabilities": [
+      {
+        "package": {
+          "ecosystem": "npm",
+          "name": "@fastify/static"
+        },
+        "vulnerable_version_range": "<= 10.1.0",
+        "first_patched_version": "10.1.1",
+        "vulnerable_functions": []
+      }
+    ],
+    "html_url": "https://github.com/advisories/GHSA-83w8-p2f5-377r"
+  },
+  {
+    "ghsa_id": "GHSA-8pvw-jcv7-9cmj",
+    "cve_id": "CVE-2026-7120",
+    "published_at": "2026-07-24T16:43:44Z",
+    "updated_at": "2026-07-24T16:43:46Z",
+    "withdrawn_at": null,
+    "severity": "medium",
+    "cvss": {
+      "vector_string": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:L/I:N/A:N",
+      "score": 5.3
+    },
+    "vulnerabilities": [
+      {
+        "package": {
+          "ecosystem": "npm",
+          "name": "@fastify/static"
+        },
+        "vulnerable_version_range": "<= 10.1.1",
+        "first_patched_version": "10.1.2",
+        "vulnerable_functions": []
+      }
+    ],
+    "html_url": "https://github.com/advisories/GHSA-8pvw-jcv7-9cmj"
+  }
+]

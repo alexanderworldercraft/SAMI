@@ -7,11 +7,13 @@ import {
 
 it("normalise les préférences d'ambiance sur le contrat du compte", () => {
   expect(normalizeAmbientLightPreferences({
+    cinemaEnabled: true,
     ambientLightEnabled: false,
     ambientLightMode: "advanced",
     ambientLightRefreshRate: 60,
     ambientLightGridSize: 9,
   })).toEqual({
+    cinemaEnabled: true,
     ambientLightEnabled: false,
     ambientLightMode: "advanced",
     ambientLightRefreshRate: 60,
@@ -23,6 +25,7 @@ it("normalise les préférences d'ambiance sur le contrat du compte", () => {
     ambientLightRefreshRate: 96,
     ambientLightGridSize: 12,
   })).toEqual({
+    cinemaEnabled: false,
     ambientLightEnabled: true,
     ambientLightMode: "classic",
     ambientLightRefreshRate: 6,

@@ -1,0 +1,88 @@
+{
+  "date": "2026-10-26",
+  "revision": "125fad2cd819fb147ad97a801dbfc99188942fbb",
+  "previous_report": null,
+  "production_patch_applied": false,
+  "findings": [
+    {
+      "id": "SAMI-AUTH-001",
+      "severity": "high",
+      "evidence": "confirmed-local",
+      "status": "open",
+      "new": true,
+      "proposal": "01-core-security.patch"
+    },
+    {
+      "id": "SAMI-AUTH-002",
+      "severity": "high",
+      "evidence": "confirmed-local",
+      "status": "open",
+      "new": true,
+      "proposal": "03-contain-password-reset.patch"
+    },
+    {
+      "id": "SAMI-DEP-001",
+      "severity": "high",
+      "evidence": "affected-version-public-code-path",
+      "status": "open",
+      "new": true,
+      "proposal": "02-dependency-security.patch"
+    },
+    {
+      "id": "SAMI-RUNTIME-001",
+      "severity": "high",
+      "evidence": "affected-local-runtime",
+      "status": "open",
+      "new": true,
+      "proposal": null
+    },
+    {
+      "id": "SAMI-AUTH-003",
+      "severity": "moderate",
+      "evidence": "confirmed-design",
+      "status": "open",
+      "new": true,
+      "proposal": null
+    },
+    {
+      "id": "SAMI-API-001",
+      "severity": "moderate",
+      "evidence": "confirmed-local-proxy-dependent",
+      "status": "open",
+      "new": true,
+      "proposal": "01-core-security.patch"
+    },
+    {
+      "id": "SAMI-API-002",
+      "severity": "moderate",
+      "evidence": "confirmed-code-no-remote-subscription",
+      "status": "open",
+      "new": true,
+      "proposal": "01-core-security.patch"
+    },
+    {
+      "id": "SAMI-BILLING-001",
+      "severity": "moderate",
+      "evidence": "confirmed-code-product-intent-dependent",
+      "status": "open",
+      "new": true,
+      "proposal": "01-core-security.patch"
+    },
+    {
+      "id": "SAMI-DEP-002",
+      "severity": "moderate",
+      "evidence": "affected-version-reachability-unproven",
+      "status": "open",
+      "new": true,
+      "proposal": "02-dependency-security.patch"
+    },
+    {
+      "id": "SAMI-AI-001",
+      "severity": "moderate",
+      "evidence": "affected-versions-reachability-unproven",
+      "status": "open",
+      "new": true,
+      "proposal": null
+    }
+  ]
+}

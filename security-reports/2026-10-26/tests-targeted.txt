@@ -1,0 +1,33 @@
+
+ RUN  v2.1.9 /private/tmp/sami-audit-20261026-le6e1hib/backend
+
+ ✓ tests/videoTransferSecurity.test.js (49 tests) 38ms
+stdout | tests/serverFactory.test.js
+[DEBUG] Connected to DB
+
+ ✓ tests/securityAudit20261026.test.js (12 tests) 105ms
+ ✓ tests/serverFactory.test.js (7 tests) 165ms
+stdout | tests/protectedMediaLegacy.test.js
+[DEBUG] Connected to DB
+
+ ✓ tests/protectedMediaLegacy.test.js (6 tests) 3ms
+stdout | tests/protectedMediaService.test.js
+[DEBUG] Connected to DB
+
+ ✓ tests/protectedMediaService.test.js (4 tests) 2ms
+ ✓ tests/internalVideoTransferAuth.test.js (3 tests) 3ms
+stdout | tests/protectedMediaController.test.js
+[DEBUG] Connected to DB
+
+ ✓ tests/protectedMediaController.test.js (3 tests) 3ms
+stdout | tests/extensionAuthService.test.js
+[DEBUG] Connected to DB
+
+ ✓ tests/extensionAuthService.test.js (3 tests) 1ms
+ ✓ tests/resetContainment20261026.test.js (1 test) 53ms
+
+ Test Files  9 passed (9)
+      Tests  88 passed (88)
+   Start at  09:09:17
+   Duration  1.85s (transform 220ms, setup 0ms, collect 1.95s, tests 372ms, environment 1ms, prepare 180ms)
+

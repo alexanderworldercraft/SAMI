@@ -3,6 +3,7 @@ export const AMBIENT_LIGHT_DEFAULT_COLOR = "rgb(3, 3, 3)";
 export const AMBIENT_LIGHT_REFRESH_RATES = [3, 6, 12, 24, 48, 60];
 
 export const DEFAULT_AMBIENT_LIGHT_PREFERENCES = Object.freeze({
+  cinemaEnabled: false,
   ambientLightEnabled: true,
   ambientLightMode: "classic",
   ambientLightRefreshRate: 6,
@@ -10,6 +11,7 @@ export const DEFAULT_AMBIENT_LIGHT_PREFERENCES = Object.freeze({
 });
 
 export const normalizeAmbientLightPreferences = (input = {}) => ({
+  cinemaEnabled: input.cinemaEnabled === true,
   ambientLightEnabled: typeof input.ambientLightEnabled === "boolean"
     ? input.ambientLightEnabled
     : DEFAULT_AMBIENT_LIGHT_PREFERENCES.ambientLightEnabled,

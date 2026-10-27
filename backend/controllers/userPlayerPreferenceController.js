@@ -5,6 +5,7 @@ export const AMBIENT_LIGHT_MODES = ["classic", "advanced"];
 export const AMBIENT_LIGHT_REFRESH_RATES = [3, 6, 12, 24, 48, 60];
 
 export const DEFAULT_PLAYER_PREFERENCES = Object.freeze({
+  cinemaEnabled: false,
   ambientLightEnabled: true,
   ambientLightMode: "classic",
   ambientLightRefreshRate: 6,
@@ -12,6 +13,7 @@ export const DEFAULT_PLAYER_PREFERENCES = Object.freeze({
 });
 
 const serializePreferences = (preferences) => ({
+  cinemaEnabled: preferences.CinemaEnabled ?? false,
   ambientLightEnabled: preferences.AmbientLightEnabled,
   ambientLightMode: preferences.AmbientLightMode,
   ambientLightRefreshRate: preferences.AmbientLightRefreshRate,
@@ -24,12 +26,16 @@ export const validatePlayerPreferences = (input) => {
   }
 
   const preferences = {
+    cinemaEnabled: input.cinemaEnabled,
     ambientLightEnabled: input.ambientLightEnabled,
     ambientLightMode: input.ambientLightMode,
     ambientLightRefreshRate: input.ambientLightRefreshRate,
     ambientLightGridSize: input.ambientLightGridSize,
   };
 
+  if (preferences.cinemaEnabled !== undefined && typeof preferences.cinemaEnabled !== "boolean") {
+    return { error: "L'affichage cinéma doit être un booléen." };
+  }
   if (typeof preferences.ambientLightEnabled !== "boolean") {
     return { error: "L'activation de l'ambiance doit être un booléen." };
   }
@@ -84,6 +90,8 @@ export const userPlayerPreferenceController = {
         AmbientLightMode: preferences.ambientLightMode,
         AmbientLightRefreshRate: preferences.ambientLightRefreshRate,
         AmbientLightGridSize: preferences.ambientLightGridSize,
+        // Les anciens clients ne doivent pas effacer cette nouvelle préférence.
+        ...(preferences.cinemaEnabled === undefined ? {} : { CinemaEnabled: preferences.cinemaEnabled }),
       };
       const previousPreferences = await prisma.userPlayerPreference.findUnique({
         where: { UtilisateurID: userId },

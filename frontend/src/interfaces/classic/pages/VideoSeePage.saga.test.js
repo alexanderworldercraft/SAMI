@@ -34,7 +34,7 @@ const series = { SeriesID: 7, Titre: "La série", Saisons: [
   { Numero: 2, Episodes: [{ VideoID: 73 }, { VideoID: 74 }] },
 ] };
 const originalFetch = global.fetch;
-const originalScroll = Element.prototype.scrollIntoView;
+const originalScroll = window.scrollTo;
 
 const mockApi = ({ count = 1, currentSeries = null, universes = [], video = {}, contents = [
   { id: 1, type: "video", Titre: "X1", Ordre: 1 }, { id: 2, type: "video", Titre: "X2", Ordre: 2 },
@@ -55,11 +55,11 @@ beforeEach(() => {
   mockId = "1";
   mockLocation = { state: {}, search: "" };
   global.fetch = jest.fn(async () => ({ json: async () => [] }));
-  Element.prototype.scrollIntoView = jest.fn();
+  window.scrollTo = jest.fn();
 });
 afterEach(() => {
   global.fetch = originalFetch;
-  Element.prototype.scrollIntoView = originalScroll;
+  window.scrollTo = originalScroll;
 });
 
 it("relie la saga unique au lecteur et redémarre le contenu choisi à zéro", async () => {
@@ -67,7 +67,7 @@ it("relie la saga unique au lecteur et redémarre le contenu choisi à zéro", a
   const { rerender } = render(<VideoSeePage PlayerComponent={MockPlayer} />);
   fireEvent.click(await screen.findByRole("button", { name: "Continuer vers X2" }));
   expect(mockNavigate).toHaveBeenCalledWith("/lecture/2", { state: { creditNextVideoId: 2 } });
-  expect(Element.prototype.scrollIntoView).toHaveBeenCalled();
+  expect(window.scrollTo).toHaveBeenCalledWith({ top: 0, behavior: "smooth" });
   mockId = "2";
   mockLocation = { state: { creditNextVideoId: 2 }, search: "" };
   rerender(<VideoSeePage PlayerComponent={MockPlayer} />);

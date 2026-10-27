@@ -48,6 +48,7 @@ describe("userPlayerPreferenceController", () => {
 
   it("enregistre toutes les préférences sur l'utilisateur authentifié", async () => {
     const preferences = {
+      cinemaEnabled: true,
       ambientLightEnabled: false,
       ambientLightMode: "advanced",
       ambientLightRefreshRate: 24,
@@ -55,6 +56,7 @@ describe("userPlayerPreferenceController", () => {
     };
     playerPreferenceRepository.upsert.mockResolvedValue({
       UtilisateurID: 14,
+      CinemaEnabled: true,
       AmbientLightEnabled: false,
       AmbientLightMode: "advanced",
       AmbientLightRefreshRate: 24,
@@ -78,12 +80,14 @@ describe("userPlayerPreferenceController", () => {
       where: { UtilisateurID: 14 },
       create: {
         UtilisateurID: 14,
+        CinemaEnabled: true,
         AmbientLightEnabled: false,
         AmbientLightMode: "advanced",
         AmbientLightRefreshRate: 24,
         AmbientLightGridSize: 7,
       },
       update: {
+        CinemaEnabled: true,
         AmbientLightEnabled: false,
         AmbientLightMode: "advanced",
         AmbientLightRefreshRate: 24,
@@ -101,6 +105,7 @@ describe("userPlayerPreferenceController", () => {
   });
 
   it("refuse les fréquences et tailles de grille hors contrat", () => {
+    expect(validatePlayerPreferences({ ...DEFAULT_PLAYER_PREFERENCES, cinemaEnabled: "true" }).error).toMatch(/cinéma/i);
     expect(validatePlayerPreferences({
       ...DEFAULT_PLAYER_PREFERENCES,
       ambientLightRefreshRate: 96,
@@ -109,5 +114,17 @@ describe("userPlayerPreferenceController", () => {
       ...DEFAULT_PLAYER_PREFERENCES,
       ambientLightGridSize: 10,
     }).error).toMatch(/grille/i);
+  });
+
+  it("préserve le cinéma enregistré lorsqu'un ancien client envoie seulement l'ambiance", async () => {
+    const { cinemaEnabled, ...legacyPreferences } = DEFAULT_PLAYER_PREFERENCES;
+    const stored = { UtilisateurID: 14, CinemaEnabled: true, AmbientLightEnabled: true,
+      AmbientLightMode: "classic", AmbientLightRefreshRate: 6, AmbientLightGridSize: 3 };
+    playerPreferenceRepository.findUnique.mockResolvedValue(stored);
+    playerPreferenceRepository.upsert.mockResolvedValue(stored);
+    const reply = createReply();
+    await userPlayerPreferenceController.update({ user: { userId: 14 }, body: legacyPreferences }, reply);
+    expect(playerPreferenceRepository.upsert.mock.calls[0][0].update).not.toHaveProperty("CinemaEnabled");
+    expect(reply.send).toHaveBeenCalledWith({ preferences: { ...DEFAULT_PLAYER_PREFERENCES, cinemaEnabled: true } });
   });
 });

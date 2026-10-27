@@ -28,7 +28,6 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import api from '../../../services/api'
 import SearchBar from '../components/SearchBar'
 import ThemeToggle from '../../../components/ThemeToggle'
-import NavVisibilityToggle from './NavVisibilityToggle'
 import { useNav } from '../../../context/NavContext'
 import UserAvatar from "../../../components/UserAvatar";
 import { scrollToPageTop } from '../../../utils/scrollToPageTop'
@@ -101,9 +100,10 @@ export default function NavBar() {
   // Nouvel état : pour savoir si on est encore en train de charger /users/me
   const [isUserLoading, setIsUserLoading] = useState(true)
 
-  const { navMode, setNavMode } = useNav()
+  const { cinemaMode } = useNav()
 
   const location = useLocation()
+  const cinemaActive = cinemaMode && /^\/lecture\/[^/]+\/?$/.test(location.pathname)
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -169,16 +169,6 @@ export default function NavBar() {
       console.error("Erreur lors de la récupération d'un média aléatoire :", err)
     }
   }
-
-  const navVisibilityClass =
-    navMode === 'hover'
-      ? 'opacity-0 group-hover:opacity-100 transition-all duration-300 lg:-translate-x-64 group-hover:translate-x-0'
-      : 'opacity-100 translate-x-0 transition-all duration-300'
-
-  const topbarPaddingClass =
-    navMode === 'hover'
-      ? 'lg:pl-0 group-hover:lg:pl-72 opacity-0 group-hover:opacity-100 transition-all duration-300'
-      : 'lg:pl-72 opacity-100 transition-all duration-300'
 
   // Petite fonction pour gérer la déconnexion proprement
   const handleLogout = async () => {
@@ -310,12 +300,23 @@ export default function NavBar() {
         </div>
       </Dialog>
 
-      <div className="group">
+      <div>
+        {cinemaActive && (
+          <button
+            type="button"
+            onClick={() => setSidebarOpen(true)}
+            aria-label="Ouvrir la navigation"
+            className="fixed left-0 top-1/2 z-50 rounded-r-lg bg-black/70 p-2 text-white opacity-0 transition-opacity hover:opacity-100 focus:opacity-100 lg:hidden"
+          >
+            <Bars3Icon aria-hidden="true" className="size-6" />
+          </button>
+        )}
+        <div className={cinemaActive ? 'group/cinema-sidebar hidden lg:fixed lg:inset-y-0 lg:left-0 lg:z-50 lg:block lg:w-3' : ''}>
         {/* Sidebar desktop */}
         <div
           className={classNames(
-            'hidden lg:fixed lg:inset-y-0 lg:z-50 lg:flex lg:w-72 lg:flex-col backdrop-blur-2xl',
-            navVisibilityClass,
+            'hidden lg:fixed lg:inset-y-0 lg:left-0 lg:z-50 lg:flex lg:w-72 lg:flex-col backdrop-blur-2xl transition-transform duration-300',
+            cinemaActive && '-translate-x-full group-hover/cinema-sidebar:translate-x-0 group-focus-within/cinema-sidebar:translate-x-0',
           )}
         >
           <div className="flex grow flex-col gap-y-5 overflow-y-auto border-r border-gray-200 bg-white px-6 pb-4 dark:border-white/10 dark:bg-black/50">
@@ -402,7 +403,8 @@ export default function NavBar() {
         </div>
 
         {/* Topbar */}
-        <div className={classNames(topbarPaddingClass, 'transition-[padding] duration-300')}>
+        </div>
+        <div data-horizontal-navbar className={cinemaActive ? 'hidden' : 'lg:pl-72'}>
           <div className="sticky top-0 z-40 flex h-16 shrink-0 items-center gap-x-4 border-b border-gray-200 bg-white px-4 shadow-sm sm:gap-x-6 sm:px-6 lg:px-8 dark:border-white/10 dark:bg-black/50 dark:shadow-none">
             {/* Burger mobile */}
             <button
@@ -479,12 +481,6 @@ export default function NavBar() {
                           </Link>
                         </MenuItem>
                       ))}
-
-                      {/* Visibilité de la barre */}
-                      <div className="px-3 py-2 grid grid-cols-2 gap-2">
-                        <span className="block text-xs text-gray-900 dark:text-white">Visibilité de la barre</span>
-                        <NavVisibilityToggle onModeChange={setNavMode} />
-                      </div>
 
                       <MenuItem>
                         <button

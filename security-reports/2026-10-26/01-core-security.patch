@@ -1,0 +1,286 @@
+--- a/backend/controllers/logController.js
++++ b/backend/controllers/logController.js
+@@ -44,29 +44,9 @@
+   }
+ }
+ 
+-/**
+- * Récupère l'IP "réelle" de l'utilisateur en tenant compte du reverse proxy (Nginx).
+- * - x-forwarded-for peut contenir plusieurs IP: "client, proxy1, proxy2"
+- * - On prend la première (la plus à gauche).
+- */
++/** Fastify resolves trusted proxy hops; never trust forwarding headers here. */
+ export function getClientIp(request) {
+-  const xff = request.headers["x-forwarded-for"];
+-  if (typeof xff === "string") {
+-    const first = xff.split(",")[0]?.trim();
+-    if (first) return first;
+-  } else if (Array.isArray(xff) && xff.length > 0) {
+-    const first = String(xff[0] || "").split(",")[0]?.trim();
+-    if (first) return first;
+-  }
+-
+-  const xRealIp = request.headers["x-real-ip"];
+-  if (typeof xRealIp === "string" && xRealIp.trim()) return xRealIp.trim();
+-
+-  // Fastify peut fournir request.ip
+-  if (request.ip) return request.ip;
+-
+-  // Fallback Node
+-  return request.socket?.remoteAddress || null;
++  return request.ip || request.socket?.remoteAddress || null;
+ }
+ 
+ export function getUserAgent(request) {
+--- a/backend/controllers/userController.js
++++ b/backend/controllers/userController.js
+@@ -1,6 +1,7 @@
+ // controllers/userController.js
+ 
+ import { userRepository } from '../models/user.js';
++import crypto from 'node:crypto';
+ import bcrypt from 'bcrypt';
+ import jwt from 'jsonwebtoken';
+ import dotenv from 'dotenv';
+@@ -38,6 +39,10 @@
+ 
+ // Valeur par défaut si GradeID est absent ou non mappé
+ const TOKEN_DEFAULT_EXPIRATION = '12h';
++
++const isFakePremiumEnabled = () =>
++  process.env.NODE_ENV !== "production"
++  && process.env.SAMI_ENABLE_FAKE_PREMIUM === "true";
+ 
+ const TOKEN_EXPIRATION_SECONDS = Object.freeze({
+   "4h": 4 * 60 * 60,
+@@ -600,7 +605,7 @@
+       }
+ 
+       // 3) Compte explicitement bloqué côté BDD
+-      if (user.EtatID === 3) {
++      if (user.EtatID !== ETAT.ACTIVE) {
+         return reply.status(403).send({
+           error: 'Votre compte est bloqué. Veuillez contacter l\'administrateur.',
+         });
+@@ -1286,7 +1291,6 @@
+       // ✅ Mot de passe OK → on réinitialise les tentatives
+       clearLoginAttempts(clientKey);
+ 
+-      console.log("User avant suppression:", user);
+ 
+       const currentTimestamp = new Date().toISOString().replace(/[:.]/g, "-");
+ 
+@@ -1295,7 +1299,7 @@
+           ? "Admin@delete.com"
+           : "Utilisateur@delete.com";
+ 
+-      const deletedMotDePasse = await bcrypt.hash("deleted", 10);
++      const deletedMotDePasse = await bcrypt.hash(crypto.randomBytes(32).toString("base64url"), 10);
+ 
+       // Mettre à jour l'utilisateur dans la BDD
+       let updatedUser;
+@@ -1307,7 +1311,6 @@
+           CheminImage: null,
+           EtatID: ETAT.DELETED,
+         });
+-        console.log("Utilisateur mis à jour :", updatedUser);
+       } catch (err) {
+         console.error("Erreur lors de la mise à jour de l'utilisateur :", err);
+         throw err;
+@@ -1821,6 +1824,9 @@
+   },
+ 
+   async createFakePremiumCheckout(request, reply) {
++    if (!isFakePremiumEnabled()) {
++      return reply.status(404).send({ error: "Route API introuvable." });
++    }
+     try {
+       const { userId } = request.user;
+       const { plan } = request.body;
+@@ -1842,6 +1848,9 @@
+   },
+ 
+   async fakePremiumPaymentWebhook(request, reply) {
++    if (!isFakePremiumEnabled()) {
++      return reply.status(404).send({ error: "Route API introuvable." });
++    }
+     try {
+       const signature = request.headers["x-fake-payment-signature"];
+       return userController.handleFakePremiumPaymentEvent(request, reply, request.body, signature);
+@@ -1854,6 +1863,9 @@
+   },
+ 
+   async handleFakePremiumPaymentEvent(request, reply, payload, signature) {
++    if (!isFakePremiumEnabled()) {
++      return reply.status(404).send({ error: "Route API introuvable." });
++    }
+     try {
+       if (!verifyFakePaymentPayload(payload, signature)) {
+         return reply.status(401).send({ error: "Signature de paiement invalide." });
+--- a/backend/middlewares/authMiddleware.js
++++ b/backend/middlewares/authMiddleware.js
+@@ -2,7 +2,8 @@
+ 
+ import jwt from 'jsonwebtoken';
+ import dotenv from 'dotenv';
+-import { AUTH_COOKIE_NAME } from "../constants.js";
++import { prisma } from "../services/db.js";
++import { AUTH_COOKIE_NAME, ETAT } from "../constants.js";
+ import { isVideoMediaAccessToken } from "../services/videoMediaAccessToken.js";
+ 
+ dotenv.config();
+@@ -42,9 +43,20 @@
+     }
+ 
+     // Vérification du token (mode sync pour éviter double-callback)
+-    const decoded = jwt.verify(token, secretKey);
++    const decoded = jwt.verify(token, secretKey, { algorithms: ["HS256"] });
+     if (isVideoMediaAccessToken(decoded)) {
+       return reply.status(401).send({ error: "Invalid token scope" });
++    }
++    const userId = Number(decoded?.userId);
++    if (!Number.isSafeInteger(userId) || userId <= 0) {
++      return reply.status(401).send({ error: "Invalid user" });
++    }
++    const user = await prisma.utilisateur.findUnique({
++      where: { UtilisateurID: userId },
++      select: { EtatID: true },
++    });
++    if (!user || user.EtatID !== ETAT.ACTIVE) {
++      return reply.status(401).send({ error: "Inactive account" });
+     }
+     request.user = decoded;
+   } catch (err) {
+--- /dev/null
++++ b/backend/middlewares/socketAuthMiddleware.js
+@@ -0,0 +1,23 @@
++import { authMiddleware } from "./authMiddleware.js";
++import { ensureAdmin } from "../services/authz.js";
++
++// Progress events concern administrative uploads; authenticate before subscribing.
++export async function socketAuthMiddleware(socket, next) {
++  const request = { headers: socket.handshake.headers };
++  let rejected = false;
++  const reply = {
++    status() { return this; },
++    code() { return this; },
++    send() { rejected = true; },
++  };
++  try {
++    await authMiddleware(request, reply);
++    if (rejected) return next(new Error("Authentication required"));
++    const admin = await ensureAdmin(request, reply);
++    if (!admin || rejected) return next(new Error("Administrator required"));
++    socket.data.userId = admin.userId;
++    return next();
++  } catch {
++    return next(new Error("Authentication required"));
++  }
++}
+--- a/backend/server/createServer.js
++++ b/backend/server/createServer.js
+@@ -34,6 +34,7 @@
+ import videoRoutes from "../routes/videoRoutes.js";
+ import extensionAuthRoutes from "../routes/extensionAuthRoutes.js";
+ import { registerSocialPreviewRoute } from "../routes/socialPreviewRoutes.js";
++import { socketAuthMiddleware } from "../middlewares/socketAuthMiddleware.js";
+ import { globalRateLimit } from "../middlewares/rateLimitMiddleware.js";
+ import {
+   createCorsOriginValidator,
+@@ -236,7 +237,7 @@
+ } = {}) {
+   const server = Fastify({
+     ...(https ? { https } : {}),
+-    ...(trustProxy ? { trustProxy: true } : {}),
++    ...(trustProxy ? { trustProxy: trustProxy === true ? "loopback" : trustProxy } : {}),
+     ajv: {
+       customOptions: { removeAdditional: true },
+     },
+@@ -248,6 +249,7 @@
+       methods: ["GET", "POST"],
+     },
+   });
++  io.use(socketAuthMiddleware);
+   server.decorate("io", io);
+ 
+   registerDocumentation(server, publicHost);
+--- a/backend/services/authz.js
++++ b/backend/services/authz.js
+@@ -1,4 +1,4 @@
+-import { ADMIN_GRADE_IDS, GRADE } from "../constants.js";
++import { ADMIN_GRADE_IDS, ETAT, GRADE } from "../constants.js";
+ import { prisma } from "./db.js";
+ 
+ export const getRequestUserId = (request) => {
+@@ -16,10 +16,10 @@
+ 
+   const user = await prisma.utilisateur.findUnique({
+     where: { UtilisateurID: userId },
+-    select: { GradeID: true },
++    select: { GradeID: true, EtatID: true },
+   });
+ 
+-  if (!user || !ADMIN_GRADE_IDS.includes(user.GradeID)) {
++  if (!user || user.EtatID !== ETAT.ACTIVE || !ADMIN_GRADE_IDS.includes(user.GradeID)) {
+     reply.status(403).send({ error: "Accès réservé aux administrateurs." });
+     return null;
+   }
+--- a/backend/services/protectedMediaService.js
++++ b/backend/services/protectedMediaService.js
+@@ -126,6 +126,7 @@
+       select: {
+         UtilisateurID: true,
+         GradeID: true,
++        EtatID: true,
+         PremiumEndDate: true,
+         AiPreference: true,
+       },
+@@ -135,7 +136,7 @@
+   if (!video || video.EtatID !== ETAT.ACTIVE) {
+     return { error: { statusCode: 404, message: "Vidéo introuvable." } };
+   }
+-  if (!user) {
++  if (!user || user.EtatID !== ETAT.ACTIVE) {
+     return { error: { statusCode: 401, message: "Utilisateur introuvable." } };
+   }
+   if (isVideoPremium(video) && !canAccessPremium(user)) {
+--- /dev/null
++++ b/backend/tests/securityAudit20261026.test.js
+@@ -0,0 +1,37 @@
++import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
++import jwt from "jsonwebtoken";
++const db = vi.hoisted(() => ({ utilisateur: { findUnique: vi.fn(), findFirst: vi.fn(), update: vi.fn() }, action: { findUnique: vi.fn() }, log: { create: vi.fn() } }));
++vi.mock("../services/db.js", () => ({ prisma: db, default: db }));
++vi.mock("../services/mailService.js", () => ({ sendPasswordResetEmail: vi.fn() }));
++import { authMiddleware } from "../middlewares/authMiddleware.js";
++import { ensureAdmin } from "../services/authz.js";
++import { getClientIp } from "../controllers/logController.js";
++import { userRepository } from "../models/user.js";
++import { userController } from "../controllers/userController.js";
++import { getVideoMediaAccess } from "../services/protectedMediaService.js";
++import { createServer } from "../server/createServer.js";
++const secret = "sami-audit-synthetic-secret-20261026-only";
++const reply = () => { const r = { send: vi.fn(), header: vi.fn() }; r.status = vi.fn(() => r); r.code = r.status; return r; };
++let server;
++beforeEach(() => { vi.clearAllMocks(); db.utilisateur.findUnique.mockResolvedValue({ UtilisateurID: 7, GradeID: 2, EtatID: 1 }); db.utilisateur.update.mockResolvedValue({}); db.action.findUnique.mockResolvedValue(null); });
++afterEach(async () => { await server?.close(); server = undefined; vi.restoreAllMocks(); });
++describe("security audit 2026-10-26", () => {
++  it.each([2,3])("rejects an existing JWT when EtatID is %i", async EtatID => {
++    db.utilisateur.findUnique.mockResolvedValue({ UtilisateurID: 7, GradeID: 2, EtatID });
++    const token = jwt.sign({ userId: 7 }, secret, { expiresIn: "1h" }); const r=reply();
++    await authMiddleware({ headers: { authorization: `Bearer ${token}` } }, r);
++    expect(r.status).toHaveBeenCalledWith(401);
++  });
++  it("allows an active account with a valid JWT", async () => { const r=reply(); const req={headers:{authorization:`Bearer ${jwt.sign({userId:7},secret,{expiresIn:"1h"})}`}}; await authMiddleware(req,r); expect(r.status).not.toHaveBeenCalled(); expect(req.user.userId).toBe(7); });
++  it("rejects deleted-account login even with a valid password", async () => {
++    vi.spyOn(userRepository,"getUserBySurnom").mockResolvedValue({UtilisateurID:7,Surnom:"synthetic-deleted",EtatID:2,GradeID:2,MotDePasse:"$2b$10$tMuo9A4QxQ4KeVHrXsJ0OO9feXsQqriXkP96TZ9SjqGFPPtKwV8uW"});
++    const bcrypt=await import("bcrypt");vi.spyOn(bcrypt.default,"compare").mockResolvedValue(true);
++    const r=reply();await userController.login({body:{surnom:"synthetic-deleted",motDePasse:"synthetic-only"},headers:{},ip:"127.0.0.1"},r);expect(r.status).toHaveBeenCalledWith(403);
++  });
++  it("denies administrator rights to an inactive administrator",async()=> { db.utilisateur.findUnique.mockResolvedValue({GradeID:2,EtatID:3}); const r=reply();expect(await ensureAdmin({user:{userId:7}},r)).toBe(null);expect(r.status).toHaveBeenCalledWith(403); });
++  it("denies media access for a blocked user including scoped media tokens",async()=> { const database={video:{findUnique:vi.fn().mockResolvedValue({VideoID:42,EtatID:1,VideoAudioTracks:[]})},utilisateur:{findUnique:vi.fn().mockResolvedValue({UtilisateurID:7,GradeID:2,EtatID:3})}}; const out=await getVideoMediaAccess(42,7,{database});expect(out.error?.statusCode).toBe(401); });
++  it("does not trust arbitrary forwarded headers in the IP helper",()=> { expect(getClientIp({ip:"198.51.100.7",headers:{"x-forwarded-for":"203.0.113.8","x-real-ip":"203.0.113.9"}})).toBe("198.51.100.7"); });
++  it("uses only the trusted loopback hop when proxy support is enabled",async()=> { server=createServer({trustProxy:true,publicUrl:"https://sami.test"}); server.get("/audit-ip",r=>({ip:r.ip}));const r=await server.inject({method:"GET",url:"/audit-ip",remoteAddress:"127.0.0.1",headers:{"x-forwarded-for":"203.0.113.8, 198.51.100.7"}});expect(r.json().ip).toBe("198.51.100.7"); });
++  it.each(["createFakePremiumCheckout","fakePremiumPaymentWebhook","handleFakePremiumPaymentEvent"])("disables %s in production before any mutation",async method=> { const r=reply(); await userController[method]({user:{userId:7},body:{plan:"YEARLY"},headers:{}},r,{},"synthetic-signature");expect(r.status).toHaveBeenCalledWith(404);expect(db.utilisateur.update).not.toHaveBeenCalled(); });
++  it("rejects unauthenticated socket connections",async()=> { server=createServer({publicUrl:"https://sami.test"});await server.ready();expect(server.io.of("/")._fns.length).toBeGreaterThan(0);const next=vi.fn();for(const fn of server.io.of("/")._fns)await fn({handshake:{headers:{}},data:{}},next);expect(next).toHaveBeenCalledWith(expect.any(Error)); });
++});
