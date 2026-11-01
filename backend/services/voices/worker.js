@@ -49,7 +49,7 @@ export async function runVoiceLease({ config, signal }) {
     ]);
     if (!isDirectVoiceOutput(realWorkspace, realAudioPath) || audioInfo.isSymbolicLink() || !audioInfo.isFile()) throw new Error("Sortie vocale hors du dossier autorisé.");
     if ((await fs.promises.stat(audioPath)).size > 15 * 1024 * 1024) throw new Error("Réplique trop volumineuse.");
-    await request("finish", { audio: (await fs.promises.readFile(audioPath)).toString("base64"), watermarked: result.watermarked, watermarkConfidence: result.watermarkConfidence });
+    await request("finish", { audio: (await fs.promises.readFile(audioPath)).toString("base64"), voiceMode: result.voiceMode, watermarked: result.watermarked, watermarkConfidence: result.watermarkConfidence });
   } catch (error) {
     if (!controller.signal.aborted) await request("finish", { error: String(error.message).slice(0, 4000) }).catch(() => {});
     throw error;

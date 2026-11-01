@@ -6,6 +6,7 @@ import { queueAiDubbingPreview, serializeAiDubbingJob } from "../services/aiDubb
 const env = {
   SAMI_AI_DUBBING_ENABLED: "true", SAMI_AI_DUBBING_WORKER_ENABLED: "false",
   SAMI_AI_DUBBING_PIPELINE_VERSION: "sami-dubbing-v5-guided-references-r4",
+  SAMI_AI_DUBBING_VOICE_ENGINE: "qwen3-tts",
   SAMI_INSTANCE_ROLE: "primary", SAMI_INSTANCE_ID: "guided-test",
   SAMI_TRANSFER_SHARED_SECRET: "guided-reference-test-secret-32-bytes-minimum",
 };

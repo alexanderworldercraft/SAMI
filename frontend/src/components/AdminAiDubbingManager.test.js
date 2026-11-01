@@ -211,18 +211,20 @@ it("envoie le début de l'extrait choisi en minutes et secondes", async () => {
 
   await waitFor(() => expect(api.post).toHaveBeenCalledWith(
     "/ai-dubbing/videos/11/requests",
-    { language: "fr", previewStartSeconds: 75, expectedSpeakerCount: null }
+    { language: "fr", voiceMode: "faithful", previewStartSeconds: 75, expectedSpeakerCount: null }
   ));
   expect(await screen.findByRole("status")).toHaveTextContent("01:15–02:00");
 });
 
-it("attend les passages de toutes les voix avant de créer le job guidé", async () => {
+it("attend les passages de toutes les voix et conserve le mode fidèle choisi", async () => {
   render(<AdminAiDubbingManager />);
   await screen.findByText(/Film test — Français/);
   fireEvent.change(screen.getByLabelText("Rechercher une vidéo par titre ou ID"), { target: { value: "11" } });
   fireEvent.click(screen.getByRole("button", { name: "Vidéo" }));
   fireEvent.click(await screen.findByRole("option", { name: /#11 — Film source/ }));
   fireEvent.change(screen.getByLabelText("Nombre d'intervenants"), { target: { value: "2" } });
+  expect(screen.getByLabelText("Mode vocal")).toHaveValue("faithful");
+  fireEvent.change(screen.getByLabelText("Mode vocal"), { target: { value: "faithful" } });
   fireEvent.click(screen.getByRole("button", { name: "Générer l'extrait" }));
   const video = await screen.findByLabelText("Vidéo source pour les références");
   Object.defineProperty(video, "duration", { configurable: true, value: 310 });
@@ -241,7 +243,7 @@ it("attend les passages de toutes les voix avant de créer le job guidé", async
   expect(submit).toBeEnabled();
   fireEvent.click(submit);
   await waitFor(() => expect(api.post).toHaveBeenCalledWith("/ai-dubbing/videos/11/requests", {
-    language: "fr", previewStartSeconds: 0, expectedSpeakerCount: 2,
+    language: "fr", voiceMode: "faithful", previewStartSeconds: 0, expectedSpeakerCount: 2,
     manualVoiceReferences: [{ ranges: [{ start: 1, end: 4 }, { start: 20, end: 24 }] }, { ranges: [{ start: 10, end: 13 }] }],
   }));
 });

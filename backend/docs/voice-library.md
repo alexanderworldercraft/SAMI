@@ -10,6 +10,24 @@ Originaux et répliques sont privés à la création. La publication est indépe
 
 Les téléchargements explicites sont réservés aux admins ; les lecteurs ordinaires n’offrent pas de bouton de téléchargement. Comme tout audio écoutable dans un navigateur, le flux peut néanmoins être capturé par son destinataire : ce contrôle ne constitue pas un DRM.
 
+## Modes vocaux expérimentaux
+
+Chaque nouvelle réplique propose **Fidèle à l’original** (par défaut) ou **Naturelle**. Le doublage vidéo utilise également Fidèle à l’original par défaut, y compris pour une demande API sans mode explicite ; ce défaut exige Qwen3-TTS. Ce choix est enregistré avec l’audio et affiché dans la bibliothèque. Changer le mode dans le formulaire de modification exige une nouvelle génération confirmée : la réplique repasse en privé et en attente. Une relance conserve le choix.
+
+Avec Qwen3-TTS, Naturelle utilise uniquement l’identité vocale (`x_vector_only_mode=True`). Fidèle utilise aussi les codes audio et la transcription exacte de la référence (`False`, mode ICL). Il cherche à reprendre le timbre, les intonations et les effets présents dans l’extrait, sans garantir la reproduction d’un écho, d’une réverbération ou d’un filtre. Aucun traitement audio supplémentaire n’est ajouté pour reconstituer ces effets. Le mode fidèle exige Qwen3-TTS et une transcription non vide ; il ne revient pas silencieusement au mode naturel. Une transcription automatique doit être vérifiée pour correspondre à l’extrait.
+
+Les anciennes répliques restent identifiées « Profil historique » et conservent leur politique de génération jusqu’au choix explicite d’un nouveau mode. Le moteur et les contrôles qualité restent partagés avec le doublage vidéo ; la sélection du mode prend la priorité sur les anciennes règles de langue.
+
+Le même choix est disponible à la création d’un doublage vidéo. Il couvre tous les intervenants, l’aperçu, les échantillons et la piste complète. Les références et le mode sont verrouillés ensemble ; pour essayer l’autre mode, créer un nouveau doublage après avoir terminé ou refusé la tâche active de la même vidéo/langue. Les références vidéo restent issues de la séparation voix/ambiance : les effets retirés par cette séparation ne pourront pas être repris par le modèle. La sélection automatique d’un extrait ne garantit pas qu’il contienne tous les effets rencontrés dans la vidéo.
+
+La validation sonore reste à réaliser avec des extraits représentatifs, notamment les voix transformées. Les tests de contrat vérifient les paramètres et la conservation du choix, pas le résultat perceptif. Voir [l’interface Qwen3-TTS](https://github.com/QwenLM/Qwen3-TTS/blob/main/qwen_tts/inference/qwen3_tts_model.py).
+
+### Mise à jour nécessaire
+
+Appliquer sur le coordinateur la migration `20261101120000_add_dubbing_voice_mode`, qui ajoute `AiDubbingJob.VoiceMode` nullable pour préserver les anciens jobs, puis régénérer le client Prisma. La bibliothèque conserve le mode dans `VoiceAudio.Models` et ne demande pas de colonne supplémentaire.
+
+Déployer le backend, le frontend et les scripts de doublage sur les clones, puis redémarrer SAMI pour renouveler les capacités. Le probe et le heartbeat doivent annoncer `voiceModes: 1` ; seuls ces clones reçoivent les nouvelles demandes avec choix explicite. Les anciens jobs restent compatibles avec leurs runtimes historiques. Les modèles et leurs poids ne changent pas ; aucune réinstallation n’est nécessaire.
+
 ## Déploiement
 
 1. Sauvegarder la base, appliquer `20260911120000_add_voice_library` avec `npx prisma migrate deploy` depuis `backend`, puis `npx prisma generate --generator client`.

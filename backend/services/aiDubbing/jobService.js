@@ -17,6 +17,7 @@ import { cleanupAiDubbingInput } from "./sourceService.js";
 import { resolveProtectedVideoStorageFile } from "../protectedMediaService.js";
 import { VIDEO_ROOT } from "../video/videoPaths.js";
 import { normalizeManualVoiceReferences } from "./manualReferences.js";
+import { normalizeVoiceMode } from "./voiceMode.js";
 
 const { randomUUID } = crypto;
 const SUPPORTED_LANGUAGES = new Set(AI_DUBBING_LANGUAGES.map((language) => language.code));
@@ -103,6 +104,7 @@ export const serializeAiDubbingJob = (job) => job && ({
   previewStartSeconds: job.PreviewStartSeconds || 0,
   expectedSpeakerCount: Number(job.ExpectedSpeakerCount) || null,
   manualVoiceReferences: job.ManualVoiceReferences || null,
+  voiceMode: job.VoiceMode || null,
   previewEndSeconds: (job.PreviewStartSeconds || 0) + PREVIEW_DURATION_SECONDS,
   error: job.ErrorMessage,
   previewAvailable: Boolean(job.PreviewRelativePath),
@@ -210,6 +212,7 @@ export async function queueAiDubbingPreview({
   previewStartSeconds,
   expectedSpeakerCount,
   manualVoiceReferences,
+  voiceMode,
   requestedByUserId,
   database = prisma,
   env = process.env,
@@ -222,6 +225,7 @@ export async function queueAiDubbingPreview({
     throw error;
   }
   const parsedVideoId = Number(videoId);
+  const normalizedVoiceMode = normalizeVoiceMode(voiceMode, runtime.voiceEngine);
   const language = normalizeAiLanguage(targetLanguage);
   const normalizedPreviewStartSeconds = normalizeAiDubbingPreviewStartSeconds(previewStartSeconds);
   const normalizedExpectedSpeakerCount = normalizeAiDubbingExpectedSpeakerCount(expectedSpeakerCount);
@@ -265,7 +269,12 @@ export async function queueAiDubbingPreview({
     },
     include: jobInclude,
   });
-  if (existing) return { job: existing, alreadyQueued: true };
+  if (existing) {
+    if (existing.VoiceMode !== normalizedVoiceMode) {
+      throw Object.assign(new Error("Un doublage actif utilise déjà un autre mode vocal pour cette vidéo et cette langue. Terminez ou refusez cette tâche avant de changer de mode."), { statusCode: 409 });
+    }
+    return { job: existing, alreadyQueued: true };
+  }
 
   const job = await database.aiDubbingJob.create({
     data: {
@@ -279,6 +288,7 @@ export async function queueAiDubbingPreview({
       PreviewStartSeconds: normalizedPreviewStartSeconds,
       ExpectedSpeakerCount: normalizedExpectedSpeakerCount,
       ManualVoiceReferences: normalizedManualReferences || Prisma.DbNull,
+      VoiceMode: normalizedVoiceMode,
       VoiceEngine: runtime.voiceEngine,
       VoiceModel: runtime.voiceModel,
       VoiceModelRevision: runtime.voiceModelRevision,

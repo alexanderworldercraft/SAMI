@@ -38,7 +38,7 @@ export const getAiDubbingConfiguration = async (request, reply) => {
     ready: runtime.ready,
     error: runtime.error,
     coordinatorReady: runtime.coordinatorReady,
-    workerReady: workers.some((worker) => worker.ready && worker.online && worker.enabled && !worker.draining),
+    workerReady: workers.some((worker) => worker.ready && worker.online && worker.enabled && !worker.draining && worker.capabilities?.voiceModes === 1),
     workers,
     languages: [
       { code: "en", label: "Anglais" },
@@ -80,6 +80,7 @@ export const requestAiDubbingPreview = async (request, reply) => {
       previewStartSeconds: request.body?.previewStartSeconds,
       expectedSpeakerCount: request.body?.expectedSpeakerCount,
       manualVoiceReferences: request.body?.manualVoiceReferences,
+      voiceMode: request.body?.voiceMode,
       requestedByUserId: admin.userId,
     });
     await createLog({
@@ -87,10 +88,10 @@ export const requestAiDubbingPreview = async (request, reply) => {
       UtilisateurID: admin.userId,
       ActionNom: "ai_dubbing_preview_requested",
       VideoID: queued.job.VideoID,
-      Champ: "language_preview_start_speakers",
+      Champ: "language_preview_start_speakers_voice_mode",
       NouvelleValeur: `${queued.job.TargetLanguage}@${queued.job.PreviewStartSeconds || 0}s#${
         queued.job.ExpectedSpeakerCount || "auto"
-      }`,
+      }:${queued.job.VoiceMode || "legacy"}`,
     });
     return reply.status(queued.alreadyQueued ? 200 : 202).send({
       alreadyQueued: queued.alreadyQueued,

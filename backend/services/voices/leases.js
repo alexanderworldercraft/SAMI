@@ -4,6 +4,7 @@ import path from "path";
 import { prisma } from "../db.js";
 import { fail, probeAudio, voicePath, textField } from "./library.js";
 import { AI_DUBBING_OFFLINE_AFTER_MS } from "../aiDubbing/constants.js";
+import { assertVoiceMode, workerSupportsVoiceMode } from "../aiDubbing/voiceMode.js";
 
 const leaseMs = 120000;
 const hash = value => crypto.createHash("sha256").update(String(value)).digest("hex");
@@ -24,7 +25,7 @@ export async function claimVoice(workerId, database = prisma) {
     ]);
     if (busy.some(Boolean)) return null;
     const candidates = await tx.voiceAudio.findMany({ where: { Kind: { in: worker.Capabilities?.voiceTranscription === 1 ? ["AI", "ORIGINAL"] : ["AI"] }, Status: "QUEUED", Personne: { EtatID: 1 } }, include: { Original: true }, orderBy: { CreatedAt: "asc" }, take: 50 });
-    const row = candidates.find(row => row.Kind === "ORIGINAL" || row.Models?.voiceEngine === worker.Engine && row.Models?.voiceModel === worker.Model && (row.Models?.voiceModelRevision || null) === (worker.ModelRevision || null) && row.Models?.pipeline === worker.PipelineVersion && row.Models?.generationConfigHash === worker.Capabilities?.profile?.generationConfigHash);
+    const row = candidates.find(row => row.Kind === "ORIGINAL" || workerSupportsVoiceMode(worker, row.Models?.voiceMode) && row.Models?.voiceEngine === worker.Engine && row.Models?.voiceModel === worker.Model && (row.Models?.voiceModelRevision || null) === (worker.ModelRevision || null) && row.Models?.pipeline === worker.PipelineVersion && row.Models?.generationConfigHash === worker.Capabilities?.profile?.generationConfigHash);
     if (!row) return null;
     const token = crypto.randomBytes(32).toString("hex");
     const changed = await tx.voiceAudio.updateMany({ where: { VoiceAudioID: row.VoiceAudioID, Status: "QUEUED" }, data: { Status: "PROCESSING", AssignedWorkerID: workerId, LeaseToken: hash(token), LeaseExpiresAt: new Date(now.getTime() + leaseMs) } });
@@ -58,6 +59,7 @@ export async function finishVoice(workerId, id, body, database = prisma) {
     if (!result.count) fail("Bail vocal expiré.", 409);
     return { ready: true };
   }
+  assertVoiceMode(row.Models?.voiceMode, body.voiceMode);
   if (body.watermarked !== true || !(body.watermarkConfidence >= 0.5) || typeof body.audio !== "string" || body.audio.length > 20 * 1024 * 1024 || !/^[A-Za-z0-9+/]+={0,2}$/.test(body.audio)) fail("Sortie vocale invalide ou non watermarquée.");
   const audio = Buffer.from(body.audio, "base64");
   if (audio.subarray(0, 4).toString() !== "RIFF" || audio.subarray(8, 12).toString() !== "WAVE") fail("Format WAV requis.");

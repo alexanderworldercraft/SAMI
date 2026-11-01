@@ -9329,10 +9329,6 @@
       grid-template-columns: repeat(8, minmax(0, 1fr));
     }
 
-    .xl\:grid-cols-\[1fr_1fr_1fr_1fr_auto\] {
-      grid-template-columns: 1fr 1fr 1fr 1fr auto;
-    }
-
     .xl\:grid-cols-\[220px_minmax\(0\,1fr\)_auto\] {
       grid-template-columns: 220px minmax(0, 1fr) auto;
     }

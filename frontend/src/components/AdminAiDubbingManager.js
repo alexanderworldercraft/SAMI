@@ -4,6 +4,7 @@ import { CpuChipIcon, SpeakerWaveIcon, TrashIcon } from "@heroicons/react/24/out
 import api from "../services/api";
 import DubbingVideoSelect from "./DubbingVideoSelect";
 import GuidedVoiceReferenceEditor from "./GuidedVoiceReferenceEditor";
+import VoiceModeSelect, { voiceModeLabel } from "./VoiceModeSelect";
 
 const apiUrl = String(process.env.REACT_APP_URL_LOCAL || "").replace(/\/+$/, "");
 const BUSY_STATUSES = new Set([
@@ -96,6 +97,7 @@ export default function AdminAiDubbingManager() {
   const requestNumber = useRef(0);
   const [videoId, setVideoId] = useState("");
   const [language, setLanguage] = useState("fr");
+  const [voiceMode, setVoiceMode] = useState("faithful");
   const [expectedSpeakerCount, setExpectedSpeakerCount] = useState("");
   const [previewMinutes, setPreviewMinutes] = useState("0");
   const [previewSeconds, setPreviewSeconds] = useState("0");
@@ -151,6 +153,7 @@ export default function AdminAiDubbingManager() {
       const previewStartSeconds = (Number(previewMinutes) * 60) + Number(previewSeconds);
       const response = await api.post(`/ai-dubbing/videos/${videoId}/requests`, {
         language,
+        voiceMode,
         previewStartSeconds,
         expectedSpeakerCount: expectedSpeakerCount === "" ? null : Number(expectedSpeakerCount),
         ...(manualVoiceReferences ? { manualVoiceReferences } : {}),
@@ -272,7 +275,7 @@ export default function AdminAiDubbingManager() {
   if (loading) return <p className="text-sm text-slate-600 dark:text-slate-400">Chargement du doublage IA…</p>;
 
   const availableWorkers = (config?.workers || []).filter((worker) => (
-    worker.ready && worker.online && worker.enabled && !worker.draining
+    worker.ready && worker.online && worker.enabled && !worker.draining && worker.capabilities?.voiceModes === 1
   ));
 
   const renderJob = (job) => (
@@ -286,6 +289,7 @@ export default function AdminAiDubbingManager() {
                 <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">
                   Extrait de validation : {formatClock(job.previewStartSeconds)}–{formatClock(job.previewEndSeconds)}
                 </p>
+                <p className="mt-1 text-xs text-slate-600 dark:text-slate-300">Mode vocal : {voiceModeLabel(job.voiceMode)}</p>
                 <p className="mt-1 text-xs text-slate-600 dark:text-slate-400">
                   Version : {job.id}
                   {job.models?.pipeline ? ` · Profil : ${job.models.pipeline}` : ""}
@@ -589,14 +593,14 @@ export default function AdminAiDubbingManager() {
             {(config?.workers || []).map((worker) => (
               <p key={worker.id} className="mt-1 text-xs text-slate-600 dark:text-slate-300">
                 {worker.id} · {worker.model || "modèle inconnu"} · {worker.device || "périphérique inconnu"}
-                {worker.ready && worker.online && worker.enabled && !worker.draining ? " · prêt" : " · hors du pool"}
+                {worker.ready && worker.online && worker.enabled && !worker.draining && worker.capabilities?.voiceModes === 1 ? " · prêt" : " · hors du pool"}
               </p>
             ))}
           </div>
         </div>
       </div>
 
-      <form onSubmit={requestPreview} className="grid gap-3 rounded-2xl border border-sky-500/20 bg-white/70 p-5 dark:bg-slate-950/50 sm:grid-cols-2 sm:items-end xl:grid-cols-[1fr_1fr_1fr_1fr_auto]">
+      <form onSubmit={requestPreview} className="grid gap-3 rounded-2xl border border-sky-500/20 bg-white/70 p-5 dark:bg-slate-950/50 sm:grid-cols-2 sm:items-end xl:grid-cols-3">
         <DubbingVideoSelect value={videoId} onChange={setVideoId} />
         <label className="grid gap-2 text-sm font-bold">
           Langue cible
@@ -625,6 +629,7 @@ export default function AdminAiDubbingManager() {
             Renseigné = choix des passages par voix · vide = mode automatique
           </span>
         </label>
+        <VoiceModeSelect value={voiceMode} onChange={setVoiceMode} />
         <fieldset className="grid gap-2 text-sm font-bold">
           <legend>Début de l'extrait</legend>
           <div className="flex items-center gap-2">

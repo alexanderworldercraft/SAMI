@@ -17,6 +17,17 @@ beforeEach(() => {
 afterEach(() => { for (const dir of directories.splice(0)) fs.rmSync(dir, { recursive: true, force: true }); });
 const update = body => updateVoice({ id: row.VoiceAudioID, body, userId: 7, database });
 describe("édition de voix", () => {
+  it("changer de mode exige une régénération et conserve les paramètres du modèle", async () => {
+    row.Models = { voiceMode: "faithful", voiceEngine: "qwen3-tts", pipeline: "historical-pipeline" };
+    await expect(update({ voiceMode: "natural" })).rejects.toMatchObject({ statusCode: 409 });
+    expect(await update({ voiceMode: "natural", regenerate: true })).toMatchObject({ voiceMode: "natural", status: "QUEUED", public: false });
+    expect(database.voiceAudio.update.mock.calls[0][0].data.Models).toEqual({ ...row.Models, voiceMode: "natural" });
+  });
+  it("refuse le mode fidèle avec un moteur incompatible", async () => {
+    row.Models = { voiceMode: "natural", voiceEngine: "chatterbox" };
+    await expect(update({ voiceMode: "faithful", regenerate: true })).rejects.toMatchObject({ statusCode: 409 });
+    expect(database.voiceAudio.update).not.toHaveBeenCalled();
+  });
   it("renomme une réplique sans altérer sa publication ni son audio", async () => {
     const result = await update({ title: "Nouveau titre" });
     expect(result).toMatchObject({ title: "Nouveau titre", public: true, status: "READY" });

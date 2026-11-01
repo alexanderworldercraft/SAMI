@@ -761,6 +761,7 @@ model AiDubbingJob {
   PreviewStartSeconds      Int              @default(0)
   ExpectedSpeakerCount     Int?
   ManualVoiceReferences    Json?
+  VoiceMode                String?          @db.VarChar(16)
   PreviewRelativePath      String?          @db.VarChar(512)
   VoiceProfileRelativePath String?          @db.VarChar(512)
   VoiceProfileChecksum     String?          @db.Char(64)

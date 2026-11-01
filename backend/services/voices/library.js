@@ -6,6 +6,7 @@ import { prisma } from "../db.js";
 import { BACKEND_ROOT } from "../video/videoPaths.js";
 import { resolveProtectedVideoStorageFile } from "../protectedMediaService.js";
 import { getAiDubbingConfig } from "../aiDubbing/config.js";
+import { normalizeVoiceMode } from "../aiDubbing/voiceMode.js";
 
 export const VOICE_ROOT = path.join(BACKEND_ROOT, "var", "voices");
 export const LANGUAGES = [{ code: "fr", label: "Français" }, { code: "en", label: "Anglais" }, { code: "ja", label: "Japonais" }];
@@ -27,6 +28,7 @@ export const serializeVoice = (row, admin = false) => ({
   public: row.IsPublic, status: row.Status, duration: row.Duration,
   originalId: row.OriginalID && (admin || row.Original?.IsPublic && row.Original?.Status === "READY") ? row.OriginalID : null,
   automaticTranscription: row.Models?.automaticTranscription === true,
+  voiceMode: row.Kind === "AI" ? row.Models?.voiceMode || null : null,
   createdAt: row.CreatedAt, watermarked: row.Watermarked,
   ...(admin ? { error: row.ErrorMessage, authorizationNote: row.AuthorizationNote, authorizedBy: row.AuthorizedBy, authorizedAt: row.AuthorizedAt, models: row.Models } : {}),
 });
@@ -98,6 +100,8 @@ export async function queueReplica({ originalId, body, userId, database = prisma
   const config = getAiDubbingConfig();
   if (!config.active) fail("La génération locale est désactivée sur le serveur.", 503);
   const models = { voiceEngine: config.voiceEngine, voiceModel: config.voiceModel, voiceModelRevision: config.voiceModelRevision, pipeline: config.pipelineVersion, generationConfigHash: config.generationConfigHash };
+  models.voiceMode = normalizeVoiceMode(body.voiceMode, config.voiceEngine);
+  if (models.voiceMode === "faithful" && !original.Text?.trim()) fail("Le mode fidèle exige la transcription exacte de l’original.");
   return database.voiceAudio.create({ data: {
     VoiceAudioID: crypto.randomUUID(), PersonneID: original.PersonneID, OriginalID: originalId, Kind: "AI",
     Title: textField(body.title, "Titre", 191), Text: textField(body.text, "Texte à prononcer", 500), Language: languageField(body.language),

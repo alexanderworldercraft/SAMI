@@ -38,7 +38,7 @@ export default async function voiceRoutes(app) {
   });
   app.get("/config", { preHandler: adminOnly }, async () => {
     const workers = await listAiDubbingWorkers();
-    return { transcriptionWorkerReady: workers.some(w => w.online && w.ready && w.enabled && !w.draining && w.capabilities?.voiceTranscription === 1), languages: LANGUAGES, workerReady: workers.some(w => w.online && w.ready && w.enabled && !w.draining && w.capabilities?.voiceLibrary === 1) };
+    return { transcriptionWorkerReady: workers.some(w => w.online && w.ready && w.enabled && !w.draining && w.capabilities?.voiceTranscription === 1), languages: LANGUAGES, workerReady: workers.some(w => w.online && w.ready && w.enabled && !w.draining && w.capabilities?.voiceLibrary === 1 && w.capabilities?.voiceModes === 1) };
   });
   app.post("/originals", { preHandler: adminOnly }, async (req, reply) => {
     let temporary;

@@ -1,5 +1,7 @@
 # Contrat du runtime local de doublage IA
 
+Les nouveaux jobs peuvent fournir `models.voiceMode` : `natural` (identité vocale seule) ou `faithful` (audio et transcription de référence, Qwen3-TTS requis). Le choix explicite prime sur les politiques de prompt des profils et des langues. Une valeur absente ou `null` conserve le comportement historique. Le probe annonce `voiceModes: 1` ; le résultat et le manifeste vocal confirment le mode pour empêcher son changement entre aperçu et piste complète. Voir [les modes vocaux et leur mise à jour](../../docs/voice-library.md#modes-vocaux-expérimentaux).
+
 SAMI n'appelle aucun service IA distant. Le serveur exécute le programme local défini par
 `SAMI_AI_DUBBING_COMMAND`, sans shell, avec les accès réseau Hugging Face et Transformers forcés
 en mode hors ligne pendant le traitement.

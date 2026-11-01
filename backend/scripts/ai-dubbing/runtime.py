@@ -1756,6 +1756,7 @@ def build_voice_profile(
         }
     models = models or {}
     manifest = {
+        **({"voiceMode": models["voiceMode"]} if models.get("voiceMode") is not None else {}),
         **({"manualVoiceReferences": manual_references} if manual_references else {}),
         **({"manualSpeakerMapping": (diarization_metadata or {}).get("manualSpeakerMapping")} if manual_references else {}),
         "schemaVersion": 2,
@@ -1823,6 +1824,7 @@ def regenerate_single_voice_profile(
         [],
         expected_pipeline=pipeline_version,
         expected_generation_config_hash=generation_config_hash,
+        expected_voice_mode=models.get("voiceMode"),
     )
     target_speaker = str(target_speaker or "")
     if target_speaker not in previous_references:
@@ -1912,12 +1914,15 @@ def load_voice_profile(
     cues,
     expected_pipeline=None,
     expected_generation_config_hash=None,
+    expected_voice_mode=None,
 ):
     profile_root = Path(profile_root).resolve()
     manifest_path = profile_root / "manifest.json"
     if not manifest_path.is_file() or digest(manifest_path) != str(expected_checksum or ""):
         raise RuntimeError("Le profil vocal validé est absent ou son empreinte a changé.")
     manifest = load_json(manifest_path)
+    if expected_voice_mode is not None and manifest.get("voiceMode") != expected_voice_mode:
+        raise RuntimeError("Le mode vocal a changé depuis la validation des profils vocaux.")
     if manifest.get("schemaVersion") != 2:
         raise RuntimeError("La version du profil vocal validé n'est pas prise en charge.")
     if manifest.get("sourcePlaylistSha256") != digest(source):
@@ -2053,10 +2058,21 @@ def qwen_device_options(torch):
     raise RuntimeError("Qwen3-TTS nécessite NVIDIA CUDA ou Apple Silicon avec Metal (MPS) accessible.")
 
 
-def load_voice_model(install, references=None):
+def validate_voice_mode(mode, engine):
+    if mode is not None and mode not in ("natural", "faithful"):
+        raise ValueError("Mode vocal invalide.")
+    if mode == "faithful" and engine != "qwen3-tts":
+        raise ValueError("Le mode fidèle nécessite Qwen3-TTS.")
+    return mode
+
+
+def load_voice_model(install, references=None, voice_mode=None):
     import torch
 
     engine = str(install.get("voiceEngine") or "chatterbox").lower()
+    validate_voice_mode(voice_mode, engine)
+    if voice_mode == "faithful" and any(not str(ref.get("text") or "").strip() for ref in (references or {}).values()):
+        raise ValueError("Le mode fidèle exige la transcription exacte de chaque référence vocale.")
     voice = install.get("models", {}).get("voice") or install.get("models", {}).get("chatterbox") or {}
     if engine == "qwen3-tts":
         device_options = qwen_device_options(torch)
@@ -2073,13 +2089,15 @@ def load_voice_model(install, references=None):
         prompts = {}
         for speaker, reference in (references or {}).items():
             ref_text = str(reference.get("text") or "").strip()
+            x_vector_only = voice_mode == "natural" or (voice_mode is None and not bool(ref_text))
             prompts[speaker] = model.create_voice_clone_prompt(
                 ref_audio=str(reference["path"]),
-                ref_text=ref_text or None,
-                x_vector_only_mode=not bool(ref_text),
+                ref_text=None if x_vector_only else ref_text,
+                x_vector_only_mode=x_vector_only,
             )
         return {
             "engine": engine,
+            "voiceMode": voice_mode,
             "model": model,
             "prompts": prompts,
             "sampleRate": None,
@@ -2164,7 +2182,8 @@ def generate_voice(runtime, text, language, speaker, reference, attempt=0,
     return guarded_voice_operation(operation, profile=profile, speaker=speaker,
         text=text, language=language, **watch_context,
         details={"attempt": attempt + 1, "engine": runtime["engine"],
-                 "promptPolicy": "speaker-embedding-only" if identity_prompt_enabled(profile, language) else "reference-audio-and-text",
+                 "voiceMode": runtime.get("voiceMode"),
+                 "promptPolicy": "speaker-embedding-only" if runtime.get("voiceMode") == "natural" or (runtime.get("voiceMode") is None and identity_prompt_enabled(profile, language)) else "reference-audio-and-text",
                  "referenceText": reference.get("text"), "referenceSha256": digest(reference["path"])})
 
 
@@ -2282,6 +2301,10 @@ def bounded_japanese_generation(runtime, text, language, speaker, reference, att
 
 
 def generation_voice_prompt(runtime, speaker, reference, profile, language):
+    # Explicit per-generation choices take precedence over historical language policies.
+    if runtime.get("voiceMode") is not None:
+        validate_voice_mode(runtime["voiceMode"], runtime["engine"])
+        return runtime["prompts"][speaker]
     if not identity_prompt_enabled(profile, language):
         return runtime["prompts"][speaker]
     # Separate cache: never replace legacy ICL prompts or the selected reference.
@@ -3662,6 +3685,7 @@ def process(phase, input_path, output_path, root):
     workspace = Path(input_path).resolve().parent
     install = install_manifest(root)
     models = payload.get("models") or {}
+    voice_mode = validate_voice_mode(models.get("voiceMode"), str(install.get("voiceEngine") or "chatterbox").lower())
     profile = resolve_dubbing_profile(models.get("pipeline"))
     expected_generation_config_hash = PROFILE_GENERATION_CONFIG_HASHES[profile]
     if payload.get("generationConfigHash") != expected_generation_config_hash:
@@ -3972,6 +3996,7 @@ def process(phase, input_path, output_path, root):
             all_cues,
             expected_pipeline=profile,
             expected_generation_config_hash=payload.get("generationConfigHash"),
+            expected_voice_mode=voice_mode,
         )
         profile_path = profile_root / "manifest.json"
         profile_checksum = digest(profile_path)
@@ -3993,7 +4018,7 @@ def process(phase, input_path, output_path, root):
         )
         validate_synthesis_cues(cues)
     report_progress(47, "LOADING_VOICE_MODEL")
-    model = load_voice_model(install, references)
+    model = load_voice_model(install, references, voice_mode=voice_mode)
     quality_model = load_quality_model(install)
     reference_seed_identities = (
         profile_checksum
@@ -4099,6 +4124,7 @@ def process(phase, input_path, output_path, root):
         "voiceSamples": voice_samples,
         "previewStartSeconds": start_seconds,
         "voiceEngine": expected_identity["voiceEngine"],
+        "voiceMode": voice_mode,
         "voiceModel": expected_identity["voiceModel"],
         "voiceModelRevision": expected_identity["voiceModelRevision"],
         "generationConfigHash": payload.get("generationConfigHash"),
@@ -4118,6 +4144,7 @@ def main():
     if args.probe:
         result = probe(root)
         result["voiceLibrary"] = 1
+        result["voiceModes"] = 1
         print(json.dumps(result, ensure_ascii=False))
         raise SystemExit(0 if result.get("ready") else 1)
     if args.smoke_test:

@@ -241,6 +241,7 @@ export async function collectAiDubbingCapabilities({ config } = {}) {
         languages: ["en", "fr", "ja"],
         ...(probe.components || {}),
         voiceLibrary: probe.voiceLibrary === 1 ? 1 : 0,
+        voiceModes: probe.voiceModes === 1 ? 1 : 0,
         voiceTranscription,
         // Le probe matériel ne remplace pas l'identité du profil utilisée par le primary.
         profile: {

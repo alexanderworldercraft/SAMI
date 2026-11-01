@@ -9,6 +9,7 @@ import {
   AI_DUBBING_STATUS,
 } from "./constants.js";
 import { assertAiDubbingConfig } from "./config.js";
+import { workerSupportsVoiceMode } from "./voiceMode.js";
 import {
   cleanupAiDubbingArtifacts,
   receiveAiDubbingArtifact,
@@ -89,6 +90,7 @@ export const serializeAiDubbingLease = (claim) => claim && ({
       separation: claim.job.SeparationModel,
       pipeline: claim.job.PipelineVersion,
       generationConfigHash: claim.job.GenerationConfigHash,
+      voiceMode: claim.job.VoiceMode || null,
     },
   },
   inputManifest: claim.job.InputManifest,
@@ -240,6 +242,7 @@ const workerIsOnline = (worker, now, config) => (
 
 export const aiDubbingWorkerMatchesJob = (worker, job) => (
   worker.PipelineVersion === job.PipelineVersion
+  && workerSupportsVoiceMode(worker, job.VoiceMode)
   && worker.Capabilities?.profile?.generationConfigHash === job.GenerationConfigHash
   && worker.Engine === job.VoiceEngine
   && worker.Model === job.VoiceModel

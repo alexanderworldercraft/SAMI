@@ -92,6 +92,27 @@ test("ajoute un original depuis la fiche personne sans générer de réplique", 
 });
 
 const adminVoices = (voice = item) => api.get.mockImplementation(url => Promise.resolve({ data: url === "/voices/config" ? { workerReady: true } : { items: [voice], admin: true, pages: 1 } }));
+test.each(["natural", "faithful"])("envoie le mode %s à la création d’une réplique", async mode => {
+  adminVoices({ ...item, kind: "ORIGINAL" });
+  api.post.mockResolvedValue({ data: {} });
+  render(<VoiceCollection personId="7" />);
+  fireEvent.click(await screen.findByRole("button", { name: "Utiliser comme référence" }));
+  expect(screen.getByLabelText("Mode vocal")).toHaveValue("faithful");
+  fireEvent.change(screen.getByLabelText("Mode vocal"), { target: { value: mode } });
+  fireEvent.click(screen.getByRole("button", { name: "Générer la réplique" }));
+  await waitFor(() => expect(api.post).toHaveBeenCalledWith("/voices/voice-1/replicas", expect.objectContaining({ voiceMode: mode })));
+});
+test("changer uniquement le mode vocal exige la confirmation de régénération", async () => {
+  adminVoices({ ...item, voiceMode: "natural" });
+  api.patch.mockResolvedValue({ data: {} });
+  render(<VoiceCollection personId="7" />);
+  fireEvent.click(await screen.findByRole("button", { name: "Modifier" }));
+  fireEvent.change(screen.getByLabelText("Mode vocal"), { target: { value: "faithful" } });
+  expect(screen.getByRole("checkbox")).not.toBeChecked();
+  fireEvent.click(screen.getByRole("checkbox"));
+  fireEvent.click(screen.getByRole("button", { name: "Enregistrer et régénérer" }));
+  await waitFor(() => expect(api.patch).toHaveBeenCalledWith("/voices/voice-1", expect.objectContaining({ voiceMode: "faithful", regenerate: true })));
+});
 test("modifier le texte IA exige une confirmation explicite de régénération", async () => {
   adminVoices(); api.patch.mockResolvedValue({ data: {} });
   render(<VoiceCollection />);

@@ -7,6 +7,7 @@ import { prisma } from "../db.js";
 import { resolveUploadPath, VIDEO_ROOT } from "../video/videoPaths.js";
 import { AI_DUBBING_STATUS } from "./constants.js";
 import { assertManualVoiceReferenceManifest } from "./manualReferences.js";
+import { assertVoiceMode } from "./voiceMode.js";
 
 const isInside = (root, candidate) => {
   const relative = path.relative(path.resolve(root), path.resolve(candidate));
@@ -41,6 +42,7 @@ const encodeAudioHls = ({ inputPath, outputDir }) => new Promise((resolve, rejec
 });
 
 const assertResultIdentity = (job, result) => {
+  assertVoiceMode(job.VoiceMode, result?.voiceMode);
   if (result?.watermarked !== true || !(Number(result.watermarkConfidence) >= 0.5)) {
     throw new Error("Le clone n'a pas confirmé un watermark Perth exploitable.");
   }
@@ -149,6 +151,7 @@ const copyPreviewProfile = async ({ job, result, files, beforeCommit = null }) =
   }
   const manifest = JSON.parse(await fs.promises.readFile(manifestArtifact.absolutePath, "utf8"));
   assertManualVoiceReferenceManifest(manifest, job.ManualVoiceReferences);
+  assertVoiceMode(job.VoiceMode, manifest.voiceMode);
   if (manifest.schemaVersion !== 2 || manifest.voiceEngine !== job.VoiceEngine) {
     throw new Error("Le profil vocal ne correspond pas au moteur attribué.");
   }

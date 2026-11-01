@@ -5,6 +5,7 @@ import api from "../../../services/api";
 import { useAiFeaturePreference } from "../../../context/AiFeaturePreferenceContext";
 import DubbingVideoSelect from "../../../components/DubbingVideoSelect";
 import { VOICE_PRESENTATION_TEXT } from "../../../constants/voicePresentation";
+import VoiceModeSelect, { voiceModeLabel } from "../../../components/VoiceModeSelect";
 
 const inputClass = "w-full rounded-xl border border-slate-300 bg-white p-3 text-sm text-slate-950 dark:border-slate-600 dark:bg-slate-950 dark:text-white";
 const buttonClass = "rounded-xl bg-sky-700 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-600 disabled:opacity-50";
@@ -74,18 +75,20 @@ function OriginalForm({ onSaved, personId }) {
 }
 
 function ReplicaForm({ original, onSaved, onClose }) {
+  const [voiceMode, setVoiceMode] = useState("faithful");
   const [title, setTitle] = useState(`Présentation IA · ${personName(original.person)}`.slice(0, 191));
   const [text, setText] = useState(VOICE_PRESENTATION_TEXT[original.language] || VOICE_PRESENTATION_TEXT.fr);
   const [language, setLanguage] = useState(original.language);
   const [busy, setBusy] = useState(false); const [error, setError] = useState("");
   return <form className={`${panelClass} grid gap-4`} onSubmit={async e => {
     e.preventDefault(); setBusy(true); setError("");
-    try { await api.post(`/voices/${original.id}/replicas`, { title, text, language }); onSaved(); }
+    try { await api.post(`/voices/${original.id}/replicas`, { title, text, language, voiceMode }); onSaved(); }
     catch (err) { setError(err.response?.data?.error || "Génération impossible."); }
     finally { setBusy(false); }
   }}>
     <h2 className="text-lg font-bold">Générer une réplique IA · {personName(original.person)}</h2>
     <p className="text-sm">Voix de référence : {original.title}. La réplique sera privée et pourra être écoutée avant publication.</p>
+    <VoiceModeSelect value={voiceMode} onChange={setVoiceMode} />
     <label className="grid gap-2 text-sm">Titre<input required maxLength={191} className={inputClass} value={title} onChange={e => setTitle(e.target.value)} /></label>
     <LanguageSelect value={language} onChange={next => {
       if (text === VOICE_PRESENTATION_TEXT[language]) setText(VOICE_PRESENTATION_TEXT[next]);
@@ -99,6 +102,7 @@ function ReplicaForm({ original, onSaved, onClose }) {
 }
 
 function EditVoiceForm({ item, onSaved, onClose }) {
+  const [voiceMode, setVoiceMode] = useState(item.voiceMode || "");
   const [title, setTitle] = useState(item.title);
   const [text, setText] = useState(item.text);
   const [language, setLanguage] = useState(item.language);
@@ -106,12 +110,13 @@ function EditVoiceForm({ item, onSaved, onClose }) {
   const [confirmed, setConfirmed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const regenerate = item.kind === "AI" && (text !== item.text || language !== item.language);
+  const regenerate = item.kind === "AI" && (text !== item.text || language !== item.language || voiceMode !== (item.voiceMode || ""));
   const authorizationChanged = item.kind === "ORIGINAL" && note !== item.authorizationNote;
   return <form aria-label="Modifier une voix" className={`${panelClass} grid gap-4`} onSubmit={async e => {
     e.preventDefault(); setBusy(true); setError("");
     try {
       const body = { title, text, language };
+      if (item.kind === "AI" && voiceMode) body.voiceMode = voiceMode;
       if (regenerate) body.regenerate = confirmed;
       if (authorizationChanged) Object.assign(body, { authorizationNote: note, authorized: confirmed });
       await api.patch(`/voices/${item.id}`, body); onSaved();
@@ -122,6 +127,7 @@ function EditVoiceForm({ item, onSaved, onClose }) {
     <p className="text-sm">{personName(item.person)} · {item.kind === "AI" ? "Réplique IA" : "Voix originale"}. La personne et le fichier original restent associés à cet enregistrement.</p>
     <label className="grid gap-2 text-sm">Titre<input required maxLength={191} className={inputClass} value={title} onChange={e => setTitle(e.target.value)} /></label>
     <LanguageSelect value={language} onChange={setLanguage} />
+    {item.kind === "AI" && <VoiceModeSelect value={voiceMode} onChange={setVoiceMode} allowLegacy={!item.voiceMode} />}
     <label className="grid gap-2 text-sm">{item.kind === "AI" ? "Texte à prononcer" : "Transcription exacte"}<textarea required={item.kind === "AI"} maxLength={item.kind === "AI" ? 500 : 1000} rows={4} className={inputClass} value={text} onChange={e => setText(e.target.value)} /></label>
     {item.kind === "ORIGINAL" && <p className="text-sm">Laissez la transcription vide pour demander sa reconnaissance automatique. Si vous effacez un texte existant, l’original repassera en privé et attendra la transcription.</p>}
     {item.kind === "ORIGINAL" && <label className="grid gap-2 text-sm">Justificatif d’autorisation<textarea required maxLength={2000} className={inputClass} value={note} onChange={e => setNote(e.target.value)} /></label>}
@@ -212,6 +218,7 @@ export function VoiceCollection({ personId, compact = false }) {
     <div className="grid gap-4 lg:grid-cols-2">{data?.items.map(item => <article key={item.id} className={`${panelClass} flex flex-col gap-3`}>
       <div className="flex flex-wrap items-center gap-2 text-xs font-bold"><span className={`rounded-full px-3 py-1 ${item.kind === "AI" ? "bg-violet-500/15 text-violet-700 dark:text-violet-300" : "bg-sky-500/15 text-sky-700 dark:text-sky-300"}`}>{item.kind === "AI" ? "IA · Voix synthétique" : "Original"}</span><span>{languageName(item.language)}</span>{data.admin && <span className="ml-auto text-slate-500 dark:text-slate-400">{item.public ? "Publié" : "Privé · admins"}</span>}</div>
       <div><h3 className="text-lg font-bold">{item.title}</h3><Link className="text-sm text-sky-700 hover:underline dark:text-sky-300" to={`/personnes/${item.personId}`}>{personName(item.person)}{item.kind === "AI" ? " · IA" : ""}</Link></div>
+      {item.kind === "AI" && <p className="text-xs text-slate-600 dark:text-slate-300">Mode vocal : {voiceModeLabel(item.voiceMode)}</p>}
       <p className="whitespace-pre-wrap break-words text-sm text-slate-600 dark:text-slate-300">{item.text}</p>
       {item.automaticTranscription && item.text && <p className="text-xs text-slate-500 dark:text-slate-400">Transcription initiale par IA · vérifiable et modifiable par un administrateur.</p>}
       {item.status === "READY" ? <audio aria-label={`${item.kind === "AI" ? "IA" : "Original"} : ${item.title}`} controls controlsList={data.admin ? undefined : "nodownload"} preload="none" crossOrigin="use-credentials" src={audioUrl(item.id)} className="mt-auto w-full" onContextMenu={data.admin ? undefined : e => e.preventDefault()} /> : <p role="status" className="text-sm">{item.kind === "ORIGINAL" ? ({ QUEUED: "Transcription automatique en attente", PROCESSING: "Transcription automatique en cours", FAILED: "Transcription automatique échouée" }[item.status] || statusNames[item.status]) : statusNames[item.status]}</p>}

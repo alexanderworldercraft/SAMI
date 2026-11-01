@@ -10,6 +10,7 @@ import { getAiDubbingConfig } from "./config.js";
 import { AI_DUBBING_STATUS } from "./constants.js";
 import { retainUntargetedVoiceSample } from "./resultService.js";
 import { assertManualVoiceReferenceManifest } from "./manualReferences.js";
+import { assertVoiceMode } from "./voiceMode.js";
 import { runAiDubbingCommand } from "./commandRunner.js";
 export { runAiDubbingCommand, terminateDubbingProcessTree } from "./commandRunner.js";
 
@@ -27,13 +28,14 @@ const sha256File = (filename) => {
   return hash.digest("hex");
 };
 
-const copyValidatedVoiceProfile = async ({ sourceRoot, destinationRoot, expectedChecksum, manualVoiceReferences }) => {
+const copyValidatedVoiceProfile = async ({ sourceRoot, destinationRoot, expectedChecksum, manualVoiceReferences, voiceMode }) => {
   const manifestSource = path.join(sourceRoot, "manifest.json");
   if (!fs.existsSync(manifestSource) || sha256File(manifestSource) !== String(expectedChecksum || "")) {
     throw new Error("Le manifeste du profil vocal généré est absent ou invalide.");
   }
   const manifest = JSON.parse(await fs.promises.readFile(manifestSource, "utf8"));
   assertManualVoiceReferenceManifest(manifest, manualVoiceReferences);
+  assertVoiceMode(voiceMode, manifest.voiceMode);
   if (manifest.schemaVersion !== 2 || !Object.keys(manifest.references || {}).length) {
     throw new Error("Le profil vocal généré ne contient aucune référence exploitable.");
   }
@@ -121,6 +123,7 @@ export const buildAiDubbingRuntimeInput = ({
     voiceProfilePath: preview && !regenerationTarget ? null : job.voiceProfileAbsolutePath,
     voiceProfileChecksum: preview && !regenerationTarget ? null : job.VoiceProfileChecksum,
     models: {
+      voiceMode: job.VoiceMode || null,
       voiceEngine: job.VoiceEngine,
       voiceModel: job.VoiceModel,
       voiceModelRevision: job.VoiceModelRevision,
@@ -221,6 +224,7 @@ async function processAiDubbingJob(jobId, { database = prisma, env = process.env
       },
     });
     const result = JSON.parse(await fs.promises.readFile(outputPath, "utf8"));
+    assertVoiceMode(initial.VoiceMode, result.voiceMode);
     const audioPath = path.resolve(String(result.audioPath || ""));
     if (!isInside(workspace, audioPath) || !fs.existsSync(audioPath)) {
       throw new Error("Le runtime de doublage n'a pas produit de fichier audio valide dans son espace de travail.");
@@ -269,6 +273,7 @@ async function processAiDubbingJob(jobId, { database = prisma, env = process.env
         destinationRoot: profileDir,
         expectedChecksum: result.voiceProfileChecksum,
         manualVoiceReferences: initial.ManualVoiceReferences,
+        voiceMode: initial.VoiceMode,
       });
       const generatedSamples = Array.isArray(result.voiceSamples) ? result.voiceSamples : [];
       const expectedSpeakers = new Set(voiceProfile.speakers || []);

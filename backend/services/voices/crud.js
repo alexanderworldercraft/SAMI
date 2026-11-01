@@ -1,11 +1,12 @@
 import fs from "fs";
 import path from "path";
 import { prisma } from "../db.js";
+import { normalizeVoiceMode } from "../aiDubbing/voiceMode.js";
 import { fail, languageField, serializeVoice, textField, voiceInclude, voicePath } from "./library.js";
 
 export async function updateVoice({ id, body, userId, database = prisma }) {
   if (!body || typeof body !== "object" || Array.isArray(body)) fail("Modification invalide.");
-  const allowed = ["title", "text", "language", "authorizationNote", "authorized", "regenerate"];
+  const allowed = ["title", "text", "language", "voiceMode", "authorizationNote", "authorized", "regenerate"];
   if (!Object.keys(body).length || Object.keys(body).some(key => !allowed.includes(key))) fail("Champ de modification non autorisé.");
   return database.$transaction(async tx => {
     const row = await tx.voiceAudio.findFirst({ where: { VoiceAudioID: id, Personne: { EtatID: 1 } } });
@@ -15,11 +16,22 @@ export async function updateVoice({ id, body, userId, database = prisma }) {
     if (body.title !== undefined) data.Title = textField(body.title, "Titre", 191);
     if (body.text !== undefined) data.Text = row.Kind === "ORIGINAL" && typeof body.text === "string" && !body.text.trim() ? "" : textField(body.text, row.Kind === "AI" ? "Texte à prononcer" : "Transcription originale", row.Kind === "AI" ? 500 : 1000);
     if (body.language !== undefined) data.Language = languageField(body.language);
-    const contentChanged = data.Text !== undefined && data.Text !== row.Text || data.Language !== undefined && data.Language !== row.Language;
+    let modeChanged = false;
+    if (body.voiceMode !== undefined) {
+      if (row.Kind !== "AI") fail("Le mode vocal concerne uniquement les répliques IA.");
+      const voiceMode = normalizeVoiceMode(body.voiceMode, row.Models?.voiceEngine);
+      modeChanged = voiceMode !== row.Models?.voiceMode;
+      if (modeChanged) data.Models = { ...row.Models, voiceMode };
+    }
+    const contentChanged = modeChanged || data.Text !== undefined && data.Text !== row.Text || data.Language !== undefined && data.Language !== row.Language;
     if (row.Kind === "AI") {
       if (body.authorizationNote !== undefined || body.authorized !== undefined) fail("L’autorisation d’une réplique provient de son original.");
       if (contentChanged) {
-        if (body.regenerate !== true) fail("Confirmez la nouvelle génération après modification du texte ou de la langue.", 409);
+        if (body.regenerate !== true) fail("Confirmez la nouvelle génération après modification du texte, de la langue ou du mode vocal.", 409);
+        if ((data.Models || row.Models)?.voiceMode === "faithful") {
+          const original = await tx.voiceAudio.findFirst({ where: { VoiceAudioID: row.OriginalID, Kind: "ORIGINAL", Status: "READY" } });
+          if (!original?.Text?.trim()) fail("Le mode fidèle exige la transcription exacte de l’original.");
+        }
         Object.assign(data, { Status: "QUEUED", IsPublic: false, PublishedAt: null, PublishedBy: null, Duration: null, Watermarked: false, ErrorMessage: null, LeaseToken: null, LeaseExpiresAt: null, AssignedWorkerID: null });
       }
     } else {

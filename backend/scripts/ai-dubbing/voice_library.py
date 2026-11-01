@@ -43,7 +43,8 @@ def process_voice(input_path, output_path, root, runtime):
     if runtime.digest(reference_path) != payload.get("referenceSha256"):
         raise ValueError("La référence originale a changé.")
     reference = {"path": reference_path, "text": payload.get("referenceText") or ""}
-    engine = runtime.load_voice_model(install, {"SPEAKER_00": reference})
+    voice_mode = runtime.validate_voice_mode(payload.get("models", {}).get("voiceMode"), str(install.get("voiceEngine") or "chatterbox").lower())
+    engine = runtime.load_voice_model(install, {"SPEAKER_00": reference}, voice_mode=voice_mode)
     quality_model = runtime.load_quality_model(install)
     raw = workspace / "raw.wav"
     cue = {"speaker": "SPEAKER_00", "text": text, "start": 0, "end": 180}
@@ -84,5 +85,6 @@ def process_voice(input_path, output_path, root, runtime):
     confidence = runtime.watermark_audio(raw, destination)
     runtime.write_json(output_path, {
         "audioPath": str(destination), "watermarked": True,
+        "voiceMode": voice_mode,
         "watermarkConfidence": confidence, "duration": duration,
     })
