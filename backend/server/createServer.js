@@ -35,6 +35,8 @@ import videoEncodingRoutes from "../routes/videoEncodingRoutes.js";
 import videoRoutes from "../routes/videoRoutes.js";
 import extensionAuthRoutes from "../routes/extensionAuthRoutes.js";
 import { registerSocialPreviewRoute } from "../routes/socialPreviewRoutes.js";
+import { registerPageSeoRoutes } from "../routes/pageSeoRoutes.js";
+import { createPageShellSender } from "../services/pageSeoService.js";
 import { socketAuthMiddleware } from "../middlewares/socketAuthMiddleware.js";
 import { globalRateLimit } from "../middlewares/rateLimitMiddleware.js";
 import {
@@ -116,7 +118,8 @@ function registerDocumentation(server, publicHost) {
 function registerStaticFiles(
   server,
   uploadsRootPath = uploadsRoot,
-  frontendBuildRootPath = frontendBuildRoot
+  frontendBuildRootPath = frontendBuildRoot,
+  sendPageShell
 ) {
   server.all("/uploads/BDD", async (_request, reply) =>
     reply.status(404).send({ error: "Not found" })
@@ -218,10 +221,15 @@ function registerStaticFiles(
   });
 
   server.setNotFoundHandler((request, reply) => {
-    if (request.raw.url?.startsWith("/api/")) {
+    reply.header("X-Robots-Tag", "noindex, nofollow");
+    const pathname = (request.raw.url || "/").split("?", 1)[0];
+    if (/^\/api(?:\/|$)/.test(pathname)) {
       return reply.status(404).send({ error: "Route API introuvable." });
     }
-    return reply.sendFile("index.html", frontendBuildRootPath);
+    if (!["GET", "HEAD"].includes(request.method) || /^\/(?:static|uploads)(?:\/|$)/.test(pathname) || /\/[^/]+\.[^/]+$/.test(pathname)) {
+      return reply.status(404).send({ error: "Fichier ou route introuvable." });
+    }
+    return sendPageShell(reply, pathname, 404);
   });
 }
 
@@ -280,6 +288,8 @@ export function createServer({
   for (const [routes, prefix] of ROUTES) {
     server.register(routes, { prefix });
   }
+  const sendPageShell = createPageShellSender({ frontendBuildRoot: frontendBuildRootPath, appName, publicUrl });
+  registerPageSeoRoutes(server, { sendPageShell, publicUrl });
   registerSocialPreviewRoute(server, {
     appName,
     frontendBuildRoot: frontendBuildRootPath,
@@ -290,8 +300,9 @@ export function createServer({
       ? { loadPersonMetadata: loadPersonSocialPreviewMetadata }
       : {}),
     publicUrl,
+    sendPageShell,
   });
-  registerStaticFiles(server, uploadsRootPath, frontendBuildRootPath);
+  registerStaticFiles(server, uploadsRootPath, frontendBuildRootPath, sendPageShell);
 
   return server;
 }

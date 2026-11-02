@@ -799,6 +799,7 @@ const VideoSeePage = ({ PlayerComponent = VideoPlayer }) => {
         <title>{pageMetadata.title}</title>
         <meta name="description" content={pageMetadata.description} />
         <meta name="application-name" content={pageMetadata.siteName} />
+        <meta name="robots" content="noindex, nofollow" />
         <link rel="canonical" href={pageMetadata.canonicalUrl} />
         <meta property="og:type" content={pageMetadata.openGraphType} />
         <meta property="og:locale" content="fr_FR" />

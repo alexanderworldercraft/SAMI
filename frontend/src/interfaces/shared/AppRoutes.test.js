@@ -21,14 +21,14 @@ jest.mock("../classic", () => ({ classicInterface: {
 const page = () => null;
 const Shell = ({ children }) => children;
 const definition = { Shell, pages: Object.fromEntries(APP_ROUTES.filter((route) => !route.admin).map((route) => [route.page, page])) };
-const routes = () => AppRoutes({ interfaceDefinition: definition }).props.children;
+const routes = () => AppRoutes({ interfaceDefinition: definition }).props.children.flat();
 const find = (path) => routes().find((route) => route.props.path === path).props.element;
 
 test("conserve les URL et ajoute la récupération de l'application, y compris les paramètres des fiches et du lecteur", () => {
   expect(routes().map((route) => route.props.path)).toEqual([
     "/login", "/register", "/recuperation-mot-de-passe", "/profile", "/settings", "/videos", "/sagas", "/musique", "/voix",
     "/personnes", "/personnes/:id", "/lecture/:id", "/administration", "/nouvelle-video", "/nouvelle-musique",
-    "/updates", "/stats", "/politique-confidentialite", "/conditions-utilisation", "/conformite-donnees", "/",
+    "/updates", "/stats", "/politique-confidentialite", "/conditions-utilisation", "/conformite-donnees", "/", "*",
   ]);
 });
 test("les URL publiques restent publiques et les URL utilisateur restent protégées", () => {
