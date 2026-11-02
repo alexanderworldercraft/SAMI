@@ -52,7 +52,7 @@ describe("GET /lecture/:id social preview", () => {
       appName: "Mon SAMI",
       publicUrl: "https://sami.example",
       publicHost: "sami.example",
-      loadSocialPreviewMetadata: vi.fn().mockResolvedValue(null),
+      loadSocialPreviewMetadata: vi.fn().mockResolvedValue({ type: "movie", video: { title: "Un film" } }),
     });
     await server.ready();
 
@@ -128,7 +128,7 @@ describe("GET /lecture/:id social preview", () => {
     expect(response.body).not.toContain("CheminAcces");
   });
 
-  it("retourne des métadonnées génériques si la base échoue", async () => {
+  it("signale une indisponibilité temporaire sans la confondre avec une page absente", async () => {
     const roots = await createStaticRoots();
     server = createServer({
       ...roots,
@@ -145,14 +145,14 @@ describe("GET /lecture/:id social preview", () => {
       headers: { host: "evil.example" },
     });
 
-    expect(response.statusCode).toBe(200);
-    expect(response.body).toContain(
-      '<meta data-rh="true" property="og:title" content="Mon SAMI" />'
-    );
+    expect(response.statusCode).toBe(503);
+    expect(response.headers["retry-after"]).toBe("30");
+    expect(response.headers["x-robots-tag"]).toBe("noindex, nofollow");
+    expect(response.body).toContain("Service temporairement indisponible");
     expect(response.body).toContain(
       '<meta data-rh="true" property="og:image" content="https://sami.example/logo512.png" />'
     );
-    expect(response.body).toContain("https://sami.example/lecture/99");
+    expect(response.body).not.toContain('rel="canonical"');
     expect(response.body).not.toContain("evil.example");
     expect(response.body).not.toContain("DB indisponible");
   });
@@ -174,11 +174,10 @@ describe("GET /lecture/:id social preview", () => {
       url: "/lecture/1e3",
     });
 
-    expect(response.statusCode).toBe(200);
+    expect(response.statusCode).toBe(404);
     expect(loadSocialPreviewMetadata).not.toHaveBeenCalled();
-    expect(response.body).toContain(
-      '<link data-rh="true" rel="canonical" href="https://sami.example/" />'
-    );
+    expect(response.body).toContain("Page introuvable");
+    expect(response.body).not.toContain('rel="canonical"');
   });
 });
 
@@ -225,7 +224,7 @@ describe("GET /personnes/:id social preview", () => {
     expect(response.body).not.toContain("Métadonnées génériques");
   });
 
-  it("n'interroge pas la base et revient sur l'annuaire pour un identifiant invalide", async () => {
+  it("n'interroge pas la base et répond 404 pour un identifiant invalide", async () => {
     const roots = await createStaticRoots();
     const loadPersonSocialPreviewMetadata = vi.fn();
     server = createServer({
@@ -242,11 +241,9 @@ describe("GET /personnes/:id social preview", () => {
       url: "/personnes/1e3",
     });
 
-    expect(response.statusCode).toBe(200);
+    expect(response.statusCode).toBe(404);
     expect(loadPersonSocialPreviewMetadata).not.toHaveBeenCalled();
-    expect(response.body).toContain(
-      '<link data-rh="true" rel="canonical" href="https://sami.example/personnes" />'
-    );
+    expect(response.body).not.toContain('rel="canonical"');
     expect(response.body).toContain(
       '<meta data-rh="true" property="og:image" content="https://sami.example/logo512.png" />'
     );

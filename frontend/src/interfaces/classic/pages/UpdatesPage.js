@@ -2,6 +2,34 @@ import React, { useEffect, useState } from "react";
 
 const updates = [
   {
+    "version": "8.7.1",
+    "title": "Référencement des pages publiques et liens introuvables",
+    "date": "2 novembre 2026",
+    "sections": [
+      {
+        "title": "Identifier les pages publiques",
+        "items": [
+          "L'accueil, les mises à jour et les pages légales disposent de titres, descriptions et liens de référence propres à chaque page, conservés pendant la navigation.",
+          "Un plan du site permet aux moteurs de découvrir uniquement ces cinq pages publiques. Les aperçus de partage restent disponibles sur les contenus qui en disposent."
+        ]
+      },
+      {
+        "title": "Préserver les espaces réservés",
+        "items": [
+          "Les pages de connexion et de récupération, les statistiques, les paramètres, l'administration et les contenus protégés sont explicitement exclus du référencement.",
+          "L'accès aux vidéos, musiques, personnes et voix conserve les protections du compte. L'inscription désactivée est décrite comme une page de connexion."
+        ]
+      },
+      {
+        "title": "Comprendre les liens indisponibles",
+        "items": [
+          "Une adresse inconnue ou un identifiant invalide affiche une page introuvable avec un lien de retour à l'accueil.",
+          "Une panne temporaire lors du chargement d'un aperçu est signalée comme une indisponibilité, sans présenter le contenu comme supprimé."
+        ]
+      }
+    ]
+  },
+  {
     "version": "8.7.0",
     "title": "Récupération sécurisée du compte et protection des sessions",
     "date": "26 octobre 2026",

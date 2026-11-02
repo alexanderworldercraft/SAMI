@@ -1,5 +1,6 @@
 import { ETAT } from "../constants.js";
 import { prisma } from "./db.js";
+import { parseContentId } from "../../frontend/src/seo/routePolicy.mjs";
 
 export const SOCIAL_META_START = '<meta name="sami-meta-start" content="" />';
 export const SOCIAL_META_END = '<meta name="sami-meta-end" content="" />';
@@ -10,14 +11,9 @@ const LEGACY_SOCIAL_META_END = "<!-- SAMI_META_END -->";
 const DEFAULT_APP_NAME = "SAMI";
 const DEFAULT_DESCRIPTION_MAX_LENGTH = 200;
 const FALLBACK_IMAGE_PATH = "/logo512.png";
-const MAX_PRISMA_INT = 2_147_483_647;
 
 export function parseLectureVideoId(value) {
-  const normalized = String(value ?? "").trim();
-  if (!/^[1-9][0-9]*$/.test(normalized)) return null;
-
-  const videoId = Number(normalized);
-  return Number.isSafeInteger(videoId) && videoId <= MAX_PRISMA_INT ? videoId : null;
+  return parseContentId(value);
 }
 
 export const parsePersonId = parseLectureVideoId;
@@ -331,27 +327,28 @@ export function renderSocialMetaBlock(meta) {
   const type = escapeHtml(meta.type);
   const imageUrl = escapeHtml(meta.imageUrl);
   const imageAlt = escapeHtml(meta.imageAlt);
-  const canonicalUrl = escapeHtml(meta.canonicalUrl);
+  const canonicalUrl = meta.canonicalUrl ? escapeHtml(meta.canonicalUrl) : null;
 
   return [
     SOCIAL_META_START,
     `  <title data-rh="true">${title}</title>`,
     `  <meta data-rh="true" name="application-name" content="${siteName}" />`,
     `  <meta data-rh="true" name="description" content="${description}" />`,
+    `  <meta data-rh="true" name="robots" content="${escapeHtml(meta.robots || "noindex, nofollow")}" />`,
     `  <meta data-rh="true" property="og:type" content="${type}" />`,
     `  <meta data-rh="true" property="og:site_name" content="${siteName}" />`,
     `  <meta data-rh="true" property="og:title" content="${title}" />`,
     `  <meta data-rh="true" property="og:description" content="${description}" />`,
     `  <meta data-rh="true" property="og:image" content="${imageUrl}" />`,
     `  <meta data-rh="true" property="og:image:alt" content="${imageAlt}" />`,
-    `  <meta data-rh="true" property="og:url" content="${canonicalUrl}" />`,
+    ...(canonicalUrl ? [`  <meta data-rh="true" property="og:url" content="${canonicalUrl}" />`] : []),
     '  <meta data-rh="true" property="og:locale" content="fr_FR" />',
     '  <meta data-rh="true" name="twitter:card" content="summary_large_image" />',
     `  <meta data-rh="true" name="twitter:title" content="${title}" />`,
     `  <meta data-rh="true" name="twitter:description" content="${description}" />`,
     `  <meta data-rh="true" name="twitter:image" content="${imageUrl}" />`,
     `  <meta data-rh="true" name="twitter:image:alt" content="${imageAlt}" />`,
-    `  <link data-rh="true" rel="canonical" href="${canonicalUrl}" />`,
+    ...(canonicalUrl ? [`  <link data-rh="true" rel="canonical" href="${canonicalUrl}" />`] : []),
     SOCIAL_META_END,
   ].join("\n");
 }

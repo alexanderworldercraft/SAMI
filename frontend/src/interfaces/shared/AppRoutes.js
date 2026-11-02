@@ -8,6 +8,7 @@ import FormNewVideoPage from "../../components/FormNewVideoPage";
 import FormNewMusicPage from "../../components/FormNewMusicPage";
 import { classicInterface } from "../classic";
 import { APP_ROUTES } from "./routeDefinitions";
+import NotFoundPage from "./NotFoundPage";
 
 const guards = {
   public: NotProtectedRoute,
@@ -35,6 +36,7 @@ export default function AppRoutes({ interfaceDefinition }) {
         );
         return <Route key={route.path} path={route.path} element={<Guard>{page}</Guard>} />;
       })}
+      <Route path="*" element={<NotFoundPage />} />
     </Routes>
   );
 }

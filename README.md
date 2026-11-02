@@ -2,7 +2,7 @@
 
 SAMI (**Système d’Archivage Multimédia Intégré**) est une médiathèque web privée permettant d’organiser, diffuser et suivre des films, séries et musiques depuis une seule interface.
 
-La version actuelle est la **8.7.0**. Elle repose sur un backend Fastify, une interface React, Prisma avec MySQL, un pipeline vidéo FFmpeg/HLS et Socket.IO pour le retour en temps réel des traitements.
+La version actuelle est la **8.7.1**. Elle repose sur un backend Fastify, une interface React, Prisma avec MySQL, un pipeline vidéo FFmpeg/HLS et Socket.IO pour le retour en temps réel des traitements.
 
 ## Fonctionnalités
 
@@ -39,7 +39,7 @@ La version actuelle est la **8.7.0**. Elle repose sur un backend Fastify, une in
 - [abonnements Premium factices](docs/premium-subscriptions.md) mensuels/annuels, temps acquis conservé à la résiliation, changements à l'échéance et renouvellement automatique configurable ;
 - espaces protégés pour les administrateurs et super administrateurs ;
 - gestion des vidéos, séries, genres, personnes, sagas, univers et musiques ;
-- annuaire et fiches publiques des personnes avec recherche du nom complet à 80 %, filmographie regroupée et aperçus de partage dédiés ;
+- annuaire et fiches des personnes pour les comptes autorisés, avec recherche du nom complet à 80 %, filmographie regroupée et aperçus de partage dédiés ;
 - édition des personnes avec photos, suppression réversible et corbeille réservée au super administrateur ;
 - association semi-automatique d’acteurs et réalisateurs à un film ou une série, avec création contrôlée et recherche des photos manquantes ;
 - plusieurs personnages par acteur et par film ou série, import par parenthèses, affichage sur les photos et édition depuis la filmographie par les administrateurs ;
@@ -98,6 +98,14 @@ Les URL, les droits d'accès, les services et les contextes restent communs.
 `data-interface-mode` indique le choix demandé ; `data-interface-rendered`
 indique le mode réellement affiché. Aucun changement de BDD pour cette étape.
 Voir [l'organisation et le contrat des interfaces](frontend/src/interfaces/README.md).
+
+## Nouveautés de la version 8.7.1
+
+- métadonnées propres à chaque page, cohérentes entre le HTML initial et React, avec conservation des URL canoniques et des aperçus sociaux ;
+- indexation limitée à l'accueil, aux mises à jour et aux trois pages légales ; comptes, statistiques et contenus protégés explicitement exclus ;
+- sitemap XML public limité à ces cinq pages et annoncé dans `robots.txt` ;
+- vraies pages 404 pour les liens absents et les identifiants invalides, réponse temporaire 503 pour une panne de chargement des aperçus ;
+- [procédure de déploiement et de validation du lot SEO A](docs/seo-lot-a.md).
 
 ## Nouveautés de la version 8.7.0
 
@@ -190,7 +198,7 @@ le déploiement. Les détails sont dans la section « Génériques proposés par
 
 Les consignes de déploiement, la migration et les limites sont détaillées dans [la documentation de la bibliothèque de voix](backend/docs/voice-library.md).
 
-L’historique complet des versions, de la 6.1.0 à la 8.7.0, est disponible dans l’application à l’adresse `/updates` et dans `frontend/src/interfaces/classic/pages/UpdatesPage.js`.
+L’historique complet des versions, de la 6.1.0 à la 8.7.1, est disponible dans l’application à l’adresse `/updates` et dans `frontend/src/interfaces/classic/pages/UpdatesPage.js`.
 
 ## Stack technique
 
@@ -1008,7 +1016,7 @@ cd ../backend
 npm start
 ```
 
-Fastify sert le build React depuis `frontend/build`, les médias depuis `/uploads/` et l’application React pour les routes inconnues. Les sauvegardes placées dans `backend/BDD` ne sont pas publiées par le serveur statique.
+Fastify sert le build React depuis `frontend/build`, les médias depuis `/uploads/` et les routes applicatives connues avec leurs métadonnées. Les adresses inconnues répondent 404 ; le sitemap est limité aux cinq pages publiques approuvées. Les sauvegardes placées dans `backend/BDD` ne sont pas publiées par le serveur statique.
 
 La documentation de l’API est accessible à l’adresse :
 

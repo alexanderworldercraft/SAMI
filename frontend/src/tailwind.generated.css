@@ -2023,6 +2023,10 @@
     place-items: center;
   }
 
+  .content-center {
+    align-content: center;
+  }
+
   .items-baseline {
     align-items: baseline;
   }
