@@ -109,6 +109,8 @@ const VideoListTendance = ({
                       <img
                         src={getImageUrl(item.CheminImage)}
                         alt={item.Titre}
+                        loading="lazy"
+                        decoding="async"
                         className="aspect-2/3 w-full object-cover transition duration-500 group-hover:scale-105"
                       />
 

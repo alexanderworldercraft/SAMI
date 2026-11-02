@@ -1,6 +1,6 @@
 {
   "name": "frontend",
-  "version": "8.7.1",
+  "version": "8.7.2",
   "private": true,
   "dependencies": {
     "@headlessui/react": "^2.2.4",
@@ -25,6 +25,7 @@
     "build:css": "tailwindcss -i ./src/tailwind.css -o ./src/tailwind.generated.css --optimize && node ./scripts/normalize-tailwind-css.js",
     "start": "concurrently \"tailwindcss -i ./src/tailwind.css -o ./src/tailwind.generated.css --optimize --watch\" \"react-scripts start\"",
     "build": "npm run build:css && react-scripts build",
+    "postbuild": "node scripts/precompress-assets.mjs",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
   },

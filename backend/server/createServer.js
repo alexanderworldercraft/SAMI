@@ -43,7 +43,7 @@ import {
   createCorsOriginValidator,
   securityHeadersMiddleware,
 } from "../middlewares/securityMiddleware.js";
-import { setStaticFileHeaders } from "../utils/staticHeaders.js";
+import { setFrontendAssetHeaders, setStaticFileHeaders } from "../utils/staticHeaders.js";
 import { VIDEO_TRANSFER_BLOCK_MARKER } from "../services/videoTransferConfig.js";
 import { parsePublicOrigins } from "./serverConfig.js";
 
@@ -210,6 +210,7 @@ function registerStaticFiles(
   server.register(fastifyStatic, {
     root: frontendBuildRootPath,
     prefix: "/",
+    preCompressed: true,
     wildcard: true,
     decorateReply: false,
   });
@@ -266,6 +267,7 @@ export function createServer({
 
   registerDocumentation(server, publicHost);
   server.addHook("onRequest", securityHeadersMiddleware);
+  server.addHook("onSend", setFrontendAssetHeaders);
   server.register(fastifyCors, {
     origin: createCorsOriginValidator(publicUrl),
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],

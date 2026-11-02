@@ -64,6 +64,8 @@ const GenreFeaturedVideoSection = ({
           <img
             src={getImageUrl(item.CheminImage)}
             alt={item.Titre}
+            loading="lazy"
+            decoding="async"
             className="absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-105"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/45 to-transparent" />
@@ -98,6 +100,8 @@ const GenreFeaturedVideoSection = ({
           <img
             src={getImageUrl(featured.CheminImage)}
             alt={featured.Titre}
+            loading="lazy"
+            decoding="async"
             className="absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-105"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent" />
@@ -159,6 +163,8 @@ const GenreFeaturedVideoSection = ({
                 <img
                   src={getImageUrl(standardVideos[4].CheminImage)}
                   alt={standardVideos[4].Titre}
+                  loading="lazy"
+                  decoding="async"
                   className="absolute inset-0 h-full w-full object-cover transition duration-500 group-hover:scale-105 xl:static xl:aspect-2/3"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/35 to-transparent" />

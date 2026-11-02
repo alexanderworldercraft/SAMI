@@ -2,7 +2,7 @@
 
 SAMI (**Système d’Archivage Multimédia Intégré**) est une médiathèque web privée permettant d’organiser, diffuser et suivre des films, séries et musiques depuis une seule interface.
 
-La version actuelle est la **8.7.1**. Elle repose sur un backend Fastify, une interface React, Prisma avec MySQL, un pipeline vidéo FFmpeg/HLS et Socket.IO pour le retour en temps réel des traitements.
+La version actuelle est la **8.7.2**. Elle repose sur un backend Fastify, une interface React, Prisma avec MySQL, un pipeline vidéo FFmpeg/HLS et Socket.IO pour le retour en temps réel des traitements.
 
 ## Fonctionnalités
 
@@ -98,6 +98,13 @@ Les URL, les droits d'accès, les services et les contextes restent communs.
 `data-interface-mode` indique le choix demandé ; `data-interface-rendered`
 indique le mode réellement affiché. Aucun changement de BDD pour cette étape.
 Voir [l'organisation et le contrat des interfaces](frontend/src/interfaces/README.md).
+
+## Nouveautés de la version 8.7.2
+
+- JS/CSS précompressés en Brotli et gzip après chaque build et négociés par Fastify, avec repli vers les originaux ;
+- cache long réservé aux assets publics dont l'URL porte une empreinte de contenu, sans l'appliquer au HTML, aux API ni aux médias protégés ;
+- affiches de genres et de tendances différées hors écran, bannière principale toujours chargée immédiatement ;
+- [procédure de déploiement et de validation du lot SEO B](docs/seo-lot-b.md).
 
 ## Nouveautés de la version 8.7.1
 
@@ -198,7 +205,7 @@ le déploiement. Les détails sont dans la section « Génériques proposés par
 
 Les consignes de déploiement, la migration et les limites sont détaillées dans [la documentation de la bibliothèque de voix](backend/docs/voice-library.md).
 
-L’historique complet des versions, de la 6.1.0 à la 8.7.1, est disponible dans l’application à l’adresse `/updates` et dans `frontend/src/interfaces/classic/pages/UpdatesPage.js`.
+L’historique complet des versions, de la 6.1.0 à la 8.7.2, est disponible dans l’application à l’adresse `/updates` et dans `frontend/src/interfaces/classic/pages/UpdatesPage.js`.
 
 ## Stack technique
 

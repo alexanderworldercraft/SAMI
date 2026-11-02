@@ -295,6 +295,9 @@ const HomePage = () => {
                 <img
                     src={heroBackgroundUrl}
                     alt=""
+                    loading="eager"
+                    fetchpriority="high"
+                    decoding="async"
                     className="absolute inset-0 h-full w-full object-cover"
                 />
                 <div className="absolute inset-0 bg-gradient-to-r from-slate-950 via-slate-950/65 to-slate-950/15" />

@@ -2,6 +2,27 @@ import React, { useEffect, useState } from "react";
 
 const updates = [
   {
+    "version": "8.7.2",
+    "title": "Chargement plus léger des pages et des affiches",
+    "date": "2 novembre 2026",
+    "sections": [
+      {
+        "title": "Réduire le volume transféré",
+        "items": [
+          "Les fichiers de l’interface sont disponibles en versions compressées adaptées au navigateur, avec conservation des fichiers originaux pour la compatibilité.",
+          "Les ressources dont l’adresse identifie une version précise peuvent être conservées plus longtemps en cache. Une mise à jour utilise de nouvelles adresses pour charger les nouveaux fichiers."
+        ]
+      },
+      {
+        "title": "Charger les affiches au bon moment",
+        "items": [
+          "Les affiches des sélections par genre et des tendances de l’accueil peuvent se charger à l’approche de l’écran, en conservant leur disposition et leurs textes alternatifs.",
+          "La bannière principale reste chargée immédiatement. Les pages de compte, les règles de référencement et les accès aux médias protégés conservent leur fonctionnement."
+        ]
+      }
+    ]
+  },
+  {
     "version": "8.7.1",
     "title": "Référencement des pages publiques et liens introuvables",
     "date": "2 novembre 2026",
