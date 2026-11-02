@@ -3,7 +3,7 @@ import crypto from "crypto";
 import fs from "fs";
 import path from "path";
 import { updateVoice, deleteVoice } from "../services/voices/crud.js";
-import { voicePath } from "../services/voices/library.js";
+import { voiceInclude, voicePath } from "../services/voices/library.js";
 let database, row;
 const directories = [];
 beforeEach(() => {
@@ -17,29 +17,34 @@ beforeEach(() => {
 afterEach(() => { for (const dir of directories.splice(0)) fs.rmSync(dir, { recursive: true, force: true }); });
 const update = body => updateVoice({ id: row.VoiceAudioID, body, userId: 7, database });
 describe("édition de voix", () => {
-  it("changer de mode exige une régénération et conserve les paramètres du modèle", async () => {
+  it("corrige le mode associé à une réplique sans régénérer ni changer le modèle", async () => {
     row.Models = { voiceMode: "faithful", voiceEngine: "qwen3-tts", pipeline: "historical-pipeline" };
-    await expect(update({ voiceMode: "natural" })).rejects.toMatchObject({ statusCode: 409 });
-    expect(await update({ voiceMode: "natural", regenerate: true })).toMatchObject({ voiceMode: "natural", status: "QUEUED", public: false });
-    expect(database.voiceAudio.update.mock.calls[0][0].data.Models).toEqual({ ...row.Models, voiceMode: "natural" });
+    expect(await update({ voiceMode: "natural" })).toMatchObject({ voiceMode: "natural", status: "READY", public: true, watermarked: true });
+    expect(database.voiceAudio.update.mock.calls[0][0].data).toEqual({ Models: { ...row.Models, voiceMode: "natural" } });
   });
   it("refuse le mode fidèle avec un moteur incompatible", async () => {
     row.Models = { voiceMode: "natural", voiceEngine: "chatterbox" };
-    await expect(update({ voiceMode: "faithful", regenerate: true })).rejects.toMatchObject({ statusCode: 409 });
+    await expect(update({ voiceMode: "faithful" })).rejects.toMatchObject({ statusCode: 409 });
     expect(database.voiceAudio.update).not.toHaveBeenCalled();
   });
   it("renomme une réplique sans altérer sa publication ni son audio", async () => {
     const result = await update({ title: "Nouveau titre" });
     expect(result).toMatchObject({ title: "Nouveau titre", public: true, status: "READY" });
-    expect(database.voiceAudio.update.mock.calls[0][0].data).toEqual({ Title: "Nouveau titre" });
+    expect(database.voiceAudio.update).toHaveBeenCalledWith({
+      where: { VoiceAudioID: row.VoiceAudioID },
+      data: { Title: "Nouveau titre" },
+      include: voiceInclude,
+    });
   });
-  it("exige une confirmation avant de régénérer et retire la publication", async () => {
-    await expect(update({ text: "Bonsoir" })).rejects.toMatchObject({ statusCode: 409 });
-    expect(database.voiceAudio.update).not.toHaveBeenCalled();
-    expect(await update({ text: "Bonsoir", regenerate: true })).toMatchObject({ text: "Bonsoir", status: "QUEUED", public: false, watermarked: false });
-    expect(database.voiceAudio.update.mock.calls[0][0].data).toMatchObject({ LeaseToken: null, AssignedWorkerID: null, Duration: null, PublishedAt: null });
+  it.each([["text", "Bonsoir", "Text"], ["language", "en", "Language"]])("corrige %s sans remplacer l’audio ni retirer sa publication", async (field, value, column) => {
+    const file = voicePath(row.VoiceAudioID);
+    directories.push(path.dirname(file)); fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, "audio conservé");
+    row.Duration = 12.5;
+    expect(await update({ [field]: value })).toMatchObject({ [field]: value, status: "READY", public: true, watermarked: true, duration: 12.5 });
+    expect(database.voiceAudio.update.mock.calls[0][0].data).toEqual({ [column]: value });
+    expect(fs.readFileSync(file, "utf8")).toBe("audio conservé");
   });
-  it.each([{ text: "x".repeat(501) }, { language: "xx" }, { personId: 3 }, { kind: "ORIGINAL" }, { public: true }, { authorizationNote: "autre" }])("refuse les données invalides ou les champs protégés : %j", async body => {
+  it.each([{ text: "x".repeat(501) }, { language: "xx" }, { personId: 3 }, { kind: "ORIGINAL" }, { public: true }, { authorizationNote: "autre" }, { text: "Bonsoir", regenerate: true }])("refuse les données invalides ou les champs protégés : %j", async body => {
     await expect(update(body)).rejects.toMatchObject({ statusCode: 400 });
     expect(database.voiceAudio.update).not.toHaveBeenCalled();
   });
@@ -51,9 +56,10 @@ describe("édition de voix", () => {
     await update({ authorizationNote: "Nouvel accord", authorized: true });
     expect(database.voiceAudio.update.mock.calls[0][0].data).toMatchObject({ AuthorizationNote: "Nouvel accord", AuthorizedBy: 7, AuthorizedAt: expect.any(Date) });
   });
-  it("effacer une transcription originale déclenche sa reconnaissance et retire la publication", async () => {
+  it("efface une transcription originale sans lancer de transcription ni retirer la publication", async () => {
     row.Kind = "ORIGINAL";
-    expect(await update({ text: "" })).toMatchObject({ text: "", status: "QUEUED", public: false, automaticTranscription: true });
+    expect(await update({ text: "" })).toMatchObject({ text: "", status: "READY", public: true, automaticTranscription: false });
+    expect(database.voiceAudio.update.mock.calls[0][0].data).toEqual({ Text: "" });
   });
   it("une transcription manuelle remplace une demande automatique en attente", async () => {
     row.Kind = "ORIGINAL"; row.Text = ""; row.Status = "QUEUED";

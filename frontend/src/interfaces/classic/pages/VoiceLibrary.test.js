@@ -102,27 +102,27 @@ test.each(["natural", "faithful"])("envoie le mode %s à la création d’une r�
   fireEvent.click(screen.getByRole("button", { name: "Générer la réplique" }));
   await waitFor(() => expect(api.post).toHaveBeenCalledWith("/voices/voice-1/replicas", expect.objectContaining({ voiceMode: mode })));
 });
-test("changer uniquement le mode vocal exige la confirmation de régénération", async () => {
+test("corrige le mode vocal sans demander de régénération", async () => {
   adminVoices({ ...item, voiceMode: "natural" });
   api.patch.mockResolvedValue({ data: {} });
   render(<VoiceCollection personId="7" />);
   fireEvent.click(await screen.findByRole("button", { name: "Modifier" }));
   fireEvent.change(screen.getByLabelText("Mode vocal"), { target: { value: "faithful" } });
-  expect(screen.getByRole("checkbox")).not.toBeChecked();
-  fireEvent.click(screen.getByRole("checkbox"));
-  fireEvent.click(screen.getByRole("button", { name: "Enregistrer et régénérer" }));
-  await waitFor(() => expect(api.patch).toHaveBeenCalledWith("/voices/voice-1", expect.objectContaining({ voiceMode: "faithful", regenerate: true })));
+  expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
+  await act(async () => fireEvent.click(screen.getByRole("button", { name: "Enregistrer" })));
+  expect(api.patch).toHaveBeenCalledWith("/voices/voice-1", { title: item.title, text: item.text, language: "fr", voiceMode: "faithful" });
 });
-test("modifier le texte IA exige une confirmation explicite de régénération", async () => {
+test("corrige les informations d’un audio IA sans demander de génération", async () => {
   adminVoices(); api.patch.mockResolvedValue({ data: {} });
   render(<VoiceCollection />);
   fireEvent.click(await screen.findByRole("button", { name: "Modifier" }));
-  fireEvent.change(screen.getByLabelText("Texte à prononcer"), { target: { value: "Bonsoir" } });
-  const checkbox = screen.getByRole("checkbox");
-  expect(checkbox).toBeRequired();
-  fireEvent.click(checkbox);
+  fireEvent.change(screen.getByLabelText("Titre"), { target: { value: "Titre corrigé" } });
+  fireEvent.change(screen.getByLabelText("Langue"), { target: { value: "en" } });
+  fireEvent.change(screen.getByLabelText("Texte de l’audio"), { target: { value: "Bonsoir" } });
+  expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
   await act(async () => fireEvent.submit(screen.getByRole("form", { name: "Modifier une voix" })));
-  expect(api.patch).toHaveBeenCalledWith("/voices/voice-1", { title: "Bonjour", text: "Bonsoir", language: "fr", regenerate: true });
+  expect(api.patch).toHaveBeenCalledWith("/voices/voice-1", { title: "Titre corrigé", text: "Bonsoir", language: "en" });
+  expect(api.post).not.toHaveBeenCalled();
 });
 test("supprimer demande confirmation et annuler ne fait aucun appel", async () => {
   adminVoices(); api.delete.mockResolvedValue({ data: { deleted: true } });

@@ -110,14 +110,12 @@ function EditVoiceForm({ item, onSaved, onClose }) {
   const [confirmed, setConfirmed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const regenerate = item.kind === "AI" && (text !== item.text || language !== item.language || voiceMode !== (item.voiceMode || ""));
   const authorizationChanged = item.kind === "ORIGINAL" && note !== item.authorizationNote;
   return <form aria-label="Modifier une voix" className={`${panelClass} grid gap-4`} onSubmit={async e => {
     e.preventDefault(); setBusy(true); setError("");
     try {
       const body = { title, text, language };
       if (item.kind === "AI" && voiceMode) body.voiceMode = voiceMode;
-      if (regenerate) body.regenerate = confirmed;
       if (authorizationChanged) Object.assign(body, { authorizationNote: note, authorized: confirmed });
       await api.patch(`/voices/${item.id}`, body); onSaved();
     } catch (err) { setError(err.response?.data?.error || "Modification impossible."); }
@@ -125,15 +123,16 @@ function EditVoiceForm({ item, onSaved, onClose }) {
   }}>
     <h2 className="text-lg font-bold">Modifier · {item.title}</h2>
     <p className="text-sm">{personName(item.person)} · {item.kind === "AI" ? "Réplique IA" : "Voix originale"}. La personne et le fichier original restent associés à cet enregistrement.</p>
+    <p className="text-sm text-slate-600 dark:text-slate-300">L’enregistrement corrige les informations de cet extrait et conserve son audio existant.</p>
     <label className="grid gap-2 text-sm">Titre<input required maxLength={191} className={inputClass} value={title} onChange={e => setTitle(e.target.value)} /></label>
     <LanguageSelect value={language} onChange={setLanguage} />
     {item.kind === "AI" && <VoiceModeSelect value={voiceMode} onChange={setVoiceMode} allowLegacy={!item.voiceMode} />}
-    <label className="grid gap-2 text-sm">{item.kind === "AI" ? "Texte à prononcer" : "Transcription exacte"}<textarea required={item.kind === "AI"} maxLength={item.kind === "AI" ? 500 : 1000} rows={4} className={inputClass} value={text} onChange={e => setText(e.target.value)} /></label>
-    {item.kind === "ORIGINAL" && <p className="text-sm">Laissez la transcription vide pour demander sa reconnaissance automatique. Si vous effacez un texte existant, l’original repassera en privé et attendra la transcription.</p>}
+    <label className="grid gap-2 text-sm">{item.kind === "AI" ? "Texte de l’audio" : "Transcription exacte"}<textarea required={item.kind === "AI"} maxLength={item.kind === "AI" ? 500 : 1000} rows={4} className={inputClass} value={text} onChange={e => setText(e.target.value)} /></label>
+    {item.kind === "ORIGINAL" && <p className="text-sm">Corrigez la transcription des paroles présentes dans l’enregistrement.</p>}
     {item.kind === "ORIGINAL" && <label className="grid gap-2 text-sm">Justificatif d’autorisation<textarea required maxLength={2000} className={inputClass} value={note} onChange={e => setNote(e.target.value)} /></label>}
-    {(regenerate || authorizationChanged) && <label className="flex items-start gap-3 text-sm"><input required type="checkbox" checked={confirmed} onChange={e => setConfirmed(e.target.checked)} />{regenerate ? "Je confirme la nouvelle génération. Cette réplique redeviendra privée et son audio sera remplacé après validation." : "Je confirme disposer de l’autorisation décrite pour utiliser cette voix."}</label>}
+    {authorizationChanged && <label className="flex items-start gap-3 text-sm"><input required type="checkbox" checked={confirmed} onChange={e => setConfirmed(e.target.checked)} />Je confirme disposer de l’autorisation décrite pour utiliser cette voix.</label>}
     {error && <p role="alert" className="text-red-600 dark:text-red-400">{error}</p>}
-    <div className="flex gap-3"><button className={buttonClass} disabled={busy}>{busy ? "Enregistrement…" : regenerate ? "Enregistrer et régénérer" : "Enregistrer"}</button><button type="button" disabled={busy} onClick={onClose}>Annuler</button></div>
+    <div className="flex gap-3"><button className={buttonClass} disabled={busy}>{busy ? "Enregistrement…" : "Enregistrer"}</button><button type="button" disabled={busy} onClick={onClose}>Annuler</button></div>
   </form>;
 }
 

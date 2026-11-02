@@ -1,6 +1,7 @@
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 import Fastify from "fastify";
 import multipart from "@fastify/multipart";
+import crypto from "crypto";
 import fs from "fs";
 import os from "os";
 import path from "path";
@@ -8,8 +9,9 @@ import { execFileSync } from "child_process";
 
 const db = vi.hoisted(() => ({
   utilisateur: { findUnique: vi.fn() }, userAiPreference: { findUnique: vi.fn() },
-  voiceAudio: { findMany: vi.fn(), findFirst: vi.fn(), count: vi.fn(), updateMany: vi.fn(), create: vi.fn() },
+  voiceAudio: { findMany: vi.fn(), findFirst: vi.fn(), count: vi.fn(), updateMany: vi.fn(), create: vi.fn(), update: vi.fn() },
   personne: { findFirst: vi.fn() },
+  $transaction: vi.fn(),
 }));
 vi.mock("../services/db.js", () => ({ prisma: db }));
 vi.mock("../middlewares/authMiddleware.js", () => ({ authMiddleware: async (req, reply) => {
@@ -30,6 +32,7 @@ beforeEach(() => {
   db.utilisateur.findUnique.mockResolvedValue({ GradeID: 3, EtatID: 1 });
   db.userAiPreference.findUnique.mockResolvedValue({ Accepted: true, DisclosureVersion: AI_DISCLOSURE_VERSION });
   db.voiceAudio.findMany.mockResolvedValue([]); db.voiceAudio.count.mockResolvedValue(0);
+  db.$transaction.mockImplementation(callback => callback(db));
 });
 describe("accès à la bibliothèque vocale", () => {
   it.each(["/voices", "/voices/123/audio", "/voices/123/download"])("refuse les visiteurs : %s", async url => {
@@ -91,6 +94,30 @@ describe("accès à la bibliothèque vocale", () => {
   });
 });
 describe("intégrité des originaux et des générations", () => {
+  it.each(["ORIGINAL", "AI"])("enregistre les informations d’un audio %s sans remplacer son fichier", async kind => {
+    db.utilisateur.findUnique.mockResolvedValue({ GradeID: 2, EtatID: 1 });
+    const id = crypto.randomUUID();
+    const row = { VoiceAudioID: id, Kind: kind, PersonneID: 4, Title: "Ancien titre", Text: "Ancien texte", Language: "fr", Status: "READY", IsPublic: true, Duration: 8.5, Watermarked: kind === "AI", Models: kind === "AI" ? { voiceEngine: "qwen3-tts", voiceMode: "natural" } : null };
+    db.voiceAudio.findFirst.mockResolvedValue(row);
+    db.voiceAudio.update.mockImplementation(async args => {
+      // Prisma rejects non-query arguments such as the former voicePath function.
+      expect(Object.keys(args).sort()).toEqual(["data", "include", "where"]);
+      expect(args.data).not.toHaveProperty("Status");
+      expect(args.data).not.toHaveProperty("IsPublic");
+      expect(args.data).not.toHaveProperty("Watermarked");
+      return { ...row, ...args.data };
+    });
+    const file = voicePath(id);
+    fs.mkdirSync(path.dirname(file), { recursive: true }); fs.writeFileSync(file, "audio existant");
+    try {
+      const payload = { title: "Titre corrigé", language: "en", text: "Texte corrigé", ...(kind === "AI" ? { voiceMode: "faithful" } : {}) };
+      const response = await app.inject({ method: "PATCH", url: `/voices/${id}`, headers: { "x-user": "7" }, payload });
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toMatchObject({ id, title: payload.title, text: payload.text, language: "en", status: "READY", public: true, duration: 8.5 });
+      expect(fs.readFileSync(file, "utf8")).toBe("audio existant");
+      expect(db.voiceAudio.updateMany).not.toHaveBeenCalled();
+    } finally { fs.rmSync(path.dirname(file), { recursive: true, force: true }); }
+  });
   it("importe un fichier, le conserve intact et sert l'écoute par plages et le téléchargement admin", async () => {
     db.utilisateur.findUnique.mockResolvedValue({ GradeID: 2, EtatID: 1 });
     db.personne.findFirst.mockResolvedValue({ PersonneID: 4 });
